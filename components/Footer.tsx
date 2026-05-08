@@ -24,7 +24,7 @@ export default function Footer() {
             <ul className="space-y-2 text-sm font-light">
               <li><Link href="/" className="hover:text-white transition">{t.footer.home}</Link></li>
               <li><Link href="/browse" className="hover:text-white transition">{t.footer.browse}</Link></li>
-              <li><Link href="/about" className="hover:text-white transition">{t.footer.aboutUs}</Link></li>
+              <li><Link href="/" className="hover:text-white transition">{t.footer.aboutUs}</Link></li>
             </ul>
           </div>
 

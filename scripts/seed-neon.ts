@@ -11,7 +11,7 @@ const neonDb = new PrismaClient({
     },
   },
 })
-
+                            
 async function safeInsert(label: string, fn: () => Promise<void>) {
   try {
     await fn()

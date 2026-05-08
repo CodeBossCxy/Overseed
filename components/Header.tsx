@@ -147,14 +147,6 @@ export default function Header() {
       ],
     },
     {
-      key: 'globalization',
-      label: t.nav.brandGlobalization,
-      items: [
-        { label: t.nav.aiAssistant, href: '/ai-assistant' },
-        { label: t.nav.growthServices, href: '/growth-services' },
-      ],
-    },
-    {
       key: 'pricing',
       label: t.nav.pricing,
       items: [
@@ -171,6 +163,12 @@ export default function Header() {
         { label: t.nav.creatorCommunity, href: '/community/creator' },
         { label: t.nav.brandCommunity, href: '/community/brand' },
       ],
+    },
+    {
+      key: 'globalization',
+      label: t.nav.brandAiAssistant,
+      href: '/ai-assistant',
+      items: [],
     },
   ]
 
@@ -194,7 +192,13 @@ export default function Header() {
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-6">
             {navMenus.map((menu) => (
-              <NavDropdown key={menu.key} label={menu.label} items={menu.items} isGlobal={isGlobal} />
+              menu.href ? (
+                <Link key={menu.key} href={menu.href} className={`transition text-sm font-medium ${isGlobal ? 'text-gray-200 hover:text-[#ff769f]' : 'text-gray-700 hover:text-primary-600'}`}>
+                  {menu.label}
+                </Link>
+              ) : (
+                <NavDropdown key={menu.key} label={menu.label} items={menu.items} isGlobal={isGlobal} />
+              )
             ))}
           </nav>
 
@@ -308,31 +312,42 @@ export default function Header() {
           <div className={`lg:hidden py-4 border-t ${isGlobal ? 'border-[#d4e0fd]/10' : ''}`}>
             <nav className="flex flex-col space-y-1">
               {navMenus.map((menu) => (
-                <div key={menu.key}>
-                  <button
-                    onClick={() => setMobileExpanded(mobileExpanded === menu.key ? null : menu.key)}
-                    className={`flex items-center justify-between w-full py-2 transition font-medium ${isGlobal ? 'text-gray-200 hover:text-[#ff769f]' : 'text-gray-700 hover:text-primary-600'}`}
+                menu.href ? (
+                  <Link
+                    key={menu.key}
+                    href={menu.href}
+                    className={`block py-2 transition font-medium ${isGlobal ? 'text-gray-200 hover:text-[#ff769f]' : 'text-gray-700 hover:text-primary-600'}`}
+                    onClick={() => setMobileMenuOpen(false)}
                   >
                     {menu.label}
-                    <svg className={`w-4 h-4 transition-transform ${mobileExpanded === menu.key ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  {mobileExpanded === menu.key && (
-                    <div className="pl-4 space-y-1">
-                      {menu.items.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={`block py-2 text-sm transition ${isGlobal ? 'text-gray-400 hover:text-[#ff769f]' : 'text-gray-600 hover:text-primary-600'}`}
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  </Link>
+                ) : (
+                  <div key={menu.key}>
+                    <button
+                      onClick={() => setMobileExpanded(mobileExpanded === menu.key ? null : menu.key)}
+                      className={`flex items-center justify-between w-full py-2 transition font-medium ${isGlobal ? 'text-gray-200 hover:text-[#ff769f]' : 'text-gray-700 hover:text-primary-600'}`}
+                    >
+                      {menu.label}
+                      <svg className={`w-4 h-4 transition-transform ${mobileExpanded === menu.key ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {mobileExpanded === menu.key && (
+                      <div className="pl-4 space-y-1">
+                        {menu.items.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={`block py-2 text-sm transition ${isGlobal ? 'text-gray-400 hover:text-[#ff769f]' : 'text-gray-600 hover:text-primary-600'}`}
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
               ))}
 
               <div className="border-t pt-3 mt-2 space-y-3">
