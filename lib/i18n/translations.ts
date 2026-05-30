@@ -279,7 +279,7 @@ export const translations = {
       terms: 'Terms of Service',
       privacy: 'Privacy Policy',
       contact: 'Contact Us',
-      copyright: '© 2026 Overseed. All rights reserved.',
+      copyright: '© 2026 NEWOFF LLC. All rights reserved.',
       tagline: 'Connecting brands with creators worldwide for authentic collaborations.',
     },
     auth: {
@@ -1428,7 +1428,7 @@ export const translations = {
       terms: '服务条款',
       privacy: '隐私政策',
       contact: '联系我们',
-      copyright: '© 2026 Overseed. 版权所有。',
+      copyright: '© 2026 NEWOFF LLC. 版权所有。',
       tagline: '连接全球品牌与创作者，打造真实的合作关系。',
     },
     auth: {

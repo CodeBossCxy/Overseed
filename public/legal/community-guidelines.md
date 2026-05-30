@@ -2,7 +2,7 @@
 
 **Effective Date:** April 1, 2026
 
-Welcome to Overseed! Our mission is to foster a transparent, professional, and creative ecosystem where brands and content creators can build meaningful cross-border partnerships. These Community Guidelines ("Guidelines") apply to all users, including brands, merchants, and content creators (collectively, "Users"), on the Overseed platform (the "Platform").
+Welcome to Overseed, operated by NEWOFF LLC! Our mission is to foster a transparent, professional, and creative ecosystem where brands and content creators can build meaningful cross-border partnerships. These Community Guidelines ("Guidelines") apply to all users, including brands, merchants, and content creators (collectively, "Users"), on the Overseed platform (the "Platform").
 
 By using Overseed, you agree to uphold these standards. These Guidelines complement our Terms of Service and Privacy Policy.
 

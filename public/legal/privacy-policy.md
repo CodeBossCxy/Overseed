@@ -2,7 +2,7 @@
 
 **Effective Date:** April 25, 2026
 
-This Privacy Policy explains how Overseed (hereinafter "Overseed," "we," or "the Platform") collects, uses, shares, and protects your personal information.
+This Privacy Policy explains how NEWOFF LLC, doing business as Overseed (hereinafter "Overseed," "we," or "the Platform"), collects, uses, shares, and protects your personal information.
 
 This Policy applies to the Overseed website, accounts, platform features, brief systems, in-platform messaging, AI tools, data analytics, and related services.
 

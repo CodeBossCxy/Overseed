@@ -2,7 +2,7 @@
 
 **Effective Date:** April 25, 2026
 
-Welcome to Overseed. These Terms of Service apply to your access and use of the website, platform, tools, and related services provided by Overseed (hereinafter "Overseed," "we," or "the Platform").
+Welcome to Overseed. These Terms of Service apply to your access and use of the website, platform, tools, and related services provided by NEWOFF LLC, doing business as Overseed (hereinafter "Overseed," "we," or "the Platform").
 
 By registering an account, accessing, or using Overseed services, you agree to these Terms. If you do not agree to these Terms, please do not use our services.
 

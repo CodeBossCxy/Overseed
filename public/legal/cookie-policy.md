@@ -2,7 +2,7 @@
 
 **Effective Date:** April 1, 2026
 
-At Overseed (overseed.net), we believe in being clear and open about how we collect and use data related to you. In the spirit of transparency, this policy provides detailed information about how and when we use cookies and similar technologies on our Platform.
+At NEWOFF LLC, doing business as Overseed (overseed.net), we believe in being clear and open about how we collect and use data related to you. In the spirit of transparency, this policy provides detailed information about how and when we use cookies and similar technologies on our Platform.
 
 ---
 
