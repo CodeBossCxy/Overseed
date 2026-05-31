@@ -7,7 +7,7 @@ const localDb = new PrismaClient({
 const neonDb = new PrismaClient({
   datasources: {
     db: {
-      url: 'postgresql://neondb_owner:npg_yXujgJFH04Uh@ep-bold-cake-aikj744w.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require',
+      url: process.env.NEON_DATABASE_URL!,
     },
   },
 })
