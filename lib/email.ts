@@ -1,6 +1,13 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+let resend: Resend
+
+function getResend() {
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY)
+  }
+  return resend
+}
 
 export async function sendOTPEmail(to: string, otp: string, locale: string = 'en') {
   const isZh = locale === 'zh'
@@ -17,7 +24,7 @@ export async function sendOTPEmail(to: string, otp: string, locale: string = 'en
     ? '此验证码将在10分钟后过期。如果您没有请求此验证码，请忽略此邮件。'
     : 'This code expires in 10 minutes. If you didn\'t request this, you can safely ignore this email.'
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: `Overseed <${process.env.EMAIL_FROM}>`,
     to,
     subject,
