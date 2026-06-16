@@ -1,14 +1,6 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 465,
-  secure: true,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-})
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function sendOTPEmail(to: string, otp: string, locale: string = 'en') {
   const isZh = locale === 'zh'
@@ -25,8 +17,8 @@ export async function sendOTPEmail(to: string, otp: string, locale: string = 'en
     ? '此验证码将在10分钟后过期。如果您没有请求此验证码，请忽略此邮件。'
     : 'This code expires in 10 minutes. If you didn\'t request this, you can safely ignore this email.'
 
-  await transporter.sendMail({
-    from: `"Overseed" <${process.env.EMAIL_FROM}>`,
+  await resend.emails.send({
+    from: `Overseed <${process.env.EMAIL_FROM}>`,
     to,
     subject,
     html: `

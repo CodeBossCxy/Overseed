@@ -136,8 +136,13 @@ export async function POST(request: Request) {
       },
     })
 
-    // Send OTP email
-    await sendOTPEmail(email.toLowerCase(), otp, locale || 'en')
+    // Send OTP email (non-blocking — don't fail signup if email fails)
+    try {
+      await sendOTPEmail(email.toLowerCase(), otp, locale || 'en')
+    } catch (emailError) {
+      console.error('Failed to send OTP email:', emailError)
+      // User is created, they can use "Resend OTP" on the verification screen
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
