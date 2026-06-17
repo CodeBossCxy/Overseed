@@ -82,8 +82,19 @@ export async function GET(
       targetLanguage
     )
 
+    // Also translate nested brand profile description
+    let translatedBrand = translatedCampaign.brand
+    if (translatedCampaign.brand?.description) {
+      translatedBrand = await getTranslatedEntity(
+        'BrandProfile',
+        { ...translatedCampaign.brand, id: translatedCampaign.brand.id },
+        targetLanguage
+      )
+    }
+
     return NextResponse.json({
       ...translatedCampaign,
+      brand: translatedBrand,
       _meta: { language: targetLanguage },
     })
   } catch (error) {

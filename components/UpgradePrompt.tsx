@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface UpgradePromptProps {
   feature: 'apply' | 'social-accounts'
@@ -8,18 +9,20 @@ interface UpgradePromptProps {
   description?: string
 }
 
-const defaultContent = {
-  apply: {
-    title: 'Pro Feature: Apply to Campaigns',
-    description: 'Upgrade to a Pro account to apply to campaigns and start collaborating with brands.',
-  },
-  'social-accounts': {
-    title: 'Pro Feature: Link Social Accounts',
-    description: 'Upgrade to a Pro account to link your social media accounts and showcase your reach to brands.',
-  },
-}
-
 export default function UpgradePrompt({ feature, title, description }: UpgradePromptProps) {
+  const { t } = useLanguage()
+
+  const defaultContent = {
+    apply: {
+      title: t.upgrade?.applyCampaignsTitle || 'Pro Feature: Apply to Campaigns',
+      description: t.upgrade?.applyCampaignsDesc || 'Upgrade to a Pro account to apply to campaigns and start collaborating with brands.',
+    },
+    'social-accounts': {
+      title: t.upgrade?.linkAccountsTitle || 'Pro Feature: Link Social Accounts',
+      description: t.upgrade?.linkAccountsDesc || 'Upgrade to a Pro account to link your social media accounts and showcase your reach to brands.',
+    },
+  }
+
   const content = defaultContent[feature]
 
   return (
@@ -37,7 +40,7 @@ export default function UpgradePrompt({ feature, title, description }: UpgradePr
         href="/dashboard/upgrade"
         className="inline-block px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:from-amber-600 hover:to-orange-600 transition font-medium shadow-md"
       >
-        Upgrade to Pro
+        {t.upgrade?.upgradeToPro || 'Upgrade to Pro'}
       </Link>
     </div>
   )

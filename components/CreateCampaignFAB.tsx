@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { useViewMode } from '@/lib/hooks/useViewMode'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function CreateCampaignFAB() {
   const { data: session } = useSession()
   const { isBrand } = useViewMode()
+  const { t } = useLanguage()
 
   if (!session || !isBrand) return null
 
@@ -22,7 +24,7 @@ export default function CreateCampaignFAB() {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
       </svg>
       <span className="absolute right-16 bg-gray-900 text-white text-sm px-3 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none">
-        Create Campaign
+        {t.nav?.createCampaign || 'Create Campaign'}
       </span>
     </Link>
   )

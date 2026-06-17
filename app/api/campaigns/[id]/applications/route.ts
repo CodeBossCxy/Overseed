@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTranslatedEntities } from '@/lib/translation-service'
+import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
 
 // GET: View all applications for a campaign (brand only)
 export async function GET(
@@ -73,7 +75,16 @@ export async function GET(
       },
     })
 
-    return NextResponse.json(applications)
+    // Translate pitch messages if language specified
+    const lang = searchParams.get('lang') || 'en'
+    const targetLanguage: SupportedLanguage = isSupportedLanguage(lang) ? lang : 'en'
+    const translatedApplications = await getTranslatedEntities(
+      'Application',
+      applications,
+      targetLanguage
+    )
+
+    return NextResponse.json(translatedApplications)
   } catch (error) {
     console.error('Error fetching applications:', error)
     return NextResponse.json(

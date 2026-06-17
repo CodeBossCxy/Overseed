@@ -74,23 +74,22 @@ export default function CampaignApplicationsPage() {
 
   useEffect(() => {
     fetchData()
-  }, [campaignId, filter])
+  }, [campaignId, filter, locale])
 
   const fetchData = async () => {
     setIsLoading(true)
     try {
       // Fetch campaign details
-      const campaignRes = await fetch(`/api/campaigns/${campaignId}`)
+      const campaignRes = await fetch(`/api/campaigns/${campaignId}?lang=${locale}`)
       if (campaignRes.ok) {
         const campaignData = await campaignRes.json()
         setCampaign(campaignData)
       }
 
       // Fetch applications
-      const url = filter
-        ? `/api/campaigns/${campaignId}/applications?status=${filter}`
-        : `/api/campaigns/${campaignId}/applications`
-      const response = await fetch(url)
+      const params = new URLSearchParams({ lang: locale })
+      if (filter) params.set('status', filter)
+      const response = await fetch(`/api/campaigns/${campaignId}/applications?${params}`)
       if (response.ok) {
         const data = await response.json()
         setApplications(data)

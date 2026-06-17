@@ -64,6 +64,7 @@ function NavDropdown({ label, items, isGlobal }: { label: string; items: Dropdow
 function MessageBadge({ isGlobal }: { isGlobal?: boolean }) {
   const [unread, setUnread] = useState(0)
   const { data: session } = useSession()
+  const { t } = useLanguage()
   const badgeUserId = (session?.user as any)?.id
 
   useEffect(() => {
@@ -106,7 +107,7 @@ function MessageBadge({ isGlobal }: { isGlobal?: boolean }) {
     <Link
       href="/dashboard/messages"
       className={`relative p-2 rounded-md transition ${isGlobal ? 'text-gray-200 hover:text-[#ff769f] hover:bg-[#456fa3]/15' : 'text-gray-600 hover:text-primary-600 hover:bg-gray-100'}`}
-      title="Messages"
+      title={t.messages?.title}
     >
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -186,7 +187,7 @@ export default function Header() {
             ) : (
               <img src={themeMode === 'brand' ? "/blue_overseed.png" : "/pink_overseed.png"} alt="Overseed" className="h-28 -my-4 translate-y-[2px] w-auto object-contain" />
             )}
-            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-400 text-amber-900 rounded uppercase tracking-wider">Beta</span>
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-400 text-amber-900 rounded uppercase tracking-wider">{t.nav.beta}</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -208,7 +209,7 @@ export default function Header() {
             <button
               onClick={toggleLanguage}
               className={`p-2 rounded-md transition ${isGlobal ? 'text-gray-200 hover:text-[#ff769f] hover:bg-[#456fa3]/15' : 'text-gray-600 hover:text-primary-600 hover:bg-gray-100'}`}
-              title={locale === 'en' ? '切换中文' : 'Switch to English'}
+              title={t.nav.switchLanguage}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
@@ -245,7 +246,7 @@ export default function Header() {
                   <Link
                     href="/admin"
                     className={`p-2 rounded-md transition ${isGlobal ? 'text-gray-200 hover:text-[#ff769f] hover:bg-[#456fa3]/15' : 'text-gray-600 hover:text-primary-600 hover:bg-gray-100'}`}
-                    title="Admin"
+                    title={t.nav.admin}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -293,7 +294,7 @@ export default function Header() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={`lg:hidden p-2 rounded-md ${isGlobal ? 'hover:bg-[#456fa3]/15 text-gray-200' : 'hover:bg-gray-100'}`}
-              aria-label="Toggle menu"
+              aria-label={t.nav.toggleMenu}
               aria-expanded={mobileMenuOpen}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,7 +390,7 @@ export default function Header() {
                         className="block text-gray-700 hover:text-primary-600 transition"
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        Admin
+                        {t.nav.admin}
                       </Link>
                     )}
                     <Link

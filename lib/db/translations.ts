@@ -22,9 +22,10 @@ export const DEFAULT_LANGUAGE: SupportedLanguage = 'en'
  * Update this when adding new translatable fields.
  */
 export const TRANSLATABLE_FIELDS = {
-  Campaign: ['title', 'description', 'contentGuidelines'],
+  Campaign: ['title', 'description', 'contentGuidelines', 'giftDescription'],
   InfluencerProfile: ['bio'],
   BrandProfile: ['description'],
+  Application: ['pitchMessage'],
 } as const
 
 export type TranslatableEntity = keyof typeof TRANSLATABLE_FIELDS

@@ -13,7 +13,7 @@ interface LegalPageProps {
 }
 
 export default function LegalPage({ enPath, zhPath, fallbackTitle }: LegalPageProps) {
-  const { locale } = useLanguage()
+  const { locale, t } = useLanguage()
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -38,7 +38,7 @@ export default function LegalPage({ enPath, zhPath, fallbackTitle }: LegalPagePr
 
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           {loading ? (
-            <div className="text-center text-white/60 py-20">{locale === 'zh' ? '加载中...' : 'Loading...'}</div>
+            <div className="text-center text-white/60 py-20">{t.common?.loading || 'Loading...'}</div>
           ) : (
             <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-8 md:p-12">
               <ReactMarkdown

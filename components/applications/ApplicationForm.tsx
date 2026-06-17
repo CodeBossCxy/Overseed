@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface SocialAccount {
   id: string
@@ -26,6 +27,7 @@ export default function ApplicationForm({
   isNegotiable,
 }: ApplicationFormProps) {
   const router = useRouter()
+  const { t } = useLanguage()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -72,11 +74,11 @@ export default function ApplicationForm({
     return (
       <div className="text-center py-12">
         <div className="text-6xl mb-4">🎉</div>
-        <h2 className="text-2xl font-bold text-green-600 mb-2">Application Submitted!</h2>
+        <h2 className="text-2xl font-bold text-green-600 mb-2">{t.applicationForm?.submitted || 'Application Submitted!'}</h2>
         <p className="text-gray-600 mb-4">
-          Your application for "{campaignTitle}" has been sent to the brand.
+          {(t.applicationForm?.submittedMessage || 'Your application for "{title}" has been sent to the brand.').replace('{title}', campaignTitle)}
         </p>
-        <p className="text-sm text-gray-500">Redirecting to your applications...</p>
+        <p className="text-sm text-gray-500">{t.applicationForm?.redirecting || 'Redirecting to your applications...'}</p>
       </div>
     )
   }
@@ -93,7 +95,7 @@ export default function ApplicationForm({
       {socialAccounts.length > 0 && (
         <div>
           <label className="block text-sm font-medium mb-2">
-            Select Social Account for This Campaign
+            {t.applicationForm?.selectAccount || 'Select Social Account for This Campaign'}
           </label>
           <div className="space-y-2">
             {socialAccounts.map((account) => (
@@ -127,7 +129,7 @@ export default function ApplicationForm({
             <p className="text-sm text-gray-500 mt-2">
               No social accounts linked.{' '}
               <a href="/dashboard/influencer/accounts" className="text-primary-600 hover:underline">
-                Add one first
+                {t.applicationForm?.addAccountFirst || 'Add one first'}
               </a>
             </p>
           )}
@@ -137,17 +139,17 @@ export default function ApplicationForm({
       {/* Pitch Message */}
       <div>
         <label className="block text-sm font-medium mb-2">
-          Why are you a good fit for this campaign?
+          {t.applicationForm?.pitchLabel || 'Why are you a good fit for this campaign?'}
         </label>
         <textarea
           rows={6}
           value={formData.pitchMessage}
           onChange={(e) => setFormData({ ...formData, pitchMessage: e.target.value })}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          placeholder="Tell the brand about yourself, your audience, and why you'd be perfect for this campaign..."
+          placeholder={t.applicationForm?.pitchPlaceholder || "Tell the brand about yourself, your audience, and why you'd be perfect for this campaign..."}
         />
         <p className="text-xs text-gray-500 mt-1">
-          A compelling pitch increases your chances of being selected
+          {t.applicationForm?.pitchHint || 'A compelling pitch increases your chances of being selected'}
         </p>
       </div>
 

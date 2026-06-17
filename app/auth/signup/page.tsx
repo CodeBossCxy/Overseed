@@ -85,7 +85,7 @@ export default function SignUpPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Something went wrong')
+        setError(data.error || t.errors?.somethingWrong)
         return
       }
 
@@ -103,11 +103,11 @@ export default function SignUpPage() {
     setError('')
 
     if (!businessLegalName.trim()) {
-      setError('Business / Company name is required')
+      setError(t.signupBusiness?.legalNameRequired || 'Business / Company name is required')
       return
     }
     if (!businessCountry.trim()) {
-      setError('Country of registration is required')
+      setError(t.signupBusiness?.countryRequired || 'Country of registration is required')
       return
     }
 
@@ -207,7 +207,7 @@ export default function SignUpPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to resend code')
+        setError(data.error || t.errors?.failedToResend)
         return
       }
 
@@ -238,7 +238,7 @@ export default function SignUpPage() {
       }
       return true
     } catch {
-      setError('Failed to validate invite code')
+      setError(t.errors?.failedToValidate || 'Failed to validate invite code')
       return false
     }
   }
@@ -268,7 +268,7 @@ export default function SignUpPage() {
           <img src="/pink_logo_with_txt.png" alt="Overseed" className="h-20 w-auto" />
         </Link>
         <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-          {step === 'otp' ? t.auth.otp.title : step === 'business-info' ? 'Business Verification' : t.auth.signup.title}
+          {step === 'otp' ? t.auth.otp.title : step === 'business-info' ? (t.signupBusiness?.verificationTitle || 'Business Verification') : t.auth.signup.title}
         </h2>
         {step === 'otp' ? (
           <p className="mt-2 text-center text-sm text-gray-600">
@@ -300,7 +300,7 @@ export default function SignUpPage() {
             /* ===== BUSINESS INFO STEP (brand only) ===== */
             <div>
               <p className="text-sm text-gray-600 mb-4">
-                To verify your brand, please provide your business details. Your account will be reviewed before you can create campaigns or message creators.
+                {t.signupBusiness?.verificationDesc || 'To verify your brand, please provide your business details. Your account will be reviewed before you can create campaigns or message creators.'}
               </p>
 
               {error && (
@@ -312,7 +312,7 @@ export default function SignUpPage() {
               <form onSubmit={handleBusinessInfoSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="businessLegalName" className="block text-sm font-medium text-gray-700">
-                    Business / Company Name <span className="text-red-500">*</span>
+                    {t.signupBusiness?.legalName || 'Business / Company Name'} <span className="text-red-500">*</span>
                   </label>
                   <input
                     id="businessLegalName"
@@ -321,13 +321,13 @@ export default function SignUpPage() {
                     onChange={(e) => setBusinessLegalName(e.target.value)}
                     required
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="Acme Inc."
+                    placeholder={t.signupBusiness?.legalNamePlaceholder || "Acme Inc."}
                   />
                 </div>
 
                 <div>
                   <label htmlFor="businessRegistrationNo" className="block text-sm font-medium text-gray-700">
-                    Business Registration Number
+                    {t.signupBusiness?.registrationNo || 'Business Registration Number'}
                   </label>
                   <input
                     id="businessRegistrationNo"
@@ -335,13 +335,13 @@ export default function SignUpPage() {
                     value={businessRegistrationNo}
                     onChange={(e) => setBusinessRegistrationNo(e.target.value)}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="e.g. 12345678"
+                    placeholder={t.signupBusiness?.registrationNoPlaceholder || "e.g. 12345678"}
                   />
                 </div>
 
                 <div>
                   <label htmlFor="businessCountry" className="block text-sm font-medium text-gray-700">
-                    Country of Registration <span className="text-red-500">*</span>
+                    {t.signupBusiness?.country || 'Country of Registration'} <span className="text-red-500">*</span>
                   </label>
                   <select
                     id="businessCountry"
@@ -350,33 +350,33 @@ export default function SignUpPage() {
                     required
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                   >
-                    <option value="">Select a country</option>
-                    <option value="US">United States</option>
-                    <option value="GB">United Kingdom</option>
-                    <option value="CA">Canada</option>
-                    <option value="AU">Australia</option>
-                    <option value="CN">China</option>
-                    <option value="JP">Japan</option>
-                    <option value="KR">South Korea</option>
-                    <option value="SG">Singapore</option>
-                    <option value="DE">Germany</option>
-                    <option value="FR">France</option>
-                    <option value="NL">Netherlands</option>
-                    <option value="SE">Sweden</option>
-                    <option value="BR">Brazil</option>
-                    <option value="MX">Mexico</option>
-                    <option value="IN">India</option>
-                    <option value="AE">United Arab Emirates</option>
-                    <option value="NZ">New Zealand</option>
-                    <option value="IT">Italy</option>
-                    <option value="ES">Spain</option>
-                    <option value="OTHER">Other</option>
+                    <option value="">{t.signupBusiness?.selectCountry || 'Select a country'}</option>
+                    <option value="US">{t.signupBusiness?.countries?.us || 'United States'}</option>
+                    <option value="GB">{t.signupBusiness?.countries?.uk || 'United Kingdom'}</option>
+                    <option value="CA">{t.signupBusiness?.countries?.ca || 'Canada'}</option>
+                    <option value="AU">{t.signupBusiness?.countries?.au || 'Australia'}</option>
+                    <option value="CN">{t.signupBusiness?.countries?.cn || 'China'}</option>
+                    <option value="JP">{t.signupBusiness?.countries?.jp || 'Japan'}</option>
+                    <option value="KR">{t.signupBusiness?.countries?.kr || 'South Korea'}</option>
+                    <option value="SG">{t.signupBusiness?.countries?.sg || 'Singapore'}</option>
+                    <option value="DE">{t.signupBusiness?.countries?.de || 'Germany'}</option>
+                    <option value="FR">{t.signupBusiness?.countries?.fr || 'France'}</option>
+                    <option value="NL">{t.signupBusiness?.countries?.nl || 'Netherlands'}</option>
+                    <option value="SE">{t.signupBusiness?.countries?.se || 'Sweden'}</option>
+                    <option value="BR">{t.signupBusiness?.countries?.br || 'Brazil'}</option>
+                    <option value="MX">{t.signupBusiness?.countries?.mx || 'Mexico'}</option>
+                    <option value="IN">{t.signupBusiness?.countries?.in || 'India'}</option>
+                    <option value="AE">{t.signupBusiness?.countries?.ae || 'United Arab Emirates'}</option>
+                    <option value="NZ">{t.signupBusiness?.countries?.nz || 'New Zealand'}</option>
+                    <option value="IT">{t.signupBusiness?.countries?.it || 'Italy'}</option>
+                    <option value="ES">{t.signupBusiness?.countries?.es || 'Spain'}</option>
+                    <option value="OTHER">{t.signupBusiness?.countries?.other || 'Other'}</option>
                   </select>
                 </div>
 
                 <div>
                   <label htmlFor="businessWebsite" className="block text-sm font-medium text-gray-700">
-                    Business Website
+                    {t.signupBusiness?.website || 'Business Website'}
                   </label>
                   <input
                     id="businessWebsite"
@@ -384,13 +384,13 @@ export default function SignUpPage() {
                     value={businessWebsite}
                     onChange={(e) => setBusinessWebsite(e.target.value)}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="https://example.com"
+                    placeholder={t.signupBusiness?.websitePlaceholder || "https://example.com"}
                   />
                 </div>
 
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
                   <p className="text-xs text-blue-700">
-                    You can upload supporting documents (business license, registration certificate) after signing in from your brand profile page.
+                    {t.signupBusiness?.documentsHint || 'You can upload supporting documents (business license, registration certificate) after signing in from your brand profile page.'}
                   </p>
                 </div>
 
@@ -399,7 +399,7 @@ export default function SignUpPage() {
                   disabled={isLoading}
                   className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
-                  {isLoading ? 'Creating account...' : 'Submit & Create Account'}
+                  {isLoading ? (t.signupBusiness?.submitting || 'Creating account...') : (t.signupBusiness?.submitButton || 'Submit & Create Account')}
                 </button>
               </form>
 
@@ -408,7 +408,7 @@ export default function SignUpPage() {
                   onClick={() => { setStep('form'); setError('') }}
                   className="text-sm text-gray-500 hover:text-gray-700"
                 >
-                  Back
+                  {t.signupBusiness?.back || 'Back'}
                 </button>
               </div>
             </div>
