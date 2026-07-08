@@ -4,7 +4,15 @@ import CreateCampaignFAB from './CreateCampaignFAB'
 import BetaBanner from './BetaBanner'
 import BetaFeedbackWidget from './BetaFeedbackWidget'
 
-export default function MainLayout({ children, noFooter }: { children: React.ReactNode; noFooter?: boolean }) {
+export default function MainLayout({
+  children,
+  noFooter,
+  hideFooter,
+}: {
+  children: React.ReactNode
+  noFooter?: boolean
+  hideFooter?: boolean
+}) {
   return (
     <div className={`flex flex-col ${noFooter ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       <BetaBanner />
@@ -12,7 +20,7 @@ export default function MainLayout({ children, noFooter }: { children: React.Rea
       <main className={noFooter ? 'flex-1 overflow-hidden' : 'flex-grow'}>
         {children}
       </main>
-      {!noFooter && <Footer />}
+      {!noFooter && !hideFooter && <Footer />}
       <CreateCampaignFAB />
       <BetaFeedbackWidget />
     </div>

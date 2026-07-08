@@ -64,12 +64,12 @@ export default function ApplicationDetailPage() {
           const data = await res.json()
           setApplication(data)
         } else if (res.status === 404) {
-          setError('Application not found')
+          setError(t.applications.detail.notFound)
         } else {
-          setError('Failed to load application')
+          setError(t.applications.detail.loadFailed)
         }
       } catch {
-        setError('Failed to load application')
+        setError(t.applications.detail.loadFailed)
       } finally {
         setIsLoading(false)
       }
@@ -94,7 +94,7 @@ export default function ApplicationDetailPage() {
   }
 
   const handleWithdraw = async () => {
-    if (!confirm('Are you sure you want to withdraw this application?')) return
+    if (!confirm(t.confirmDialogs.withdrawApplication)) return
     try {
       const res = await fetch(`/api/applications/${applicationId}`, {
         method: 'DELETE',
@@ -114,16 +114,16 @@ export default function ApplicationDetailPage() {
 
     if (type === 'PAID' || type === 'PAID_PLUS_GIFT') {
       if (min && max) return `$${min.toLocaleString()} - $${max.toLocaleString()}`
-      if (max) return `Up to $${max.toLocaleString()}`
-      if (min) return `From $${min.toLocaleString()}`
+      if (max) return `${t.campaign.upTo} $${max.toLocaleString()}`
+      if (min) return `${t.campaign.from} $${min.toLocaleString()}`
     }
 
     const labels: Record<string, string> = {
-      PAID: 'Paid',
-      GIFTED: 'Gifted',
-      PAID_PLUS_GIFT: 'Paid + Gift',
-      AFFILIATE: 'Affiliate',
-      NEGOTIABLE: 'Negotiable',
+      PAID: t.campaign.paid,
+      GIFTED: t.campaign.gifted,
+      PAID_PLUS_GIFT: t.campaign.paidPlusGift,
+      AFFILIATE: t.campaign.affiliate,
+      NEGOTIABLE: t.campaign.negotiable,
     }
     return labels[type] || type
   }
@@ -143,12 +143,12 @@ export default function ApplicationDetailPage() {
     return (
       <MainLayout>
         <div className="max-w-3xl mx-auto px-4 py-12 text-center">
-          <p className="text-gray-500 text-lg">{error || 'Application not found'}</p>
+          <p className="text-gray-500 text-lg">{error || t.applications.detail.notFound}</p>
           <Link
             href="/dashboard/influencer/applications"
             className="inline-block mt-4 text-primary-600 hover:underline"
           >
-            ← Back to My Applications
+            {t.applications.detail.backToApplications}
           </Link>
         </div>
       </MainLayout>
@@ -166,7 +166,7 @@ export default function ApplicationDetailPage() {
           href="/dashboard/influencer/applications"
           className="text-primary-600 hover:underline text-sm mb-6 inline-block"
         >
-          ← Back to My Applications
+          {t.applications.detail.backToApplications}
         </Link>
 
         {/* Header */}
@@ -197,7 +197,7 @@ export default function ApplicationDetailPage() {
                     {application.campaign.title}
                   </Link>
                   <div className="flex items-center gap-1 text-sm text-gray-600 mt-1">
-                    <span>{application.campaign.brand.companyName || 'Anonymous Brand'}</span>
+                    <span>{application.campaign.brand.companyName || t.campaign.anonymousBrand}</span>
                     {application.campaign.brand.isVerified && (
                       <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -214,11 +214,11 @@ export default function ApplicationDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Your Application */}
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="font-semibold text-gray-900 mb-4">Your Application</h2>
+            <h2 className="font-semibold text-gray-900 mb-4">{t.applications.detail.yourApplication}</h2>
 
             {/* Applied date */}
             <div className="mb-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Applied</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.applications.detail.applied}</p>
               <p className="text-sm text-gray-800">
                 {formatDate(application.appliedAt, locale)}
               </p>
@@ -227,7 +227,7 @@ export default function ApplicationDetailPage() {
             {/* Social account used */}
             {application.socialAccount && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Account Used</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.applications.detail.accountUsed}</p>
                 <p className="text-sm text-gray-800">
                   {application.socialAccount.platform.name} — @{application.socialAccount.username}
                   <span className="text-gray-500 ml-1">
@@ -240,7 +240,7 @@ export default function ApplicationDetailPage() {
             {/* Proposed rate */}
             {application.proposedRate && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Your Proposed Rate</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.applications.detail.yourProposedRate}</p>
                 <p className="text-lg font-semibold text-primary-600">
                   ${Number(application.proposedRate).toLocaleString()}
                 </p>
@@ -250,7 +250,7 @@ export default function ApplicationDetailPage() {
             {/* Pitch message */}
             {application.pitchMessage && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Your Pitch</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.applications.detail.yourPitch}</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
                   {application.pitchMessage}
                 </p>
@@ -260,7 +260,7 @@ export default function ApplicationDetailPage() {
             {/* Reviewed date */}
             {application.reviewedAt && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Reviewed</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.applications.detail.reviewed}</p>
                 <p className="text-sm text-gray-800">
                   {formatDate(application.reviewedAt, locale)}
                 </p>
@@ -270,7 +270,7 @@ export default function ApplicationDetailPage() {
             {/* Rejection reason */}
             {application.rejectionReason && (
               <div className="mb-4 p-3 bg-red-50 rounded-lg">
-                <p className="text-xs text-red-600 uppercase tracking-wide mb-1">Rejection Reason</p>
+                <p className="text-xs text-red-600 uppercase tracking-wide mb-1">{t.applications.detail.rejectionReason}</p>
                 <p className="text-sm text-red-700">{application.rejectionReason}</p>
               </div>
             )}
@@ -278,7 +278,7 @@ export default function ApplicationDetailPage() {
             {/* Brand notes */}
             {application.brandNotes && (
               <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">Brand Notes</p>
+                <p className="text-xs text-blue-600 uppercase tracking-wide mb-1">{t.applications.detail.brandNotes}</p>
                 <p className="text-sm text-blue-700">{application.brandNotes}</p>
               </div>
             )}
@@ -286,11 +286,11 @@ export default function ApplicationDetailPage() {
 
           {/* Campaign Info */}
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="font-semibold text-gray-900 mb-4">Campaign Details</h2>
+            <h2 className="font-semibold text-gray-900 mb-4">{t.brand.campaignDetail.campaignDetails}</h2>
 
             {/* Compensation */}
             <div className="mb-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Compensation</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.campaign.compensation}</p>
               <p className="text-sm font-medium text-gray-800">{formatCompensation(application)}</p>
             </div>
 
@@ -307,7 +307,7 @@ export default function ApplicationDetailPage() {
             {/* Platforms */}
             {application.campaign.platforms && application.campaign.platforms.length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Platforms</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.campaign.platforms}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {application.campaign.platforms.map((p, i) => (
                     <span
@@ -324,7 +324,7 @@ export default function ApplicationDetailPage() {
             {/* Categories */}
             {application.campaign.categories && application.campaign.categories.length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Categories</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.brand.campaignDetail.categories}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {application.campaign.categories.map((c, i) => (
                     <span
@@ -341,7 +341,7 @@ export default function ApplicationDetailPage() {
             {/* Deadline */}
             {application.campaign.deadline && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Application Deadline</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.brand.campaignDetail.applicationDeadline}</p>
                 <p className="text-sm text-gray-800">
                   {formatDate(application.campaign.deadline, locale)}
                 </p>
@@ -351,7 +351,7 @@ export default function ApplicationDetailPage() {
             {/* Campaign period */}
             {(application.campaign.campaignStartDate || application.campaign.campaignEndDate) && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Campaign Period</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.brand.campaignDetail.campaignPeriod}</p>
                 <p className="text-sm text-gray-800">
                   {application.campaign.campaignStartDate &&
                     formatDate(application.campaign.campaignStartDate, locale)}
@@ -366,7 +366,7 @@ export default function ApplicationDetailPage() {
               href={`/campaign/${application.campaign.id}`}
               className="text-sm text-primary-600 hover:underline"
             >
-              View Full Campaign →
+              {t.applications.detail.viewFullCampaign}
             </Link>
           </div>
         </div>
@@ -381,7 +381,7 @@ export default function ApplicationDetailPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
-              Message Brand
+              {t.applications.detail.messageBrand}
             </button>
           )}
           {canWithdraw && (
@@ -389,14 +389,14 @@ export default function ApplicationDetailPage() {
               onClick={handleWithdraw}
               className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition text-sm"
             >
-              Withdraw Application
+              {t.applications.detail.withdrawApplication}
             </button>
           )}
           <Link
             href={`/campaign/${application.campaign.id}`}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm"
           >
-            View Campaign
+            {t.messages.viewCampaign}
           </Link>
         </div>
       </div>

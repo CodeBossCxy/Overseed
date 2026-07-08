@@ -1,12 +1,15 @@
 'use client'
 
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function BetaBanner() {
   const [dismissed, setDismissed] = useState(false)
+  const pathname = usePathname()
   const { t } = useLanguage()
 
+  if (pathname === '/') return null
   if (dismissed) return null
 
   return (
@@ -23,7 +26,7 @@ export default function BetaBanner() {
         <button
           onClick={() => setDismissed(true)}
           className="text-white/80 hover:text-white transition flex-shrink-0 ml-4"
-          aria-label="Dismiss"
+          aria-label={t.common.dismiss}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

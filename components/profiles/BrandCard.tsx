@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface BrandCardProps {
   brand: {
@@ -18,6 +19,7 @@ interface BrandCardProps {
 }
 
 export default function BrandCard({ brand }: BrandCardProps) {
+  const { t } = useLanguage()
   return (
     <Link
       href={`/brand/${brand.id}`}
@@ -30,7 +32,7 @@ export default function BrandCard({ brand }: BrandCardProps) {
             {brand.logoUrl ? (
               <img
                 src={brand.logoUrl}
-                alt={brand.companyName || 'Brand'}
+                alt={brand.companyName || t.profileCards.brand.logoAltFallback}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -44,7 +46,7 @@ export default function BrandCard({ brand }: BrandCardProps) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
               <h3 className="font-semibold text-gray-900 truncate">
-                {brand.companyName || 'Anonymous Brand'}
+                {brand.companyName || t.profileCards.brand.anonymousBrand}
               </h3>
               {brand.isVerified && (
                 <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -70,13 +72,13 @@ export default function BrandCard({ brand }: BrandCardProps) {
         <div className="flex items-center gap-4 mt-4 pt-3 border-t text-sm">
           {brand._count && (
             <div>
-              <span className="text-gray-500">Campaigns</span>
+              <span className="text-gray-500">{t.profileCards.brand.campaigns}</span>
               <span className="ml-1 font-medium">{brand._count.campaigns}</span>
             </div>
           )}
           {brand.completedCollaborations !== undefined && (
             <div>
-              <span className="text-gray-500">Collaborations</span>
+              <span className="text-gray-500">{t.profileCards.brand.collaborations}</span>
               <span className="ml-1 font-medium">{brand.completedCollaborations}</span>
             </div>
           )}

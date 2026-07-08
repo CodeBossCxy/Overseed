@@ -32,10 +32,10 @@ export default function UpgradePage() {
         window.location.href = data.url
       } else {
         const data = await res.json()
-        alert(data.error || 'Failed to start checkout')
+        alert(data.error || t.upgrade.failedToStartCheckout)
       }
     } catch {
-      alert('Something went wrong')
+      alert(t.errors.somethingWrong)
     } finally {
       setIsLoading(false)
     }

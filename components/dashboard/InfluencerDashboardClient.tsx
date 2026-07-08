@@ -76,8 +76,8 @@ export default function InfluencerDashboardClient({
               </svg>
             </div>
             <div>
-              <p className="text-sm font-semibold text-purple-900">Set Up Payments</p>
-              <p className="text-xs text-purple-700">Connect your bank account to receive campaign payments from brands.</p>
+              <p className="text-sm font-semibold text-purple-900">{t.payments.setupTitle}</p>
+              <p className="text-xs text-purple-700">{t.payments.setupDesc}</p>
             </div>
           </div>
           <button
@@ -96,7 +96,7 @@ export default function InfluencerDashboardClient({
             disabled={stripeLoading}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition flex-shrink-0 disabled:opacity-50"
           >
-            {stripeLoading ? 'Loading...' : 'Set Up'}
+            {stripeLoading ? t.common.loading : t.payments.setUp}
           </button>
         </div>
       )}

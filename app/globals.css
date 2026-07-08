@@ -320,16 +320,22 @@ body {
   @apply rounded-lg my-3 max-w-full;
 }
 
+/* ── Homepage scroll snap (desktop) ── */
+@media (min-width: 1024px) {
+  html.hp-snap {
+    scroll-snap-type: y mandatory;
+  }
+}
+
 /* ── Homepage section slide-in animations ── */
+/* Opacity-only: a transform here would shift the section's scroll-snap
+   area and make snap positions land offset until the reveal finishes. */
 .hp-section {
   opacity: 0;
-  transform: translateY(48px);
-  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .hp-section.hp-visible {
   opacity: 1;
-  transform: translateY(0);
 }
 
 /* ── Hero title reveal ── */
@@ -355,4 +361,14 @@ body {
     0 0 40px 4px rgba(255, 255, 255, 0.08),
     -8px 0 30px -4px rgba(255, 255, 255, 0.10),
     8px 0 30px -4px rgba(255, 255, 255, 0.10);
+}
+
+.home-hero-products {
+  display: none;
+}
+
+@media (min-width: 1024px) and (min-height: 840px) {
+  .home-hero-products {
+    display: block;
+  }
 }

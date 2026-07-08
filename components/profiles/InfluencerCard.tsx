@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface InfluencerCardProps {
   influencer: {
@@ -29,7 +30,8 @@ interface InfluencerCardProps {
 }
 
 export default function InfluencerCard({ influencer }: InfluencerCardProps) {
-  const displayName = influencer.displayName || influencer.user.name || 'Unknown'
+  const { t } = useLanguage()
+  const displayName = influencer.displayName || influencer.user.name || t.profileCards.influencer.unknownName
   const avatar = influencer.avatarUrl || influencer.user.image
 
   // Get total followers across all platforms
@@ -117,7 +119,7 @@ export default function InfluencerCard({ influencer }: InfluencerCardProps) {
         )}
         {influencer.completedCampaigns !== undefined && influencer.completedCampaigns > 0 && (
           <div className="mt-2 text-xs text-gray-400">
-            {influencer.completedCampaigns} completed
+            {influencer.completedCampaigns} {t.profileCards.influencer.completedSuffix}
           </div>
         )}
       </div>

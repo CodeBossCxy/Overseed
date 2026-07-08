@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface ApplicationActionsProps {
   applicationId: string
@@ -13,6 +14,7 @@ export default function ApplicationActions({
   currentStatus,
   onStatusChange,
 }: ApplicationActionsProps) {
+  const { t } = useLanguage()
   const [isLoading, setIsLoading] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
@@ -38,14 +40,14 @@ export default function ApplicationActions({
       setShowRejectModal(false)
     } catch (error) {
       console.error('Error updating application:', error)
-      alert('Failed to update application')
+      alert(t.applications.actions.updateFailed)
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleApprove = () => {
-    if (confirm('Are you sure you want to approve this application?')) {
+    if (confirm(t.applications.actions.confirmApprove)) {
       updateStatus('APPROVED')
     }
   }
@@ -66,7 +68,7 @@ export default function ApplicationActions({
   }
 
   const handleMarkComplete = () => {
-    if (confirm('Mark this collaboration as complete?')) {
+    if (confirm(t.applications.actions.confirmComplete)) {
       updateStatus('COMPLETED')
     }
   }
@@ -82,21 +84,21 @@ export default function ApplicationActions({
               disabled={isLoading}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50"
             >
-              Mark Under Review
+              {t.applications.actions.markUnderReview}
             </button>
             <button
               onClick={handleApprove}
               disabled={isLoading}
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50"
             >
-              Approve
+              {t.applications.actions.approve}
             </button>
             <button
               onClick={handleReject}
               disabled={isLoading}
               className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:opacity-50"
             >
-              Reject
+              {t.applications.actions.reject}
             </button>
           </div>
         )
@@ -109,14 +111,14 @@ export default function ApplicationActions({
               disabled={isLoading}
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50"
             >
-              Approve
+              {t.applications.actions.approve}
             </button>
             <button
               onClick={handleReject}
               disabled={isLoading}
               className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:opacity-50"
             >
-              Reject
+              {t.applications.actions.reject}
             </button>
           </div>
         )
@@ -129,7 +131,7 @@ export default function ApplicationActions({
               disabled={isLoading}
               className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition disabled:opacity-50"
             >
-              Mark as Complete
+              {t.applications.actions.markComplete}
             </button>
           </div>
         )
@@ -139,7 +141,7 @@ export default function ApplicationActions({
       case 'COMPLETED':
         return (
           <p className="text-gray-500 text-sm">
-            No actions available for this status.
+            {t.applications.actions.noActions}
           </p>
         )
 
@@ -156,32 +158,32 @@ export default function ApplicationActions({
       {showRejectModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold mb-4">Reject Application</h3>
+            <h3 className="text-lg font-semibold mb-4">{t.applications.actions.rejectModalTitle}</h3>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Reason for Rejection (shown to applicant)
+                  {t.applications.actions.rejectionReasonLabel}
                 </label>
                 <textarea
                   rows={3}
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
-                  placeholder="Optional - explain why this application was rejected..."
+                  placeholder={t.applications.actions.rejectionReasonPlaceholder}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Internal Notes (only visible to you)
+                  {t.applications.actions.internalNotesLabel}
                 </label>
                 <textarea
                   rows={2}
                   value={brandNotes}
                   onChange={(e) => setBrandNotes(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
-                  placeholder="Private notes about this applicant..."
+                  placeholder={t.applications.actions.internalNotesPlaceholder}
                 />
               </div>
             </div>
@@ -191,14 +193,14 @@ export default function ApplicationActions({
                 onClick={() => setShowRejectModal(false)}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition"
               >
-                Cancel
+                {t.applications.actions.cancel}
               </button>
               <button
                 onClick={submitRejection}
                 disabled={isLoading}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:opacity-50"
               >
-                {isLoading ? 'Rejecting...' : 'Reject'}
+                {isLoading ? t.applications.actions.rejecting : t.applications.actions.reject}
               </button>
             </div>
           </div>

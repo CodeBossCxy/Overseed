@@ -201,7 +201,7 @@ export default function AIAssistantPage() {
         const data = await res.json()
         setMessages((prev) => [
           ...prev,
-          { id: assistantId, role: 'assistant', content: data.error || 'Something went wrong.', timestamp: new Date() },
+          { id: assistantId, role: 'assistant', content: data.error || t.aiAssistant.errorGeneric, timestamp: new Date() },
         ])
         setIsLoading(false)
         stopProgress()
@@ -214,7 +214,7 @@ export default function AIAssistantPage() {
       if (!reader) {
         setMessages((prev) => [
           ...prev,
-          { id: assistantId, role: 'assistant', content: 'Failed to read response.', timestamp: new Date() },
+          { id: assistantId, role: 'assistant', content: t.aiAssistant.errorReadResponse, timestamp: new Date() },
         ])
         setIsLoading(false)
         stopProgress()
@@ -300,7 +300,7 @@ export default function AIAssistantPage() {
               prev.map((m) => (m.id === assistantId ? { ...m, dbId: event.messageId } : m))
             )
           } else if (event.type === 'error') {
-            contentSoFar = contentSoFar || event.error || 'Something went wrong.'
+            contentSoFar = contentSoFar || event.error || t.aiAssistant.errorGeneric
             decided = true
             flushContent()
           }
@@ -333,13 +333,13 @@ export default function AIAssistantPage() {
         if (exists) {
           return prev.map((m) =>
             m.id === assistantId
-              ? { ...m, content: m.content || 'Sorry, something went wrong. Please try again.' }
+              ? { ...m, content: m.content || t.aiAssistant.errorRetry }
               : m
           )
         }
         return [
           ...prev,
-          { id: assistantId, role: 'assistant', content: 'Sorry, something went wrong. Please try again.', timestamp: new Date() },
+          { id: assistantId, role: 'assistant', content: t.aiAssistant.errorRetry, timestamp: new Date() },
         ]
       })
     } finally {
@@ -430,14 +430,14 @@ export default function AIAssistantPage() {
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      alert('Failed to generate document. Please try again.')
+      alert(t.aiAssistant.errorGenerateDoc)
     }
   }
 
   const formatLabels: Record<string, { label: string; ext: string; icon: string }> = {
-    docx: { label: 'Word Document', ext: '.docx', icon: 'W' },
-    xlsx: { label: 'Excel Spreadsheet', ext: '.xlsx', icon: 'X' },
-    pdf: { label: 'PDF Document', ext: '.pdf', icon: 'P' },
+    docx: { label: t.aiAssistant.formatWord, ext: '.docx', icon: 'W' },
+    xlsx: { label: t.aiAssistant.formatExcel, ext: '.xlsx', icon: 'X' },
+    pdf: { label: t.aiAssistant.formatPdf, ext: '.pdf', icon: 'P' },
   }
 
   const formatDate = (dateStr: string) => {
@@ -445,8 +445,8 @@ export default function AIAssistantPage() {
     const now = new Date()
     const diff = now.getTime() - date.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    if (days === 0) return 'Today'
-    if (days === 1) return 'Yesterday'
+    if (days === 0) return t.common.today
+    if (days === 1) return t.common.yesterday
     if (days < 7) return `${days}d ago`
     return date.toLocaleDateString()
   }
@@ -466,7 +466,7 @@ export default function AIAssistantPage() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                New Chat
+                {t.aiAssistant.newChat}
               </button>
               <button
                 onClick={() => setSidebarOpen(false)}
@@ -485,7 +485,7 @@ export default function AIAssistantPage() {
                   <svg className="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
-                  <p className="text-xs">No conversations yet</p>
+                  <p className="text-xs">{t.aiAssistant.noConversations}</p>
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -524,7 +524,7 @@ export default function AIAssistantPage() {
                           <button
                             onClick={(e) => startRename(chat.id, chat.title, e)}
                             className="p-1 rounded-md hover:bg-gray-200 transition text-gray-300 hover:text-gray-600"
-                            title="Rename"
+                            title={t.aiAssistant.rename}
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -533,7 +533,7 @@ export default function AIAssistantPage() {
                           <button
                             onClick={(e) => deleteChat(chat.id, e)}
                             className="p-1 rounded-md hover:bg-red-50 transition text-gray-300 hover:text-red-500"
-                            title="Delete"
+                            title={t.common.delete}
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -722,7 +722,7 @@ export default function AIAssistantPage() {
                                   <div>
                                     <p className="text-sm font-semibold text-gray-900">{docTitle}</p>
                                     <p className="text-xs text-gray-500">
-                                      {isStillStreaming ? `Generating document... ${progress}%` : `${fl.label} (${fl.ext})`}
+                                      {isStillStreaming ? t.aiAssistant.generatingDocument.replace('{progress}', String(progress)) : `${fl.label} (${fl.ext})`}
                                     </p>
                                   </div>
                                 </div>
@@ -733,7 +733,7 @@ export default function AIAssistantPage() {
                                       <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                                       <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                     </div>
-                                    Generating...
+                                    {t.aiAssistant.generating}
                                   </div>
                                 ) : (
                                   <button
@@ -743,7 +743,7 @@ export default function AIAssistantPage() {
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
-                                    Download {fl.label}
+                                    {t.aiAssistant.download.replace('{label}', fl.label)}
                                   </button>
                                 )}
                               </div>
@@ -772,7 +772,7 @@ export default function AIAssistantPage() {
                         <button
                           onClick={() => handleCopy(message.id, message.content)}
                           className="p-1 rounded-md hover:bg-gray-100 transition text-gray-400 hover:text-gray-600"
-                          title="Copy"
+                          title={t.aiAssistant.copy}
                         >
                           {copiedId === message.id ? (
                             <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -790,7 +790,7 @@ export default function AIAssistantPage() {
                           <button
                             onClick={() => handleEditResend(msgIndex)}
                             className="p-1 rounded-md hover:bg-gray-100 transition text-gray-400 hover:text-gray-600"
-                            title="Edit & resend"
+                            title={t.aiAssistant.editResend}
                           >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -808,7 +808,7 @@ export default function AIAssistantPage() {
                                   ? 'text-emerald-500 bg-emerald-50'
                                   : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
                               }`}
-                              title="Good response"
+                              title={t.aiAssistant.goodResponse}
                             >
                               <svg className="w-3.5 h-3.5" fill={message.feedback === 'like' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14zm-10 11H7V10H4a2 2 0 00-2 2v7a2 2 0 002 2z" />
@@ -821,7 +821,7 @@ export default function AIAssistantPage() {
                                   ? 'text-red-500 bg-red-50'
                                   : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
                               }`}
-                              title="Bad response"
+                              title={t.aiAssistant.badResponse}
                             >
                               <svg className="w-3.5 h-3.5" fill={message.feedback === 'dislike' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10zm10-11h-3v11h1a2 2 0 002-2V6a2 2 0 00-2-2z" />
@@ -867,7 +867,7 @@ export default function AIAssistantPage() {
                   href="/dashboard/upgrade"
                   className="inline-block px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:from-amber-600 hover:to-orange-600 transition font-medium shadow-md"
                 >
-                  Upgrade to Pro
+                  {t.upgrade.upgradeToPro}
                 </Link>
               </div>
             </div>

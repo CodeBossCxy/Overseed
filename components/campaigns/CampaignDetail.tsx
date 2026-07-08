@@ -113,10 +113,10 @@ export default function CampaignDetail({
       if (res.ok) {
         router.push('/')
       } else {
-        alert('Failed to delete campaign')
+        alert(t.errors.failedToDeleteCampaign)
       }
     } catch {
-      alert('Failed to delete campaign')
+      alert(t.errors.failedToDeleteCampaign)
     } finally {
       setIsDeleting(false)
       setShowDeleteConfirm(false)
@@ -179,7 +179,7 @@ export default function CampaignDetail({
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {campaign.images.map((image, index) => (
                   <div key={index} className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                    <Image src={image} alt={`Campaign image ${index + 1}`} width={400} height={225} className="w-full h-full object-cover" />
+                    <Image src={image} alt={t.campaign.campaignImageAlt.replace('{n}', String(index + 1))} width={400} height={225} className="w-full h-full object-cover" />
                   </div>
                 ))}
                 {campaign.media.map((media) => (
@@ -187,7 +187,7 @@ export default function CampaignDetail({
                     {media.mediaType === 'video' ? (
                       <video src={media.mediaUrl} className="w-full h-full object-cover" controls />
                     ) : (
-                      <Image src={media.mediaUrl} alt="Campaign media" width={400} height={225} className="w-full h-full object-cover" />
+                      <Image src={media.mediaUrl} alt={t.campaign.campaignMediaAlt} width={400} height={225} className="w-full h-full object-cover" />
                     )}
                   </div>
                 ))}
@@ -279,9 +279,9 @@ export default function CampaignDetail({
                 <div className="mt-2">
                   <span className="text-sm font-medium text-gray-500">{t.campaign.wordCount} </span>
                   <span className="text-sm">
-                    {campaign.wordCountMin && `Min ${campaign.wordCountMin}`}
+                    {campaign.wordCountMin && `${t.campaign.min} ${campaign.wordCountMin}`}
                     {campaign.wordCountMin && campaign.wordCountMax && ' - '}
-                    {campaign.wordCountMax && `Max ${campaign.wordCountMax}`}
+                    {campaign.wordCountMax && `${t.campaign.max} ${campaign.wordCountMax}`}
                   </span>
                 </div>
               )}
@@ -394,7 +394,7 @@ export default function CampaignDetail({
                           href="/dashboard/upgrade"
                           className="block w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:from-amber-600 hover:to-orange-600 transition text-center font-medium"
                         >
-                          Upgrade to Pro to Apply
+                          {t.campaign.upgradeToProToApply}
                         </Link>
                       ) : isAuthenticated ? (
                         <Link
@@ -434,7 +434,7 @@ export default function CampaignDetail({
             <Link href={`/brand/${campaign.brand.id}`} className="flex items-center gap-3 hover:bg-gray-50 p-2 rounded-lg -mx-2">
               <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                 {campaign.brand.logoUrl ? (
-                  <Image src={campaign.brand.logoUrl} alt={campaign.brand.companyName || 'Brand'} width={48} height={48} className="w-full h-full object-cover" />
+                  <Image src={campaign.brand.logoUrl} alt={campaign.brand.companyName || t.profileCards.brand.logoAltFallback} width={48} height={48} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-500 text-xl">
                     {campaign.brand.companyName?.charAt(0) || 'B'}

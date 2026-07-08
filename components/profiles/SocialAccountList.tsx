@@ -1,5 +1,7 @@
 'use client'
 
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+
 interface SocialAccount {
   id: string
   platform: {
@@ -28,6 +30,8 @@ export default function SocialAccountList({
   onDelete,
   onAdd,
 }: SocialAccountListProps) {
+  const { t } = useLanguage()
+
   const getPlatformIcon = (slug: string) => {
     const svgClass = "w-6 h-6 text-white"
     switch (slug) {
@@ -118,13 +122,13 @@ export default function SocialAccountList({
   if (accounts.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
-        <p>No social accounts linked yet.</p>
+        <p>{t.socialAccounts.list.empty}</p>
         {!isPublicView && onAdd && (
           <button
             onClick={onAdd}
             className="text-primary-600 hover:underline mt-2 inline-block"
           >
-            Add your first account
+            {t.socialAccounts.list.addFirst}
           </button>
         )}
       </div>
@@ -156,7 +160,7 @@ export default function SocialAccountList({
                   </svg>
                   {account.verificationMethod && account.verificationMethod !== 'manual' && (
                     <span className="text-xs text-blue-500">
-                      {account.verificationMethod === 'url' ? 'Verified via URL' : 'Verified via Screenshot'}
+                      {account.verificationMethod === 'url' ? t.influencer.accounts.verifiedViaUrl : t.influencer.accounts.verifiedViaScreenshot}
                     </span>
                   )}
                 </span>
@@ -179,13 +183,13 @@ export default function SocialAccountList({
           {/* Stats */}
           <div className="text-right">
             <div className="font-semibold">{formatFollowers(account.followerCount)}</div>
-            <div className="text-xs text-gray-500">followers</div>
+            <div className="text-xs text-gray-500">{t.socialAccounts.list.followers}</div>
           </div>
 
           {account.engagementRate && (
             <div className="text-right">
               <div className="font-semibold">{Number(account.engagementRate).toFixed(1)}%</div>
-              <div className="text-xs text-gray-500">engagement</div>
+              <div className="text-xs text-gray-500">{t.socialAccounts.list.engagement}</div>
             </div>
           )}
 
@@ -194,7 +198,7 @@ export default function SocialAccountList({
             <button
               onClick={() => onDelete(account.id)}
               className="p-2 text-gray-400 hover:text-red-600 transition"
-              title="Remove account"
+              title={t.common.removeAccount}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

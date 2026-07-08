@@ -14,6 +14,30 @@ interface DropdownItem {
   href: string
 }
 
+function HeaderArrowIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 17 17 7M9 7h8v8" />
+    </svg>
+  )
+}
+
+function LandingLogo() {
+  return (
+    <span className="flex items-center" aria-label="Overseed">
+      <Image
+        src="/home/landing-logo-overseed.png"
+        alt="Overseed"
+        width={381}
+        height={98}
+        priority
+        sizes="(max-width: 640px) 180px, 220px"
+        className="h-12 w-auto object-contain sm:h-14"
+      />
+    </span>
+  )
+}
+
 function NavDropdown({ label, items, isGlobal }: { label: string; items: DropdownItem[]; isGlobal?: boolean }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -124,10 +148,11 @@ function MessageBadge({ isGlobal }: { isGlobal?: boolean }) {
 export default function Header() {
   const { data: session } = useSession()
   const { locale, setLocale, t } = useLanguage()
-  const { currentMode, isBrand, switchView, isSwitching } = useViewMode()
+  const { isBrand, switchView, isSwitching } = useViewMode()
   const { themeMode } = useTheme()
   const pathname = usePathname()
   const isHomePage = pathname === '/' || pathname === '/contact'
+  const isLandingPage = pathname === '/'
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileExpanded, setMobileExpanded] = useState<string | null>(null)
 
@@ -174,27 +199,55 @@ export default function Header() {
   ]
 
   const isGlobal = themeMode === 'global'
+  const landingNavMenus = [
+    { key: 'brand', label: t.nav.forBrands, href: '/brand', items: [] },
+    { key: 'creator', label: t.nav.forCreators, href: '/creator', items: [] },
+    { key: 'ai', label: t.nav.ai, href: '/ai-assistant', items: [] },
+  ]
+  const visibleNavMenus = isLandingPage ? landingNavMenus : navMenus
 
   return (
-    <header className={`sticky top-0 z-50 ${isGlobal ? 'bg-[#0a1527]/20 backdrop-blur-md' : 'bg-white shadow-sm'}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+    <header
+      className={`z-50 ${
+        isLandingPage
+          ? 'absolute left-0 right-0 top-0 bg-transparent'
+          : isGlobal
+            ? 'sticky top-0 bg-[#0a1527]/20 backdrop-blur-md'
+            : 'sticky top-0 bg-white shadow-sm'
+      }`}
+    >
+      <div className={`${isLandingPage ? 'max-w-[1440px]' : 'max-w-7xl'} mx-auto px-4 sm:px-6 lg:px-8`}>
+        <div className={`relative flex justify-between items-center ${isLandingPage ? 'h-24' : 'h-16'}`}>
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {isGlobal ? (
+            {isLandingPage ? (
+              <LandingLogo />
+            ) : isGlobal ? (
               <img src="/gray_logo_with_txt.png" alt="Overseed" className="h-28 -my-4 translate-y-[2px] w-auto object-contain brightness-200" />
             ) : (
               <img src={themeMode === 'brand' ? "/blue_overseed.png" : "/pink_overseed.png"} alt="Overseed" className="h-28 -my-4 translate-y-[2px] w-auto object-contain" />
             )}
-            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-400 text-amber-900 rounded uppercase tracking-wider">{t.nav.beta}</span>
+            {!isLandingPage && (
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-400 text-amber-900 rounded uppercase">{t.nav.beta}</span>
+            )}
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-6">
-            {navMenus.map((menu) => (
+          <nav className={`hidden lg:flex items-center ${isLandingPage ? 'space-x-12 lg:absolute lg:left-1/2 lg:-translate-x-1/2' : 'space-x-6'}`}>
+            {visibleNavMenus.map((menu) => (
               menu.href ? (
-                <Link key={menu.key} href={menu.href} className={`transition text-sm font-medium ${isGlobal ? 'text-gray-200 hover:text-[#ff769f]' : 'text-gray-700 hover:text-primary-600'}`}>
+                <Link
+                  key={menu.key}
+                  href={menu.href}
+                  className={`transition font-normal ${
+                    isLandingPage
+                      ? 'text-base text-[#071735] hover:text-[#2c6fb2]'
+                      : isGlobal
+                        ? 'text-sm text-gray-200 hover:text-[#ff769f]'
+                        : 'text-sm text-gray-700 hover:text-primary-600'
+                  }`}
+                >
                   {menu.label}
                 </Link>
               ) : (
@@ -206,15 +259,34 @@ export default function Header() {
           {/* Right side */}
           <div className="flex items-center gap-1">
             {/* Language Switcher */}
-            <button
-              onClick={toggleLanguage}
-              className={`p-2 rounded-md transition ${isGlobal ? 'text-gray-200 hover:text-[#ff769f] hover:bg-[#456fa3]/15' : 'text-gray-600 hover:text-primary-600 hover:bg-gray-100'}`}
-              title={t.nav.switchLanguage}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-              </svg>
-            </button>
+            {isLandingPage ? (
+              <button
+                onClick={toggleLanguage}
+                className="mr-2 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#d4e1ef] bg-[#f9fbff]/75 px-4 text-sm font-normal shadow-[inset_0_1px_8px_rgba(255,255,255,0.9),0_12px_28px_rgba(88,126,171,0.12)] backdrop-blur-md transition hover:bg-white sm:mr-3"
+                title={t.nav.switchLanguage}
+              >
+                <svg className="h-4 w-4 text-[#0b3a7c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+                <span className={locale === 'en' ? 'text-[#082052]' : 'text-[#8ba3c4]'}>EN</span>
+                <span className="text-[#b6c8de]">/</span>
+                <span className={`font-cn ${locale === 'zh' ? 'text-[#082052]' : 'text-[#8ba3c4]'}`}>中文</span>
+              </button>
+            ) : (
+              <button
+                onClick={toggleLanguage}
+                className={`p-2 rounded-md transition ${
+                  isGlobal
+                    ? 'text-gray-200 hover:text-[#ff769f] hover:bg-[#456fa3]/15'
+                    : 'text-gray-600 hover:text-primary-600 hover:bg-gray-100'
+                }`}
+                title={t.nav.switchLanguage}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+              </button>
+            )}
 
             {/* Auth buttons */}
             {session ? (
@@ -275,17 +347,24 @@ export default function Header() {
               </div>
             ) : (
               <div className="hidden lg:flex items-center space-x-2">
-                <Link
-                  href="/auth/signin"
-                  className={`px-4 py-2 rounded-md transition text-sm ${isGlobal ? 'text-gray-200 hover:bg-[#456fa3]/15' : 'text-gray-700 hover:bg-gray-100'}`}
-                >
-                  {t.nav.login}
-                </Link>
+                {!isLandingPage && (
+                  <Link
+                    href="/auth/signin"
+                    className={`px-4 py-2 rounded-md transition text-sm ${isGlobal ? 'text-gray-200 hover:bg-[#456fa3]/15' : 'text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {t.nav.login}
+                  </Link>
+                )}
                 <Link
                   href="/auth/signup"
-                  className="px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 transition text-sm"
+                  className={
+                    isLandingPage
+                      ? 'inline-flex min-h-[56px] items-center gap-4 rounded-full border border-white/80 bg-[#f8fbff]/75 px-8 text-base font-normal text-[#082052] shadow-[inset_0_1px_12px_rgba(255,255,255,0.95),0_14px_30px_rgba(81,124,174,0.16)] transition hover:bg-white'
+                      : 'px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 transition text-sm'
+                  }
                 >
                   {t.nav.signup}
+                  {isLandingPage && <HeaderArrowIcon />}
                 </Link>
               </div>
             )}
@@ -293,7 +372,13 @@ export default function Header() {
             {/* Mobile menu button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className={`lg:hidden p-2 rounded-md ${isGlobal ? 'hover:bg-[#456fa3]/15 text-gray-200' : 'hover:bg-gray-100'}`}
+              className={`lg:hidden p-2 rounded-md ${
+                isLandingPage
+                  ? 'text-[#071735] hover:bg-[#dcecff]/70'
+                  : isGlobal
+                    ? 'hover:bg-[#456fa3]/15 text-gray-200'
+                    : 'hover:bg-gray-100'
+              }`}
               aria-label={t.nav.toggleMenu}
               aria-expanded={mobileMenuOpen}
             >
@@ -310,14 +395,20 @@ export default function Header() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className={`lg:hidden py-4 border-t ${isGlobal ? 'border-[#d4e0fd]/10' : ''}`}>
+          <div className={`lg:hidden py-4 border-t ${isLandingPage ? 'border-[#c7dcef]' : isGlobal ? 'border-[#d4e0fd]/10' : ''}`}>
             <nav className="flex flex-col space-y-1">
-              {navMenus.map((menu) => (
+              {visibleNavMenus.map((menu) => (
                 menu.href ? (
                   <Link
                     key={menu.key}
                     href={menu.href}
-                    className={`block py-2 transition font-medium ${isGlobal ? 'text-gray-200 hover:text-[#ff769f]' : 'text-gray-700 hover:text-primary-600'}`}
+                    className={`block py-2 transition font-normal ${
+                      isLandingPage
+                        ? 'text-[#071735] hover:text-[#2c6fb2]'
+                        : isGlobal
+                          ? 'text-gray-200 hover:text-[#ff769f]'
+                          : 'text-gray-700 hover:text-primary-600'
+                    }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     {menu.label}
@@ -326,7 +417,13 @@ export default function Header() {
                   <div key={menu.key}>
                     <button
                       onClick={() => setMobileExpanded(mobileExpanded === menu.key ? null : menu.key)}
-                      className={`flex items-center justify-between w-full py-2 transition font-medium ${isGlobal ? 'text-gray-200 hover:text-[#ff769f]' : 'text-gray-700 hover:text-primary-600'}`}
+                      className={`flex items-center justify-between w-full py-2 transition font-normal ${
+                        isLandingPage
+                          ? 'text-[#071735] hover:text-[#2c6fb2]'
+                          : isGlobal
+                            ? 'text-gray-200 hover:text-[#ff769f]'
+                            : 'text-gray-700 hover:text-primary-600'
+                      }`}
                     >
                       {menu.label}
                       <svg className={`w-4 h-4 transition-transform ${mobileExpanded === menu.key ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -339,7 +436,13 @@ export default function Header() {
                           <Link
                             key={item.href}
                             href={item.href}
-                            className={`block py-2 text-sm transition ${isGlobal ? 'text-gray-400 hover:text-[#ff769f]' : 'text-gray-600 hover:text-primary-600'}`}
+                            className={`block py-2 text-sm transition ${
+                              isLandingPage
+                                ? 'text-[#35547a] hover:text-[#2c6fb2]'
+                                : isGlobal
+                                  ? 'text-gray-400 hover:text-[#ff769f]'
+                                  : 'text-gray-600 hover:text-primary-600'
+                            }`}
                             onClick={() => setMobileMenuOpen(false)}
                           >
                             {item.label}
@@ -372,14 +475,14 @@ export default function Header() {
                     )}
                     <Link
                       href="/dashboard/messages"
-                      className="block text-gray-700 hover:text-primary-600 transition"
+                      className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.messages?.title || 'Messages'}
                     </Link>
                     <Link
                       href={dashboardLink}
-                      className="block text-gray-700 hover:text-primary-600 transition"
+                      className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.nav.myCenter}
@@ -387,7 +490,7 @@ export default function Header() {
                     {(session.user as any)?.userType === 'ADMIN' && (
                       <Link
                         href="/admin"
-                        className="block text-gray-700 hover:text-primary-600 transition"
+                        className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         {t.nav.admin}
@@ -395,7 +498,7 @@ export default function Header() {
                     )}
                     <Link
                       href="/settings"
-                      className="block text-gray-700 hover:text-primary-600 transition"
+                      className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.nav.settings}
@@ -405,7 +508,7 @@ export default function Header() {
                         setMobileMenuOpen(false)
                         signOut()
                       }}
-                      className="text-left text-gray-700 hover:text-primary-600 transition"
+                      className={`text-left transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
                     >
                       {t.nav.logout}
                     </button>
@@ -414,14 +517,14 @@ export default function Header() {
                   <>
                     <Link
                       href="/auth/signin"
-                      className="block text-gray-700 hover:text-primary-600 transition"
+                      className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.nav.login}
                     </Link>
                     <Link
                       href="/auth/signup"
-                      className="block text-primary-600 font-medium hover:text-primary-700 transition"
+                      className={`block font-normal transition ${isLandingPage ? 'text-[#0a4d9c] hover:text-[#2c6fb2]' : 'text-primary-600 hover:text-primary-700'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.nav.signup}

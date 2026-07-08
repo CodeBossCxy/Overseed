@@ -3,7 +3,7 @@ import HomePage from '@/components/HomePage'
 
 export default function Page() {
   return (
-    <MainLayout>
+    <MainLayout hideFooter>
       <HomePage />
     </MainLayout>
   )

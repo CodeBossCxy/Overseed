@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Platform {
   id: number
@@ -35,8 +36,8 @@ export default function SocialAccountForm({
   existingPlatformIds,
   onSuccess,
   onCancel,
-  translations: t,
 }: SocialAccountFormProps) {
+  const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState<Tab>('url')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,8 +73,6 @@ export default function SocialAccountForm({
     (p) => !existingPlatformIds.includes(p.id)
   )
 
-  const label = (key: string, fallback: string) => t?.[key] || fallback
-
   // URL parsing
   const handleUrlChange = useCallback(async (url: string) => {
     setUrlInput(url)
@@ -95,7 +94,7 @@ export default function SocialAccountForm({
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.message || label('unsupportedUrl', 'Unsupported URL'))
+        setError(data.message || t.influencer.accounts.unsupportedUrl)
         return
       }
 
@@ -112,7 +111,7 @@ export default function SocialAccountForm({
         }))
       }
     } catch {
-      setError(label('unsupportedUrl', 'Could not parse URL'))
+      setError(t.influencer.accounts.unsupportedUrl)
     } finally {
       setUrlParsing(false)
     }
@@ -125,7 +124,7 @@ export default function SocialAccountForm({
     setAnalysisResult(null)
 
     if (!screenshotPlatformId) {
-      setError(label('selectPlatformFirst', 'Please select a platform first'))
+      setError(t.socialAccounts.form.selectPlatformFirst)
       return
     }
 
@@ -145,7 +144,7 @@ export default function SocialAccountForm({
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.message || label('analysisError', 'Analysis failed'))
+        setError(data.message || t.influencer.accounts.analysisError)
         return
       }
 
@@ -163,7 +162,7 @@ export default function SocialAccountForm({
         engagementRate: data.analysis.engagementRate ? String(data.analysis.engagementRate) : prev.engagementRate,
       }))
     } catch {
-      setError(label('analysisError', 'Failed to analyze screenshot'))
+      setError(t.influencer.accounts.analysisError)
     } finally {
       setIsAnalyzing(false)
     }
@@ -215,7 +214,7 @@ export default function SocialAccountForm({
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.message || 'Failed to add social account')
+        throw new Error(data.message || t.socialAccounts.form.genericAddError)
       }
 
       onSuccess()
@@ -229,18 +228,18 @@ export default function SocialAccountForm({
   if (availablePlatforms.length === 0) {
     return (
       <div className="p-6 bg-gray-50 rounded-lg text-center">
-        <p className="text-gray-600">You&apos;ve already linked all available platforms!</p>
+        <p className="text-gray-600">{t.socialAccounts.form.allPlatformsLinked}</p>
         <button onClick={onCancel} className="mt-4 text-primary-600 hover:underline">
-          Go back
+          {t.socialAccounts.form.goBack}
         </button>
       </div>
     )
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'url', label: label('addViaUrl', 'Add via URL') },
-    { key: 'screenshot', label: label('addViaScreenshot', 'Add via Screenshot') },
-    { key: 'manual', label: label('manualEntry', 'Manual Entry') },
+    { key: 'url', label: t.influencer.accounts.addViaUrl },
+    { key: 'screenshot', label: t.influencer.accounts.addViaScreenshot },
+    { key: 'manual', label: t.influencer.accounts.manualEntry },
   ]
 
   const platformName = urlParsed
@@ -282,21 +281,21 @@ export default function SocialAccountForm({
           <>
             <div>
               <label className="block text-sm font-medium mb-1">
-                {label('pasteUrl', 'Profile URL')}
+                {t.influencer.accounts.pasteUrl}
               </label>
               <input
                 type="text"
                 value={urlInput}
                 onChange={(e) => handleUrlChange(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder={label('urlPlaceholder', 'https://instagram.com/username')}
+                placeholder={t.influencer.accounts.urlPlaceholder}
               />
               {urlParsing && (
-                <p className="text-sm text-gray-500 mt-1">Parsing URL...</p>
+                <p className="text-sm text-gray-500 mt-1">{t.socialAccounts.form.parsingUrl}</p>
               )}
               {urlParsed && (
                 <p className="text-sm text-green-600 mt-1">
-                  Detected: {platformName} - @{urlParsed.username}
+                  {t.socialAccounts.form.detectedPrefix} {platformName} - @{urlParsed.username}
                 </p>
               )}
             </div>
@@ -304,7 +303,7 @@ export default function SocialAccountForm({
             {urlParsed && (
               <>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Platform</label>
+                  <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.platformLabel}</label>
                   <input
                     type="text"
                     value={platformName || ''}
@@ -314,7 +313,7 @@ export default function SocialAccountForm({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Username *</label>
+                  <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.usernameRequiredLabel}</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">@</span>
                     <input
@@ -329,7 +328,7 @@ export default function SocialAccountForm({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Follower Count</label>
+                    <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.followerCountLabel}</label>
                     <input
                       type="number"
                       min="0"
@@ -340,7 +339,7 @@ export default function SocialAccountForm({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Engagement Rate (%)</label>
+                    <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.engagementRateLabel}</label>
                     <input
                       type="number"
                       min="0"
@@ -362,7 +361,7 @@ export default function SocialAccountForm({
         {activeTab === 'screenshot' && (
           <>
             <div>
-              <label className="block text-sm font-medium mb-1">Platform *</label>
+              <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.platformRequiredLabel}</label>
               <select
                 required
                 value={screenshotPlatformId}
@@ -385,7 +384,7 @@ export default function SocialAccountForm({
                         .then(async (res) => {
                           if (!res.ok) {
                             const data = await res.json()
-                            setError(data.message || label('analysisError', 'Analysis failed'))
+                            setError(data.message || t.influencer.accounts.analysisError)
                             return
                           }
                           const data = await res.json()
@@ -400,14 +399,14 @@ export default function SocialAccountForm({
                             engagementRate: data.analysis.engagementRate ? String(data.analysis.engagementRate) : prev.engagementRate,
                           }))
                         })
-                        .catch(() => setError(label('analysisError', 'Failed to analyze screenshot')))
+                        .catch(() => setError(t.influencer.accounts.analysisError))
                         .finally(() => setIsAnalyzing(false))
                     }
                   }
                 }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                <option value="">Select a platform</option>
+                <option value="">{t.socialAccounts.form.selectPlatformOption}</option>
                 {availablePlatforms.map((platform) => (
                   <option key={platform.id} value={platform.id}>
                     {platform.name}
@@ -436,7 +435,7 @@ export default function SocialAccountForm({
               {isAnalyzing ? (
                 <div className="space-y-2">
                   <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-sm text-gray-600">{label('analyzingScreenshot', 'Analyzing screenshot...')}</p>
+                  <p className="text-sm text-gray-600">{t.influencer.accounts.analyzingScreenshot}</p>
                 </div>
               ) : screenshotFile ? (
                 <div className="space-y-1">
@@ -444,15 +443,15 @@ export default function SocialAccountForm({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   <p className="text-sm text-gray-600">{screenshotFile.name}</p>
-                  <p className="text-xs text-gray-400">Click or drop to replace</p>
+                  <p className="text-xs text-gray-400">{t.socialAccounts.form.clickOrDropReplace}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <svg className="w-10 h-10 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <p className="text-sm text-gray-600">{label('uploadScreenshot', 'Upload a screenshot')}</p>
-                  <p className="text-xs text-gray-400">{label('dragDropHint', 'Drag and drop or click to upload')}</p>
+                  <p className="text-sm text-gray-600">{t.influencer.accounts.uploadScreenshot}</p>
+                  <p className="text-xs text-gray-400">{t.influencer.accounts.dragDropHint}</p>
                 </div>
               )}
             </div>
@@ -461,23 +460,23 @@ export default function SocialAccountForm({
             {analysisResult && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-blue-900">{label('extractedData', 'Extracted Data')}</h4>
+                  <h4 className="font-medium text-blue-900">{t.influencer.accounts.extractedData}</h4>
                   <span className={`text-xs px-2 py-1 rounded-full ${
                     analysisResult.confidence === 'high' ? 'bg-green-100 text-green-700' :
                     analysisResult.confidence === 'medium' ? 'bg-yellow-100 text-yellow-700' :
                     'bg-red-100 text-red-700'
                   }`}>
-                    {label('confidence', 'Confidence')}: {analysisResult.confidence}
+                    {t.influencer.accounts.confidence}: {analysisResult.confidence}
                   </span>
                 </div>
-                <p className="text-sm text-blue-700">{label('reviewData', 'Review and edit the extracted data below before saving.')}</p>
+                <p className="text-sm text-blue-700">{t.influencer.accounts.reviewData}</p>
               </div>
             )}
 
             {analysisResult && (
               <>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Username</label>
+                  <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.usernameLabel}</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">@</span>
                     <input
@@ -492,7 +491,7 @@ export default function SocialAccountForm({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Follower Count</label>
+                    <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.followerCountLabel}</label>
                     <input
                       type="number"
                       min="0"
@@ -503,7 +502,7 @@ export default function SocialAccountForm({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">{label('likes', 'Likes')}</label>
+                    <label className="block text-sm font-medium mb-1">{t.influencer.accounts.likes}</label>
                     <input
                       type="number"
                       min="0"
@@ -516,7 +515,7 @@ export default function SocialAccountForm({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Engagement Rate (%)</label>
+                  <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.engagementRateLabel}</label>
                   <input
                     type="number"
                     min="0"
@@ -537,14 +536,14 @@ export default function SocialAccountForm({
         {activeTab === 'manual' && (
           <>
             <div>
-              <label className="block text-sm font-medium mb-1">Platform *</label>
+              <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.platformRequiredLabel}</label>
               <select
                 required
                 value={formData.platformId}
                 onChange={(e) => setFormData({ ...formData, platformId: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                <option value="">Select a platform</option>
+                <option value="">{t.socialAccounts.form.selectPlatformOption}</option>
                 {availablePlatforms.map((platform) => (
                   <option key={platform.id} value={platform.id}>
                     {platform.name}
@@ -554,7 +553,7 @@ export default function SocialAccountForm({
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Username *</label>
+              <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.usernameRequiredLabel}</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">@</span>
                 <input
@@ -563,25 +562,25 @@ export default function SocialAccountForm({
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="yourusername"
+                  placeholder={t.socialAccounts.form.usernamePlaceholder}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Profile URL</label>
+              <label className="block text-sm font-medium mb-1">{t.influencer.accounts.pasteUrl}</label>
               <input
                 type="url"
                 value={formData.profileUrl}
                 onChange={(e) => setFormData({ ...formData, profileUrl: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="https://..."
+                placeholder={t.socialAccounts.form.profileUrlPlaceholder}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Follower Count</label>
+                <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.followerCountLabel}</label>
                 <input
                   type="number"
                   min="0"
@@ -592,7 +591,7 @@ export default function SocialAccountForm({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Engagement Rate (%)</label>
+                <label className="block text-sm font-medium mb-1">{t.socialAccounts.form.engagementRateLabel}</label>
                 <input
                   type="number"
                   min="0"
@@ -615,7 +614,7 @@ export default function SocialAccountForm({
             onClick={onCancel}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition"
           >
-            Cancel
+            {t.socialAccounts.form.cancel}
           </button>
           <button
             type="submit"
@@ -626,7 +625,7 @@ export default function SocialAccountForm({
             }
             className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition disabled:opacity-50"
           >
-            {isSubmitting ? 'Adding...' : 'Add Account'}
+            {isSubmitting ? t.socialAccounts.form.adding : t.influencer.accounts.addAccount}
           </button>
         </div>
       </form>

@@ -411,7 +411,7 @@ export default function MessagesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-sm text-gray-900 truncate">
-                          {conv.otherUser?.name || 'Unknown User'}
+                          {conv.otherUser?.name || t.messages.unknownUser}
                         </span>
                         <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
                           {conv.lastMessage
@@ -425,7 +425,7 @@ export default function MessagesPage() {
                       <div className="flex items-center justify-between mt-1">
                         <p className="text-sm text-gray-600 truncate">
                           {conv.lastMessage?.isSystemMessage
-                            ? `[System] ${conv.lastMessage.content}`
+                            ? `${t.messages.systemPrefix} ${conv.lastMessage.content}`
                             : conv.lastMessage?.content || ''}
                         </p>
                         {conv.unreadCount > 0 && (
@@ -471,7 +471,7 @@ export default function MessagesPage() {
                   </button>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 truncate">
-                      {convDetails.otherUser?.name || 'Unknown User'}
+                      {convDetails.otherUser?.name || t.messages.unknownUser}
                     </h3>
                     <Link
                       href={`/campaign/${convDetails.campaignId}`}
@@ -492,7 +492,7 @@ export default function MessagesPage() {
                       <button
                         onClick={() => setShowSettings(!showSettings)}
                         className="p-1.5 hover:bg-gray-100 rounded-lg transition"
-                        title="Settings"
+                        title={t.nav.settings}
                       >
                         <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />

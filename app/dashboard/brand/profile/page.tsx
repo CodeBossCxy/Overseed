@@ -87,7 +87,7 @@ export default function BrandProfilePage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to update profile')
+        throw new Error(t.brand.profile.errorUpdate)
       }
 
       setSuccess(true)
@@ -168,7 +168,7 @@ export default function BrandProfilePage() {
               <div className="mt-2">
                 <img
                   src={formData.logoUrl}
-                  alt="Logo preview"
+                  alt={t.brand.profile.logoPreviewAlt}
                   className="h-16 object-contain rounded"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none'

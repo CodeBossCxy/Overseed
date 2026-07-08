@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { DM_Serif_Display, Noto_Sans_SC } from 'next/font/google'
+import { DM_Serif_Display, Manrope, Noto_Sans_SC } from 'next/font/google'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
@@ -18,6 +18,10 @@ const notoSansSC = Noto_Sans_SC({
   subsets: ['latin'],
   weight: ['300', '400', '500', '700', '900'],
   variable: '--font-noto-sans-sc',
+})
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-manrope',
 })
 
 export const metadata: Metadata = {
@@ -57,7 +61,7 @@ export default async function RootLayout({
       <head>
         <link rel="icon" type="image/png" href="/icon-pink.png" />
       </head>
-      <body className={`${notoSansSC.className} ${GeistMono.variable} ${dmSerifDisplay.variable} ${notoSansSC.variable}`}>
+      <body className={`${manrope.variable} ${notoSansSC.variable} ${GeistMono.variable} ${dmSerifDisplay.variable} font-sans`}>
         <SessionProvider session={session}>
           <LanguageProvider>
             <ThemeProvider>

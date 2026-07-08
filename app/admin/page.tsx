@@ -69,7 +69,7 @@ interface BetaFeedbackItem {
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { locale } = useLanguage()
+  const { t, locale } = useLanguage()
   const [overview, setOverview] = useState<Overview | null>(null)
   const [users, setUsers] = useState<UserData[]>([])
   const [recentAiLogs, setRecentAiLogs] = useState<AiLog[]>([])
@@ -644,7 +644,7 @@ export default function AdminDashboard() {
                   disabled={isGenerating}
                   className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium transition disabled:opacity-50"
                 >
-                  {isGenerating ? 'Generating...' : `Generate ${generateCount} Code${generateCount > 1 ? 's' : ''}`}
+                  {isGenerating ? t.admin.betaCodes.generating : `Generate ${generateCount} Code${generateCount > 1 ? 's' : ''}`}
                 </button>
               </div>
             </div>
@@ -653,23 +653,23 @@ export default function AdminDashboard() {
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-700">
-                  All Invite Codes ({betaCodes.length})
+                  {t.admin.betaCodes.allCodesTitle.replace('{count}', String(betaCodes.length))}
                 </h3>
                 <div className="text-xs text-gray-500">
-                  Active: {betaCodes.filter(c => c.isActive).length} | Used: {betaCodes.filter(c => c.usedCount > 0).length}
+                  {t.admin.betaCodes.activeLabel} {betaCodes.filter(c => c.isActive).length} | {t.admin.betaCodes.usedLabel} {betaCodes.filter(c => c.usedCount > 0).length}
                 </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-left">
                     <tr>
-                      <th className="px-4 py-3 font-medium text-gray-600">Code</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Note</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Usage</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Status</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Created</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Expires</th>
-                      <th className="px-4 py-3 font-medium text-gray-600">Action</th>
+                      <th className="px-4 py-3 font-medium text-gray-600">{t.admin.betaCodes.code}</th>
+                      <th className="px-4 py-3 font-medium text-gray-600">{t.admin.betaCodes.note}</th>
+                      <th className="px-4 py-3 font-medium text-gray-600">{t.admin.betaCodes.usageCol}</th>
+                      <th className="px-4 py-3 font-medium text-gray-600">{t.admin.betaCodes.status}</th>
+                      <th className="px-4 py-3 font-medium text-gray-600">{t.admin.betaCodes.created}</th>
+                      <th className="px-4 py-3 font-medium text-gray-600">{t.admin.betaCodes.expires}</th>
+                      <th className="px-4 py-3 font-medium text-gray-600">{t.admin.betaCodes.action}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
