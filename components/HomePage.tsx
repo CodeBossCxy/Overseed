@@ -453,7 +453,7 @@ export default function HomePage() {
             {heroStats.map((item) => (
               <div
                 key={item.title}
-                className="rounded-[24px] border border-white/80 bg-[#f8fbff]/75 p-6 text-center shadow-[inset_0_1px_12px_rgba(255,255,255,0.95),0_14px_30px_rgba(78,123,174,0.16)] backdrop-blur-md"
+                className="rounded-[24px] border border-white/80 bg-[#f8fbff]/75 p-6 text-center shadow-[inset_0_1px_12px_rgba(255,255,255,0.95),0_14px_30px_rgba(78,123,174,0.16)] backdrop-blur-md transition duration-300 hover:scale-[1.04]"
               >
                 <Image
                   src={item.image}
@@ -518,7 +518,7 @@ export default function HomePage() {
             {valueCards.map((card) => (
               <div
                 key={card.title}
-                className="rounded-[30px] border border-[#dbe9f8] bg-[#f8fbff]/75 px-8 pb-8 pt-7 shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_18px_46px_rgba(85,126,174,0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-1"
+                className="rounded-[30px] border border-[#dbe9f8] bg-[#f8fbff]/75 px-8 pb-8 pt-7 shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_18px_46px_rgba(85,126,174,0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:scale-[1.02]"
               >
                 <PlatformCardVisual image={card.image} title={card.title} />
                 <h3 className="mt-6 text-2xl font-normal leading-tight text-[#071735]">{card.title}</h3>
@@ -625,7 +625,7 @@ export default function HomePage() {
             {platformFeatures.map((feature) => (
               <div
                 key={feature.title}
-                className="rounded-[26px] border border-[#d9e7f8] bg-[#fbfdff]/80 p-6 shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_18px_42px_rgba(82,128,181,0.1)] backdrop-blur-md"
+                className="rounded-[26px] border border-[#d9e7f8] bg-[#fbfdff]/80 p-6 shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_18px_42px_rgba(82,128,181,0.1)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:scale-[1.02]"
               >
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[#d6e6f8] bg-[#f8fbff]/80 shadow-[inset_0_1px_18px_rgba(255,255,255,0.9),0_14px_34px_rgba(87,136,190,0.14)]">
                   <Image
@@ -666,7 +666,7 @@ export default function HomePage() {
             {earlyAccess.map((item) => (
               <div
                 key={item.title}
-                className="rounded-[26px] border border-[#dceafb] bg-[#fbfdff]/75 p-6 shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_18px_42px_rgba(82,128,181,0.11)] backdrop-blur-md"
+                className="rounded-[26px] border border-[#dceafb] bg-[#fbfdff]/75 p-6 shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_18px_42px_rgba(82,128,181,0.11)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:scale-[1.03]"
               >
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[#d6e6f8] bg-[#f8fbff]/80 shadow-[inset_0_1px_18px_rgba(255,255,255,0.9),0_14px_34px_rgba(87,136,190,0.14)]">
                   <Image
@@ -683,7 +683,7 @@ export default function HomePage() {
               </div>
             ))}
 
-            <div className="rounded-[28px] border border-[#d2e3f7] bg-[#f3f9ff]/75 p-6 shadow-[inset_0_1px_18px_rgba(255,255,255,0.95),0_20px_46px_rgba(82,128,181,0.16)] backdrop-blur-md">
+            <div className="rounded-[28px] border border-[#d2e3f7] bg-[#f3f9ff]/75 p-6 shadow-[inset_0_1px_18px_rgba(255,255,255,0.95),0_20px_46px_rgba(82,128,181,0.16)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:scale-[1.02]">
               <p className="text-center text-base font-normal text-[#1a315b]">{home.earlyAccess.betaLabel}</p>
               <div className="mx-auto mt-5 h-24 w-24 overflow-hidden rounded-full shadow-[0_18px_38px_rgba(69,119,180,0.16)]">
                 <Image
@@ -835,7 +835,7 @@ function StepsSection({
                 onMouseLeave={() => setHovering(false)}
                 className={`relative rounded-[26px] border bg-[#fbfdff]/80 p-6 pt-5 backdrop-blur-md transition-all duration-300 ease-out ${
                   isActive
-                    ? '-translate-y-1.5 border-[#bcd6f5] shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_26px_54px_rgba(64,110,170,0.28)]'
+                    ? '-translate-y-1.5 scale-[1.03] border-[#bcd6f5] shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_26px_54px_rgba(64,110,170,0.28)]'
                     : 'border-[#dbe8f8] shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_18px_42px_rgba(82,128,181,0.1)]'
                 } ${dim ? 'opacity-70' : 'opacity-100'}`}
               >
@@ -1003,12 +1003,12 @@ function DarkAudienceSection({
           {cards.map((card, index) => (
             <div
               key={card.title}
-              className={`rounded-[28px] border border-white/20 bg-white/[0.04] p-7 shadow-[inset_0_1px_18px_rgba(255,255,255,0.08),0_20px_46px_rgba(0,0,0,0.32)] backdrop-blur-sm transition duration-300 ${
+              className={`rounded-[28px] border border-white/20 bg-white/[0.04] p-7 shadow-[inset_0_1px_18px_rgba(255,255,255,0.08),0_20px_46px_rgba(0,0,0,0.32)] backdrop-blur-sm transition duration-300 hover:border-white/40 ${
                 index === 0
-                  ? 'md:-rotate-3'
+                  ? 'md:-rotate-3 hover:scale-105'
                   : index === 2
-                    ? 'md:rotate-3'
-                    : 'z-10 md:-translate-y-4 md:scale-[1.04] md:p-8'
+                    ? 'md:rotate-3 hover:scale-105'
+                    : 'z-10 hover:scale-[1.08] md:-translate-y-4 md:scale-[1.04] md:p-8'
               }`}
             >
               <div className="h-16 w-16 overflow-hidden rounded-full border border-white/15 shadow-[inset_0_1px_12px_rgba(255,255,255,0.1)]">
