@@ -320,6 +320,19 @@ body {
   @apply rounded-lg my-3 max-w-full;
 }
 
+/* ── Cross-device full-screen height ──
+   Mobile browser chrome (address bars) makes 100vh taller than the visible
+   area, hiding content behind the UI. `svh` sizes to the small viewport so a
+   section always fits the screen. `vh` stays as the fallback for old browsers. */
+.min-h-screen-safe {
+  min-height: 100vh;
+  min-height: 100svh;
+}
+.min-h-hero-safe {
+  min-height: calc(100vh - 4rem);
+  min-height: calc(100svh - 4rem);
+}
+
 /* ── Homepage scroll snap (desktop) ── */
 @media (min-width: 1024px) {
   html.hp-snap {

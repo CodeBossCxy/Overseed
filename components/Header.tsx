@@ -212,7 +212,7 @@ export default function Header() {
 
   return (
     <header
-      className={`z-50 ${
+      className={`z-50 pt-[env(safe-area-inset-top)] ${
         isLandingPage
           ? 'absolute left-0 right-0 top-0 bg-transparent'
           : isGlobal

@@ -400,7 +400,7 @@ export default function HomePage() {
 
   return (
     <div className="overflow-hidden bg-[#f4f9ff] font-normal text-[#071735]">
-      <section className="relative min-h-screen snap-start overflow-hidden bg-[#edf6ff] px-4 py-8 sm:px-6 lg:px-8">
+      <section className="relative min-h-screen-safe snap-start overflow-hidden bg-[#edf6ff] px-4 py-8 sm:px-6 lg:px-8">
         <Image
           src="/home/hero-bridge.png"
           alt=""
@@ -411,8 +411,8 @@ export default function HomePage() {
         />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,250,245,0.72)_0%,rgba(255,250,245,0.42)_32%,rgba(244,249,255,0)_70%)]" />
 
-        <div className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[1440px] flex-col justify-between rounded-[30px] px-2 py-4 sm:px-8 lg:px-12">
-          <div className="max-w-3xl pt-8 lg:pt-10">
+        <div className="relative z-10 mx-auto flex min-h-hero-safe w-full max-w-[1440px] flex-col justify-between rounded-[30px] px-2 py-4 sm:px-8 lg:px-12">
+          <div className="max-w-3xl pt-12 lg:pt-16">
             <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-[#d4e1ef] bg-[#f9fbff]/75 px-6 py-3 text-base font-normal text-[#0b3a7c] shadow-[inset_0_1px_8px_rgba(255,255,255,0.9),0_12px_28px_rgba(88,126,171,0.12)] backdrop-blur-md">
               <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                 <Image
@@ -503,7 +503,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section ref={setRef(0)} className="hp-section relative flex min-h-screen snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
+      <section ref={setRef(0)} className="hp-section relative flex min-h-screen-safe snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#eaf3ff_0%,#f4f9ff_55%,#ffffff_100%)]" />
         <div className="relative mx-auto w-full max-w-7xl text-center">
           <SectionLabel>{home.platform.label}</SectionLabel>
@@ -536,7 +536,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section ref={setRef(1)} className="hp-section flex min-h-screen snap-start items-center bg-black px-4 py-12 text-white sm:px-6 lg:px-8">
+      <section ref={setRef(1)} className="hp-section flex min-h-screen-safe snap-start items-center bg-black px-4 py-12 text-white sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-[1360px]">
           <div className="text-center">
             <SectionLabel dark>{home.choosePath.label}</SectionLabel>
@@ -613,7 +613,7 @@ export default function HomePage() {
         steps={steps}
       />
 
-      <section ref={setRef(5)} className="hp-section relative flex min-h-screen snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
+      <section ref={setRef(5)} className="hp-section relative flex min-h-screen-safe snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#eaf3ff_0%,#f4f9ff_55%,#ffffff_100%)]" />
         <div className="relative mx-auto w-full max-w-5xl text-center">
           <SectionLabel>{home.features.label}</SectionLabel>
@@ -649,7 +649,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section ref={setRef(6)} className="hp-section relative flex min-h-screen snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
+      <section ref={setRef(6)} className="hp-section relative flex min-h-screen-safe snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
         <div className="absolute inset-0">
           <Image src="/home/soft-blue-bg.png" alt="" fill sizes="100vw" className="object-cover" />
         </div>
@@ -717,8 +717,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section ref={setRef(7)} className="hp-section flex min-h-screen snap-start bg-[#061326] text-white">
-        <div className="relative flex min-h-screen w-full flex-col justify-between overflow-hidden bg-[#071528] px-6 py-10 sm:px-12 lg:px-16">
+      <section ref={setRef(7)} className="hp-section flex min-h-screen-safe snap-start bg-[#061326] text-white">
+        <div className="relative flex min-h-screen-safe w-full flex-col justify-between overflow-hidden bg-[#071528] px-6 py-10 sm:px-12 lg:px-16">
           <Image
             src="/background_2.jpg"
             alt=""
@@ -803,7 +803,7 @@ function StepsSection({
   return (
     <section
       ref={sectionRef}
-      className="hp-section relative flex min-h-screen snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8"
+      className="hp-section relative flex min-h-screen-safe snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8"
     >
       <div className="absolute inset-0 bg-[linear-gradient(180deg,#ffffff_0%,#f0f8ff_100%)]" />
       <div className="relative mx-auto w-full max-w-[1320px] text-center">
@@ -969,7 +969,7 @@ function DarkAudienceSection({
 }) {
   const { t } = useLanguage()
   return (
-    <section ref={sectionRef} className="hp-section flex min-h-screen snap-start items-center bg-black px-4 py-8 text-white sm:px-6 lg:px-12">
+    <section ref={sectionRef} className="hp-section flex min-h-screen-safe snap-start items-center bg-black px-4 py-8 text-white sm:px-6 lg:px-12">
       <div className="mx-auto w-full max-w-[1360px]">
         <div className="text-center">
           <div className="mb-4 inline-flex min-h-[40px] items-center gap-3 rounded-full border border-white/15 bg-white/5 px-6 text-base text-white shadow-[inset_0_1px_12px_rgba(255,255,255,0.1)]">

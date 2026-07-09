@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { DM_Serif_Display, Manrope, Noto_Sans_SC } from 'next/font/google'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
@@ -23,6 +23,13 @@ const manrope = Manrope({
   subsets: ['latin'],
   variable: '--font-manrope',
 })
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Extend under notches/rounded corners; pair with env(safe-area-inset-*) padding.
+  viewportFit: 'cover',
+}
 
 export const metadata: Metadata = {
   title: {
