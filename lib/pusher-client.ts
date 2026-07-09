@@ -13,7 +13,13 @@ export function getPusherClient(): PusherClient | null {
   if (!pusherClient) {
     pusherClient = new PusherClient(key, {
       cluster,
+      forceTLS: true,
+      enabledTransports: ['ws', 'wss'],
+      disableStats: true,
     })
+    // Degrade quietly to the polling fallback instead of spamming the console
+    // when the real-time service is unreachable (network/quota/config).
+    pusherClient.connection.bind('error', () => {})
   }
   return pusherClient
 }

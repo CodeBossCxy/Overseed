@@ -103,21 +103,25 @@ function MessageBadge({ isGlobal }: { isGlobal?: boolean }) {
     }
     fetchUnread()
 
-    // Use Pusher for real-time badge updates
+    // Use Pusher for real-time badge updates. Only open a connection when we
+    // actually have a user to subscribe for — otherwise the polling fallback
+    // below is enough and we avoid needless WebSocket connections.
     let cleanup: (() => void) | undefined
-    import('@/lib/pusher-client').then(({ getPusherClient }) => {
-      const pusher = getPusherClient()
-      if (pusher && badgeUserId) {
-        const channel = pusher.subscribe(`user-${badgeUserId}`)
-        channel.bind('conversation-updated', () => {
-          fetchUnread()
-        })
-        cleanup = () => {
-          channel.unbind_all()
-          pusher.unsubscribe(`user-${badgeUserId}`)
+    if (badgeUserId) {
+      import('@/lib/pusher-client').then(({ getPusherClient }) => {
+        const pusher = getPusherClient()
+        if (pusher) {
+          const channel = pusher.subscribe(`user-${badgeUserId}`)
+          channel.bind('conversation-updated', () => {
+            fetchUnread()
+          })
+          cleanup = () => {
+            channel.unbind_all()
+            pusher.unsubscribe(`user-${badgeUserId}`)
+          }
         }
-      }
-    })
+      })
+    }
 
     // Fallback polling
     const interval = setInterval(fetchUnread, 30000)
