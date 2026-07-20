@@ -4,6 +4,15 @@ import { useState } from 'react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 import { signOut } from 'next-auth/react'
+import { useTheme, COLOR_THEMES, type ColorTheme } from '@/components/ThemeProvider'
+
+const THEME_SWATCHES: Record<ColorTheme, string> = {
+  default: 'linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%)',
+  sunset: 'linear-gradient(135deg, #d7e6f5 0%, #f9d5b5 50%, #f0a877 100%)',
+  sky: 'linear-gradient(135deg, #c9dff6 0%, #dcebf9 50%, #f8ddc2 100%)',
+  cream: 'linear-gradient(135deg, #e8f0f9 0%, #f7efe4 50%, #f8d9ba 100%)',
+  lavender: 'linear-gradient(135deg, #e3e2f9 0%, #ece5fa 50%, #f9e0d6 100%)',
+}
 
 interface SettingsUser {
   id: string
@@ -18,7 +27,16 @@ interface SettingsUser {
 
 export default function SettingsClient({ user }: { user: SettingsUser }) {
   const { locale, setLocale, t, autoTranslateUGC, setAutoTranslateUGC } = useLanguage()
+  const { colorTheme, setColorTheme } = useTheme()
   const st = t.settings
+
+  const themeLabels: Record<ColorTheme, string> = {
+    default: st.themeDefault,
+    sunset: st.themeSunset,
+    sky: st.themeSky,
+    cream: st.themeCream,
+    lavender: st.themeLavender,
+  }
 
   // Name editing
   const [name, setName] = useState(user.name || '')
@@ -190,6 +208,42 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
           >
             中文
           </button>
+        </div>
+      </section>
+
+      {/* Theme Color Section */}
+      <section className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4">{st.themeColor}</h2>
+        <p className="text-sm text-gray-500 mb-4">{st.themeColorDescription}</p>
+        <div className="flex flex-wrap gap-4">
+          {COLOR_THEMES.map((theme) => (
+            <button
+              key={theme}
+              onClick={() => setColorTheme(theme)}
+              className="flex flex-col items-center gap-2 group"
+              aria-pressed={colorTheme === theme}
+            >
+              <span
+                className={`relative w-14 h-14 rounded-full border transition ${
+                  colorTheme === theme
+                    ? 'ring-2 ring-primary-500 ring-offset-2 border-transparent'
+                    : 'border-gray-200 group-hover:ring-2 group-hover:ring-primary-200 group-hover:ring-offset-2'
+                }`}
+                style={{ background: THEME_SWATCHES[theme] }}
+              >
+                {colorTheme === theme && (
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-primary-600 drop-shadow-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                )}
+              </span>
+              <span className={`text-xs font-medium ${colorTheme === theme ? 'text-primary-600' : 'text-gray-600'}`}>
+                {themeLabels[theme]}
+              </span>
+            </button>
+          ))}
         </div>
       </section>
 

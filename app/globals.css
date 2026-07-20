@@ -223,6 +223,43 @@
 [data-theme='global'] .text-pink-600 { color: #ff769f !important; }
 [data-theme='global'] .text-pink-700 { color: #ff769f !important; }
 
+/* ══ User-selectable color themes (Settings → Theme Color) ══
+   Set as data-color-theme on <html> by ThemeProvider for app pages only;
+   the attribute is removed on global (dark) pages and for the default theme,
+   so these rules never fight the [data-theme='global'] overrides above. */
+
+[data-color-theme='sunset'] body {
+  background: linear-gradient(150deg, #d7e6f5 0%, #f6e3d3 25%, #f9d5b5 55%, #f4b287 85%, #f0a877 100%) fixed;
+}
+[data-color-theme='sky'] body {
+  background: linear-gradient(150deg, #c9dff6 0%, #dcebf9 40%, #f3e9dd 75%, #f8ddc2 100%) fixed;
+}
+[data-color-theme='cream'] body {
+  background: linear-gradient(150deg, #e8f0f9 0%, #f7efe4 40%, #fbe6d2 75%, #f8d9ba 100%) fixed;
+}
+[data-color-theme='lavender'] body {
+  background: linear-gradient(150deg, #e3e2f9 0%, #ece5fa 35%, #f3e4ef 65%, #f9e0d6 100%) fixed;
+}
+
+/* Glassy surfaces so the ambient gradient shows through cards and wrappers */
+[data-color-theme] .bg-white {
+  background-color: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+[data-color-theme] .bg-gray-50 {
+  background-color: rgba(255, 255, 255, 0.35);
+}
+[data-color-theme] .bg-gray-100 {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+[data-color-theme] .shadow-md,
+[data-color-theme] .shadow-sm {
+  box-shadow: 0 8px 24px rgba(96, 68, 44, 0.1), 0 1px 2px rgba(96, 68, 44, 0.06);
+}
+[data-color-theme] .border-gray-100 { border-color: rgba(255, 255, 255, 0.55); }
+[data-color-theme] .border-gray-200 { border-color: rgba(255, 255, 255, 0.65); }
+
 body {
   color: var(--foreground);
   background: var(--background);

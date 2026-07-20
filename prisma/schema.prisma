@@ -117,6 +117,7 @@ model User {
   subscriptionTier SubscriptionTier @default(FREE)
   preferredLanguage  String   @default("en")
   autoTranslateUGC   Boolean  @default(true)
+  colorTheme         String   @default("default")
   isVerified    Boolean   @default(false)
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
