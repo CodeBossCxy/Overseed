@@ -30,6 +30,9 @@ export default function AIAssistantPage() {
   const { t } = useLanguage()
   const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
   const isProUser = subscriptionTier === 'PRO'
+  const isLoggedIn = !!session
+  const userType = (session?.user as any)?.userType
+  const isCreator = userType === 'INFLUENCER'
   const { themeMode } = useTheme()
   const themeIcon = themeMode === 'brand' ? '/icon-blue.png' : '/icon-pink.png'
 
@@ -449,6 +452,100 @@ export default function AIAssistantPage() {
     if (days === 1) return t.common.yesterday
     if (days < 7) return `${days}d ago`
     return date.toLocaleDateString()
+  }
+
+  const ai = t.aiAssistant.intro
+  const introHelps = [ai.help1, ai.help2, ai.help3, ai.help4, ai.help5]
+  const examplePrompts = [ai.prompt1, ai.prompt2, ai.prompt3, ai.prompt4]
+  const comingSoon = [
+    { title: ai.soon1Title, desc: ai.soon1Desc },
+    { title: ai.soon2Title, desc: ai.soon2Desc },
+    { title: ai.soon3Title, desc: ai.soon3Desc },
+    { title: ai.soon4Title, desc: ai.soon4Desc },
+    { title: ai.soon5Title, desc: ai.soon5Desc },
+  ]
+
+  // Public AI intro — logged-out visitors get the feature intro, example
+  // prompts and Coming Soon cards instead of the chat or an upgrade wall.
+  if (!isLoggedIn) {
+    return (
+      <MainLayout>
+        <div className="max-w-5xl mx-auto px-4 py-10 sm:py-14">
+          {/* Hero */}
+          <div className="text-center mb-10">
+            <img src={themeIcon} alt="Overseed" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">{ai.title}</h1>
+            <p className="mt-3 text-gray-600 max-w-xl mx-auto">{ai.subtitle}</p>
+          </div>
+
+          {/* What it helps with + CTA */}
+          <div className="bg-white rounded-2xl shadow-md p-6 mb-6 max-w-2xl mx-auto">
+            <p className="text-sm font-medium text-gray-700 mb-3">{ai.helpsWithLabel}</p>
+            <ul className="grid sm:grid-cols-2 gap-2">
+              {introHelps.map((h) => (
+                <li key={h} className="flex items-center gap-2 text-sm text-gray-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary-500 flex-shrink-0" />
+                  {h}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 flex flex-col sm:flex-row items-center gap-3">
+              <Link
+                href="/auth/signup"
+                className="inline-flex items-center justify-center px-6 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition font-medium shadow-sm"
+              >
+                {ai.startCta}
+              </Link>
+              <Link href="/auth/signin" className="text-sm text-primary-600 hover:text-primary-700 transition">
+                {t.nav.login}
+              </Link>
+            </div>
+            <p className="mt-3 text-xs text-gray-400">{ai.brandOnlyNote}</p>
+          </div>
+
+          {/* Example prompts */}
+          <div className="max-w-2xl mx-auto mb-12">
+            <p className="text-sm font-medium text-gray-700 mb-3">{ai.examplePromptsLabel}</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {examplePrompts.map((p) => (
+                <div key={p} className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm text-gray-700">
+                  {p}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Coming soon */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 text-center">{ai.comingSoonLabel}</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {comingSoon.map((c) => (
+                <div key={c.title} className="relative bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                  <span className="absolute top-3 right-3 text-[10px] font-semibold tracking-wide text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {ai.comingSoonTag}
+                  </span>
+                  <h3 className="font-semibold text-gray-900 mb-1.5 pr-20">{c.title}</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{c.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    )
+  }
+
+  // Creators don't have AI access yet.
+  if (isCreator) {
+    return (
+      <MainLayout>
+        <div className="max-w-lg mx-auto px-4 py-20 text-center">
+          <img src={themeIcon} alt="Overseed" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{ai.creatorTitle}</h1>
+          <p className="text-gray-600">{ai.creatorDesc}</p>
+        </div>
+      </MainLayout>
+    )
   }
 
   return (

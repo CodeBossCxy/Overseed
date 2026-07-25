@@ -1,4 +1,4 @@
-import MainLayout from '@/components/MainLayout'
+import CreatorWorkspaceLayout from '@/components/workspace/CreatorWorkspaceLayout'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -115,7 +115,7 @@ export default async function InfluencerDashboardPage() {
   )
 
   return (
-    <MainLayout>
+    <CreatorWorkspaceLayout>
       <InfluencerDashboardClient
         stats={stats}
         recentApplications={JSON.parse(JSON.stringify(recentApplications))}
@@ -124,6 +124,6 @@ export default async function InfluencerDashboardPage() {
         userName={session.user?.name || 'Influencer'}
         stripeOnboardingComplete={influencerProfile.stripeOnboardingComplete}
       />
-    </MainLayout>
+    </CreatorWorkspaceLayout>
   )
 }

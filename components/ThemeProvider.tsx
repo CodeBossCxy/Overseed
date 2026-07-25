@@ -7,8 +7,8 @@ import { usePathname } from 'next/navigation'
 
 export type ThemeMode = 'creator' | 'brand' | 'global'
 
-export type ColorTheme = 'default' | 'sunset' | 'sky' | 'cream' | 'lavender'
-export const COLOR_THEMES: ColorTheme[] = ['default', 'sunset', 'sky', 'cream', 'lavender']
+export type ColorTheme = 'default' | 'sunset' | 'sky' | 'cream' | 'lavender' | 'mint' | 'rose' | 'ocean' | 'honey'
+export const COLOR_THEMES: ColorTheme[] = ['default', 'sunset', 'sky', 'cream', 'lavender', 'mint', 'rose', 'ocean', 'honey']
 
 interface ThemeContextType {
   themeMode: ThemeMode
@@ -102,15 +102,17 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     link.href = iconHref + '?v=' + (isGlobalPage ? 'global' : isBrand ? 'brand' : 'creator')
   }, [pathname, session, isBrand])
 
-  // Ambient color theme only applies on app pages; the dark global theme
-  // and the default look keep the attribute off entirely
+  // Expose the chosen colour theme on <html> for every page. The heavy workspace
+  // ambience (body gradient + glassy cards) is scoped in CSS to non-global pages,
+  // so on the public/marketing pages this only publishes --user-theme-gradient,
+  // which the homepage hero opts into.
   useEffect(() => {
-    if (themeMode === 'global' || colorTheme === 'default') {
+    if (colorTheme === 'default') {
       document.documentElement.removeAttribute('data-color-theme')
     } else {
       document.documentElement.setAttribute('data-color-theme', colorTheme)
     }
-  }, [themeMode, colorTheme])
+  }, [colorTheme])
 
   const value = useMemo(() => ({
     themeMode,

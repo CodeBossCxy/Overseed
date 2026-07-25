@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import StatusBadge from '@/components/StatusBadge'
 
 interface Campaign {
   id: string
@@ -20,39 +21,20 @@ interface BrandCampaignsClientProps {
   campaigns: Campaign[]
 }
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'ACTIVE':
-      return 'bg-green-100 text-green-800'
-    case 'DRAFT':
-      return 'bg-gray-100 text-gray-800'
-    case 'PENDING_REVIEW':
-      return 'bg-yellow-100 text-yellow-800'
-    case 'PAUSED':
-      return 'bg-orange-100 text-orange-800'
-    case 'COMPLETED':
-      return 'bg-blue-100 text-blue-800'
-    case 'CANCELLED':
-      return 'bg-red-100 text-red-800'
-    default:
-      return 'bg-gray-100 text-gray-800'
-  }
-}
-
 export default function BrandCampaignsClient({ campaigns }: BrandCampaignsClientProps) {
   const { t, locale } = useLanguage()
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-6xl mx-auto pt-6 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">{t.brand.campaigns.title}</h1>
-          <p className="text-gray-600 mt-1">{t.brand.campaigns.subtitle}</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t.brand.campaigns.title}</h1>
+          <p className="text-gray-500 mt-1">{t.brand.campaigns.subtitle}</p>
         </div>
         <Link
           href="/dashboard/brand/campaigns/new"
-          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition"
+          className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 transition"
         >
           {t.brand.campaigns.createCampaign}
         </Link>
@@ -60,20 +42,20 @@ export default function BrandCampaignsClient({ campaigns }: BrandCampaignsClient
 
       {/* Campaigns Table */}
       {campaigns.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+        <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-12 text-center">
           <p className="text-gray-500 text-lg mb-4">{t.brand.campaigns.noCampaigns}</p>
           <p className="text-gray-400 mb-6">{t.brand.campaigns.noCampaignsDesc}</p>
           <Link
             href="/dashboard/brand/campaigns/new"
-            className="inline-block px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition"
+            className="inline-block px-6 py-3 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 transition"
           >
             {t.brand.campaigns.createFirst}
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead>
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {t.brand.campaigns.thCampaign}
@@ -92,9 +74,9 @@ export default function BrandCampaignsClient({ campaigns }: BrandCampaignsClient
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {campaigns.map((campaign) => (
-                <tr key={campaign.id} className="hover:bg-gray-50">
+                <tr key={campaign.id} className="hover:bg-white transition">
                   <td className="px-6 py-4">
                     <div>
                       <Link
@@ -116,9 +98,7 @@ export default function BrandCampaignsClient({ campaigns }: BrandCampaignsClient
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(campaign.status)}`}>
-                      {campaign.status.replace('_', ' ')}
-                    </span>
+                    <StatusBadge machine="campaign" status={campaign.status} size="sm" dot />
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-gray-900">{campaign._count.applications}</span>

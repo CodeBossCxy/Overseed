@@ -38,7 +38,7 @@ function LandingLogo() {
   )
 }
 
-function NavDropdown({ label, items, isGlobal }: { label: string; items: DropdownItem[]; isGlobal?: boolean }) {
+function NavDropdown({ label, items, isGlobal, isLanding }: { label: string; items: DropdownItem[]; isGlobal?: boolean; isLanding?: boolean }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -52,11 +52,20 @@ function NavDropdown({ label, items, isGlobal }: { label: string; items: Dropdow
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // The landing page renders in the dark "global" theme but on a light hero,
+  // so it needs the dark-text treatment rather than the global light-text one.
+  const buttonClass = isLanding
+    ? 'text-base text-[#071735] hover:text-[#2c6fb2]'
+    : isGlobal
+      ? 'text-sm text-gray-200 hover:text-[#ff769f]'
+      : 'text-sm text-gray-700 hover:text-primary-600'
+  const useLightPanel = isLanding || !isGlobal
+
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1 transition text-sm font-medium ${isGlobal ? 'text-gray-200 hover:text-[#ff769f]' : 'text-gray-700 hover:text-primary-600'}`}
+        className={`flex items-center gap-1 transition font-normal ${buttonClass}`}
       >
         {label}
         <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,20 +74,108 @@ function NavDropdown({ label, items, isGlobal }: { label: string; items: Dropdow
       </button>
       {open && (
         <div
-          className={`absolute top-full left-0 mt-2 w-48 rounded-lg shadow-lg py-1 z-50 ${isGlobal ? 'backdrop-blur-xl' : 'bg-white border border-gray-100'}`}
-          style={isGlobal ? { backgroundColor: 'rgba(10, 21, 39, 0.95)', border: '1px solid rgba(212, 224, 253, 0.1)' } : undefined}
+          className={`absolute top-full left-0 mt-2 w-48 rounded-lg shadow-lg py-1 z-50 ${useLightPanel ? 'bg-white border border-gray-100' : 'backdrop-blur-xl'}`}
+          style={useLightPanel ? undefined : { backgroundColor: 'rgba(10, 21, 39, 0.95)', border: '1px solid rgba(212, 224, 253, 0.1)' }}
         >
           {items.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`block px-4 py-2 text-sm font-light transition ${isGlobal ? 'hover:bg-white/10' : 'text-gray-700 hover:bg-primary-50 hover:text-primary-600'}`}
-              style={isGlobal ? { color: 'rgba(255,255,255,0.85)' } : undefined}
+              className={`block px-4 py-2 text-sm font-light transition ${useLightPanel ? 'text-gray-700 hover:bg-primary-50 hover:text-primary-600' : 'hover:bg-white/10'}`}
+              style={useLightPanel ? undefined : { color: 'rgba(255,255,255,0.85)' }}
               onClick={() => setOpen(false)}
             >
               {item.label}
             </Link>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GlobeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+    </svg>
+  )
+}
+
+function LanguageDropdown({
+  locale,
+  setLocale,
+  isGlobal,
+  isLanding,
+  title,
+}: {
+  locale: string
+  setLocale: (l: 'en' | 'zh') => void
+  isGlobal?: boolean
+  isLanding?: boolean
+  title?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const current = locale === 'en' ? 'EN' : '中文'
+  const options: { value: 'en' | 'zh'; label: string }[] = [
+    { value: 'en', label: 'English' },
+    { value: 'zh', label: '简体中文' },
+  ]
+
+  const triggerClass = isLanding
+    ? 'inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#d4e1ef] bg-[#f9fbff]/75 px-4 text-sm font-normal text-[#082052] shadow-[inset_0_1px_8px_rgba(255,255,255,0.9),0_12px_28px_rgba(88,126,171,0.12)] backdrop-blur-md transition hover:bg-white'
+    : isGlobal
+      ? 'inline-flex items-center gap-1.5 p-2 rounded-md text-gray-200 hover:text-[#ff769f] hover:bg-[#456fa3]/15 transition'
+      : 'inline-flex items-center gap-1.5 p-2 rounded-md text-gray-600 hover:text-primary-600 hover:bg-gray-100 transition'
+
+  const useLightPanel = isLanding || !isGlobal
+
+  return (
+    <div ref={ref} className="relative mr-2 sm:mr-3">
+      <button onClick={() => setOpen(!open)} className={triggerClass} title={title}>
+        <GlobeIcon className={isLanding ? 'h-4 w-4 text-[#0b3a7c]' : 'w-5 h-5'} />
+        <span className={locale === 'zh' ? 'font-cn' : undefined}>{current}</span>
+        <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          className={`absolute top-full right-0 mt-2 w-36 rounded-lg shadow-lg py-1 z-50 ${useLightPanel ? 'bg-white border border-gray-100' : 'backdrop-blur-xl'}`}
+          style={useLightPanel ? undefined : { backgroundColor: 'rgba(10, 21, 39, 0.95)', border: '1px solid rgba(212, 224, 253, 0.1)' }}
+        >
+          {options.map((opt) => {
+            const active = locale === opt.value
+            return (
+              <button
+                key={opt.value}
+                onClick={() => { setLocale(opt.value); setOpen(false) }}
+                className={`flex w-full items-center justify-between px-4 py-2 text-sm transition ${opt.value === 'zh' ? 'font-cn' : ''} ${
+                  useLightPanel
+                    ? `${active ? 'text-primary-600 font-medium' : 'text-gray-700'} hover:bg-primary-50`
+                    : `${active ? 'text-[#ff769f]' : ''} hover:bg-white/10`
+                }`}
+                style={useLightPanel || active ? undefined : { color: 'rgba(255,255,255,0.85)' }}
+              >
+                {opt.label}
+                {active && (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
@@ -160,11 +257,6 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileExpanded, setMobileExpanded] = useState<string | null>(null)
 
-  const toggleLanguage = () => {
-    const newLang = locale === 'en' ? 'zh' : 'en'
-    setLocale(newLang)
-  }
-
   const dashboardLink = isBrand ? '/dashboard/brand' : '/dashboard/influencer'
 
   const navMenus = [
@@ -173,6 +265,7 @@ export default function Header() {
       label: t.nav.campaigns,
       items: [
         { label: t.nav.campaignBoard, href: '/browse' },
+        ...(isBrand ? [{ label: t.nav.findInfluencer, href: '/dashboard/brand/discover' }] : []),
         { label: t.nav.featuredCampaigns, href: '/browse?sort=featured' },
       ],
     },
@@ -204,8 +297,24 @@ export default function Header() {
 
   const isGlobal = themeMode === 'global'
   const landingNavMenus = [
-    { key: 'brand', label: t.nav.forBrands, href: '/brand', items: [] },
-    { key: 'creator', label: t.nav.forCreators, href: '/creator', items: [] },
+    {
+      key: 'brand',
+      label: t.nav.forBrands,
+      items: [
+        { label: t.nav.postCampaign, href: '/auth/signup?type=brand' },
+        { label: t.nav.howItWorks, href: '/brand#how-it-works' },
+        { label: t.nav.brandFaq, href: '/brand#faq' },
+      ],
+    },
+    {
+      key: 'creator',
+      label: t.nav.forCreators,
+      items: [
+        { label: t.nav.browseCampaigns, href: '/browse' },
+        { label: t.nav.howItWorks, href: '/creator#how-it-works' },
+        { label: t.nav.creatorFaq, href: '/creator#faq' },
+      ],
+    },
     { key: 'ai', label: t.nav.ai, href: '/ai-assistant', items: [] },
   ]
   const visibleNavMenus = isLandingPage ? landingNavMenus : navMenus
@@ -255,7 +364,7 @@ export default function Header() {
                   {menu.label}
                 </Link>
               ) : (
-                <NavDropdown key={menu.key} label={menu.label} items={menu.items} isGlobal={isGlobal} />
+                <NavDropdown key={menu.key} label={menu.label} items={menu.items} isGlobal={isGlobal} isLanding={isLandingPage} />
               )
             ))}
           </nav>
@@ -263,34 +372,13 @@ export default function Header() {
           {/* Right side */}
           <div className="flex items-center gap-1">
             {/* Language Switcher */}
-            {isLandingPage ? (
-              <button
-                onClick={toggleLanguage}
-                className="mr-2 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#d4e1ef] bg-[#f9fbff]/75 px-4 text-sm font-normal shadow-[inset_0_1px_8px_rgba(255,255,255,0.9),0_12px_28px_rgba(88,126,171,0.12)] backdrop-blur-md transition hover:bg-white sm:mr-3"
-                title={t.nav.switchLanguage}
-              >
-                <svg className="h-4 w-4 text-[#0b3a7c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                </svg>
-                <span className={locale === 'en' ? 'text-[#082052]' : 'text-[#8ba3c4]'}>EN</span>
-                <span className="text-[#b6c8de]">/</span>
-                <span className={`font-cn ${locale === 'zh' ? 'text-[#082052]' : 'text-[#8ba3c4]'}`}>中文</span>
-              </button>
-            ) : (
-              <button
-                onClick={toggleLanguage}
-                className={`p-2 rounded-md transition ${
-                  isGlobal
-                    ? 'text-gray-200 hover:text-[#ff769f] hover:bg-[#456fa3]/15'
-                    : 'text-gray-600 hover:text-primary-600 hover:bg-gray-100'
-                }`}
-                title={t.nav.switchLanguage}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                </svg>
-              </button>
-            )}
+            <LanguageDropdown
+              locale={locale}
+              setLocale={setLocale}
+              isGlobal={isGlobal}
+              isLanding={isLandingPage}
+              title={t.nav.switchLanguage}
+            />
 
             {/* Auth buttons */}
             {session ? (

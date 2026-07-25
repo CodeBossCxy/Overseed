@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import MainLayout from '@/components/MainLayout'
+import CreatorWorkspaceLayout from '@/components/workspace/CreatorWorkspaceLayout'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function InfluencerProfilePage() {
@@ -118,17 +118,17 @@ export default function InfluencerProfilePage() {
 
   if (isLoading) {
     return (
-      <MainLayout>
+      <CreatorWorkspaceLayout>
         <div className="max-w-3xl mx-auto px-4 py-12 text-center">
           <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
           <p className="mt-4 text-gray-500">{t.influencer.profile.loading}</p>
         </div>
-      </MainLayout>
+      </CreatorWorkspaceLayout>
     )
   }
 
   return (
-    <MainLayout>
+    <CreatorWorkspaceLayout>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">{t.influencer.profile.title}</h1>
@@ -279,6 +279,6 @@ export default function InfluencerProfilePage() {
           </div>
         </form>
       </div>
-    </MainLayout>
+    </CreatorWorkspaceLayout>
   )
 }

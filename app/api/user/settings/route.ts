@@ -85,6 +85,51 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true })
   }
 
+  // Update account/region/notification/privacy preferences
+  if (action === 'updatePreferences') {
+    const updateData: Record<string, any> = {}
+
+    const stringFields = [
+      'preferredContentLanguage',
+      'timeZone',
+      'dateFormat',
+      'displayCurrency',
+      'defaultCampaignCurrency',
+    ] as const
+    for (const field of stringFields) {
+      if (body[field] !== undefined) {
+        updateData[field] = body[field] === null ? null : String(body[field])
+      }
+    }
+
+    const boolFields = [
+      'emailNotifications',
+      'emailCampaignUpdates',
+      'emailCollaborationUpdates',
+      'emailPaymentUpdates',
+      'emailProductUpdates',
+      'profileDiscoverable',
+      'allowContactSharing',
+      'allowBusinessContactSharing',
+    ] as const
+    for (const field of boolFields) {
+      if (body[field] !== undefined) {
+        updateData[field] = Boolean(body[field])
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    })
+
+    return NextResponse.json({ success: true, ...updateData })
+  }
+
   // Delete account (deactivate)
   if (action === 'deactivateAccount') {
     await prisma.user.update({

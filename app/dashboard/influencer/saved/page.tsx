@@ -1,4 +1,4 @@
-import MainLayout from '@/components/MainLayout'
+import CreatorWorkspaceLayout from '@/components/workspace/CreatorWorkspaceLayout'
 import InfluencerSavedClient from '@/components/dashboard/InfluencerSavedClient'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -62,8 +62,8 @@ export default async function SavedCampaignsPage() {
   })
 
   return (
-    <MainLayout>
+    <CreatorWorkspaceLayout>
       <InfluencerSavedClient savedCampaigns={JSON.parse(JSON.stringify(savedCampaigns))} />
-    </MainLayout>
+    </CreatorWorkspaceLayout>
   )
 }

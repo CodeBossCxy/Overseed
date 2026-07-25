@@ -70,10 +70,23 @@ enum AlertFrequency {
 
 enum PaymentStatus {
   PENDING
+  PROCESSING
   HELD
+  RELEASE_PENDING
   RELEASED
+  PAYOUT_PROCESSING
+  PAID
   REFUNDED
+  DISPUTED
   FAILED
+}
+
+enum CollaborationStatus {
+  AWAITING_CONFIRMATION
+  ACTIVE
+  SUBMITTED
+  COMPLETED
+  CANCELLED
 }
 
 enum SubscriptionTier {
@@ -118,6 +131,19 @@ model User {
   preferredLanguage  String   @default("en")
   autoTranslateUGC   Boolean  @default(true)
   colorTheme         String   @default("default")
+  preferredContentLanguage String?
+  timeZone                 String?
+  dateFormat               String  @default("MM/DD/YYYY")
+  displayCurrency          String  @default("USD")
+  defaultCampaignCurrency  String  @default("USD")
+  emailNotifications       Boolean @default(true)
+  emailCampaignUpdates        Boolean @default(true)
+  emailCollaborationUpdates   Boolean @default(true)
+  emailPaymentUpdates         Boolean @default(true)
+  emailProductUpdates         Boolean @default(true)
+  profileDiscoverable         Boolean @default(true)
+  allowContactSharing         Boolean @default(true)
+  allowBusinessContactSharing Boolean @default(true)
   isVerified    Boolean   @default(false)
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
@@ -238,6 +264,7 @@ model InfluencerProfile {
   socialAccounts  InfluencerSocialAccount[]
   applications    Application[]
   savedCampaigns  SavedCampaign[]
+  collaborations  Collaboration[]
 
   @@map("influencer_profiles")
 }
@@ -308,6 +335,7 @@ model BrandProfile {
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaigns Campaign[]
+  collaborations Collaboration[]
 
   @@map("brand_profiles")
 }
@@ -397,6 +425,7 @@ model Campaign {
   media                CampaignMedia[]
   applications         Application[]
   savedBy              SavedCampaign[]
+  collaborations       Collaboration[]
 
   @@index([status, createdAt])
   @@index([brandId])
@@ -480,6 +509,7 @@ model Application {
   socialAccount InfluencerSocialAccount? @relation(fields: [socialAccountId], references: [id])
   conversation  Conversation?
   payment       Payment?
+  collaboration Collaboration?
 
   @@unique([campaignId, influencerId])
   @@index([influencerId, status])
@@ -674,7 +704,11 @@ model SavedSearch {
 
 model Payment {
   id                    String        @id @default(cuid())
-  applicationId         String        @unique
+  // A payment belongs to a Collaboration (the funded unit of work). applicationId
+  // is retained, nullable, only for legacy rows created before Collaborations
+  // existed; new payments set collaborationId.
+  applicationId         String?       @unique
+  collaborationId       String?       @unique
   amount                Decimal       @db.Decimal(10, 2)
   platformFee           Decimal       @db.Decimal(10, 2)
   creatorPayout         Decimal       @db.Decimal(10, 2)
@@ -689,8 +723,79 @@ model Payment {
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
-  application           Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application           Application?   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  collaboration         Collaboration? @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@map("payments")
+}
+
+// ===========================================
+// COLLABORATIONS
+// ===========================================
+
+model Collaboration {
+  id             String              @id @default(cuid())
+  campaignId     String
+  applicationId  String              @unique
+  influencerId   String
+  brandId        String
+  status         CollaborationStatus @default(AWAITING_CONFIRMATION)
+
+  // Locked terms — frozen when the creator accepts the collaboration
+  deliverables        String?  @db.Text
+  fee                 Decimal? @db.Decimal(10, 2)
+  currency            String   @default("USD")
+  productCompensation String?
+  deadline            DateTime?
+  revisionRounds      Int      @default(2)
+  revisionsUsed       Int      @default(0)
+  usageRights         String?  @db.Text
+  termsLockedAt       DateTime?
+
+  // Published evidence submitted by the creator
+  publishedUrl        String?
+  publishedPlatform   String?
+  publishedAt         DateTime?
+  evidenceScreenshot  String?
+
+  // Lifecycle timestamps
+  confirmedAt    DateTime?
+  submittedAt    DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  disputedAt     DateTime?
+  reviewNote     String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  campaign         Campaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  application      Application                @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  influencer       InfluencerProfile          @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  brand            BrandProfile               @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  deliverableItems CollaborationDeliverable[]
+  payment          Payment?
+
+  @@index([brandId, status])
+  @@index([influencerId, status])
+  @@index([campaignId])
+  @@map("collaborations")
+}
+
+model CollaborationDeliverable {
+  id              String    @id @default(cuid())
+  collaborationId String
+  title           String
+  type            String    @default("other") // video | image | story | other
+  status          String    @default("pending") // pending | submitted | approved | revision_requested
+  fileUrl         String?
+  note            String?   @db.Text
+  submittedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+
+  @@index([collaborationId])
+  @@map("collaboration_deliverables")
 }

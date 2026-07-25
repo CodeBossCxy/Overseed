@@ -1,4 +1,4 @@
-import MainLayout from '@/components/MainLayout'
+import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -39,8 +39,8 @@ export default async function BrandCampaignsPage() {
   })
 
   return (
-    <MainLayout>
+    <BrandWorkspaceLayout>
       <BrandCampaignsClient campaigns={JSON.parse(JSON.stringify(campaigns))} />
-    </MainLayout>
+    </BrandWorkspaceLayout>
   )
 }

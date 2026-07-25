@@ -1,4 +1,4 @@
-import MainLayout from '@/components/MainLayout'
+import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -67,11 +67,11 @@ export default async function BrandCampaignDetailPage({ params }: { params: Prom
   }
 
   return (
-    <MainLayout>
+    <BrandWorkspaceLayout>
       <BrandCampaignDetailClient
         campaign={JSON.parse(JSON.stringify(campaign))}
         stats={stats}
       />
-    </MainLayout>
+    </BrandWorkspaceLayout>
   )
 }

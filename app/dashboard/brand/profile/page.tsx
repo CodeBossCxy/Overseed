@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import MainLayout from '@/components/MainLayout'
+import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function BrandProfilePage() {
@@ -101,17 +101,17 @@ export default function BrandProfilePage() {
 
   if (isLoading) {
     return (
-      <MainLayout>
+      <BrandWorkspaceLayout>
         <div className="max-w-3xl mx-auto px-4 py-12 text-center">
           <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
           <p className="mt-4 text-gray-500">{t.brand.profile.loading}</p>
         </div>
-      </MainLayout>
+      </BrandWorkspaceLayout>
     )
   }
 
   return (
-    <MainLayout>
+    <BrandWorkspaceLayout>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <button
@@ -285,6 +285,6 @@ export default function BrandProfilePage() {
           </div>
         </form>
       </div>
-    </MainLayout>
+    </BrandWorkspaceLayout>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import MainLayout from '@/components/MainLayout'
+import CreatorWorkspaceLayout from '@/components/workspace/CreatorWorkspaceLayout'
 import SocialAccountList from '@/components/profiles/SocialAccountList'
 import SocialAccountForm from '@/components/profiles/SocialAccountForm'
 import UpgradePrompt from '@/components/UpgradePrompt'
@@ -94,30 +94,30 @@ export default function SocialAccountsPage() {
 
   if (isLoading) {
     return (
-      <MainLayout>
+      <CreatorWorkspaceLayout>
         <div className="max-w-3xl mx-auto px-4 py-12 text-center">
           <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
           <p className="mt-4 text-gray-500">{t.influencer.accounts.loading}</p>
         </div>
-      </MainLayout>
+      </CreatorWorkspaceLayout>
     )
   }
 
   if (subscriptionTier === 'FREE') {
     return (
-      <MainLayout>
+      <CreatorWorkspaceLayout>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold mb-8">{t.influencer.accounts.title}</h1>
           <div className="bg-white rounded-lg shadow-md">
             <UpgradePrompt feature="social-accounts" />
           </div>
         </div>
-      </MainLayout>
+      </CreatorWorkspaceLayout>
     )
   }
 
   return (
-    <MainLayout>
+    <CreatorWorkspaceLayout>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -166,6 +166,6 @@ export default function SocialAccountsPage() {
           </ul>
         </div>
       </div>
-    </MainLayout>
+    </CreatorWorkspaceLayout>
   )
 }

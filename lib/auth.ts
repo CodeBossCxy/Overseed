@@ -73,10 +73,14 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      // openid-client defaults to 3500ms, which this network's round-trips
+      // to Google can exceed (RPError: outgoing request timed out).
+      httpOptions: { timeout: 15000 },
     }),
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID || '',
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET || '',
+      httpOptions: { timeout: 15000 },
     }),
     WeChatProvider({
       clientId: process.env.WECHAT_APP_ID || '',

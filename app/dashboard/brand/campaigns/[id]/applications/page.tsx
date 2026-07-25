@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import MainLayout from '@/components/MainLayout'
+import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import ApplicationStatus from '@/components/applications/ApplicationStatus'
 import ApplicationActions from '@/components/applications/ApplicationActions'
 import PaymentModal from '@/components/payments/PaymentModal'
 import PaymentStatusBadge from '@/components/payments/PaymentStatus'
+import StatusBadge from '@/components/StatusBadge'
+import ConfirmCollaborationModal from '@/components/collaborations/ConfirmCollaborationModal'
+import PipelineTabs from '@/components/PipelineTabs'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
@@ -71,6 +74,8 @@ export default function CampaignApplicationsPage() {
     creatorPayout: number
   } | null>(null)
   const [paymentLoading, setPaymentLoading] = useState(false)
+  const [collaborations, setCollaborations] = useState<any[]>([])
+  const [confirmFor, setConfirmFor] = useState<Application | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -93,6 +98,13 @@ export default function CampaignApplicationsPage() {
       if (response.ok) {
         const data = await response.json()
         setApplications(data)
+      }
+
+      // Collaborations already created for this campaign
+      const colRes = await fetch(`/api/collaborations?role=brand&campaignId=${campaignId}`)
+      if (colRes.ok) {
+        const colData = await colRes.json()
+        setCollaborations(colData.collaborations || [])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -123,18 +135,21 @@ export default function CampaignApplicationsPage() {
 
   if (isLoading) {
     return (
-      <MainLayout>
+      <BrandWorkspaceLayout>
         <div className="max-w-6xl mx-auto px-4 py-12 text-center">
           <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
           <p className="mt-4 text-gray-500">{t.brand.applications.loading}</p>
         </div>
-      </MainLayout>
+      </BrandWorkspaceLayout>
     )
   }
 
+  const collabByApp: Record<string, any> = {}
+  collaborations.forEach((col) => { collabByApp[col.applicationId] = col })
+
   return (
-    <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <BrandWorkspaceLayout>
+      <div className="max-w-6xl mx-auto pt-6 pb-8">
         {/* Header */}
         <div className="mb-8">
           <Link href="/dashboard/brand/campaigns" className="text-primary-600 hover:underline text-sm mb-2 inline-block">
@@ -147,6 +162,8 @@ export default function CampaignApplicationsPage() {
             </p>
           )}
         </div>
+
+        <PipelineTabs campaignId={campaignId} active="pipeline" />
 
         {/* Filters */}
         <div className="mb-6 flex flex-wrap gap-2">
@@ -169,13 +186,13 @@ export default function CampaignApplicationsPage() {
           {/* Applications List */}
           <div className="lg:col-span-1">
             {applications.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-8 text-center">
                 <p className="text-gray-500">
                   {filter ? `No ${filter.toLowerCase().replace('_', ' ')} applications` : t.brand.applications.noApplications}
                 </p>
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-sm divide-y max-h-[70vh] overflow-y-auto">
+              <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm divide-y max-h-[70vh] overflow-y-auto">
                 {applications.map((application) => (
                   <div
                     key={application.id}
@@ -221,7 +238,7 @@ export default function CampaignApplicationsPage() {
           {/* Application Details */}
           <div className="lg:col-span-2">
             {selectedApplication ? (
-              <div className="bg-white rounded-lg shadow-sm p-6 sticky top-20">
+              <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-6 sticky top-20">
                 {/* Influencer Info */}
                 <div className="flex items-start gap-4 mb-6">
                   <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
@@ -448,6 +465,25 @@ export default function CampaignApplicationsPage() {
                 {/* Actions */}
                 <div className="pt-6 border-t">
                   <h3 className="text-sm font-medium text-gray-500 mb-3">{t.brand.applications.actions}</h3>
+                  {collabByApp[selectedApplication.id] ? (
+                    <Link
+                      href={`/dashboard/brand/collaborations/${collabByApp[selectedApplication.id].id}`}
+                      className="flex items-center justify-between w-full mb-3 px-4 py-2.5 border border-primary-200 bg-primary-50 rounded-lg text-sm font-medium text-primary-700 hover:bg-primary-100 transition"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <StatusBadge machine="collaboration" status={collabByApp[selectedApplication.id].status} size="sm" />
+                        {t.collab.manage}
+                      </span>
+                      <span>→</span>
+                    </Link>
+                  ) : ['PENDING', 'UNDER_REVIEW'].includes(selectedApplication.status) ? (
+                    <button
+                      onClick={() => setConfirmFor(selectedApplication)}
+                      className="w-full mb-3 px-4 py-2.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition"
+                    >
+                      {t.collab.select}
+                    </button>
+                  ) : null}
                   <ApplicationActions
                     applicationId={selectedApplication.id}
                     currentStatus={selectedApplication.status}
@@ -456,13 +492,53 @@ export default function CampaignApplicationsPage() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+              <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-12 text-center">
                 <p className="text-gray-500">{t.brand.applications.selectApplication}</p>
               </div>
             )}
           </div>
         </div>
+
+        {/* Collaborations */}
+        {collaborations.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold mb-3">{t.collab.collaborationsTitle}</h2>
+            <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm divide-y">
+              {collaborations.map((col) => (
+                <div key={col.id} className="flex items-center gap-3 p-4">
+                  <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                    {col.influencer?.avatarUrl ? (
+                      <img src={col.influencer.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                        {(col.influencer?.displayName || 'C').charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{col.influencer?.displayName || col.influencer?.user?.name || 'Creator'}</p>
+                    <div className="mt-0.5"><StatusBadge machine="collaboration" status={col.status} size="sm" dot /></div>
+                  </div>
+                  {col.payment?.status && <StatusBadge machine="payment" status={col.payment.status} size="sm" />}
+                  <Link href={`/dashboard/brand/collaborations/${col.id}`} className="text-primary-600 hover:underline text-sm whitespace-nowrap">
+                    {t.collab.manage} →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {confirmFor && (
+          <ConfirmCollaborationModal
+            applicationId={confirmFor.id}
+            creatorName={confirmFor.influencer.displayName || confirmFor.influencer.user.name || 'Creator'}
+            campaignTitle={campaign?.title || ''}
+            onCreated={() => { setConfirmFor(null); fetchData() }}
+            onClose={() => setConfirmFor(null)}
+          />
+        )}
       </div>
-    </MainLayout>
+    </BrandWorkspaceLayout>
   )
 }

@@ -400,7 +400,7 @@ export default function HomePage() {
 
   return (
     <div className="overflow-hidden bg-[#f4f9ff] font-normal text-[#071735]">
-      <section className="relative min-h-screen-safe snap-start overflow-hidden bg-[#edf6ff] px-4 py-8 sm:px-6 lg:px-8">
+      <section className="hp-themed-bg relative min-h-screen-safe snap-start overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
         <Image
           src="/home/hero-bridge.png"
           alt=""
@@ -504,7 +504,7 @@ export default function HomePage() {
       </section>
 
       <section ref={setRef(0)} className="hp-section relative flex min-h-screen-safe snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,#eaf3ff_0%,#f4f9ff_55%,#ffffff_100%)]" />
+        <div className="hp-themed-gradient absolute inset-0" />
         <div className="relative mx-auto w-full max-w-7xl text-center">
           <SectionLabel>{home.platform.label}</SectionLabel>
           <h2 className="mx-auto max-w-5xl text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-[1.1] text-[#08132d]">
@@ -614,7 +614,7 @@ export default function HomePage() {
       />
 
       <section ref={setRef(5)} className="hp-section relative flex min-h-screen-safe snap-start items-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,#eaf3ff_0%,#f4f9ff_55%,#ffffff_100%)]" />
+        <div className="hp-themed-gradient absolute inset-0" />
         <div className="relative mx-auto w-full max-w-5xl text-center">
           <SectionLabel>{home.features.label}</SectionLabel>
           <h2 className="text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-tight text-[#1d2638]">
@@ -749,12 +749,12 @@ export default function HomePage() {
               <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Link href="/" className="hover:text-white">{t.footer.home}</Link>
                 <Link href="/browse" className="hover:text-white">{t.footer.browse}</Link>
-                <Link href="/faq" className="hover:text-white">{t.footer.aboutUs}</Link>
+                <Link href="/guidelines" className="hover:text-white">{t.footer.aboutUs}</Link>
                 <Link href="/terms" className="hover:text-white">{t.footer.terms}</Link>
                 <Link href="/privacy" className="hover:text-white">{t.footer.privacy}</Link>
                 <Link href="/contact" className="hover:text-white">{t.footer.contact}</Link>
               </div>
-              <p>overseed.net</p>
+              <a href="https://overseed.net" className="hover:text-white">overseed.net</a>
             </div>
           </div>
         </div>

@@ -224,41 +224,69 @@
 [data-theme='global'] .text-pink-700 { color: #ff769f !important; }
 
 /* ══ User-selectable color themes (Settings → Theme Color) ══
-   Set as data-color-theme on <html> by ThemeProvider for app pages only;
-   the attribute is removed on global (dark) pages and for the default theme,
-   so these rules never fight the [data-theme='global'] overrides above. */
+   ThemeProvider sets data-color-theme on <html> whenever a non-default theme is
+   chosen (on every page). Each theme exposes its gradient as --user-theme-gradient
+   so any surface can opt in (e.g. the public homepage hero). The heavy workspace
+   ambience below is scoped to non-global pages so it never fights the dark
+   [data-theme='global'] overrides on the marketing/public pages. */
 
-[data-color-theme='sunset'] body {
-  background: linear-gradient(150deg, #d7e6f5 0%, #f6e3d3 25%, #f9d5b5 55%, #f4b287 85%, #f0a877 100%) fixed;
-}
-[data-color-theme='sky'] body {
-  background: linear-gradient(150deg, #c9dff6 0%, #dcebf9 40%, #f3e9dd 75%, #f8ddc2 100%) fixed;
-}
-[data-color-theme='cream'] body {
-  background: linear-gradient(150deg, #e8f0f9 0%, #f7efe4 40%, #fbe6d2 75%, #f8d9ba 100%) fixed;
-}
-[data-color-theme='lavender'] body {
-  background: linear-gradient(150deg, #e3e2f9 0%, #ece5fa 35%, #f3e4ef 65%, #f9e0d6 100%) fixed;
-}
+[data-color-theme='sunset']   { --user-theme-gradient: linear-gradient(150deg, #d7e6f5 0%, #f6e3d3 25%, #f9d5b5 55%, #f4b287 85%, #f0a877 100%); }
+[data-color-theme='sky']      { --user-theme-gradient: linear-gradient(150deg, #c9dff6 0%, #dcebf9 40%, #f3e9dd 75%, #f8ddc2 100%); }
+[data-color-theme='cream']    { --user-theme-gradient: linear-gradient(150deg, #e8f0f9 0%, #f7efe4 40%, #fbe6d2 75%, #f8d9ba 100%); }
+[data-color-theme='lavender'] { --user-theme-gradient: linear-gradient(150deg, #e3e2f9 0%, #ece5fa 35%, #f3e4ef 65%, #f9e0d6 100%); }
+[data-color-theme='mint']     { --user-theme-gradient: linear-gradient(150deg, #d5efe2 0%, #e4f4e9 35%, #f3f1e0 70%, #f8ead2 100%); }
+[data-color-theme='rose']     { --user-theme-gradient: linear-gradient(150deg, #fbdce5 0%, #fce7eb 35%, #fdeee2 70%, #f9dcc8 100%); }
+[data-color-theme='ocean']    { --user-theme-gradient: linear-gradient(150deg, #c5e8ee 0%, #d6edf5 40%, #e2f0fb 75%, #d9e6f8 100%); }
+[data-color-theme='honey']    { --user-theme-gradient: linear-gradient(150deg, #fbe8c4 0%, #fceed3 35%, #f9e2bd 65%, #f3cd99 100%); }
 
-/* Glassy surfaces so the ambient gradient shows through cards and wrappers */
-[data-color-theme] .bg-white {
-  background-color: rgba(255, 255, 255, 0.62);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+/* Workspace ambience — signed-in (non-global) pages only. Frosted glass keeps
+   text readable while the theme colour stays visible behind the content. */
+html:not([data-theme='global'])[data-color-theme] body {
+  background: var(--user-theme-gradient) fixed;
 }
-[data-color-theme] .bg-gray-50 {
-  background-color: rgba(255, 255, 255, 0.35);
+html:not([data-theme='global'])[data-color-theme] .bg-white {
+  background-color: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
-[data-color-theme] .bg-gray-100 {
+html:not([data-theme='global'])[data-color-theme] .bg-white\/90,
+html:not([data-theme='global'])[data-color-theme] .bg-white\/85,
+html:not([data-theme='global'])[data-color-theme] .bg-white\/80,
+html:not([data-theme='global'])[data-color-theme] .bg-white\/75,
+html:not([data-theme='global'])[data-color-theme] .bg-white\/70,
+html:not([data-theme='global'])[data-color-theme] .bg-white\/60 {
   background-color: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
-[data-color-theme] .shadow-md,
-[data-color-theme] .shadow-sm {
+html:not([data-theme='global'])[data-color-theme] .bg-gray-50,
+html:not([data-theme='global'])[data-color-theme] .bg-gray-50\/50,
+html:not([data-theme='global'])[data-color-theme] .bg-gray-50\/40 {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+html:not([data-theme='global'])[data-color-theme] .bg-gray-100 {
+  background-color: rgba(255, 255, 255, 0.42);
+}
+html:not([data-theme='global'])[data-color-theme] .shadow-md,
+html:not([data-theme='global'])[data-color-theme] .shadow-sm,
+html:not([data-theme='global'])[data-color-theme] .shadow-lg {
   box-shadow: 0 8px 24px rgba(96, 68, 44, 0.1), 0 1px 2px rgba(96, 68, 44, 0.06);
 }
-[data-color-theme] .border-gray-100 { border-color: rgba(255, 255, 255, 0.55); }
-[data-color-theme] .border-gray-200 { border-color: rgba(255, 255, 255, 0.65); }
+html:not([data-theme='global'])[data-color-theme] .border-gray-100 { border-color: rgba(255, 255, 255, 0.55); }
+html:not([data-theme='global'])[data-color-theme] .border-gray-200 { border-color: rgba(255, 255, 255, 0.65); }
+
+/* Workspace shell background: the chosen theme's gradient everywhere, with
+   the default soft blue when no theme is selected. Fixed attachment so the
+   colour doesn't scroll away under long pages. */
+.ws-themed-bg {
+  background: var(--user-theme-gradient, linear-gradient(135deg, #eaf2fb 0%, #f2f6fc 50%, #e7eefb 100%));
+  background-attachment: fixed;
+}
+
+/* Public homepage hero/intro sections opt into the chosen theme's gradient,
+   falling back to their default blue when no theme is selected. */
+.hp-themed-bg { background: var(--user-theme-gradient, #edf6ff); }
+.hp-themed-gradient { background: var(--user-theme-gradient, linear-gradient(180deg, #eaf3ff 0%, #f4f9ff 55%, #ffffff 100%)); }
 
 body {
   color: var(--foreground);

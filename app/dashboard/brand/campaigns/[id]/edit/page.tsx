@@ -1,4 +1,4 @@
-import MainLayout from '@/components/MainLayout'
+import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import CampaignForm from '@/components/campaigns/CampaignForm'
 import { EditCampaignHeading } from '@/components/dashboard/BrandCampaignHeadings'
 import { getServerSession } from 'next-auth'
@@ -48,8 +48,8 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
   ])
 
   return (
-    <MainLayout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <BrandWorkspaceLayout>
+      <div className="max-w-4xl mx-auto pt-6 pb-8">
         <EditCampaignHeading />
 
         <CampaignForm
@@ -59,6 +59,6 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
           isEditing
         />
       </div>
-    </MainLayout>
+    </BrandWorkspaceLayout>
   )
 }

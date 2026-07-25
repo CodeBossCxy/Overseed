@@ -24,7 +24,7 @@ export default function Footer() {
             <ul className="space-y-2 text-sm font-light">
               <li><Link href="/" className="hover:text-white transition">{t.footer.home}</Link></li>
               <li><Link href="/browse" className="hover:text-white transition">{t.footer.browse}</Link></li>
-              <li><Link href="/" className="hover:text-white transition">{t.footer.aboutUs}</Link></li>
+              <li><Link href="/guidelines" className="hover:text-white transition">{t.footer.guidelines}</Link></li>
             </ul>
           </div>
 
@@ -32,8 +32,8 @@ export default function Footer() {
           <div>
             <h4 className="text-white text-sm font-semibold mb-4">{t.footer.resources}</h4>
             <ul className="space-y-2 text-sm font-light">
-              <li><Link href="/guidelines" className="hover:text-white transition">{t.footer.guidelines}</Link></li>
               <li><Link href="/faq" className="hover:text-white transition">{t.footer.faq}</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition">{t.footer.contact}</Link></li>
             </ul>
           </div>
 
@@ -48,8 +48,10 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-white/10 mt-8 pt-8 text-sm text-center text-white/40">
+        <div className="border-t border-white/10 mt-8 pt-8 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 text-sm text-center text-white/40">
           <p>{t.footer.copyright}</p>
+          <span className="hidden sm:inline">·</span>
+          <a href="https://overseed.net" className="hover:text-white transition">overseed.net</a>
         </div>
       </div>
     </footer>

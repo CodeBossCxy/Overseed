@@ -58,7 +58,7 @@ export default function InfluencerDashboardClient({
   ]
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto pt-6 pb-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">{t.influencer.dashboard.title}</h1>
         <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -101,7 +101,7 @@ export default function InfluencerDashboardClient({
         </div>
       )}
 
-      <section className="mb-8 rounded-2xl border border-gray-100 bg-white shadow-sm p-4 sm:p-5">
+      <section className="mb-8 rounded-2xl bg-white/85 backdrop-blur shadow-sm p-4 sm:p-5">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-4">{t.influencer.dashboard.overview}</h2>
         <div className="grid gap-4 sm:gap-5">
           <div>
@@ -141,7 +141,7 @@ export default function InfluencerDashboardClient({
             </Link>
           </div>
           {recentApplications.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+            <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-10 text-center">
               <p className="text-gray-500 mb-4 text-sm">{t.influencer.dashboard.noApplications}</p>
               <Link
                 href="/browse"
@@ -164,7 +164,7 @@ export default function InfluencerDashboardClient({
         </div>
 
         <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-8 lg:self-start">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm overflow-hidden">
             <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50/40">
               <h3 className="text-sm font-semibold text-gray-900">{t.influencer.dashboard.quickLinks}</h3>
               <p className="text-xs text-gray-500 mt-0.5">{t.influencer.dashboard.quickLinksHint}</p>
@@ -207,7 +207,7 @@ export default function InfluencerDashboardClient({
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50/40">
               <h3 className="text-sm font-semibold text-gray-900">{t.influencer.dashboard.connectedPlatforms}</h3>
               <Link href="/dashboard/influencer/accounts" className="text-primary-600 hover:text-primary-700 text-xs font-medium">

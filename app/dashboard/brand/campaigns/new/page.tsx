@@ -1,4 +1,4 @@
-import MainLayout from '@/components/MainLayout'
+import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import CampaignForm from '@/components/campaigns/CampaignForm'
 import { NewCampaignHeading } from '@/components/dashboard/BrandCampaignHeadings'
 import { getServerSession } from 'next-auth'
@@ -46,12 +46,12 @@ export default async function NewCampaignPage() {
   ])
 
   return (
-    <MainLayout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <BrandWorkspaceLayout>
+      <div className="max-w-4xl mx-auto pt-6 pb-8">
         <NewCampaignHeading />
 
         <CampaignForm categories={categories} platforms={platforms} />
       </div>
-    </MainLayout>
+    </BrandWorkspaceLayout>
   )
 }

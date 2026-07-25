@@ -1,15 +1,41 @@
 import MainLayout from '@/components/MainLayout'
-import CampaignFilters from '@/components/campaigns/CampaignFilters'
+import CreatorWorkspaceLayout from '@/components/workspace/CreatorWorkspaceLayout'
+import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import { BrowseTitle, BrowseCampaignList, BrowseProGate } from '@/components/browse/BrowseI18nText'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
+// Signed-in users see the campaign board inside their workspace shell;
+// logged-out visitors keep the public header layout. Creators also get
+// their saved-campaign ids so cards can show a save heart.
+async function resolveViewer(userId: string | undefined) {
+  if (!userId) return { Shell: MainLayout, savedIds: [] as string[], canSave: false }
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { userType: true },
+  })
+  if (!dbUser) return { Shell: MainLayout, savedIds: [] as string[], canSave: false }
+  if (dbUser.userType !== 'INFLUENCER') {
+    return { Shell: BrandWorkspaceLayout, savedIds: [] as string[], canSave: false }
+  }
+  const influencer = await prisma.influencerProfile.findUnique({
+    where: { userId },
+    select: { savedCampaigns: { select: { campaignId: true } } },
+  })
+  return {
+    Shell: CreatorWorkspaceLayout,
+    savedIds: influencer?.savedCampaigns.map((s) => s.campaignId) ?? [],
+    canSave: !!influencer,
+  }
+}
+
 interface SearchParams {
   category?: string
   platform?: string
   compensation?: string
+  minFollowers?: string
   sort?: string
 }
 
@@ -21,13 +47,14 @@ export default async function BrowsePage({
   const session = await getServerSession(authOptions)
   const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
   const isPro = subscriptionTier === 'PRO'
+  const { Shell, savedIds, canSave } = await resolveViewer((session?.user as any)?.id)
 
   // If user is not logged in or not PRO, show upgrade prompt
   if (!session?.user || !isPro) {
     return (
-      <MainLayout>
+      <Shell>
         <BrowseProGate isLoggedIn={!!session?.user} />
-      </MainLayout>
+      </Shell>
     )
   }
 
@@ -35,6 +62,7 @@ export default async function BrowsePage({
   const category = params.category
   const platform = params.platform
   const compensation = params.compensation
+  const minFollowers = params.minFollowers
   const sort = params.sort || 'latest'
 
   // Build filter query
@@ -58,6 +86,16 @@ export default async function BrowsePage({
 
   if (compensation) {
     where.compensationType = compensation as Prisma.EnumCompensationTypeFilter
+  }
+
+  // "Min followers required" from the creator's perspective: show campaigns
+  // whose requirement is within the selected follower count (or that have
+  // no follower requirement at all).
+  if (minFollowers && !isNaN(Number(minFollowers))) {
+    where.OR = [
+      { followerRequirements: { none: {} } },
+      { followerRequirements: { some: { minFollowers: { lte: Number(minFollowers) } } } },
+    ]
   }
 
   // Build sort query
@@ -113,23 +151,19 @@ export default async function BrowsePage({
   ])
 
   return (
-    <MainLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <Shell>
+      <div className="max-w-6xl mx-auto pt-6 pb-8">
         <BrowseTitle />
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Filters Sidebar */}
-          <CampaignFilters categories={categories} platforms={platforms} />
-
-          {/* Main Content */}
-          <div className="flex-1">
-            <BrowseCampaignList
-              initialCampaigns={JSON.parse(JSON.stringify(campaigns))}
-              filters={{ category, platform, compensation, sort }}
-            />
-          </div>
-        </div>
+        <BrowseCampaignList
+          initialCampaigns={JSON.parse(JSON.stringify(campaigns))}
+          filters={{ category, platform, compensation, minFollowers, sort }}
+          categories={JSON.parse(JSON.stringify(categories))}
+          platforms={JSON.parse(JSON.stringify(platforms))}
+          savedIds={savedIds}
+          canSave={canSave}
+        />
       </div>
-    </MainLayout>
+    </Shell>
   )
 }

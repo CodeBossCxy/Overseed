@@ -1,0 +1,3 @@
+TO DO
+
+Still open (smaller follow-ups, none blocking): verification badges/4-state in the UI (the helpers exist in lib/status.ts, just not surfaced yet), swapping the dashboards' ad-hoc campaign status pills over to StatusBadge, and draft file upload for deliverables (the model exists; the submit form currently captures published evidence rather than uploaded draft files). And the one hard blocker remains Stripe money movement, pending your Connect decisions.
