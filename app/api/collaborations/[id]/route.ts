@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { action } = body
     const current = collaboration.status as CollaborationStatus
 
-    const creatorActions = ['accept', 'decline', 'submit']
+    const creatorActions = ['accept', 'decline', 'submit', 'upload_draft']
     const brandActions = ['approve', 'request_revision']
     if (creatorActions.includes(action) && !isCreator) {
       return NextResponse.json({ message: 'Only the creator can perform this action' }, { status: 403 })
@@ -77,6 +77,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         next = 'CANCELLED'
         data.cancelledAt = new Date()
         break
+      case 'upload_draft': {
+        // Creator uploads a draft for brand feedback; status stays Active
+        if (current !== 'ACTIVE') {
+          return NextResponse.json(
+            { message: 'Drafts can only be uploaded while the collaboration is Active' },
+            { status: 400 },
+          )
+        }
+        if (!body.fileUrl) {
+          return NextResponse.json({ message: 'fileUrl is required' }, { status: 400 })
+        }
+        const deliverable = await prisma.collaborationDeliverable.create({
+          data: {
+            collaborationId: id,
+            title: body.title || 'Draft',
+            type: 'draft',
+            status: 'submitted',
+            fileUrl: body.fileUrl,
+            note: body.note || null,
+            submittedAt: new Date(),
+          },
+        })
+        return NextResponse.json({ deliverable })
+      }
       case 'submit': // creator submits deliverables + published evidence → Submitted
         next = 'SUBMITTED'
         data.submittedAt = new Date()

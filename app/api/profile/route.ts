@@ -86,6 +86,7 @@ export async function PATCH(req: NextRequest) {
         where: { userId },
         update: {
           displayName: profileData.displayName,
+          avatarUrl: profileData.avatarUrl,
           bio: profileData.bio,
           locationCity: profileData.locationCity,
           locationState: profileData.locationState,
@@ -93,10 +94,14 @@ export async function PATCH(req: NextRequest) {
           primaryNiche: profileData.primaryNiche,
           secondaryNiches: profileData.secondaryNiches,
           languages: profileData.languages,
+          preferredCollabTypes: Array.isArray(profileData.preferredCollabTypes)
+            ? profileData.preferredCollabTypes
+            : undefined,
         },
         create: {
           userId,
           displayName: profileData.displayName,
+          avatarUrl: profileData.avatarUrl,
           bio: profileData.bio,
           locationCity: profileData.locationCity,
           locationState: profileData.locationState,
@@ -104,6 +109,7 @@ export async function PATCH(req: NextRequest) {
           primaryNiche: profileData.primaryNiche,
           secondaryNiches: profileData.secondaryNiches || [],
           languages: profileData.languages || [],
+          preferredCollabTypes: profileData.preferredCollabTypes || [],
         },
       })
     }

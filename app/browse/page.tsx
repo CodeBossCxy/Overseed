@@ -11,23 +11,24 @@ import { authOptions } from '@/lib/auth'
 // logged-out visitors keep the public header layout. Creators also get
 // their saved-campaign ids so cards can show a save heart.
 async function resolveViewer(userId: string | undefined) {
-  if (!userId) return { Shell: MainLayout, savedIds: [] as string[], canSave: false }
+  if (!userId) return { Shell: MainLayout, savedIds: [] as string[], canSave: false, niche: null as string | null }
   const dbUser = await prisma.user.findUnique({
     where: { id: userId },
     select: { userType: true },
   })
-  if (!dbUser) return { Shell: MainLayout, savedIds: [] as string[], canSave: false }
+  if (!dbUser) return { Shell: MainLayout, savedIds: [] as string[], canSave: false, niche: null as string | null }
   if (dbUser.userType !== 'INFLUENCER') {
-    return { Shell: BrandWorkspaceLayout, savedIds: [] as string[], canSave: false }
+    return { Shell: BrandWorkspaceLayout, savedIds: [] as string[], canSave: false, niche: null as string | null }
   }
   const influencer = await prisma.influencerProfile.findUnique({
     where: { userId },
-    select: { savedCampaigns: { select: { campaignId: true } } },
+    select: { primaryNiche: true, savedCampaigns: { select: { campaignId: true } } },
   })
   return {
     Shell: CreatorWorkspaceLayout,
     savedIds: influencer?.savedCampaigns.map((s) => s.campaignId) ?? [],
     canSave: !!influencer,
+    niche: influencer?.primaryNiche ?? null,
   }
 }
 
@@ -47,7 +48,7 @@ export default async function BrowsePage({
   const session = await getServerSession(authOptions)
   const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
   const isPro = subscriptionTier === 'PRO'
-  const { Shell, savedIds, canSave } = await resolveViewer((session?.user as any)?.id)
+  const { Shell, savedIds, canSave, niche } = await resolveViewer((session?.user as any)?.id)
 
   // If user is not logged in or not PRO, show upgrade prompt
   if (!session?.user || !isPro) {
@@ -63,7 +64,9 @@ export default async function BrowsePage({
   const platform = params.platform
   const compensation = params.compensation
   const minFollowers = params.minFollowers
-  const sort = params.sort || 'latest'
+  // Creators default to the recommendation ordering (their niche floats to
+  // the top, without hiding anything else)
+  const sort = params.sort || (canSave ? 'recommended' : 'latest')
 
   // Build filter query
   const where: Prisma.CampaignWhereInput = { status: 'ACTIVE' }
@@ -98,11 +101,11 @@ export default async function BrowsePage({
     ]
   }
 
-  // Build sort query
+  // Build sort query ('recommended' fetches latest, then reorders below)
   let orderBy: Prisma.CampaignOrderByWithRelationInput = {}
-  if (sort === 'latest') orderBy = { createdAt: 'desc' }
-  else if (sort === 'deadline') orderBy = { deadline: 'asc' }
+  if (sort === 'deadline') orderBy = { deadline: 'asc' }
   else if (sort === 'payment') orderBy = { paymentMax: 'desc' }
+  else orderBy = { createdAt: 'desc' }
 
   const [campaigns, categories, platforms] = await Promise.all([
     prisma.campaign.findMany({
@@ -150,18 +153,27 @@ export default async function BrowsePage({
     }),
   ])
 
+  // Recommended: campaigns matching the creator's niche first (never hidden)
+  let orderedCampaigns = campaigns
+  if (sort === 'recommended' && niche) {
+    const matches = (c: (typeof campaigns)[number]) =>
+      c.categories.some(({ category }) => category.name.toLowerCase() === niche.toLowerCase())
+    orderedCampaigns = [...campaigns.filter(matches), ...campaigns.filter((c) => !matches(c))]
+  }
+
   return (
     <Shell>
       <div className="max-w-6xl mx-auto pt-6 pb-8">
-        <BrowseTitle />
+        <BrowseTitle recommended={canSave} />
 
         <BrowseCampaignList
-          initialCampaigns={JSON.parse(JSON.stringify(campaigns))}
+          initialCampaigns={JSON.parse(JSON.stringify(orderedCampaigns))}
           filters={{ category, platform, compensation, minFollowers, sort }}
           categories={JSON.parse(JSON.stringify(categories))}
           platforms={JSON.parse(JSON.stringify(platforms))}
           savedIds={savedIds}
           canSave={canSave}
+          recommendedAvailable={canSave}
         />
       </div>
     </Shell>

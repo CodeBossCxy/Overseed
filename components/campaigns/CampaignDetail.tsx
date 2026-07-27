@@ -100,26 +100,23 @@ export default function CampaignDetail({
 }: CampaignDetailProps) {
   const router = useRouter()
   const { t, locale } = useLanguage()
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-
   const spotsLeft = campaign.totalSlots - campaign.filledSlots
   const isDeadlinePassed = campaign.deadline && new Date(campaign.deadline) < new Date()
 
-  const handleDelete = async () => {
-    setIsDeleting(true)
+  // Save-campaign toggle (creators)
+  const [saved, setSaved] = useState(isSaved)
+  const [saveBusy, setSaveBusy] = useState(false)
+  const toggleSave = async () => {
+    setSaveBusy(true)
+    const next = !saved
+    setSaved(next)
     try {
-      const res = await fetch(`/api/campaigns/${campaign.id}`, { method: 'DELETE' })
-      if (res.ok) {
-        router.push('/')
-      } else {
-        alert(t.errors.failedToDeleteCampaign)
-      }
+      const res = await fetch(`/api/campaigns/${campaign.id}/save`, { method: next ? 'POST' : 'DELETE' })
+      if (!res.ok) setSaved(!next)
     } catch {
-      alert(t.errors.failedToDeleteCampaign)
+      setSaved(!next)
     } finally {
-      setIsDeleting(false)
-      setShowDeleteConfirm(false)
+      setSaveBusy(false)
     }
   }
 
@@ -200,6 +197,13 @@ export default function CampaignDetail({
             <h2 className="text-xl font-semibold mb-4">{t.campaign.aboutThisCampaign}</h2>
             <div className="prose max-w-none">
               <p className="whitespace-pre-wrap text-gray-700">{campaign.description || t.campaign.noDescription}</p>
+              {/* Anti-fraud notice — shown under every campaign per spec */}
+              <div className="mt-4 bg-amber-50/80 border border-amber-100 rounded-xl p-3 text-sm text-amber-800">
+                {t.brand.campaigns.antiFraud}{' '}
+                <Link href="/contact" className="font-semibold underline hover:text-amber-900">
+                  {t.brand.campaigns.reportNow}
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -353,26 +357,12 @@ export default function CampaignDetail({
           {/* Actions */}
           <div className="pt-4 border-t space-y-3">
             {isOwner ? (
-              <>
-                <Link
-                  href={`/dashboard/brand/campaigns/${campaign.id}/applications`}
-                  className="block w-full px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-center font-medium"
-                >
-                  {t.campaign.viewApplications} ({campaign._count.applications})
-                </Link>
-                <Link
-                  href={`/dashboard/brand/campaigns/${campaign.id}/edit`}
-                  className="block w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-center"
-                >
-                  {t.campaign.editCampaign}
-                </Link>
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="w-full px-4 py-3 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition text-center"
-                >
-                  {t.campaign.deleteCampaign}
-                </button>
-              </>
+              <Link
+                href={`/dashboard/brand/campaigns/${campaign.id}`}
+                className="block w-full px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-center font-medium"
+              >
+                {t.campaign.manageCampaignLink}
+              </Link>
             ) : (
               <>
                 {userType === 'BRAND' ? (
@@ -422,6 +412,22 @@ export default function CampaignDetail({
                         {t.campaign.allSpotsFilled}
                       </div>
                     )}
+                    {isAuthenticated && (
+                      <button
+                        onClick={toggleSave}
+                        disabled={saveBusy}
+                        className={`w-full px-4 py-3 rounded-lg transition text-center font-medium flex items-center justify-center gap-2 disabled:opacity-50 ${
+                          saved
+                            ? 'bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100'
+                            : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <svg className="w-4 h-4" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                        {saved ? t.campaign.savedCampaignBtn : t.campaign.saveCampaignBtn}
+                      </button>
+                    )}
                   </>
                 )}
               </>
@@ -459,42 +465,13 @@ export default function CampaignDetail({
 
           {/* Report */}
           <div className="pt-4 border-t">
-            <button className="text-sm text-red-600 hover:underline">
+            <Link href="/contact" className="text-sm text-red-600 hover:underline">
               {t.campaign.reportCampaign}
-            </button>
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Delete Confirmation Popup */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="bg-white rounded-lg p-6 max-w-sm mx-4 text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold mb-2">{t.campaign.deleteConfirmTitle}</h3>
-            <p className="text-gray-600 text-sm mb-4">{t.campaign.deleteConfirmMessage.replace('{title}', campaign.title)}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-              >
-                {t.campaign.cancel}
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:opacity-50"
-              >
-                {isDeleting ? t.campaign.deleting : t.common.delete}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -30,11 +30,23 @@ export async function POST(
     // Check if user has an influencer profile
     const influencerProfile = await prisma.influencerProfile.findUnique({
       where: { userId },
+      include: { socialAccounts: { select: { isVerified: true } } },
     })
 
     if (!influencerProfile) {
       return NextResponse.json(
         { message: 'Influencer profile required to apply' },
+        { status: 403 }
+      )
+    }
+
+    // Per spec: at least one verified social account before applying
+    if (!influencerProfile.socialAccounts.some((a) => a.isVerified)) {
+      return NextResponse.json(
+        {
+          message: 'Verify at least one social account before applying to campaigns.',
+          code: 'SOCIAL_VERIFICATION_REQUIRED',
+        },
         { status: 403 }
       )
     }

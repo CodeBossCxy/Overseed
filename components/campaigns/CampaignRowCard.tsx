@@ -232,13 +232,6 @@ export default function CampaignRowCard({
           )}
         </div>
         <div className="flex flex-col gap-2 w-40 md:w-auto">
-          <Link
-            href={`/campaign/${c.id}`}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-primary-700 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition"
-          >
-            {s.viewCampaign}
-            <span aria-hidden>→</span>
-          </Link>
           {onRemove && (
             <button
               onClick={() => onRemove(c.id)}

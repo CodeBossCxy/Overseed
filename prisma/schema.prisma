@@ -256,6 +256,8 @@ model InfluencerProfile {
   primaryNiche     String?
   secondaryNiches  String[]
   languages        String[]
+  // 'gifted' | 'paid' | 'performance'
+  preferredCollabTypes String[] @default([])
   isVerified       Boolean   @default(false)
   verificationDate DateTime?
   stripeConnectId          String?
