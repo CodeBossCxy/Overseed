@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getTranslatedEntity } from '@/lib/translation-service'
 import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
+import { Campaign, assertTransition, type CampaignStatus } from '@/lib/status'
 
 export async function GET(
   req: NextRequest,
@@ -138,13 +139,43 @@ export async function PATCH(
 
     const data = await req.json()
 
+    // Publishing goes through Overseed review: a brand-submitted "ACTIVE"
+    // lands in PENDING_REVIEW (unless the campaign is already live); only the
+    // admin review flow sets ACTIVE. Guard everything else with the machine.
+    let requestedStatus: CampaignStatus | undefined = data.status
+    if (requestedStatus === 'ACTIVE' && existingCampaign.status !== 'ACTIVE' && existingCampaign.status !== 'PAUSED') {
+      requestedStatus = 'PENDING_REVIEW'
+    }
+    // Unverified brands can keep drafting but not submit for review
+    if (
+      requestedStatus === 'PENDING_REVIEW' &&
+      existingCampaign.brand.brandVerificationStatus !== 'APPROVED'
+    ) {
+      return NextResponse.json(
+        { message: 'Your brand must be verified before you can publish campaigns. You can keep this campaign as a draft.' },
+        { status: 403 }
+      )
+    }
+    if (requestedStatus && requestedStatus !== existingCampaign.status) {
+      try {
+        assertTransition(Campaign, 'campaign', existingCampaign.status as CampaignStatus, requestedStatus)
+      } catch {
+        return NextResponse.json(
+          { message: `Cannot move campaign from ${existingCampaign.status} to ${requestedStatus}` },
+          { status: 422 }
+        )
+      }
+    }
+
     // Update campaign
     const campaign = await prisma.campaign.update({
       where: { id: id },
       data: {
         title: data.title,
         description: data.description,
-        status: data.status,
+        status: requestedStatus,
+        // Resubmitting for review clears the previous review note
+        reviewNote: requestedStatus === 'PENDING_REVIEW' ? null : undefined,
         deadline: data.deadline ? new Date(data.deadline) : undefined,
         campaignStartDate: data.campaignStartDate ? new Date(data.campaignStartDate) : undefined,
         campaignEndDate: data.campaignEndDate ? new Date(data.campaignEndDate) : undefined,
@@ -164,7 +195,7 @@ export async function PATCH(
         hashtagsRequired: data.hashtagsRequired,
         mentionsRequired: data.mentionsRequired,
         images: data.images,
-        publishedAt: data.status === 'ACTIVE' && !existingCampaign.publishedAt ? new Date() : undefined,
+        publishedAt: requestedStatus === 'ACTIVE' && !existingCampaign.publishedAt ? new Date() : undefined,
       },
     })
 

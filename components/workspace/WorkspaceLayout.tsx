@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { useViewMode } from '@/lib/hooks/useViewMode'
 
 // Workspace shell per the July 2026 workspace spec: floating left sidebar
 // with icon nav + user chip, and a content area with a top-right utility
@@ -53,9 +54,31 @@ export default function WorkspaceLayout({
   const pathname = usePathname()
   const { data: session } = useSession()
   const { locale, setLocale, t } = useLanguage()
+  const { switchView, isSwitching } = useViewMode()
   const w = t.workspace
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [resourcesOpen, setResourcesOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [unread, setUnread] = useState(0)
+
+  const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
+  const isPro = subscriptionTier === 'PRO'
+
+  // Unread messages dot (sidebar Messages item + top-bar bell)
+  useEffect(() => {
+    if (!session?.user) return
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch('/api/messages/unread')
+        if (res.ok) {
+          const data = await res.json()
+          setUnread(data.totalUnread || 0)
+        }
+      } catch {}
+    }
+    fetchUnread()
+    const interval = setInterval(fetchUnread, 30000)
+    return () => clearInterval(interval)
+  }, [session?.user])
 
   const navItems: NavItem[] =
     role === 'creator'
@@ -68,11 +91,12 @@ export default function WorkspaceLayout({
           { href: '/dashboard/messages', label: w.messages, icon: ICONS.chat },
           { href: '/dashboard/influencer/payouts', label: w.payouts, icon: ICONS.card },
           { href: '/settings', label: w.settings, icon: ICONS.cog },
-          { href: '/pricing/creator', label: w.myPlan, icon: ICONS.shield },
+          { href: '/dashboard/upgrade', label: w.myPlan, icon: ICONS.shield },
         ]
       : [
           { href: '/dashboard/brand', label: w.dashboard, exact: true, icon: ICONS.home },
           { href: '/dashboard/brand/campaigns', label: w.myCampaigns, icon: ICONS.briefcase },
+          { href: '/dashboard/brand/saved-creators', label: t.brand.savedCreators.title, icon: ICONS.bookmark },
           { href: '/dashboard/brand/discover', label: t.nav.findInfluencer, icon: ICONS.search },
           { href: '/dashboard/messages', label: w.messages, icon: ICONS.chat },
           { href: '/dashboard/brand/profile', label: w.brandProfile, icon: ICONS.user },
@@ -126,44 +150,106 @@ export default function WorkspaceLayout({
               }`}
             >
               <NavIcon d={item.icon} />
-              <span className="truncate">{item.label}</span>
+              <span className="truncate flex-1">{item.label}</span>
+              {item.href === '/dashboard/messages' && unread > 0 && (
+                <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
             </Link>
           )
         })}
       </nav>
 
-      {/* User chip */}
-      <Link
-        href={profileHref}
-        className="m-3 flex items-center gap-3 rounded-2xl bg-white/80 px-3 py-2.5 shadow-sm hover:bg-white transition"
-      >
-        <div className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-semibold overflow-hidden flex-shrink-0">
-          {session?.user?.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={session.user.image} alt="" className="w-full h-full object-cover" />
-          ) : (
-            initials
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-gray-900 truncate">
-            {role === 'creator' ? `@${userName.replace(/\s+/g, '').toLowerCase()}` : userName}
-          </p>
-          <p className="text-xs text-gray-500">{roleLabel}</p>
-        </div>
-        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </Link>
+      {/* Resources */}
+      <div className="px-3 pt-3 mt-2 border-t border-white/60">
+        <p className="px-4 text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">
+          {resourcesLabel}
+        </p>
+        {[
+          { href: '/faq', label: w.resourceFaq },
+          { href: '/guidelines', label: w.resourceGuidelines },
+          { href: '/contact', label: w.resourceContact },
+        ].map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={() => setMobileOpen(false)}
+            className="block px-4 py-1.5 rounded-lg text-[13px] text-gray-500 hover:text-gray-900 hover:bg-white/60 transition"
+          >
+            {item.label}
+          </Link>
+        ))}
+      </div>
+
+      {/* Account chip: avatar · name · role, with an upward menu */}
+      <div className="relative m-3">
+        {accountOpen && (
+          <div
+            data-solid className="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-40"
+            onMouseLeave={() => setAccountOpen(false)}
+          >
+            <Link
+              href={profileHref}
+              onClick={() => setAccountOpen(false)}
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              {role === 'creator' ? w.creatorProfile : w.brandProfile}
+            </Link>
+            <button
+              onClick={() => { setAccountOpen(false); switchView() }}
+              disabled={isSwitching}
+              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {role === 'creator' ? t.nav.switchToBrand : t.nav.switchToCreator}
+            </button>
+            <div className="my-1 border-t border-gray-100" />
+            <button
+              onClick={() => signOut({ callbackUrl: '/' })}
+              className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            >
+              {t.nav.logout}
+            </button>
+          </div>
+        )}
+        <button
+          onClick={() => setAccountOpen((o) => !o)}
+          className="w-full flex items-center gap-3 rounded-2xl bg-white/80 px-3 py-2.5 shadow-sm hover:bg-white transition text-left"
+        >
+          <span className="w-9 h-9 rounded-full bg-white border border-gray-200 text-gray-800 flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0">
+            {session?.user?.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={session.user.image} alt="" className="w-full h-full object-cover" />
+            ) : (
+              initials
+            )}
+          </span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block text-sm font-bold text-gray-900 truncate">
+              {role === 'creator' ? `@${userName.replace(/\s+/g, '').toLowerCase()}` : userName}
+            </span>
+            <span className="block text-xs text-gray-500">
+              {role === 'creator' ? roleLabel : t.brand.dashboard.brandAdmin}
+            </span>
+          </span>
+          <svg
+            className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${accountOpen ? 'rotate-180' : ''}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 
   return (
     <div className="min-h-screen ws-themed-bg">
       <div className="flex min-h-screen max-w-[1500px] mx-auto">
-        {/* Desktop sidebar */}
-        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 py-4 pl-4">
-          <div className="flex flex-col flex-1 rounded-3xl bg-white/55 backdrop-blur border border-white/70 shadow-sm py-4">
+        {/* Desktop sidebar — viewport-height and sticky so it is the same
+            size on every page and stays put while the content scrolls */}
+        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 py-4 pl-4 sticky top-0 h-screen self-start">
+          <div className="flex flex-col flex-1 min-h-0 rounded-3xl bg-white/55 backdrop-blur border border-white/70 shadow-sm py-4">
             {sidebarContent}
           </div>
         </aside>
@@ -192,6 +278,19 @@ export default function WorkspaceLayout({
               </svg>
             </button>
             <div className="flex items-center gap-3 ml-auto">
+              {/* Subscription status */}
+              <Link
+                href={role === 'creator' ? '/dashboard/upgrade' : '/pricing/brand'}
+                className={`h-10 px-5 rounded-full text-sm font-bold flex items-center transition ${
+                  isPro
+                    ? 'bg-indigo-100 text-indigo-900 hover:bg-indigo-200/80'
+                    : 'bg-white shadow-sm text-gray-600 hover:text-gray-900'
+                }`}
+                title={w.myPlan}
+              >
+                {isPro ? 'PRO' : t.brand.dashboard.plan.free}
+              </Link>
+              {/* Language */}
               <button
                 onClick={() => setLocale(locale === 'en' ? 'zh' : 'en')}
                 className="h-10 px-3 rounded-full bg-white shadow-sm text-sm font-medium text-gray-600 hover:text-gray-900 transition"
@@ -201,45 +300,16 @@ export default function WorkspaceLayout({
               </button>
               <Link
                 href="/dashboard/messages"
-                className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-600 hover:text-gray-900 transition"
+                className="relative w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-600 hover:text-gray-900 transition"
                 title={t.messages?.title}
               >
+                {unread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+                )}
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
               </Link>
-              <div className="relative">
-                <button
-                  onClick={() => setResourcesOpen((o) => !o)}
-                  className="h-10 px-4 rounded-full bg-white shadow-sm text-sm font-medium text-gray-700 hover:text-gray-900 transition flex items-center gap-2"
-                >
-                  {resourcesLabel}
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {resourcesOpen && (
-                  <div
-                    className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-40"
-                    onMouseLeave={() => setResourcesOpen(false)}
-                  >
-                    {[
-                      { href: '/faq', label: w.resourceFaq },
-                      { href: '/guidelines', label: w.resourceGuidelines },
-                      { href: '/contact', label: w.resourceContact },
-                    ].map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setResourcesOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 

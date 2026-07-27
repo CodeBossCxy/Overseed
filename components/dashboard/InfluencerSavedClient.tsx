@@ -142,7 +142,7 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
               {s.filters}
             </button>
             {filtersOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 p-3 z-30">
+              <div data-solid className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 p-3 z-30">
                 <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{s.filterCompensation}</p>
                 {['PAID', 'GIFTED', 'PAID_PLUS_GIFT', 'AFFILIATE', 'NEGOTIABLE'].map((type) => (
                   <label key={type} className="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer">

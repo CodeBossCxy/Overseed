@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 import CompensationBadge from '@/components/campaigns/CompensationBadge'
+import StatusBadge from '@/components/StatusBadge'
 
 interface FollowerRequirement {
   id: string
@@ -69,7 +70,7 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-5xl mx-auto pt-6 pb-8">
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
@@ -80,9 +81,7 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
           </div>
           <h1 className="text-3xl font-bold">{campaign.title}</h1>
           <div className="flex items-center gap-3 mt-2">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[campaign.status]}`}>
-              {campaign.status.replace('_', ' ')}
-            </span>
+            <StatusBadge machine="campaign" status={campaign.status} size="md" dot />
             <CompensationBadge type={campaign.compensationType} />
           </div>
         </div>
@@ -104,23 +103,23 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-        <div className="bg-white p-4 rounded-lg shadow-sm">
+        <div className="bg-white/85 backdrop-blur p-4 rounded-2xl shadow-sm">
           <div className="text-2xl font-bold">{campaign.viewCount}</div>
           <div className="text-sm text-gray-500">{t.brand.campaignDetail.views}</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm">
+        <div className="bg-white/85 backdrop-blur p-4 rounded-2xl shadow-sm">
           <div className="text-2xl font-bold">{stats.total}</div>
           <div className="text-sm text-gray-500">{t.brand.campaignDetail.applications}</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm">
+        <div className="bg-white/85 backdrop-blur p-4 rounded-2xl shadow-sm">
           <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
           <div className="text-sm text-gray-500">{t.brand.campaignDetail.pending}</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm">
+        <div className="bg-white/85 backdrop-blur p-4 rounded-2xl shadow-sm">
           <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
           <div className="text-sm text-gray-500">{t.brand.campaignDetail.approved}</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm">
+        <div className="bg-white/85 backdrop-blur p-4 rounded-2xl shadow-sm">
           <div className="text-2xl font-bold">{campaign.filledSlots}/{campaign.totalSlots}</div>
           <div className="text-sm text-gray-500">{t.brand.campaignDetail.slotsFilled}</div>
         </div>
@@ -130,7 +129,7 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Description */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">{t.brand.campaignDetail.description}</h2>
             {campaign.description ? (
               <div className="prose max-w-none whitespace-pre-wrap text-gray-700">
@@ -143,7 +142,7 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
 
           {/* Content Guidelines */}
           {campaign.contentGuidelines && (
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-6">
               <h2 className="text-lg font-semibold mb-4">{t.brand.campaignDetail.contentGuidelines}</h2>
               <div className="prose max-w-none whitespace-pre-wrap text-gray-700">
                 {campaign.contentGuidelines}
@@ -152,7 +151,7 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
           )}
 
           {/* Requirements */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">{t.brand.campaignDetail.requirements}</h2>
 
             {campaign.followerRequirements.length > 0 && (
@@ -191,7 +190,7 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Campaign Info */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">{t.brand.campaignDetail.campaignDetails}</h2>
 
             <div className="space-y-4">
@@ -246,7 +245,7 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
           </div>
 
           {/* Categories */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">{t.brand.campaignDetail.categories}</h2>
             <div className="flex flex-wrap gap-2">
               {campaign.categories.map((c) => (
@@ -261,7 +260,7 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
           </div>
 
           {/* Platforms */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">{t.brand.campaignDetail.targetPlatforms}</h2>
             <div className="flex flex-wrap gap-2">
               {campaign.platforms.map((p) => (
@@ -276,7 +275,7 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">{t.brand.campaignDetail.actions}</h2>
             <div className="space-y-2">
               {campaign.status === 'DRAFT' && (
@@ -296,6 +295,19 @@ export default function BrandCampaignDetailClient({ campaign, stats }: BrandCamp
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Anti-fraud notice — shown under every campaign per spec */}
+      <div className="mt-8 bg-amber-50/80 border border-amber-100 rounded-2xl p-4 flex items-start gap-3">
+        <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+        <p className="text-sm text-amber-800">
+          {t.brand.campaigns.antiFraud}{' '}
+          <Link href="/contact" className="font-semibold underline hover:text-amber-900">
+            {t.brand.campaigns.reportNow}
+          </Link>
+        </p>
       </div>
     </div>
   )

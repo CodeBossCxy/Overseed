@@ -5,8 +5,8 @@ import { prisma } from '@/lib/prisma'
 
 const PLAN_LIMITS = {
   FREE: {
-    campaignsPerDay: 1,
-    activeCampaigns: 3,
+    campaignsPerDay: 2,
+    activeCampaigns: 5,
     conversationsPerDay: 10,
     teamSeats: 1,
     aiChat: false,
@@ -14,8 +14,8 @@ const PLAN_LIMITS = {
   },
   PRO: {
     campaignsPerDay: 5,
-    activeCampaigns: 30,
-    conversationsPerDay: 30,
+    activeCampaigns: 50,
+    conversationsPerDay: 50,
     teamSeats: 1,
     aiChat: true,
     aiTokensPerMonth: 150_000,
@@ -110,6 +110,14 @@ export async function GET() {
         key: 'aiChat',
         used: tier === 'PRO' ? aiTokensUsed : null,
         limit: tier === 'PRO' ? limits.aiTokensPerMonth : null,
+        enabled: limits.aiChat,
+      },
+      {
+        // Image credits ledger lands with the image-generation feature;
+        // shown as "—" until then.
+        key: 'aiImage',
+        used: null,
+        limit: null,
         enabled: limits.aiChat,
       },
     ],

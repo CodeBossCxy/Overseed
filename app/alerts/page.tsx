@@ -1,4 +1,4 @@
-import MainLayout from '@/components/MainLayout'
+import RoleShell from '@/components/workspace/RoleShell'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
@@ -22,8 +22,8 @@ export default async function AlertsPage() {
   })
 
   return (
-    <MainLayout>
+    <RoleShell>
       <AlertsPageClient savedSearches={JSON.parse(JSON.stringify(savedSearches))} />
-    </MainLayout>
+    </RoleShell>
   )
 }

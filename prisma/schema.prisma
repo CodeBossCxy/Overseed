@@ -128,6 +128,9 @@ model User {
   password      String?
   userType         UserType         @default(INFLUENCER)
   subscriptionTier SubscriptionTier @default(FREE)
+  // Set when PRO was granted as a limited verified-user trial (early-stage
+  // promo); null for paid PRO. Lazily downgraded once expired.
+  proTrialEndsAt   DateTime?
   preferredLanguage  String   @default("en")
   autoTranslateUGC   Boolean  @default(true)
   colorTheme         String   @default("default")
@@ -265,6 +268,7 @@ model InfluencerProfile {
   applications    Application[]
   savedCampaigns  SavedCampaign[]
   collaborations  Collaboration[]
+  savedByBrands   SavedCreator[]
 
   @@map("influencer_profiles")
 }
@@ -305,10 +309,18 @@ model BrandProfile {
   companyName      String?
   logoUrl          String?
   websiteUrl       String?
+  storeUrl         String?
   description      String?   @db.Text
   industry         String?
+  // Public-profile multi-selects (industry kept for legacy single value)
+  countries        String[]  @default([])
+  industries       String[]  @default([])
+  socialLinks      String[]  @default([])
   companySize      String?   // 'startup', 'small', 'medium', 'enterprise'
+  // 'brand' | 'agency' | 'individual_pr' — locked once verified
+  accountType      String?
   contactName      String?
+  contactJobTitle  String?
   contactEmail     String?
   contactPhone     String?
   isVerified       Boolean   @default(false)
@@ -336,6 +348,7 @@ model BrandProfile {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaigns Campaign[]
   collaborations Collaboration[]
+  savedCreators  SavedCreator[]
 
   @@map("brand_profiles")
 }
@@ -408,6 +421,10 @@ model Campaign {
 
   // Media
   images           String[]
+
+  // Overseed campaign review: set when review requests changes
+  // (PENDING_REVIEW → DRAFT); cleared on resubmission.
+  reviewNote       String?        @db.Text
 
   // Visibility & Discovery
   isFeatured       Boolean        @default(false)
@@ -669,6 +686,20 @@ model AiChatMessage {
 // ===========================================
 // SAVED CAMPAIGNS & SEARCHES
 // ===========================================
+
+// Brand-side bookmarks of platform creators ("Saved Creators")
+model SavedCreator {
+  brandId      String
+  influencerId String
+  savedAt      DateTime @default(now())
+
+  brand      BrandProfile      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  influencer InfluencerProfile @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  @@id([brandId, influencerId])
+  @@index([influencerId])
+  @@map("saved_creators")
+}
 
 model SavedCampaign {
   influencerId String

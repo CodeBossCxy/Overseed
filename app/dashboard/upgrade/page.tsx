@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
-import MainLayout from '@/components/MainLayout'
+import RoleShell from '@/components/workspace/RoleShell'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function UpgradePage() {
@@ -43,7 +43,7 @@ export default function UpgradePage() {
 
   if (isPro) {
     return (
-      <MainLayout>
+      <RoleShell>
         <div className="max-w-lg mx-auto px-4 py-20 text-center">
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
             <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,12 +57,12 @@ export default function UpgradePage() {
             {locale === 'zh' ? '您已拥有所有 Pro 功能。' : 'You have access to all Pro features.'}
           </p>
         </div>
-      </MainLayout>
+      </RoleShell>
     )
   }
 
   return (
-    <MainLayout>
+    <RoleShell>
       <div className="max-w-lg mx-auto px-4 py-16">
         {cancelled && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
@@ -127,6 +127,6 @@ export default function UpgradePage() {
           </div>
         </div>
       </div>
-    </MainLayout>
+    </RoleShell>
   )
 }

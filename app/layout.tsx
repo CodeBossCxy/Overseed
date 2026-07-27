@@ -36,8 +36,8 @@ export const metadata: Metadata = {
     default: 'Overseed - Connect Brands with Creators',
     template: '%s | Overseed',
   },
-  description: 'A global platform connecting brands with influencers and content creators for cross-border marketing collaborations.',
-  keywords: 'influencer marketing, brand collaborations, content creators, influencers, cross-border marketing, KOL',
+  description: 'A global platform connecting brands with creators for cross-border marketing collaborations.',
+  keywords: 'creator marketing, brand collaborations, content creators, influencer marketing, cross-border marketing, KOL',
   metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3333'),
   openGraph: {
     title: 'Overseed - Connect Brands with Creators',

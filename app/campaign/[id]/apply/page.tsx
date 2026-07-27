@@ -1,4 +1,4 @@
-import MainLayout from '@/components/MainLayout'
+import RoleShell from '@/components/workspace/RoleShell'
 import ApplicationForm from '@/components/applications/ApplicationForm'
 import CompensationBadge from '@/components/campaigns/CompensationBadge'
 import CategoryName from '@/components/campaigns/CategoryName'
@@ -31,7 +31,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
   // Free users cannot apply to campaigns
   if (subscriptionTier === 'FREE') {
     return (
-      <MainLayout>
+      <RoleShell>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Link
             href={`/campaign/${id}`}
@@ -46,7 +46,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
             <UpgradePrompt feature="apply" />
           </div>
         </div>
-      </MainLayout>
+      </RoleShell>
     )
   }
 
@@ -122,7 +122,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
   const isNegotiable = campaign.compensationType === 'NEGOTIABLE' || campaign.compensationType === 'PAID'
 
   return (
-    <MainLayout>
+    <RoleShell>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back link */}
         <Link
@@ -279,6 +279,6 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       </div>
-    </MainLayout>
+    </RoleShell>
   )
 }

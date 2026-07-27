@@ -6,6 +6,49 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 
+// GET /api/stripe/connect — payout setup summary for the signed-in creator.
+// Sensitive details (bank numbers, tax info) stay in Stripe; we only surface
+// connection state, last4, currency and verification status.
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const userId = (session.user as any).id
+    const influencer = await prisma.influencerProfile.findUnique({
+      where: { userId },
+      select: { stripeConnectId: true },
+    })
+    if (!influencer?.stripeConnectId) {
+      return NextResponse.json({ connected: false })
+    }
+
+    try {
+      const account = await stripe.accounts.retrieve(influencer.stripeConnectId)
+      const external = (account.external_accounts?.data || [])[0] as any
+      return NextResponse.json({
+        connected: true,
+        verified: !!account.payouts_enabled,
+        detailsSubmitted: !!account.details_submitted,
+        defaultCurrency: account.default_currency ? account.default_currency.toUpperCase() : null,
+        payoutMethod: external
+          ? {
+              kind: external.object === 'card' ? 'card' : 'bank',
+              last4: external.last4 || null,
+              bankName: external.bank_name || external.brand || null,
+            }
+          : null,
+      })
+    } catch {
+      // Account exists in our DB but Stripe is unreachable/misconfigured.
+      return NextResponse.json({ connected: true, unavailable: true })
+    }
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

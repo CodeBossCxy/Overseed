@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getPusher } from '@/lib/pusher'
+import { containsBannedContent } from '@/lib/message-filter'
 
 // POST: Send a message
 export async function POST(
@@ -35,6 +36,13 @@ export async function POST(
       return NextResponse.json(
         { message: 'Message content is required' },
         { status: 400 }
+      )
+    }
+
+    if (containsBannedContent(content)) {
+      return NextResponse.json(
+        { message: 'Message contains prohibited content', code: 'BANNED_CONTENT' },
+        { status: 422 }
       )
     }
 

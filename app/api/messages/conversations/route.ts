@@ -80,6 +80,7 @@ export async function GET() {
           applicationId: conv.applicationId,
           campaignTitle: conv.application.campaign.title,
           campaignId: conv.application.campaign.id,
+          influencerId: conv.application.influencerId,
           otherUser,
           lastMessage: conv.messages[0] || null,
           unreadCount,

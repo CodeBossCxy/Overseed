@@ -1,45 +1,61 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
+import StatusBadge from '@/components/StatusBadge'
+import { deriveVerificationStatus } from '@/lib/status'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+
+// Company Profile per spec: (1) Account & Verification summary card;
+// (2) Public Profile (creator-visible, always editable, logo upload) +
+// Business Information (from the verification submission, locked fields,
+// never shown to creators).
+
+const INDUSTRY_KEYS = [
+  'Beauty & Cosmetics',
+  'Fashion & Apparel',
+  'Food & Beverage',
+  'Health & Wellness',
+  'Technology',
+  'Travel & Hospitality',
+  'Entertainment',
+  'Retail',
+  'Finance',
+  'Education',
+  'Other',
+]
+const COMPANY_SIZE_KEYS = ['startup', 'small', 'medium', 'enterprise']
+const COUNTRY_OPTIONS = ['US', 'UK', 'CA', 'AU', 'DE', 'FR', 'ES', 'IT', 'CN', 'HK', 'SG', 'JP', 'KR', 'AE', 'BR', 'MX']
 
 export default function BrandProfilePage() {
   const { t } = useLanguage()
-  const router = useRouter()
+  const p = t.brand.profile
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [profile, setProfile] = useState<any>(null)
   const [formData, setFormData] = useState({
     companyName: '',
     description: '',
     websiteUrl: '',
+    storeUrl: '',
     logoUrl: '',
-    industry: '',
+    countries: [] as string[],
+    industries: [] as string[],
+    socialLinks: [] as string[],
     companySize: '',
+    accountType: '',
     contactName: '',
+    contactJobTitle: '',
     contactEmail: '',
     contactPhone: '',
   })
-
-  const industryKeys = [
-    'Beauty & Cosmetics',
-    'Fashion & Apparel',
-    'Food & Beverage',
-    'Health & Wellness',
-    'Technology',
-    'Travel & Hospitality',
-    'Entertainment',
-    'Retail',
-    'Finance',
-    'Education',
-    'Other',
-  ]
-
-  const companySizeKeys = ['startup', 'small', 'medium', 'enterprise']
 
   useEffect(() => {
     fetchProfile()
@@ -51,16 +67,23 @@ export default function BrandProfilePage() {
       if (response.ok) {
         const data = await response.json()
         if (data.brandProfile) {
+          const b = data.brandProfile
+          setProfile(b)
           setFormData({
-            companyName: data.brandProfile.companyName || '',
-            description: data.brandProfile.description || '',
-            websiteUrl: data.brandProfile.websiteUrl || '',
-            logoUrl: data.brandProfile.logoUrl || '',
-            industry: data.brandProfile.industry || '',
-            companySize: data.brandProfile.companySize || '',
-            contactName: data.brandProfile.contactName || '',
-            contactEmail: data.brandProfile.contactEmail || '',
-            contactPhone: data.brandProfile.contactPhone || '',
+            companyName: b.companyName || '',
+            description: b.description || '',
+            websiteUrl: b.websiteUrl || '',
+            storeUrl: b.storeUrl || '',
+            logoUrl: b.logoUrl || '',
+            countries: b.countries || [],
+            industries: b.industries || (b.industry ? [b.industry] : []),
+            socialLinks: b.socialLinks || [],
+            companySize: b.companySize || '',
+            accountType: b.accountType || '',
+            contactName: b.contactName || '',
+            contactJobTitle: b.contactJobTitle || '',
+            contactEmail: b.contactEmail || '',
+            contactPhone: b.contactPhone || '',
           })
         }
       }
@@ -71,25 +94,50 @@ export default function BrandProfilePage() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const isVerified = profile?.brandVerificationStatus === 'APPROVED'
+  const verifState = deriveVerificationStatus(profile?.brandVerificationStatus, !!profile?.verificationSubmittedAt)
+
+  // Public-profile completion for the summary card
+  const completionChecks = [
+    !!formData.logoUrl,
+    !!formData.companyName,
+    !!formData.description,
+    formData.countries.length > 0,
+    formData.industries.length > 0,
+  ]
+  const completionPct = Math.round((completionChecks.filter(Boolean).length / completionChecks.length) * 100)
+
+  const toggleIn = (list: string[], value: string) =>
+    list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
+
+  const uploadLogo = async (file: File) => {
+    setIsUploading(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('files', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok || !data.urls?.[0]) throw new Error(data.message || p.errorUpdate)
+      setFormData((f) => ({ ...f, logoUrl: data.urls[0] }))
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleSave = async () => {
     setIsSaving(true)
     setError(null)
     setSuccess(false)
-
     try {
       const response = await fetch('/api/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brandProfile: formData,
-        }),
+        body: JSON.stringify({ brandProfile: formData }),
       })
-
-      if (!response.ok) {
-        throw new Error(t.brand.profile.errorUpdate)
-      }
-
+      if (!response.ok) throw new Error(p.errorUpdate)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err: any) {
@@ -99,12 +147,20 @@ export default function BrandProfilePage() {
     }
   }
 
+  const inputClass =
+    'w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-300'
+  const lockedClass =
+    'w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500 cursor-not-allowed'
+
+  const accountTypeLabel = (v: string) =>
+    v === 'agency' ? p.accountTypeAgency : v === 'individual_pr' ? p.accountTypeIndividual : v === 'brand' ? p.accountTypeBrand : '—'
+
   if (isLoading) {
     return (
       <BrandWorkspaceLayout>
-        <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+        <div className="max-w-4xl mx-auto px-4 py-12 text-center">
           <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-gray-500">{t.brand.profile.loading}</p>
+          <p className="mt-4 text-gray-500">{p.loading}</p>
         </div>
       </BrandWorkspaceLayout>
     )
@@ -112,179 +168,400 @@ export default function BrandProfilePage() {
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard/brand')}
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4 transition"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            {t.common.backToDashboard}
-          </button>
-          <h1 className="text-3xl font-bold">{t.brand.profile.title}</h1>
-          <p className="text-gray-600 mt-1">{t.brand.profile.subtitle}</p>
+      <div className="max-w-4xl mx-auto pt-6 pb-8">
+        {/* Header + actions */}
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{p.title}</h1>
+            <p className="text-gray-500 mt-1">{p.subtitle}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowPreview(true)}
+              className="px-4 py-2.5 bg-white shadow-sm rounded-xl text-sm font-semibold text-gray-700 hover:text-primary-700 transition"
+            >
+              {p.previewProfile}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:bg-primary-700 transition disabled:opacity-50"
+            >
+              {isSaving ? p.saving : p.saveChanges}
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6 space-y-6">
-          {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-              {error}
-            </div>
-          )}
+        {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>}
+        {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-600">{p.success}</div>}
 
-          {success && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-600">
-              {t.brand.profile.success}
+        {/* ── Card 1: Account & Verification ── */}
+        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 mb-6">
+          <h2 className="font-bold text-gray-900 mb-4">{p.accountVerification}</h2>
+          <div className="divide-y divide-gray-100">
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm font-medium text-gray-700">{p.businessVerification}</span>
+              <StatusBadge machine="verification" status={verifState} size="sm" dot />
             </div>
-          )}
-
-          {/* Company Name */}
-          <div>
-            <label className="block text-sm font-medium mb-1">{t.brand.profile.companyName}</label>
-            <input
-              type="text"
-              required
-              value={formData.companyName}
-              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              placeholder={t.brand.profile.companyNamePlaceholder}
-            />
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm font-medium text-gray-700">{p.paymentMethod}</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${profile?.stripeCustomerId ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
+                {profile?.stripeCustomerId ? t.brand.dashboard.stepAdded : t.brand.dashboard.stepNotStarted}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm font-medium text-gray-700">{p.profileCompletion}</span>
+              <div className="flex items-center gap-3">
+                <div className="w-28 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${completionPct}%` }} />
+                </div>
+                <span className="text-sm font-bold text-gray-900 tabular-nums">{completionPct}%</span>
+              </div>
+            </div>
           </div>
+        </div>
 
-          {/* Logo URL */}
-          <div>
-            <label className="block text-sm font-medium mb-1">{t.brand.profile.logoUrl}</label>
-            <input
-              type="url"
-              value={formData.logoUrl}
-              onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              placeholder="https://example.com/logo.png"
-            />
-            {formData.logoUrl && (
-              <div className="mt-2">
-                <img
-                  src={formData.logoUrl}
-                  alt={t.brand.profile.logoPreviewAlt}
-                  className="h-16 object-contain rounded"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                  }}
+        {/* ── Card 2a: Public Profile ── */}
+        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 mb-6">
+          <h2 className="font-bold text-gray-900">{p.publicProfile}</h2>
+          <p className="text-xs text-gray-500 mt-1 mb-5">{p.publicProfileNote}</p>
+
+          <div className="space-y-5">
+            {/* Logo upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{p.logo}</label>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+                  {formData.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={formData.logoUrl} alt="" className="w-full h-full object-contain" />
+                  ) : (
+                    <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="px-4 py-2 bg-white shadow-sm rounded-xl text-sm font-semibold text-gray-700 hover:text-primary-700 transition disabled:opacity-50"
+                >
+                  {isUploading ? p.uploading : p.uploadLogo}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{p.displayName} *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.companyName}
+                  onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                  className={inputClass}
+                  placeholder={p.companyNamePlaceholder}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{p.companySize} <span className="text-gray-400 font-normal">({p.optionalTag})</span></label>
+                <select
+                  value={formData.companySize}
+                  onChange={(e) => setFormData({ ...formData, companySize: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="">{p.selectSize}</option>
+                  {COMPANY_SIZE_KEYS.map((key) => (
+                    <option key={key} value={key}>{t.companySizes[key] || key}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{p.description}</label>
+              <textarea
+                rows={4}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className={inputClass}
+                placeholder={p.descriptionPlaceholder}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{p.websiteUrl} <span className="text-gray-400 font-normal">({p.optionalTag})</span></label>
+                <input
+                  type="url"
+                  value={formData.websiteUrl}
+                  onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                  className={inputClass}
+                  placeholder="https://yourcompany.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{p.storeUrl} <span className="text-gray-400 font-normal">({p.optionalTag})</span></label>
+                <input
+                  type="url"
+                  value={formData.storeUrl}
+                  onChange={(e) => setFormData({ ...formData, storeUrl: e.target.value })}
+                  className={inputClass}
+                  placeholder="https://store.yourcompany.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{p.countryRegion} *</label>
+              <div className="flex flex-wrap gap-2">
+                {COUNTRY_OPTIONS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, countries: toggleIn(formData.countries, c) })}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                      formData.countries.includes(c) ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{p.industryCategory} *</label>
+              <div className="flex flex-wrap gap-2">
+                {INDUSTRY_KEYS.map((ind) => (
+                  <button
+                    key={ind}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, industries: toggleIn(formData.industries, ind) })}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                      formData.industries.includes(ind) ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {t.industries[ind] || ind}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {p.socialLinksLabel} <span className="text-gray-400 font-normal">({p.optionalTag})</span>
+              </label>
+              <div className="space-y-2">
+                {formData.socialLinks.map((link, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="url"
+                      value={link}
+                      onChange={(e) => {
+                        const links = [...formData.socialLinks]
+                        links[i] = e.target.value
+                        setFormData({ ...formData, socialLinks: links })
+                      }}
+                      className={inputClass}
+                      placeholder="https://instagram.com/yourbrand"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, socialLinks: formData.socialLinks.filter((_, j) => j !== i) })}
+                      className="px-3 text-gray-400 hover:text-red-500 transition"
+                      aria-label="Remove"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {formData.socialLinks.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, socialLinks: [...formData.socialLinks, ''] })}
+                    className="text-sm font-semibold text-primary-600 hover:text-primary-700 transition"
+                  >
+                    + {p.addLink}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Card 2b: Business Information ── */}
+        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-gray-900">{p.businessInfo}</h2>
+              <p className="text-xs text-gray-500 mt-1">{p.businessInfoNote}</p>
+            </div>
+            {!isVerified && (
+              <Link
+                href="/contact"
+                className="px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-semibold hover:bg-primary-700 transition whitespace-nowrap"
+              >
+                {p.startVerification}
+              </Link>
             )}
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium mb-1">{t.brand.profile.description}</label>
-            <textarea
-              rows={4}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              placeholder={t.brand.profile.descriptionPlaceholder}
-            />
-          </div>
+          {!isVerified && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-800">
+              {p.verifyToPublish}
+            </div>
+          )}
 
-          {/* Website */}
-          <div>
-            <label className="block text-sm font-medium mb-1">{t.brand.profile.websiteUrl}</label>
-            <input
-              type="url"
-              value={formData.websiteUrl}
-              onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              placeholder="https://yourcompany.com"
-            />
-          </div>
-
-          {/* Industry & Company Size */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
             <div>
-              <label className="block text-sm font-medium mb-1">{t.brand.profile.industry}</label>
-              <select
-                value={formData.industry}
-                onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="">{t.brand.profile.selectIndustry}</option>
-                {industryKeys.map((industry) => (
-                  <option key={industry} value={industry}>
-                    {t.industries[industry] || industry}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {p.accountType}
+                {isVerified && <span className="ml-2 text-[11px] text-gray-400">🔒 {p.lockedAfterVerification}</span>}
+              </label>
+              {isVerified ? (
+                <p className={lockedClass}>{accountTypeLabel(formData.accountType)}</p>
+              ) : (
+                <select
+                  value={formData.accountType}
+                  onChange={(e) => setFormData({ ...formData, accountType: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="">—</option>
+                  <option value="brand">{p.accountTypeBrand}</option>
+                  <option value="agency">{p.accountTypeAgency}</option>
+                  <option value="individual_pr">{p.accountTypeIndividual}</option>
+                </select>
+              )}
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">{t.brand.profile.companySize}</label>
-              <select
-                value={formData.companySize}
-                onChange={(e) => setFormData({ ...formData, companySize: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="">{t.brand.profile.selectSize}</option>
-                {companySizeKeys.map((key) => (
-                  <option key={key} value={key}>
-                    {t.companySizes[key] || key}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{p.regCountry}</label>
+              <p className={lockedClass}>{profile?.businessCountry || '—'}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {p.legalName}
+                {isVerified && <span className="ml-2 text-[11px] text-gray-400">🔒 {p.lockedAfterVerification}</span>}
+              </label>
+              <p className={lockedClass}>{profile?.businessLegalName || '—'}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {p.regNumber}
+                {isVerified && <span className="ml-2 text-[11px] text-gray-400">🔒 {p.lockedAfterVerification}</span>}
+              </label>
+              <p className={lockedClass}>{profile?.businessRegistrationNo || '—'}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{p.contactName}</label>
+              <input
+                type="text"
+                value={formData.contactName}
+                onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                className={inputClass}
+                placeholder={p.contactNamePlaceholder}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{p.jobTitle}</label>
+              <input
+                type="text"
+                value={formData.contactJobTitle}
+                onChange={(e) => setFormData({ ...formData, contactJobTitle: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{p.workEmail}</label>
+              <input
+                type="email"
+                value={formData.contactEmail}
+                onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                className={inputClass}
+                placeholder="contact@company.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{p.contactPhone}</label>
+              <input
+                type="tel"
+                value={formData.contactPhone}
+                onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
+                className={inputClass}
+                placeholder="+1 (555) 123-4567"
+              />
             </div>
           </div>
 
-          {/* Contact Information */}
-          <div className="pt-4 border-t">
-            <h3 className="text-lg font-medium mb-4">{t.brand.profile.contactInfo}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-1">{t.brand.profile.contactName}</label>
-                <input
-                  type="text"
-                  value={formData.contactName}
-                  onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder={t.brand.profile.contactNamePlaceholder}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">{t.brand.profile.contactEmail}</label>
-                <input
-                  type="email"
-                  value={formData.contactEmail}
-                  onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="contact@company.com"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">{t.brand.profile.contactPhone}</label>
-                <input
-                  type="tel"
-                  value={formData.contactPhone}
-                  onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Submit */}
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="w-full px-6 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition font-medium disabled:opacity-50"
-            >
-              {isSaving ? t.brand.profile.saving : t.brand.profile.saveChanges}
-            </button>
-          </div>
-        </form>
+          <p className="text-xs text-gray-400 mt-5">{p.verifMaterialsNote}</p>
+        </div>
       </div>
+
+      {/* Preview modal — the creator-facing view */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowPreview(false)}>
+          <div data-solid className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-bold text-gray-900">{p.previewTitle}</h3>
+              <button onClick={() => setShowPreview(false)} className="text-gray-400 hover:text-gray-700" aria-label={p.close}>✕</button>
+            </div>
+            <p className="text-xs text-gray-400 mb-5">{p.previewNote}</p>
+
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+                {formData.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={formData.logoUrl} alt="" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-xl font-bold text-gray-300">{(formData.companyName || '?').charAt(0)}</span>
+                )}
+              </div>
+              <div>
+                <p className="font-bold text-gray-900 flex items-center gap-1.5">
+                  {formData.companyName || '—'}
+                  {isVerified && (
+                    <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
+                    </svg>
+                  )}
+                </p>
+                {isVerified && <p className="text-xs text-gray-500">{t.brand.dashboard.verifiedBusiness}</p>}
+              </div>
+            </div>
+
+            {formData.description && <p className="text-sm text-gray-600 mt-4">{formData.description}</p>}
+
+            {(formData.countries.length > 0 || formData.industries.length > 0) && (
+              <div className="flex flex-wrap gap-1.5 mt-4">
+                {formData.industries.map((ind) => (
+                  <span key={ind} className="px-2.5 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium">
+                    {t.industries[ind] || ind}
+                  </span>
+                ))}
+                {formData.countries.map((c) => (
+                  <span key={c} className="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">{c}</span>
+                ))}
+              </div>
+            )}
+
+            {(formData.websiteUrl || formData.storeUrl || formData.socialLinks.filter(Boolean).length > 0) && (
+              <div className="mt-4 space-y-1">
+                {[formData.websiteUrl, formData.storeUrl, ...formData.socialLinks].filter(Boolean).map((link, i) => (
+                  <p key={i} className="text-xs text-primary-600 truncate">{link}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </BrandWorkspaceLayout>
   )
 }

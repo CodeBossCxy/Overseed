@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       campaign: { select: { id: true, title: true, images: true } },
       influencer: { select: { id: true, displayName: true, avatarUrl: true, user: { select: { name: true, image: true } } } },
       brand: { select: { id: true, companyName: true, logoUrl: true } },
-      payment: { select: { status: true, amount: true, currency: true } },
+      payment: { select: { status: true, amount: true, creatorPayout: true, currency: true, paidAt: true, releasedAt: true } },
     },
   })
 

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 import StatusBadge from '@/components/StatusBadge'
+import { deriveVerificationStatus, VERIFICATION_META } from '@/lib/status'
 
 interface Stats {
   liveCampaigns: number
@@ -72,7 +73,6 @@ export default function BrandDashboardClient({
   const isApproved = brandProfile.brandVerificationStatus === 'APPROVED'
   const isPending = brandProfile.brandVerificationStatus === 'PENDING'
   const isRejected = brandProfile.brandVerificationStatus === 'REJECTED'
-  const displayName = brandProfile.companyName || userName
 
   const relTime = (iso: string) => {
     const diffMin = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
@@ -88,15 +88,22 @@ export default function BrandDashboardClient({
     return formatDate(iso, locale)
   }
 
+  // Business verification caption uses the canonical 4-state vocabulary
+  // (Not Verified / Under Review / Action Required / Verified).
+  const verifState = deriveVerificationStatus(brandProfile.brandVerificationStatus as any, true)
+  const verifLabel = (t.status as any)?.verification?.[VERIFICATION_META[verifState].key] ?? verifState
+
   const steps = [
-    { done: setup.profile, title: d.stepProfile, caption: setup.profile ? d.stepProfileDone : d.stepPending, href: '/dashboard/brand/profile' },
-    { done: setup.verification, title: d.stepVerification, caption: setup.verification ? d.stepVerified : d.stepPending, href: '/dashboard/brand/profile' },
-    { done: setup.payment, title: d.stepPayment, caption: setup.payment ? d.stepAdded : d.stepPending, href: '/dashboard/brand/profile' },
-    { done: setup.firstCampaign, title: d.stepFirstCampaign, caption: setup.firstCampaign ? d.stepProfileDone : d.stepPending, href: '/dashboard/brand/campaigns/new' },
+    { done: setup.profile, title: d.stepProfile, caption: setup.profile ? d.stepCompleted : d.stepNotStarted, href: '/dashboard/brand/profile' },
+    { done: setup.verification, title: d.stepVerification, caption: verifLabel, href: '/dashboard/brand/profile' },
+    { done: setup.payment, title: d.stepPayment, caption: setup.payment ? d.stepAdded : d.stepNotStarted, href: '/dashboard/brand/profile' },
+    { done: setup.firstCampaign, title: d.stepFirstCampaign, caption: setup.firstCampaign ? d.stepCompleted : d.stepNotStarted, href: '/dashboard/brand/campaigns/new' },
   ]
   const doneCount = steps.filter((s) => s.done).length
   const pct = Math.round((doneCount / steps.length) * 100)
   const nextStep = steps.find((s) => !s.done)
+  // Spec: the setup banner only shows while onboarding is incomplete
+  const setupDone = doneCount === steps.length
 
   const statCards = [
     {
@@ -135,15 +142,15 @@ export default function BrandDashboardClient({
 
   return (
     <div className="max-w-7xl mx-auto pt-6 pb-8">
-      {/* Verification Status Banners */}
+      {/* Verification Status Banners (canonical vocabulary from lib/status) */}
       {isPending && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
           <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div>
-            <h3 className="font-semibold text-amber-800">Verification Under Review</h3>
-            <p className="text-sm text-amber-700 mt-0.5">Your brand verification is being reviewed by our team. You can browse the platform, but creating campaigns and messaging creators will be available once approved.</p>
+            <h3 className="font-semibold text-amber-800">{d.verifPendingTitle}</h3>
+            <p className="text-sm text-amber-700 mt-0.5">{d.verifPendingDesc}</p>
           </div>
         </div>
       )}
@@ -153,11 +160,19 @@ export default function BrandDashboardClient({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
           <div>
-            <h3 className="font-semibold text-red-800">Verification Not Approved</h3>
+            <h3 className="font-semibold text-red-800">{d.verifUnableTitle}</h3>
             {brandProfile.rejectionReason && (
-              <p className="text-sm text-red-700 mt-0.5"><strong>Reason:</strong> {brandProfile.rejectionReason}</p>
+              <p className="text-sm text-red-700 mt-0.5"><strong>{d.reasonLabel}</strong> {brandProfile.rejectionReason}</p>
             )}
-            <p className="text-sm text-red-700 mt-1">Please update your business information from your <Link href="/dashboard/brand/profile" className="underline font-medium">profile page</Link> and contact support for re-review.</p>
+            <p className="text-sm text-red-700 mt-1">{d.verifUnableDesc}</p>
+            <div className="flex gap-4 mt-2">
+              <Link href="/dashboard/brand/profile" className="text-sm font-semibold text-red-700 underline">
+                {t.workspace.brandProfile}
+              </Link>
+              <Link href="/contact" className="text-sm font-semibold text-red-700 underline">
+                {d.contactSupport}
+              </Link>
+            </div>
           </div>
         </div>
       )}
@@ -165,46 +180,56 @@ export default function BrandDashboardClient({
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-3xl font-bold text-gray-900">{d.title}</h1>
-            {isApproved && (
+          <h1 className="text-3xl font-bold text-gray-900">
+            {d.welcomeBack} {userName}!
+          </h1>
+          <p className="text-gray-500 mt-1">{d.title}</p>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {brandProfile.companyName && (
+              <span className="text-sm font-semibold text-gray-800">{brandProfile.companyName}</span>
+            )}
+            {isApproved ? (
               <span className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600">
                 <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
                 </svg>
                 {d.verifiedBusiness}
               </span>
+            ) : (
+              <span className="inline-flex items-center px-2.5 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">
+                {d.unverifiedBusiness}
+              </span>
             )}
           </div>
-          <p className="text-lg font-semibold text-gray-900 mt-3">
-            {d.welcomeBack} {displayName} 👋
-          </p>
-          <p className="text-sm text-gray-500 mt-0.5">{d.welcomeSubtitle}</p>
         </div>
         <div className="flex items-center gap-3">
           <span
             className={`px-4 py-2 rounded-full text-sm font-bold ${
               subscriptionTier === 'PRO'
-                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white'
+                ? 'bg-indigo-100 text-indigo-900'
                 : 'bg-white shadow-sm text-gray-600'
             }`}
           >
-            {subscriptionTier === 'PRO' ? d.plan.pro.toUpperCase() : d.plan.free}
+            {subscriptionTier === 'PRO' ? 'PRO' : d.plan.free}
           </span>
-          <div className="flex items-center gap-2.5 bg-white shadow-sm rounded-full pl-1.5 pr-4 py-1.5">
-            <Avatar src={brandProfile.logoUrl} name={displayName} className="w-8 h-8 rounded-full text-xs" />
-            <div className="leading-tight">
-              <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-              <p className="text-[11px] text-gray-500">{d.brandAdmin}</p>
-            </div>
-          </div>
+          {isApproved && (
+            <Link
+              href="/dashboard/brand/campaigns/new"
+              className="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:bg-primary-700 transition inline-flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              {d.createCampaign}
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Hero + setup */}
+      {/* Hero + setup (setup banner hides itself once onboarding is done) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div
-          className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-[#091326] bg-cover bg-center text-white p-8 sm:p-10 flex flex-col justify-center min-h-[280px]"
+          className={`${setupDone ? 'lg:col-span-3' : 'lg:col-span-2'} relative overflow-hidden rounded-3xl bg-[#091326] bg-cover bg-center text-white p-8 sm:p-10 flex flex-col justify-center min-h-[280px]`}
           style={{ backgroundImage: "url('/home/hero-earth.jpg')" }}
         >
           {/* Left-side scrim keeps the copy readable over the photo */}
@@ -230,6 +255,7 @@ export default function BrandDashboardClient({
           )}
         </div>
 
+        {!setupDone && (
         <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 flex flex-col">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -271,6 +297,7 @@ export default function BrandDashboardClient({
             <span aria-hidden>→</span>
           </Link>
         </div>
+        )}
       </div>
 
       {/* Stat cards */}

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import StatusBadge from '@/components/StatusBadge'
 import PaymentStatusBadge from '@/components/payments/PaymentStatus'
+import PaymentModal from '@/components/payments/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 
@@ -24,6 +25,58 @@ export default function BrandManageCollaborationPage() {
   const [revisionOpen, setRevisionOpen] = useState(false)
   const [revisionNote, setRevisionNote] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [payBusy, setPayBusy] = useState(false)
+  const [paymentModal, setPaymentModal] = useState<{
+    clientSecret: string
+    amount: number
+    platformFee: number
+    creatorPayout: number
+  } | null>(null)
+
+  const fundCollaboration = async (collabData: any) => {
+    setPayBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId: collabData.applicationId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to create payment')
+      const amount = Number(collabData.fee || 0)
+      const platformFee = Math.round(amount * 10) / 100
+      setPaymentModal({
+        clientSecret: data.clientSecret,
+        amount,
+        platformFee,
+        creatorPayout: amount - platformFee,
+      })
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setPayBusy(false)
+    }
+  }
+
+  const releasePayment = async (collabData: any) => {
+    setPayBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/stripe/release', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId: collabData.applicationId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to release payment')
+      await load()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setPayBusy(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -205,6 +258,26 @@ export default function BrandManageCollaborationPage() {
               <h2 className="text-lg font-semibold mb-3">{c.actions}</h2>
               {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
               <div className="space-y-2">
+                {/* Fund: no payment yet (or a failed attempt) and not terminal */}
+                {!isTerminal && (!collab.payment || ['PENDING', 'FAILED'].includes(collab.payment.status)) && collab.fee != null && (
+                  <button
+                    onClick={() => fundCollaboration(collab)}
+                    disabled={payBusy}
+                    className="w-full px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50"
+                  >
+                    {payBusy ? '…' : c.fundCollaboration}
+                  </button>
+                )}
+                {/* Release: funds secured and work approved or awaiting release */}
+                {collab.payment && ['HELD', 'RELEASE_PENDING'].includes(collab.payment.status) && collab.status === 'COMPLETED' && (
+                  <button
+                    onClick={() => releasePayment(collab)}
+                    disabled={payBusy}
+                    className="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-50"
+                  >
+                    {payBusy ? '…' : c.releasePayment}
+                  </button>
+                )}
                 {collab.status === 'SUBMITTED' && (
                   <>
                     <button onClick={() => doAction('approve')} disabled={busy} className="w-full px-4 py-2.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition disabled:opacity-50">
@@ -267,6 +340,20 @@ export default function BrandManageCollaborationPage() {
           </div>
         </div>
       </div>
+
+      {paymentModal && (
+        <PaymentModal
+          clientSecret={paymentModal.clientSecret}
+          amount={paymentModal.amount}
+          platformFee={paymentModal.platformFee}
+          creatorPayout={paymentModal.creatorPayout}
+          onSuccess={() => {
+            setPaymentModal(null)
+            load()
+          }}
+          onCancel={() => setPaymentModal(null)}
+        />
+      )}
     </BrandWorkspaceLayout>
   )
 }

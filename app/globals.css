@@ -240,31 +240,33 @@
 [data-color-theme='honey']    { --user-theme-gradient: linear-gradient(150deg, #fbe8c4 0%, #fceed3 35%, #f9e2bd 65%, #f3cd99 100%); }
 
 /* Workspace ambience — signed-in (non-global) pages only. Frosted glass keeps
-   text readable while the theme colour stays visible behind the content. */
+   text readable while the theme colour stays visible behind the content.
+   Overlay surfaces (modals, drawers, dropdowns) opt OUT via data-solid on
+   their panel element so they stay fully opaque and readable. */
 html:not([data-theme='global'])[data-color-theme] body {
   background: var(--user-theme-gradient) fixed;
 }
-html:not([data-theme='global'])[data-color-theme] .bg-white {
+html:not([data-theme='global'])[data-color-theme] .bg-white:not([data-solid]):not([data-solid] *) {
   background-color: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
-html:not([data-theme='global'])[data-color-theme] .bg-white\/90,
-html:not([data-theme='global'])[data-color-theme] .bg-white\/85,
-html:not([data-theme='global'])[data-color-theme] .bg-white\/80,
-html:not([data-theme='global'])[data-color-theme] .bg-white\/75,
-html:not([data-theme='global'])[data-color-theme] .bg-white\/70,
-html:not([data-theme='global'])[data-color-theme] .bg-white\/60 {
+html:not([data-theme='global'])[data-color-theme] .bg-white\/90:not([data-solid] *),
+html:not([data-theme='global'])[data-color-theme] .bg-white\/85:not([data-solid] *),
+html:not([data-theme='global'])[data-color-theme] .bg-white\/80:not([data-solid] *),
+html:not([data-theme='global'])[data-color-theme] .bg-white\/75:not([data-solid] *),
+html:not([data-theme='global'])[data-color-theme] .bg-white\/70:not([data-solid] *),
+html:not([data-theme='global'])[data-color-theme] .bg-white\/60:not([data-solid] *) {
   background-color: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
-html:not([data-theme='global'])[data-color-theme] .bg-gray-50,
-html:not([data-theme='global'])[data-color-theme] .bg-gray-50\/50,
-html:not([data-theme='global'])[data-color-theme] .bg-gray-50\/40 {
+html:not([data-theme='global'])[data-color-theme] .bg-gray-50:not([data-solid] *),
+html:not([data-theme='global'])[data-color-theme] .bg-gray-50\/50:not([data-solid] *),
+html:not([data-theme='global'])[data-color-theme] .bg-gray-50\/40:not([data-solid] *) {
   background-color: rgba(255, 255, 255, 0.3);
 }
-html:not([data-theme='global'])[data-color-theme] .bg-gray-100 {
+html:not([data-theme='global'])[data-color-theme] .bg-gray-100:not([data-solid] *) {
   background-color: rgba(255, 255, 255, 0.42);
 }
 html:not([data-theme='global'])[data-color-theme] .shadow-md,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import MainLayout from '@/components/MainLayout'
+import RoleShell from '@/components/workspace/RoleShell'
 import ApplicationStatus from '@/components/applications/ApplicationStatus'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -130,18 +130,18 @@ export default function ApplicationDetailPage() {
 
   if (isLoading) {
     return (
-      <MainLayout>
+      <RoleShell>
         <div className="max-w-3xl mx-auto px-4 py-12 text-center">
           <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
           <p className="mt-4 text-gray-500">{t.common.loading}</p>
         </div>
-      </MainLayout>
+      </RoleShell>
     )
   }
 
   if (error || !application) {
     return (
-      <MainLayout>
+      <RoleShell>
         <div className="max-w-3xl mx-auto px-4 py-12 text-center">
           <p className="text-gray-500 text-lg">{error || t.applications.detail.notFound}</p>
           <Link
@@ -151,7 +151,7 @@ export default function ApplicationDetailPage() {
             {t.applications.detail.backToApplications}
           </Link>
         </div>
-      </MainLayout>
+      </RoleShell>
     )
   }
 
@@ -159,7 +159,7 @@ export default function ApplicationDetailPage() {
   const canMessage = ['PENDING', 'UNDER_REVIEW', 'APPROVED', 'COMPLETED'].includes(application.status)
 
   return (
-    <MainLayout>
+    <RoleShell>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back link */}
         <Link
@@ -400,6 +400,6 @@ export default function ApplicationDetailPage() {
           </Link>
         </div>
       </div>
-    </MainLayout>
+    </RoleShell>
   )
 }

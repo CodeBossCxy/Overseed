@@ -157,24 +157,49 @@ export const Payment = makeMachine<PaymentStatus>(
 // Derived from existing DB fields (BrandVerificationStatus, isVerified) rather
 // than stored as its own column, so no migration is needed to adopt it.
 // ─────────────────────────────────────────────
-export type VerificationStatus = 'NOT_VERIFIED' | 'UNDER_REVIEW' | 'ACTION_REQUIRED' | 'VERIFIED'
+export type VerificationStatus =
+  | 'NOT_VERIFIED'
+  | 'UNDER_REVIEW'
+  | 'ACTION_REQUIRED'
+  | 'VERIFIED'
+  | 'UNABLE_TO_VERIFY'
 
 export const VERIFICATION_META: Record<VerificationStatus, StatusMeta> = {
   NOT_VERIFIED: { key: 'notVerified', tone: 'gray' },
   UNDER_REVIEW: { key: 'underReview', tone: 'amber' },
   ACTION_REQUIRED: { key: 'actionRequired', tone: 'red' },
   VERIFIED: { key: 'verified', tone: 'green' },
+  // Per spec, REJECTED is a back-office state only; users see "Unable to
+  // Verify" with a Contact Support pointer instead of a raw rejection.
+  UNABLE_TO_VERIFY: { key: 'unableToVerify', tone: 'red' },
 }
 
-/** Map the existing BrandVerificationStatus (PENDING/APPROVED/REJECTED) + submission to the 4-state. */
+/** Map the existing BrandVerificationStatus (PENDING/APPROVED/REJECTED) + submission to the front-facing state. */
 export function deriveVerificationStatus(
   dbStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | null | undefined,
   hasSubmitted: boolean,
 ): VerificationStatus {
   if (dbStatus === 'APPROVED') return 'VERIFIED'
-  if (dbStatus === 'REJECTED') return 'ACTION_REQUIRED'
+  if (dbStatus === 'REJECTED') return 'UNABLE_TO_VERIFY'
   if (dbStatus === 'PENDING' && hasSubmitted) return 'UNDER_REVIEW'
   return 'NOT_VERIFIED'
+}
+
+// ─────────────────────────────────────────────
+// Account status — back-office risk control only (per spec: not shown to
+// regular users). Derived from User.isActive until a dedicated column with a
+// RESTRICTED tier is needed.
+// ─────────────────────────────────────────────
+export type AccountStatus = 'ACTIVE' | 'RESTRICTED' | 'SUSPENDED'
+
+export const ACCOUNT_STATUS_META: Record<AccountStatus, StatusMeta> = {
+  ACTIVE: { key: 'active', tone: 'green' },
+  RESTRICTED: { key: 'restricted', tone: 'amber' },
+  SUSPENDED: { key: 'suspended', tone: 'red' },
+}
+
+export function deriveAccountStatus(isActive: boolean): AccountStatus {
+  return isActive ? 'ACTIVE' : 'SUSPENDED'
 }
 
 /** Public verified badge label key by account type (per spec). */

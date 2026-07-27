@@ -1,7 +1,10 @@
-import MainLayout from '@/components/MainLayout'
+import RoleShell from '@/components/workspace/RoleShell'
 import InfluencerProfileWrapper from '@/components/profiles/InfluencerProfileWrapper'
+import CreatorSaveBar from '@/components/profiles/CreatorSaveBar'
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export default async function InfluencerProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -38,8 +41,18 @@ export default async function InfluencerProfilePage({ params }: { params: Promis
     },
   })
 
+  // Brand viewers get save (bookmark) + report actions on creator profiles
+  const session = await getServerSession(authOptions)
+  const viewerIsBrand = session?.user
+    ? !!(await prisma.brandProfile.findUnique({
+        where: { userId: (session.user as any).id },
+        select: { id: true },
+      }))
+    : false
+
   return (
-    <MainLayout>
+    <RoleShell>
+      {viewerIsBrand && <CreatorSaveBar influencerId={id} />}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <InfluencerProfileWrapper
           initialInfluencer={{
@@ -48,6 +61,6 @@ export default async function InfluencerProfilePage({ params }: { params: Promis
           } as any}
         />
       </div>
-    </MainLayout>
+    </RoleShell>
   )
 }

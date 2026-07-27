@@ -74,13 +74,18 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<UserData[]>([])
   const [recentAiLogs, setRecentAiLogs] = useState<AiLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'ai-usage' | 'beta-codes' | 'beta-feedback' | 'brand-verification'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'ai-usage' | 'beta-codes' | 'beta-feedback' | 'brand-verification' | 'campaign-review'>('overview')
 
   // Brand verification state
   const [pendingBrands, setPendingBrands] = useState<any[]>([])
   const [brandVerifFilter, setBrandVerifFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING')
   const [rejectReason, setRejectReason] = useState('')
   const [rejectingId, setRejectingId] = useState<string | null>(null)
+
+  // Campaign review state
+  const [reviewCampaigns, setReviewCampaigns] = useState<any[]>([])
+  const [changesNote, setChangesNote] = useState('')
+  const [changesId, setChangesId] = useState<string | null>(null)
 
   // Beta state
   const [betaCodes, setBetaCodes] = useState<BetaCode[]>([])
@@ -116,6 +121,7 @@ export default function AdminDashboard() {
     fetchBetaCodes()
     fetchBetaFeedback()
     fetchBrandVerifications('PENDING')
+    fetchCampaignReviews()
   }, [session, status, router])
 
   const fetchBrandVerifications = async (filterStatus?: string) => {
@@ -139,6 +145,31 @@ export default function AdminDashboard() {
         setRejectingId(null)
         setRejectReason('')
         fetchBrandVerifications()
+      }
+    } catch {}
+  }
+
+  const fetchCampaignReviews = async () => {
+    try {
+      const res = await fetch('/api/admin/campaign-review')
+      if (res.ok) {
+        const data = await res.json()
+        setReviewCampaigns(data.campaigns)
+      }
+    } catch {}
+  }
+
+  const handleCampaignReview = async (campaignId: string, action: 'approve' | 'request_changes', reviewNote?: string) => {
+    try {
+      const res = await fetch('/api/admin/campaign-review', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId, action, reviewNote }),
+      })
+      if (res.ok) {
+        setChangesId(null)
+        setChangesNote('')
+        fetchCampaignReviews()
       }
     } catch {}
   }
@@ -225,17 +256,21 @@ export default function AdminDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
-          {(['overview', 'users', 'ai-usage', 'brand-verification', 'beta-codes', 'beta-feedback'] as const).map((tab) => (
+          {(['overview', 'users', 'ai-usage', 'brand-verification', 'campaign-review', 'beta-codes', 'beta-feedback'] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => { setActiveTab(tab); if (tab === 'brand-verification') fetchBrandVerifications() }}
+              onClick={() => {
+                setActiveTab(tab)
+                if (tab === 'brand-verification') fetchBrandVerifications()
+                if (tab === 'campaign-review') fetchCampaignReviews()
+              }}
               className={`px-4 py-2 rounded-md text-sm font-medium transition ${
                 activeTab === tab
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              {tab === 'overview' ? 'Overview' : tab === 'users' ? 'Users' : tab === 'ai-usage' ? 'AI Usage' : tab === 'brand-verification' ? 'Brand Verification' : tab === 'beta-codes' ? 'Beta Codes' : 'Beta Feedback'}
+              {tab === 'overview' ? 'Overview' : tab === 'users' ? 'Users' : tab === 'ai-usage' ? 'AI Usage' : tab === 'brand-verification' ? 'Brand Verification' : tab === 'campaign-review' ? `Campaign Review${reviewCampaigns.length ? ` (${reviewCampaigns.length})` : ''}` : tab === 'beta-codes' ? 'Beta Codes' : 'Beta Feedback'}
             </button>
           ))}
         </div>
@@ -478,6 +513,93 @@ export default function AdminDashboard() {
 
         {/* Beta Codes Tab */}
         {/* Brand Verification Tab */}
+        {/* Campaign Review Tab */}
+        {activeTab === 'campaign-review' && (
+          <div>
+            {reviewCampaigns.length === 0 ? (
+              <p className="text-gray-500 text-sm">No campaigns awaiting review.</p>
+            ) : (
+              <div className="space-y-4">
+                {reviewCampaigns.map((c) => (
+                  <div key={c.id} className="bg-white rounded-lg border border-gray-200 p-5">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                          {c.images?.[0] ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={c.images[0]} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold">
+                              {c.title.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <a href={`/campaign/${c.id}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-gray-900 hover:text-primary-600 truncate block">
+                            {c.title}
+                          </a>
+                          <p className="text-sm text-gray-500 truncate">
+                            {c.brand?.companyName}
+                            {c.categories?.[0] && <> · {c.categories[0].category?.name}</>}
+                            {c.platforms?.length > 0 && <> · {c.platforms.map((p: any) => p.platform.name).join(', ')}</>}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-violet-100 text-violet-700 flex-shrink-0">
+                        In Review
+                      </span>
+                    </div>
+
+                    {c.description && (
+                      <p className="mt-3 text-sm text-gray-600 line-clamp-3">{c.description}</p>
+                    )}
+
+                    <div className="mt-4 flex gap-2 items-center">
+                      <button
+                        onClick={() => handleCampaignReview(c.id, 'approve')}
+                        className="px-4 py-1.5 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition"
+                      >
+                        Approve → Live
+                      </button>
+                      {changesId === c.id ? (
+                        <div className="flex gap-2 items-center flex-1">
+                          <input
+                            type="text"
+                            value={changesNote}
+                            onChange={(e) => setChangesNote(e.target.value)}
+                            placeholder="What needs to change..."
+                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          />
+                          <button
+                            onClick={() => handleCampaignReview(c.id, 'request_changes', changesNote)}
+                            disabled={!changesNote.trim()}
+                            className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-md hover:bg-amber-700 transition disabled:opacity-50"
+                          >
+                            Send back to Draft
+                          </button>
+                          <button
+                            onClick={() => { setChangesId(null); setChangesNote('') }}
+                            className="px-3 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-md hover:bg-gray-50 transition"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setChangesId(c.id)}
+                          className="px-4 py-1.5 border border-amber-300 text-amber-700 text-sm rounded-md hover:bg-amber-50 transition"
+                        >
+                          Request Changes
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'brand-verification' && (
           <div>
             <div className="flex gap-2 mb-6">

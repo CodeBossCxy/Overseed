@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
+import { resolveModel, providerConfig } from '@/lib/ai-models'
+import { getEffectiveTier, isUserVerified } from '@/lib/subscription'
 
 // Allow streaming responses to run longer on Vercel
 export const maxDuration = 60
@@ -61,7 +63,17 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = (session.user as any).id
-  const subscriptionTier = (session.user as any).subscriptionTier || 'FREE'
+
+  // The assistant requires a verified account
+  if (!(await isUserVerified(userId))) {
+    return NextResponse.json(
+      { error: 'Verification required to use the AI assistant', code: 'VERIFICATION_REQUIRED' },
+      { status: 403 }
+    )
+  }
+
+  // Effective tier (handles expired verified-user trials)
+  const subscriptionTier = await getEffectiveTier(userId)
   if (subscriptionTier !== 'PRO') {
     return NextResponse.json({ error: 'Pro subscription required' }, { status: 403 })
   }
@@ -86,7 +98,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Messages are required' }, { status: 400 })
   }
 
-  const useProvider = provider === 'claude' ? 'claude' : 'openai'
+  // `provider` carries the model id from the picker (old values still work)
+  const modelDef = resolveModel(provider)
+  const conn = providerConfig(modelDef.provider)
+  if (!conn.apiKey) {
+    return NextResponse.json(
+      { error: `${modelDef.label} is not configured yet. Please pick another model.` },
+      { status: 503 }
+    )
+  }
+  const useProvider = modelDef.id
 
   try {
     // Get or create chat for history
@@ -116,7 +137,7 @@ export async function POST(req: NextRequest) {
           try {
             const client = new Anthropic({ apiKey: process.env.CLAUDE_API })
             const resp = await client.messages.create({
-              model: 'claude-sonnet-4-20250514',
+              model: process.env.AI_MODEL_CLAUDE || 'claude-sonnet-5',
               max_tokens: 30,
               messages: [{ role: 'user', content: `Generate a short title (max 6 words, no quotes) summarizing this chat topic. Reply with ONLY the title, nothing else. If the message is in Chinese, reply in Chinese.\n\nMessage: ${msgForTitle.slice(0, 200)}` }],
             })
@@ -135,7 +156,7 @@ export async function POST(req: NextRequest) {
     let totalTokens = 0
     let promptTokens = 0
     let completionTokens = 0
-    const model = useProvider === 'claude' ? 'claude-sonnet-4-20250514' : 'gpt-5.4'
+    const model = modelDef.model
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -143,10 +164,10 @@ export async function POST(req: NextRequest) {
           // Send chatId as first event
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'meta', chatId: activeChatId })}\n\n`))
 
-          if (useProvider === 'claude') {
-            const client = new Anthropic({ apiKey: process.env.CLAUDE_API })
+          if (modelDef.provider === 'anthropic') {
+            const client = new Anthropic({ apiKey: conn.apiKey })
             const response = await client.messages.create({
-              model: 'claude-sonnet-4-20250514',
+              model: modelDef.model,
               max_tokens: 16384,
               system: SYSTEM_PROMPT,
               stream: true,
@@ -170,16 +191,44 @@ export async function POST(req: NextRequest) {
               }
             }
             totalTokens = promptTokens + completionTokens
+          } else if (modelDef.provider === 'deepseek' || modelDef.provider === 'kimi') {
+            // OpenAI-compatible chat.completions streaming
+            const client = new OpenAI({ apiKey: conn.apiKey, baseURL: conn.baseURL })
+            const response = await client.chat.completions.create({
+              model: modelDef.model,
+              stream: true,
+              stream_options: { include_usage: true },
+              messages: [
+                { role: 'system' as const, content: SYSTEM_PROMPT },
+                ...messages.map((m: any) => ({
+                  role: m.role as 'user' | 'assistant',
+                  content: m.content as string,
+                })),
+              ],
+            })
+
+            for await (const chunk of response) {
+              const text = chunk.choices?.[0]?.delta?.content
+              if (text) {
+                fullContent += text
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', text })}\n\n`))
+              }
+              if (chunk.usage) {
+                promptTokens = chunk.usage.prompt_tokens || 0
+                completionTokens = chunk.usage.completion_tokens || 0
+                totalTokens = chunk.usage.total_tokens || promptTokens + completionTokens
+              }
+            }
           } else {
-            // GPT-5.4 uses the Responses API with streaming
+            // OpenAI models use the Responses API with streaming
             const res = await fetch('https://api.openai.com/v1/responses', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.CHAT_API}`,
+                'Authorization': `Bearer ${conn.apiKey}`,
               },
               body: JSON.stringify({
-                model: 'gpt-5.4',
+                model: modelDef.model,
                 instructions: SYSTEM_PROMPT,
                 input: messages.map((m: any) => ({
                   role: m.role as 'user' | 'assistant',

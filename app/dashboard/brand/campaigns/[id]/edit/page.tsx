@@ -52,6 +52,14 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
       <div className="max-w-4xl mx-auto pt-6 pb-8">
         <EditCampaignHeading />
 
+        {/* Overseed review requested changes: In Review → Draft + note */}
+        {campaign.status === 'DRAFT' && campaign.reviewNote && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <p className="font-semibold text-amber-800 text-sm">⚠ Changes requested by Overseed review</p>
+            <p className="text-sm text-amber-700 mt-1">{campaign.reviewNote}</p>
+          </div>
+        )}
+
         <CampaignForm
           categories={categories}
           platforms={platforms}

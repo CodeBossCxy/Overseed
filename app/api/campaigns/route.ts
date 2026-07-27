@@ -147,14 +147,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (brandProfile.brandVerificationStatus !== 'APPROVED') {
+    const data = await req.json()
+
+    // Unverified brands may draft campaigns but not submit them for review
+    if (brandProfile.brandVerificationStatus !== 'APPROVED' && data.status && data.status !== 'DRAFT') {
       return NextResponse.json(
-        { message: 'Your brand must be verified before you can create campaigns. Please wait for admin approval.' },
+        { message: 'Your brand must be verified before you can publish campaigns. You can save this campaign as a draft.' },
         { status: 403 }
       )
     }
-
-    const data = await req.json()
 
     // Validate required fields
     if (!data.title || !data.compensationType) {
@@ -164,13 +165,17 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Publishing goes through Overseed review: a brand-submitted "ACTIVE"
+    // lands in PENDING_REVIEW; only the admin review flow sets ACTIVE.
+    const requestedStatus = data.status === 'ACTIVE' ? 'PENDING_REVIEW' : data.status || 'DRAFT'
+
     // Create campaign
     const campaign = await prisma.campaign.create({
       data: {
         brandId: brandProfile.id,
         title: data.title,
         description: data.description,
-        status: data.status || 'DRAFT',
+        status: requestedStatus,
         deadline: data.deadline ? new Date(data.deadline) : null,
         campaignStartDate: data.campaignStartDate ? new Date(data.campaignStartDate) : null,
         campaignEndDate: data.campaignEndDate ? new Date(data.campaignEndDate) : null,

@@ -108,35 +108,47 @@ export async function PATCH(req: NextRequest) {
       })
     }
 
-    // Update brand profile
+    // Update brand profile. Public-profile + contact fields only — the
+    // business/verification fields (legal name, registration number, account
+    // type, country of registration) are locked and changed via support.
     if (data.brandProfile) {
       const profileData = data.brandProfile
+      const editable = {
+        companyName: profileData.companyName,
+        description: profileData.description,
+        websiteUrl: profileData.websiteUrl,
+        storeUrl: profileData.storeUrl,
+        logoUrl: profileData.logoUrl,
+        industry: profileData.industry,
+        countries: Array.isArray(profileData.countries) ? profileData.countries : undefined,
+        industries: Array.isArray(profileData.industries) ? profileData.industries : undefined,
+        socialLinks: Array.isArray(profileData.socialLinks)
+          ? profileData.socialLinks.filter((l: any) => typeof l === 'string' && l.trim()).slice(0, 5)
+          : undefined,
+        companySize: profileData.companySize,
+        contactName: profileData.contactName,
+        contactJobTitle: profileData.contactJobTitle,
+        contactEmail: profileData.contactEmail,
+        contactPhone: profileData.contactPhone,
+      }
       await prisma.brandProfile.upsert({
         where: { userId },
-        update: {
-          companyName: profileData.companyName,
-          description: profileData.description,
-          websiteUrl: profileData.websiteUrl,
-          logoUrl: profileData.logoUrl,
-          industry: profileData.industry,
-          companySize: profileData.companySize,
-          contactName: profileData.contactName,
-          contactEmail: profileData.contactEmail,
-          contactPhone: profileData.contactPhone,
-        },
-        create: {
-          userId,
-          companyName: profileData.companyName,
-          description: profileData.description,
-          websiteUrl: profileData.websiteUrl,
-          logoUrl: profileData.logoUrl,
-          industry: profileData.industry,
-          companySize: profileData.companySize,
-          contactName: profileData.contactName,
-          contactEmail: profileData.contactEmail,
-          contactPhone: profileData.contactPhone,
-        },
+        update: editable,
+        create: { userId, ...editable },
       })
+      // Account type can be chosen until verification locks it
+      if (profileData.accountType) {
+        const existing = await prisma.brandProfile.findUnique({
+          where: { userId },
+          select: { brandVerificationStatus: true },
+        })
+        if (existing?.brandVerificationStatus !== 'APPROVED') {
+          await prisma.brandProfile.update({
+            where: { userId },
+            data: { accountType: profileData.accountType },
+          })
+        }
+      }
     }
 
     // Fetch updated user

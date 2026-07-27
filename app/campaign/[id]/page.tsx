@@ -1,4 +1,4 @@
-import MainLayout from '@/components/MainLayout'
+import RoleShell from '@/components/workspace/RoleShell'
 import CampaignDetailWrapper from '@/components/campaigns/CampaignDetailWrapper'
 import SimilarCampaigns from '@/components/campaigns/SimilarCampaigns'
 import { prisma } from '@/lib/prisma'
@@ -175,7 +175,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   isSaved = userCheckResult.isSaved
 
   return (
-    <MainLayout>
+    <RoleShell>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <CampaignDetailWrapper
           initialCampaign={campaign as any}
@@ -190,6 +190,6 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         {/* Similar Campaigns */}
         <SimilarCampaigns campaignId={id} initialCampaigns={similarCampaigns as any} />
       </div>
-    </MainLayout>
+    </RoleShell>
   )
 }

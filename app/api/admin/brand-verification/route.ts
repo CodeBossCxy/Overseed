@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { grantVerifiedTrial } from '@/lib/subscription'
 
 // GET: List brand profiles by verification status
 export async function GET(req: NextRequest) {
@@ -60,9 +61,16 @@ export async function PATCH(req: NextRequest) {
         verificationReviewedBy: adminUserId,
         rejectionReason: action === 'REJECT' ? rejectionReason : null,
       },
+      select: { brandVerificationStatus: true, userId: true },
     })
 
-    return NextResponse.json({ success: true, status: updated.brandVerificationStatus })
+    // Early-stage promo: newly verified users get a free PRO trial
+    let trialGranted = false
+    if (action === 'APPROVE') {
+      trialGranted = await grantVerifiedTrial(updated.userId)
+    }
+
+    return NextResponse.json({ success: true, status: updated.brandVerificationStatus, trialGranted })
   } catch (error) {
     console.error('Error updating brand verification:', error)
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 })

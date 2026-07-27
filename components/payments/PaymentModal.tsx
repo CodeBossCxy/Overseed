@@ -82,7 +82,7 @@ export default function PaymentModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+      <div data-solid className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
         <h2 className="text-lg font-semibold mb-1">{t.payments?.fundTitle || 'Fund Campaign Payment'}</h2>
         <p className="text-sm text-gray-500 mb-5">
           {t.payments?.fundDesc || 'Funds will be held securely until you release them after the work is completed.'}

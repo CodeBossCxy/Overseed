@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
-import MainLayout from '@/components/MainLayout'
+import CreatorWorkspaceLayout from '@/components/workspace/CreatorWorkspaceLayout'
+import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
+import { useViewMode } from '@/lib/hooks/useViewMode'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import Link from 'next/link'
 import { getPusherClient } from '@/lib/pusher-client'
@@ -13,6 +15,7 @@ interface ConversationItem {
   applicationId: string
   campaignTitle: string
   campaignId: string
+  influencerId?: string
   otherUser: {
     id: string
     name: string | null
@@ -43,8 +46,10 @@ interface MessageItem {
 export default function MessagesPage() {
   const { data: session } = useSession()
   const { t, locale } = useLanguage()
+  const { isBrand } = useViewMode()
   const searchParams = useSearchParams()
   const userId = (session?.user as any)?.id
+  const Shell = isBrand ? BrandWorkspaceLayout : CreatorWorkspaceLayout
 
   const [conversations, setConversations] = useState<ConversationItem[]>([])
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
@@ -63,7 +68,18 @@ export default function MessagesPage() {
     return false
   })
   const [showSettings, setShowSettings] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
+  const [savedCreatorIds, setSavedCreatorIds] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Brands see a bookmark next to creators they saved
+  useEffect(() => {
+    if (!isBrand) return
+    fetch('/api/saved-creators?idsOnly=1')
+      .then((res) => (res.ok ? res.json() : { ids: [] }))
+      .then((data) => setSavedCreatorIds(new Set(data.ids || [])))
+      .catch(() => {})
+  }, [isBrand])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -271,12 +287,26 @@ export default function MessagesPage() {
       )
 
       if (res.ok) {
+        setSendError(null)
         // Refresh messages to get the real message
         await fetchMessages(selectedConvId)
         await fetchConversations()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        // Remove the optimistic message; restore the input so nothing is lost
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
+        setInput(content)
+        setSendError(
+          data.code === 'BANNED_CONTENT'
+            ? (t.messages as any)?.bannedWarning ||
+                'This message can’t be sent: sharing off-platform contact info (WhatsApp, WeChat, phone numbers, emails) is not allowed.'
+            : data.message || 'Failed to send message'
+        )
       }
     } catch (error) {
       console.error('Error sending message:', error)
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
+      setInput(content)
     } finally {
       setSendingMessage(false)
     }
@@ -315,16 +345,16 @@ export default function MessagesPage() {
 
   if (!session) {
     return (
-      <MainLayout>
+      <Shell>
         <div className="flex items-center justify-center h-96">
           <p className="text-gray-500">{t.common.loading}</p>
         </div>
-      </MainLayout>
+      </Shell>
     )
   }
 
   return (
-    <MainLayout>
+    <Shell>
       <div
         className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col"
         style={{ height: 'calc(100vh - 64px)' }}
@@ -410,8 +440,13 @@ export default function MessagesPage() {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm text-gray-900 truncate">
+                        <span className="font-medium text-sm text-gray-900 truncate flex items-center gap-1.5">
                           {conv.otherUser?.name || t.messages.unknownUser}
+                          {isBrand && conv.influencerId && savedCreatorIds.has(conv.influencerId) && (
+                            <svg className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                            </svg>
+                          )}
                         </span>
                         <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
                           {conv.lastMessage
@@ -573,7 +608,7 @@ export default function MessagesPage() {
                             </p>
                           </div>
                           {/* Translate button */}
-                          {isLikelyForeignLanguage(msg.content) && !autoTranslate && (
+                          {(
                             <button
                               onClick={() => translateMessage(msg.id, msg.content)}
                               disabled={translatingIds.has(msg.id)}
@@ -602,6 +637,15 @@ export default function MessagesPage() {
 
                 {/* Input */}
                 <div className="border-t border-gray-100 p-4">
+                  {sendError && (
+                    <div className="mb-3 flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-sm text-red-700">
+                      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <span className="flex-1">{sendError}</span>
+                      <button type="button" onClick={() => setSendError(null)} className="text-red-400 hover:text-red-600" aria-label="Dismiss">✕</button>
+                    </div>
+                  )}
                   <form onSubmit={handleSend} className="flex items-end gap-3">
                     <textarea
                       value={input}
@@ -664,6 +708,6 @@ export default function MessagesPage() {
           </div>
         </div>
       </div>
-    </MainLayout>
+    </Shell>
   )
 }

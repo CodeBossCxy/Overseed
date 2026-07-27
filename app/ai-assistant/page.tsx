@@ -2,12 +2,25 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import MainLayout from '@/components/MainLayout'
+import RoleShell from '@/components/workspace/RoleShell'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useTheme } from '@/components/ThemeProvider'
+
+
+// Keep in sync with lib/ai-models.ts (client components can't import it
+// directly without leaking env handling).
+const AI_MODEL_OPTIONS = [
+  { id: 'gpt-5.6-luna', label: 'OpenAI GPT-5.6 Luna' },
+  { id: 'gpt-5.6-sol', label: 'OpenAI GPT-5.6 Sol' },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
+  { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+  { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
+  { id: 'kimi-k2.6', label: 'Kimi K2.6' },
+  { id: 'kimi-k3', label: 'Kimi K3' },
+]
 
 interface Message {
   id: string
@@ -39,7 +52,7 @@ export default function AIAssistantPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [provider, setProvider] = useState<'openai' | 'claude'>('openai')
+  const [provider, setProvider] = useState<string>('claude-sonnet-5')
   const [chatId, setChatId] = useState<string | null>(null)
   const [chatList, setChatList] = useState<ChatSummary[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -113,7 +126,7 @@ export default function AIAssistantPage() {
       if (res.ok) {
         const data = await res.json()
         setChatId(data.id)
-        setProvider(data.provider === 'claude' ? 'claude' : 'openai')
+        setProvider(data.provider && AI_MODEL_OPTIONS.some((m) => m.id === data.provider) ? data.provider : 'claude-sonnet-5')
         setMessages(
           data.messages.map((m: any) => ({
             id: m.id,
@@ -469,7 +482,7 @@ export default function AIAssistantPage() {
   // prompts and Coming Soon cards instead of the chat or an upgrade wall.
   if (!isLoggedIn) {
     return (
-      <MainLayout>
+      <RoleShell>
         <div className="max-w-5xl mx-auto px-4 py-10 sm:py-14">
           {/* Hero */}
           <div className="text-center mb-10">
@@ -531,25 +544,25 @@ export default function AIAssistantPage() {
             </div>
           </div>
         </div>
-      </MainLayout>
+      </RoleShell>
     )
   }
 
   // Creators don't have AI access yet.
   if (isCreator) {
     return (
-      <MainLayout>
+      <RoleShell>
         <div className="max-w-lg mx-auto px-4 py-20 text-center">
           <img src={themeIcon} alt="Overseed" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{ai.creatorTitle}</h1>
           <p className="text-gray-600">{ai.creatorDesc}</p>
         </div>
-      </MainLayout>
+      </RoleShell>
     )
   }
 
   return (
-    <MainLayout noFooter>
+    <RoleShell noFooter>
       <div className="h-full flex overflow-hidden">
         {/* Sidebar */}
         {isProUser && sidebarOpen && (
@@ -705,29 +718,18 @@ export default function AIAssistantPage() {
             </div>
 
             {isProUser && (
-              <div className="flex items-center gap-1.5 bg-gray-100 rounded-full p-0.5">
-                <button
-                  onClick={() => setProvider('openai')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    provider === 'openai'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="px-3 py-1.5 bg-gray-100 rounded-full text-xs font-medium text-gray-800 border-0 focus:outline-none focus:ring-2 focus:ring-primary-100 cursor-pointer"
+                  title="AI model"
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${provider === 'openai' ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                  GPT-5.4
-                </button>
-                <button
-                  onClick={() => setProvider('claude')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    provider === 'claude'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${provider === 'claude' ? 'bg-orange-500' : 'bg-gray-300'}`} />
-                  Claude
-                </button>
+                  {AI_MODEL_OPTIONS.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
@@ -996,12 +998,12 @@ export default function AIAssistantPage() {
                 </button>
               </form>
               <p className="text-[10px] text-gray-400 text-center mt-2">
-                {provider === 'claude' ? 'Claude by Anthropic' : 'GPT-5.4 by OpenAI'} — responses may not always be accurate
+                {AI_MODEL_OPTIONS.find((m) => m.id === provider)?.label || provider} — responses may not always be accurate
               </p>
             </div>
           </div>
         </div>
       </div>
-    </MainLayout>
+    </RoleShell>
   )
 }

@@ -59,10 +59,11 @@ export default async function BrandDashboardPage() {
       where: { brandId: brandProfile.id, status: 'ACTIVE', createdAt: { gte: monthAgo } },
     }),
     prisma.campaign.count({ where: { brandId: brandProfile.id, status: 'DRAFT' } }),
+    // Spec: "Applications to Review" counts Applied (PENDING) only
     prisma.application.count({
       where: {
         campaign: { brandId: brandProfile.id },
-        status: { in: ['PENDING', 'UNDER_REVIEW'] },
+        status: 'PENDING',
       },
     }),
     prisma.collaboration.count({
