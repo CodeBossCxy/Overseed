@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const VALID_COLOR_THEMES = ['default', 'sunset', 'sky', 'cream', 'lavender', 'mint', 'rose', 'ocean', 'honey']
+const VALID_COLOR_THEMES = ['default', 'dawn', 'sunset']
 
 export async function GET() {
   const session = await getServerSession(authOptions)

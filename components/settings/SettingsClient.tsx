@@ -10,14 +10,8 @@ import { useTheme, COLOR_THEMES, type ColorTheme } from '@/components/ThemeProvi
 // the preview cards show exactly what the workspace background will be.
 const THEME_SWATCHES: Record<ColorTheme, string> = {
   default: 'linear-gradient(135deg, #eaf2fb 0%, #f2f6fc 50%, #e7eefb 100%)',
-  sunset: 'linear-gradient(150deg, #d7e6f5 0%, #f6e3d3 25%, #f9d5b5 55%, #f4b287 85%, #f0a877 100%)',
-  sky: 'linear-gradient(150deg, #c9dff6 0%, #dcebf9 40%, #f3e9dd 75%, #f8ddc2 100%)',
-  cream: 'linear-gradient(150deg, #e8f0f9 0%, #f7efe4 40%, #fbe6d2 75%, #f8d9ba 100%)',
-  lavender: 'linear-gradient(150deg, #e3e2f9 0%, #ece5fa 35%, #f3e4ef 65%, #f9e0d6 100%)',
-  mint: 'linear-gradient(150deg, #d5efe2 0%, #e4f4e9 35%, #f3f1e0 70%, #f8ead2 100%)',
-  rose: 'linear-gradient(150deg, #fbdce5 0%, #fce7eb 35%, #fdeee2 70%, #f9dcc8 100%)',
-  ocean: 'linear-gradient(150deg, #c5e8ee 0%, #d6edf5 40%, #e2f0fb 75%, #d9e6f8 100%)',
-  honey: 'linear-gradient(150deg, #fbe8c4 0%, #fceed3 35%, #f9e2bd 65%, #f3cd99 100%)',
+  dawn: 'linear-gradient(45deg, #b9c7ee 0%, #dde1f0 20%, #f1eeeb 45%, #f6ede1 70%, #f5e3d0 100%)',
+  sunset: 'linear-gradient(180deg, #a3cbe9 0%, #d9e2e1 22%, #efe5d3 33%, #f8d1a2 52%, #f5b87f 75%, #f1a76c 100%)',
 }
 
 const CURRENCIES = ['USD', 'CNY', 'EUR', 'GBP', 'HKD', 'JPY', 'CAD', 'AUD', 'SGD']
@@ -120,14 +114,8 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
 
   const themeLabels: Record<ColorTheme, string> = {
     default: st.themeDefault,
+    dawn: st.themeDawn,
     sunset: st.themeSunset,
-    sky: st.themeSky,
-    cream: st.themeCream,
-    lavender: st.themeLavender,
-    mint: st.themeMint,
-    rose: st.themeRose,
-    ocean: st.themeOcean,
-    honey: st.themeHoney,
   }
 
   // Name editing

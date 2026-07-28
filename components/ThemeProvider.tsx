@@ -7,8 +7,8 @@ import { usePathname } from 'next/navigation'
 
 export type ThemeMode = 'creator' | 'brand' | 'global'
 
-export type ColorTheme = 'default' | 'sunset' | 'sky' | 'cream' | 'lavender' | 'mint' | 'rose' | 'ocean' | 'honey'
-export const COLOR_THEMES: ColorTheme[] = ['default', 'sunset', 'sky', 'cream', 'lavender', 'mint', 'rose', 'ocean', 'honey']
+export type ColorTheme = 'default' | 'dawn' | 'sunset'
+export const COLOR_THEMES: ColorTheme[] = ['default', 'dawn', 'sunset']
 
 interface ThemeContextType {
   themeMode: ThemeMode
