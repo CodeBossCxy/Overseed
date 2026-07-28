@@ -164,8 +164,24 @@ export default function CreatorPayoutsPage() {
     },
   ]
 
-  const renderRow = (col: any) => (
-    <div key={col.id} className="flex items-center gap-4 p-4">
+  const expectedShort = (payment: any) => {
+    if (!payment) return '—'
+    if (payment.status === 'PAID') return payment.paidAt ? formatDate(payment.paidAt, locale) : p.stepPaid
+    if (['RELEASED', 'PAYOUT_PROCESSING'].includes(payment.status)) {
+      if (payment.releasedAt) {
+        const est = new Date(new Date(payment.releasedAt).getTime() + 5 * 86400000)
+        return `${p.estPrefix} ${formatDate(est.toISOString(), locale)}`
+      }
+      return p.afterRelease
+    }
+    if (['HELD', 'RELEASE_PENDING'].includes(payment.status)) return p.afterApprovalShort
+    return '—'
+  }
+
+  const thClass = 'py-2.5 px-3 text-left text-xs font-medium text-gray-400 first:pl-5'
+
+  const campaignCell = (col: any) => (
+    <div className="flex items-center gap-3 min-w-[180px]">
       <div className="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
         {col.campaign?.images?.[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -176,33 +192,107 @@ export default function CreatorPayoutsPage() {
           </div>
         )}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-gray-900 truncate">{col.campaign?.title}</p>
-        <p className="text-xs text-gray-500 truncate">
-          {col.brand?.companyName}
-          {col.payment?.paidAt
-            ? ` · ${formatDate(col.payment.paidAt, locale)}`
-            : col.updatedAt && ` · ${formatDate(col.updatedAt, locale)}`}
-        </p>
-      </div>
-      {col.payment ? (
-        <>
-          <StatusBadge machine="payment" status={col.payment.status} size="sm" dot />
-          <p className="font-semibold text-gray-900 tabular-nums w-24 text-right">{money(payout(col))}</p>
-        </>
-      ) : (
-        <span className="px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-medium">
-          {p.awaitingBrandPayment}
-        </span>
-      )}
-      <button
-        onClick={() => setDetail(col)}
-        className="px-3.5 py-1.5 bg-white shadow-sm rounded-full text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
-      >
-        {p.viewDetails}
-      </button>
+      <p className="text-sm font-semibold text-gray-900 truncate">{col.campaign?.title}</p>
     </div>
   )
+
+  const brandCell = (col: any) => (
+    <div className="flex items-center gap-2.5 min-w-[110px]">
+      <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-500 overflow-hidden flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+        {col.brand?.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={col.brand.logoUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          (col.brand?.companyName || 'B').slice(0, 2).toUpperCase()
+        )}
+      </div>
+      <span className="text-sm text-gray-700 truncate">{col.brand?.companyName || '—'}</span>
+    </div>
+  )
+
+  const paymentsTable = (list: any[]) => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full">
+        <thead>
+          <tr>
+            <th className={thClass}>{p.thCampaign}</th>
+            <th className={thClass}>{p.thBrand}</th>
+            <th className={thClass}>{p.thStatus}</th>
+            <th className={thClass}>{p.thAmount}</th>
+            <th className={thClass}>{p.thExpected}</th>
+            <th className={thClass}>{p.thAction}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {list.map((col) => (
+            <tr key={col.id} className="hover:bg-white/70 transition">
+              <td className="py-3 px-3 pl-5">{campaignCell(col)}</td>
+              <td className="py-3 px-3">{brandCell(col)}</td>
+              <td className="py-3 px-3">
+                {col.payment ? (
+                  <StatusBadge machine="payment" status={col.payment.status} size="sm" dot />
+                ) : (
+                  <span className="px-2.5 py-0.5 bg-amber-50 text-amber-600 rounded-full text-xs font-medium whitespace-nowrap">
+                    {p.awaitingBrandPayment}
+                  </span>
+                )}
+              </td>
+              <td className="py-3 px-3 text-sm font-semibold text-gray-900 tabular-nums whitespace-nowrap">
+                {col.payment ? money(payout(col)) : '—'}
+              </td>
+              <td className="py-3 px-3 text-sm text-gray-600 whitespace-nowrap">{expectedShort(col.payment)}</td>
+              <td className="py-3 px-3 pr-5">
+                <button
+                  onClick={() => setDetail(col)}
+                  className="px-3.5 py-1.5 bg-white shadow-sm rounded-lg text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
+                >
+                  {p.viewDetails}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+
+  const historyTable = (list: any[]) => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full">
+        <thead>
+          <tr>
+            <th className={thClass}>{p.thCampaign}</th>
+            <th className={thClass}>{p.thBrand}</th>
+            <th className={thClass}>{p.thStatus}</th>
+            <th className={thClass}>{p.thDate}</th>
+            <th className={thClass}>{p.thAmount}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {list.map((col) => (
+            <tr
+              key={col.id}
+              onClick={() => setDetail(col)}
+              className="hover:bg-white/70 transition cursor-pointer"
+            >
+              <td className="py-3 px-3 pl-5">{campaignCell(col)}</td>
+              <td className="py-3 px-3">{brandCell(col)}</td>
+              <td className="py-3 px-3">
+                <StatusBadge machine="payment" status={col.payment.status} size="sm" dot />
+              </td>
+              <td className="py-3 px-3 text-sm text-gray-600 whitespace-nowrap">
+                {formatDate(col.payment.paidAt || col.updatedAt, locale)}
+              </td>
+              <td className="py-3 px-3 pr-5 text-sm font-semibold text-gray-900 tabular-nums whitespace-nowrap">
+                {money(payout(col))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+
 
   return (
     <CreatorWorkspaceLayout>
@@ -305,6 +395,17 @@ export default function CreatorPayoutsPage() {
               <option value="30">{p.last30}</option>
               <option value="90">{p.last90}</option>
             </select>
+            {(historyStatus || historyRange) && (
+              <button
+                onClick={() => { setHistoryStatus(''); setHistoryRange('') }}
+                className="px-3.5 py-1.5 bg-white shadow-sm rounded-full text-sm font-medium text-primary-600 hover:bg-primary-50 transition"
+              >
+                {p.clearFilters}
+              </button>
+            )}
+            <span className="ml-auto text-xs text-gray-400">
+              {p.showingWord} {historyList.length} {p.resultsWord}
+            </span>
           </div>
         )}
 
@@ -316,7 +417,7 @@ export default function CreatorPayoutsPage() {
             ) : activeList.length === 0 ? (
               <div className="p-10 text-center text-gray-500 text-sm">{p.noPayments}</div>
             ) : (
-              <div className="divide-y divide-gray-100">{activeList.map(renderRow)}</div>
+              paymentsTable(activeList)
             ))}
 
           {tab === 'history' &&
@@ -325,7 +426,7 @@ export default function CreatorPayoutsPage() {
             ) : historyList.length === 0 ? (
               <div className="p-10 text-center text-gray-500 text-sm">{p.noHistory}</div>
             ) : (
-              <div className="divide-y divide-gray-100">{historyList.map(renderRow)}</div>
+              historyTable(historyList)
             ))}
 
           {tab === 'settings' && (
@@ -433,6 +534,16 @@ export default function CreatorPayoutsPage() {
             </div>
           )}
         </div>
+        {/* Stripe security note */}
+        <div className="mt-4 flex items-center justify-between gap-3 px-2 text-xs text-gray-400">
+          <span className="flex items-center gap-2">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            {p.stripeFooter}
+          </span>
+          <span className="font-bold text-indigo-400 text-sm tracking-tight">stripe</span>
+        </div>
       </div>
 
       {/* Payment details drawer */}
@@ -531,7 +642,10 @@ export default function CreatorPayoutsPage() {
                           <div className={`w-0.5 flex-1 min-h-[20px] ${step.done && arr[i + 1].done ? 'bg-emerald-300' : 'bg-gray-200'}`} />
                         )}
                       </div>
-                      <p className={`text-sm pb-5 ${step.done ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{step.label}</p>
+                      <div className="pb-5">
+                        <p className={`text-sm ${step.done ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{step.label}</p>
+                        {!step.done && <p className="text-[11px] text-gray-300">{p.pendingWord}</p>}
+                      </div>
                     </div>
                   ))}
                 </div>

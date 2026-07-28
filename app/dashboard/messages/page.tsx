@@ -16,6 +16,8 @@ interface ConversationItem {
   campaignTitle: string
   campaignId: string
   influencerId?: string
+  brandProfileId?: string
+  favorited?: boolean
   otherUser: {
     id: string
     name: string | null
@@ -70,6 +72,8 @@ export default function MessagesPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [savedCreatorIds, setSavedCreatorIds] = useState<Set<string>>(new Set())
+  const [listQuery, setListQuery] = useState('')
+  const [listFilter, setListFilter] = useState<'all' | 'unread' | 'favorites'>('all')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Brands see a bookmark next to creators they saved
@@ -343,6 +347,22 @@ export default function MessagesPage() {
     return date.toLocaleTimeString(localeTag, { hour: '2-digit', minute: '2-digit' })
   }
 
+  const isFavorited = (conv: ConversationItem) =>
+    !!conv.favorited || (isBrand && !!conv.influencerId && savedCreatorIds.has(conv.influencerId))
+
+  const visibleConversations = conversations.filter((conv) => {
+    if (listFilter === 'unread' && conv.unreadCount === 0) return false
+    if (listFilter === 'favorites' && !isFavorited(conv)) return false
+    const q = listQuery.trim().toLowerCase()
+    if (!q) return true
+    return (
+      (conv.otherUser?.name || '').toLowerCase().includes(q) ||
+      (conv.campaignTitle || '').toLowerCase().includes(q)
+    )
+  })
+
+  const selectedConv = conversations.find((cv) => cv.id === selectedConvId)
+
   if (!session) {
     return (
       <Shell>
@@ -377,10 +397,32 @@ export default function MessagesPage() {
               showMobileThread ? 'hidden md:flex' : 'flex'
             }`}
           >
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-800">
-                {t.messages?.conversations || 'Conversations'}
-              </h2>
+            <div className="p-4 border-b border-gray-100 space-y-3">
+              <div className="relative">
+                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={listQuery}
+                  onChange={(e) => setListQuery(e.target.value)}
+                  placeholder={(t.messages as any)?.searchMessages || 'Search messages...'}
+                  className="w-full pl-9 pr-3 py-2 bg-gray-50 rounded-full text-sm border border-transparent focus:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                />
+              </div>
+              <div className="flex gap-1.5">
+                {([['all', (t.messages as any)?.tabAll || 'All'], ['unread', (t.messages as any)?.tabUnread || 'Unread'], ['favorites', (t.messages as any)?.tabFavorites || 'Favorites']] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setListFilter(key)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition ${
+                      listFilter === key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
@@ -388,7 +430,7 @@ export default function MessagesPage() {
                 <div className="p-6 text-center text-gray-500 text-sm">
                   {t.common.loading}
                 </div>
-              ) : conversations.length === 0 ? (
+              ) : visibleConversations.length === 0 ? (
                 <div className="p-6 text-center">
                   <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <svg
@@ -414,7 +456,7 @@ export default function MessagesPage() {
                   </p>
                 </div>
               ) : (
-                conversations.map((conv) => (
+                visibleConversations.map((conv) => (
                   <button
                     key={conv.id}
                     onClick={() => handleSelectConversation(conv.id)}
@@ -442,9 +484,9 @@ export default function MessagesPage() {
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-sm text-gray-900 truncate flex items-center gap-1.5">
                           {conv.otherUser?.name || t.messages.unknownUser}
-                          {isBrand && conv.influencerId && savedCreatorIds.has(conv.influencerId) && (
-                            <svg className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                          {isFavorited(conv) && (
+                            <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2l2.9 6.26 6.86.62-5.18 4.55 1.52 6.72L12 16.67l-6.1 3.48 1.52-6.72L2.24 8.88l6.86-.62L12 2z" />
                             </svg>
                           )}
                         </span>
@@ -505,17 +547,35 @@ export default function MessagesPage() {
                     </svg>
                   </button>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">
+                    <h3 className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
                       {convDetails.otherUser?.name || t.messages.unknownUser}
+                      {selectedConv && isFavorited(selectedConv) && (
+                        <>
+                          <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2l2.9 6.26 6.86.62-5.18 4.55 1.52 6.72L12 16.67l-6.1 3.48 1.52-6.72L2.24 8.88l6.86-.62L12 2z" />
+                          </svg>
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[10px] font-semibold">
+                            {(t.messages as any)?.favorited || 'Favorited'}
+                          </span>
+                        </>
+                      )}
                     </h3>
                     <Link
                       href={`/campaign/${convDetails.campaignId}`}
                       className="text-xs text-primary-600 hover:underline truncate block"
                     >
-                      {convDetails.campaignTitle}
+                      {(t.messages as any)?.messageContext || 'Message context:'} {convDetails.campaignTitle}
                     </Link>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    {!isBrand && selectedConv?.brandProfileId && (
+                      <Link
+                        href={`/brand/${selectedConv.brandProfileId}`}
+                        className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
+                      >
+                        {(t.messages as any)?.viewBrandProfile || 'View Brand Profile'}
+                      </Link>
+                    )}
                     <Link
                       href={`/campaign/${convDetails.campaignId}`}
                       className="text-xs text-gray-500 hover:text-primary-600"
@@ -678,6 +738,18 @@ export default function MessagesPage() {
                       </svg>
                     </button>
                   </form>
+                  {/* Safety note */}
+                  <div className="mt-2.5 flex items-center justify-between gap-3 text-[11px] text-gray-400">
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      {(t.messages as any)?.safetyNote || 'Please communicate safely and do not make any payments outside the platform.'}
+                    </span>
+                    <Link href="/contact" className="text-primary-500 hover:underline whitespace-nowrap">
+                      {(t.messages as any)?.reportUser || 'Report user'}
+                    </Link>
+                  </div>
                 </div>
               </>
             ) : (

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { useViewMode } from '@/lib/hooks/useViewMode'
+import LanguageSetupModal from '@/components/workspace/LanguageSetupModal'
 
 // Workspace shell per the July 2026 workspace spec: floating left sidebar
 // with icon nav + user chip, and a content area with a top-right utility
@@ -316,6 +317,9 @@ export default function WorkspaceLayout({
           <main className="flex-1 px-4 sm:px-8 pb-10">{children}</main>
         </div>
       </div>
+
+      {/* Mandatory first-login Language & Region setup */}
+      <LanguageSetupModal />
     </div>
   )
 }

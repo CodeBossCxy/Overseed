@@ -403,7 +403,15 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
 
       {/* ── 2 Language & Region ── */}
       <section className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 mb-6">
-        <SectionHeader n={2} title={st.sectionLanguageRegion} />
+        <SectionHeader
+          n={2}
+          title={st.sectionLanguageRegion}
+          chip={
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold border border-amber-200">
+              {st.firstLoginRequired}
+            </span>
+          }
+        />
         <p className="text-sm text-gray-500 mb-5 ml-10">{st.accountRegionNote}</p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-10 gap-y-6 ml-0 lg:ml-10">

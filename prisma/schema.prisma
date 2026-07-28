@@ -133,6 +133,8 @@ model User {
   proTrialEndsAt   DateTime?
   preferredLanguage  String   @default("en")
   autoTranslateUGC   Boolean  @default(true)
+  // Stamped once the mandatory first-login Language & Region setup is done
+  languageSetupAt    DateTime?
   colorTheme         String   @default("default")
   preferredContentLanguage String?
   timeZone                 String?

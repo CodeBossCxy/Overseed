@@ -4,6 +4,28 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { hash, compare } from 'bcryptjs'
 
+// GET: settings state the client needs before render (first-login setup flag)
+export async function GET() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: (session.user as any).id },
+    select: {
+      languageSetupAt: true,
+      preferredLanguage: true,
+      preferredContentLanguage: true,
+      timeZone: true,
+      dateFormat: true,
+      displayCurrency: true,
+      defaultCampaignCurrency: true,
+    },
+  })
+  if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json({ ...user, needsLanguageSetup: !user.languageSetupAt })
+}
+
 export async function PATCH(request: Request) {
   const session = await getServerSession(authOptions)
 
@@ -131,6 +153,15 @@ export async function PATCH(request: Request) {
   }
 
   // Delete account (deactivate)
+  // First-login Language & Region setup complete
+  if (action === 'completeLanguageSetup') {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { languageSetupAt: new Date() },
+    })
+    return NextResponse.json({ success: true })
+  }
+
   if (action === 'deactivateAccount') {
     await prisma.user.update({
       where: { id: userId },

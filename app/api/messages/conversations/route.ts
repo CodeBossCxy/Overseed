@@ -22,7 +22,7 @@ export async function GET() {
             application: {
               include: {
                 campaign: {
-                  select: { id: true, title: true },
+                  select: { id: true, title: true, brandId: true },
                 },
                 influencer: {
                   include: {
@@ -49,6 +49,21 @@ export async function GET() {
         conversation: { updatedAt: 'desc' },
       },
     })
+
+    // Creators see a star on brands they favorited (any saved campaign of
+    // that brand counts as favoriting the brand)
+    let favoritedBrandIds = new Set<string>()
+    const influencerSelf = await prisma.influencerProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    })
+    if (influencerSelf) {
+      const savedRows = await prisma.savedCampaign.findMany({
+        where: { influencerId: influencerSelf.id },
+        select: { campaign: { select: { brandId: true } } },
+      })
+      favoritedBrandIds = new Set(savedRows.map((r) => r.campaign.brandId))
+    }
 
     const conversations = await Promise.all(
       participations.map(async (p) => {
@@ -81,6 +96,8 @@ export async function GET() {
           campaignTitle: conv.application.campaign.title,
           campaignId: conv.application.campaign.id,
           influencerId: conv.application.influencerId,
+          brandProfileId: conv.application.campaign.brandId,
+          favorited: favoritedBrandIds.has(conv.application.campaign.brandId),
           otherUser,
           lastMessage: conv.messages[0] || null,
           unreadCount,
