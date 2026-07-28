@@ -36,9 +36,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma
-/prisma/migrations
-
 # uploaded files (keep the directory structure, ignore contents)
 /public/uploads/campaigns/*
 !/public/uploads/campaigns/.gitkeep
