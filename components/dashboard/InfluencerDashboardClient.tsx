@@ -227,39 +227,48 @@ export default function InfluencerDashboardClient({
             <p className="py-6 text-center text-sm text-gray-400">{d.noRecommended}</p>
           ) : (
             <div className="space-y-4">
-              {recommended.map((c) => (
-                <div key={c.id} className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
-                    {c.images?.[0] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.images[0]} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold">
-                        {c.title?.charAt(0)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{c.title}</p>
-                    {c.categories?.[0] && (
-                      <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                        {t.categoryNames[c.categories[0].category?.name] || c.categories[0].category?.name}
+              {recommended.map((c) => {
+                const isPaid = c.paymentMin != null || c.paymentMax != null
+                return (
+                  <Link key={c.id} href={`/campaign/${c.id}`} className="flex items-center gap-3 group">
+                    <div className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                      {c.images?.[0] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.images[0]} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold">
+                          {c.title?.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-primary-700 transition">
+                        {c.title}
                       </p>
-                    )}
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-bold text-gray-900">{price(c)}</p>
-                    <p className="text-[11px] text-gray-400">{t.influencer.saved.flatFee}</p>
-                  </div>
-                  <Link
-                    href={`/campaign/${c.id}`}
-                    className="flex-shrink-0 px-3.5 py-2 bg-white shadow-sm rounded-xl text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
-                  >
-                    {t.influencer.saved.viewCampaign} →
+                      <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5 min-w-0">
+                        {c.categories?.[0] && (
+                          <>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                            <span className="truncate">
+                              {t.categoryNames[c.categories[0].category?.name] || c.categories[0].category?.name}
+                            </span>
+                            <span className="flex-shrink-0 text-gray-300">·</span>
+                          </>
+                        )}
+                        <span className="flex-shrink-0 whitespace-nowrap font-medium text-gray-500">
+                          {isPaid ? `${price(c)} ${t.influencer.saved.flatFee}` : t.influencer.saved.productOnly}
+                        </span>
+                      </p>
+                    </div>
+                    <span
+                      aria-hidden
+                      className="flex-shrink-0 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition"
+                    >
+                      →
+                    </span>
                   </Link>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
