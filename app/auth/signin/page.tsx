@@ -47,7 +47,11 @@ export default function SignInPage() {
   }
 
   const handleWeChatSignIn = () => {
-    setShowWeChatPopup(true)
+    if (process.env.NEXT_PUBLIC_WECHAT_LOGIN_ENABLED === 'true') {
+      signIn('wechat', { callbackUrl })
+    } else {
+      setShowWeChatPopup(true)
+    }
   }
 
   return (

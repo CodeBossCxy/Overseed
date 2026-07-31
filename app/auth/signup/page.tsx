@@ -257,7 +257,11 @@ export default function SignUpPage() {
     const valid = await validateInviteCode()
     if (!valid) return
     sessionStorage.setItem('betaInviteCode', inviteCode.trim().toUpperCase())
-    setShowWeChatPopup(true)
+    if (process.env.NEXT_PUBLIC_WECHAT_LOGIN_ENABLED === 'true') {
+      signIn('wechat', { callbackUrl: userType === 'brand' ? '/brand' : '/creator' })
+    } else {
+      setShowWeChatPopup(true)
+    }
   }
 
   return (

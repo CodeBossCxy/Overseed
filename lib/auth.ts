@@ -35,6 +35,10 @@ function WeChatProvider(options: {
 
         const response = await fetch(url.toString())
         const tokens = await response.json()
+        // WeChat reports failures as errcode/errmsg inside a 200 response
+        if (tokens.errcode) {
+          throw new Error(`WeChat token error ${tokens.errcode}: ${tokens.errmsg}`)
+        }
         return { tokens }
       },
     },
@@ -47,17 +51,25 @@ function WeChatProvider(options: {
         url.searchParams.append('lang', 'en')
 
         const response = await fetch(url.toString())
-        return await response.json()
+        const profile = await response.json()
+        if (profile.errcode) {
+          throw new Error(`WeChat userinfo error ${profile.errcode}: ${profile.errmsg}`)
+        }
+        return profile
       },
     },
     profile(profile) {
       return {
-        id: profile.openid,
+        // unionid is stable across a WeChat Open Platform account's apps;
+        // fall back to openid when the account has no mobile/official app
+        id: profile.unionid || profile.openid,
         name: profile.nickname,
         email: profile.email || `${profile.openid}@wechat.local`,
         image: profile.headimgurl,
       }
     },
+    // WeChat does not support PKCE; state is echoed back by qrconnect
+    checks: ['state'],
     style: {
       logo: '/wechat-logo.svg',
       bg: '#07C160',
