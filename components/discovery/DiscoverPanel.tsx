@@ -114,6 +114,66 @@ export default function DiscoverPanel() {
   }
   /* END TEMP */
 
+  /* TEMP: influencers.club creator detail popup (contact info stripped
+     server-side; brands contact creators inside Overseed only) */
+  const [detailFor, setDetailFor] = useState<DiscoveredCreator | null>(null)
+  const [detail, setDetail] = useState<any | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+
+  const openDetail = async (creator: DiscoveredCreator) => {
+    if (!creator.handle) return
+    setDetailFor(creator)
+    setDetail(null)
+    setDetailError(null)
+    setDetailLoading(true)
+    try {
+      const qs = new URLSearchParams({
+        platform: creator.platform,
+        handle: creator.handle,
+      })
+      const res = await fetch(`/api/discovery/club-enrich?${qs}`)
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Failed to load creator details')
+      setDetail(data)
+    } catch (err: any) {
+      setDetailError(err.message || 'Failed to load creator details')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const closeDetail = () => {
+    setDetailFor(null)
+    setDetail(null)
+    setDetailError(null)
+  }
+
+  // Hashtags can repeat with case/# variants — dedupe for display
+  const dedupeTags = (tags: any[]) =>
+    Array.from(
+      new Map(
+        (tags || []).map((t) => {
+          const s = String(t).replace(/^#+/, '')
+          return [s.toLowerCase(), s] as [string, string]
+        })
+      ).values()
+    )
+
+  // Growth arrives as a number or an object of period -> percent
+  const formatGrowth = (g: any): string | null => {
+    if (g == null) return null
+    if (typeof g === 'number') return `${g > 0 ? '+' : ''}${g.toFixed(1)}%`
+    if (typeof g === 'object') {
+      const parts = Object.entries(g)
+        .filter(([, v]) => typeof v === 'number' || typeof v === 'string')
+        .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${typeof v === 'number' && v > 0 ? '+' : ''}${v}${typeof v === 'number' ? '%' : ''}`)
+      return parts.length ? parts.join(' · ') : null
+    }
+    return null
+  }
+  /* END TEMP */
+
   const browseParams = useCallback(() => {
     const qs = new URLSearchParams({ sort, limit: String(PAGE_SIZE) })
     // The browse endpoint filters by a single platform; with a subset
@@ -404,7 +464,18 @@ export default function DiscoverPanel() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {creators.map((creator) => (
-                <div key={creator.id} className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-5 flex gap-4">
+                // TEMP: club results open the detail popup on click
+                <div
+                  key={creator.id}
+                  onClick={
+                    creator.id.startsWith('club:') ? () => openDetail(creator) : undefined
+                  }
+                  className={`bg-white/85 backdrop-blur rounded-2xl shadow-sm p-5 flex gap-4 ${
+                    creator.id.startsWith('club:')
+                      ? 'cursor-pointer hover:shadow-md transition'
+                      : ''
+                  }`}
+                >
                   <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
                     {creator.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -443,16 +514,25 @@ export default function DiscoverPanel() {
                         ))}
                       </div>
                     )}
-                    {creator.profile_url && (
-                      <div className="mt-3">
-                        <a
-                          href={creator.profile_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary-600 hover:underline font-medium"
-                        >
-                          {d.viewProfile} ↗
-                        </a>
+                    {(creator.profile_url || creator.id.startsWith('club:')) && (
+                      <div className="mt-3 flex items-center gap-4">
+                        {/* TEMP: club cards advertise the detail popup */}
+                        {creator.id.startsWith('club:') && (
+                          <span className="text-sm text-primary-600 font-medium">
+                            View details · 1 credit
+                          </span>
+                        )}
+                        {creator.profile_url && (
+                          <a
+                            href={creator.profile_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-sm text-primary-600 hover:underline font-medium"
+                          >
+                            {d.viewProfile} ↗
+                          </a>
+                        )}
                       </div>
                     )}
                   </div>
@@ -474,6 +554,157 @@ export default function DiscoverPanel() {
           )}
         </>
       )}
+
+      {/* TEMP: influencers.club creator detail popup — remove with the other
+          TEMP blocks, lib/influencers-club.ts and api/discovery/club-enrich */}
+      {detailFor && (
+        <div
+          data-solid
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={closeDetail}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                {(detail?.avatar_url || detailFor.avatar_url) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={detail?.avatar_url || detailFor.avatar_url || ''}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg">
+                    {(detailFor.display_name || detailFor.handle || '?').charAt(0)}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 truncate">
+                  {detail?.name || detailFor.display_name || detailFor.handle}
+                </p>
+                <p className="text-sm text-gray-500 truncate">
+                  @{detailFor.handle?.replace(/^@+/, '')} ·{' '}
+                  {PLATFORM_LABELS[detailFor.platform] || detailFor.platform}
+                </p>
+                {detail && (detail.location || detail.language) && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {[detail.location, detail.language].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={closeDetail}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            {detailLoading && (
+              <p className="py-8 text-center text-sm text-gray-500">
+                Loading creator details…
+              </p>
+            )}
+            {detailError && (
+              <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                {detailError}
+              </div>
+            )}
+
+            {detail && (
+              <>
+                {/* Key stats */}
+                <div className="grid grid-cols-2 gap-3 mt-5">
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-500">Total followers (all platforms)</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      {formatFollowers(detail.total_followers, locale)}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-500">Engagement</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      {detail.engagement_percent != null
+                        ? `${Number(detail.engagement_percent).toFixed(1)}%`
+                        : '—'}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-500">Follower growth</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {formatGrowth(detail.follower_growth) || '—'}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-500">Posts / month</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      {detail.posting_frequency_recent_months != null
+                        ? Number(detail.posting_frequency_recent_months).toFixed(1)
+                        : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bio */}
+                {detail.bio && (
+                  <p className="mt-4 text-sm text-gray-600 whitespace-pre-line">{detail.bio}</p>
+                )}
+
+                {/* Niche + hashtags */}
+                {(detail.niche?.length > 0 || detail.hashtags?.length > 0) && (
+                  <div className="flex flex-wrap gap-1.5 mt-4">
+                    {detail.niche?.map((n: string) => (
+                      <span key={n} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs">
+                        {n}
+                      </span>
+                    ))}
+                    {dedupeTags(detail.hashtags).map((h) => (
+                      <span key={h} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">
+                        #{h}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Cross-platform presence (no usernames/links — contact stays on Overseed) */}
+                {detail.accounts?.length > 0 && (
+                  <div className="mt-5">
+                    <p className="text-xs font-medium text-gray-500 mb-2">Platform presence</p>
+                    <div className="space-y-1.5">
+                      {detail.accounts.map((a: any) => (
+                        <div
+                          key={a.platform}
+                          className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2"
+                        >
+                          <span className="font-medium text-gray-700 capitalize">{a.platform}</span>
+                          <span className="text-gray-600">
+                            {formatFollowers(a.followers, locale)} {d.followers}
+                            {a.engagement_percent != null && (
+                              <> · {Number(a.engagement_percent).toFixed(1)}%</>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <p className="mt-5 text-xs text-gray-400 border-t border-gray-100 pt-3">
+                  Contact details are hidden. Invite and message creators through Overseed
+                  to keep collaborations safe and on-platform.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {/* END TEMP */}
     </div>
   )
 }

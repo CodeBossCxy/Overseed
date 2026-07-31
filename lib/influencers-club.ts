@@ -161,3 +161,111 @@ export async function clubSearch(opts: ClubSearchOptions) {
     live_calls: 1,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Creator detail (enrich by handle, full) — 1 credit per uncached lookup.
+// Contact info policy: brands must only reach creators through Overseed, so
+// email fields, bio links, and off-platform link lists are stripped/redacted
+// server-side before anything reaches the browser.
+// ---------------------------------------------------------------------------
+
+const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g
+
+const ENRICH_PLATFORM_KEYS = [
+  'instagram',
+  'youtube',
+  'tiktok',
+  'twitter',
+  'snapchat',
+  'discord',
+  'pinterest',
+  'facebook',
+  'linkedin',
+  'twitch',
+  'onlyfans',
+] as const
+
+// Sanitized details cached per platform:handle for the server process life —
+// repeat opens of the same creator cost no credits.
+const enrichCache = new Map<string, any>()
+
+function redact(text: unknown): string | null {
+  return typeof text === 'string' ? text.replace(EMAIL_RE, '•••') : null
+}
+
+export async function clubEnrich(platform: ClubPlatform, handle: string) {
+  const cacheKey = `${platform}:${handle.toLowerCase()}`
+  const cached = enrichCache.get(cacheKey)
+  if (cached) return cached
+
+  const res = await fetch(`${BASE}/public/v1/creators/enrich/handle/full/`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      handle,
+      platform,
+      include_lookalikes: false,
+      include_audience_data: false,
+    }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(60000),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const detail =
+      data?.detail || data?.message || `Influencers Club enrichment failed (${res.status})`
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+  }
+  const r = data?.result
+  if (!r) throw new Error('No data available for this creator')
+
+  // Cross-platform presence with follower counts
+  const accounts = ENRICH_PLATFORM_KEYS.flatMap((key) => {
+    const p = r[key]
+    if (!p || typeof p !== 'object') return []
+    const followers = p.follower_count ?? p.subscriber_count ?? null
+    const username = p.username ?? p.custom_url ?? p.title ?? null
+    if (followers == null && !username) return []
+    return [
+      {
+        platform: key,
+        username,
+        followers,
+        engagement_percent: p.engagement_percent ?? null,
+      },
+    ]
+  })
+  const totalFollowers = accounts.reduce((sum, a) => sum + (a.followers || 0), 0)
+
+  const main = r[platform] || {}
+  const detail = {
+    platform,
+    handle,
+    name: main.full_name || main.title || r.first_name || handle,
+    avatar_url: main.profile_picture ?? null,
+    bio: redact(main.biography ?? main.description),
+    location: r.location ?? null,
+    language: r.speaking_language ?? null,
+    gender: r.gender ?? null,
+    is_business: r.is_business ?? null,
+    has_brand_deals: r.has_brand_deals ?? null,
+    niche: [main.niche_class, main.niche_sub_class]
+      .flat()
+      .filter((x: any) => typeof x === 'string'),
+    hashtags: (main.hashtags || main.video_hashtags || []).slice(0, 8),
+    followers: main.follower_count ?? main.subscriber_count ?? null,
+    engagement_percent: main.engagement_percent ?? null,
+    posting_frequency_recent_months: main.posting_frequency_recent_months ?? null,
+    avg_views: main.avg_views ?? null,
+    avg_likes: main.avg_likes ?? null,
+    // Shape varies by platform (number or object of period -> pct); the
+    // client renders whatever is present.
+    follower_growth: main.creator_follower_growth ?? null,
+    income: main.income ?? null,
+    total_followers: totalFollowers,
+    accounts,
+  }
+
+  enrichCache.set(cacheKey, detail)
+  return detail
+}
