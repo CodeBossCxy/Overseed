@@ -24,7 +24,20 @@ interface SearchResult {
   warnings: string[]
   cache_hits: number
   live_calls: number
+  // TEMP: present only on influencers.club responses
+  credits_left?: string | null
 }
+
+/* TEMP: influencers.club data source — remove this block together with
+   lib/influencers-club.ts and app/api/discovery/club-search/. */
+type DiscoverySource = 'kol' | 'club'
+const SOURCE_LABELS: Record<DiscoverySource, string> = {
+  kol: 'YouTube API',
+  club: 'Influencers Club API',
+}
+// Club bills 0.01 credits per returned creator — keep pages small.
+const CLUB_PAGE_SIZE = 10
+/* END TEMP */
 
 const PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const
 const PLATFORM_LABELS: Record<string, string> = {
@@ -51,6 +64,8 @@ export default function DiscoverPanel() {
   const d = t.brand.discover
 
   const [query, setQuery] = useState('')
+  // TEMP: influencers.club source picker state — remove with the TEMP blocks below
+  const [source, setSource] = useState<DiscoverySource>('kol')
   const [platforms, setPlatforms] = useState<string[]>([...PLATFORMS])
   const [country, setCountry] = useState('')
   const [minFollowers, setMinFollowers] = useState('')
@@ -70,10 +85,26 @@ export default function DiscoverPanel() {
   const [unavailable, setUnavailable] = useState(false)
 
   const togglePlatform = (p: string) => {
+    // TEMP: club searches take exactly one platform per request (and each
+    // returned creator costs credits), so platform pills act as radio buttons
+    if (source === 'club') {
+      setPlatforms([p])
+      return
+    }
     setPlatforms((prev) =>
       prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
     )
   }
+
+  /* TEMP: switch data source — collapse platform selection to one for club */
+  const changeSource = (s: DiscoverySource) => {
+    setSource(s)
+    if (s === 'club') {
+      setPlatforms((prev) => [prev[0] || 'instagram'])
+      setSearchResult(null)
+    }
+  }
+  /* END TEMP */
 
   const browseParams = useCallback(() => {
     const qs = new URLSearchParams({ sort, limit: String(PAGE_SIZE) })
@@ -145,17 +176,28 @@ export default function DiscoverPanel() {
     setError(null)
     setUnavailable(false)
     try {
-      const qs = new URLSearchParams({
-        q: query.trim(),
-        topics: query.trim(),
-        platforms: platforms.join(','),
-        limit: String(PAGE_SIZE),
-      })
+      /* TEMP: influencers.club search path — small pages, one platform */
+      const isClub = source === 'club'
+      const qs = isClub
+        ? new URLSearchParams({
+            q: query.trim(),
+            platform: platforms[0],
+            limit: String(CLUB_PAGE_SIZE),
+          })
+        : new URLSearchParams({
+            q: query.trim(),
+            topics: query.trim(),
+            platforms: platforms.join(','),
+            limit: String(PAGE_SIZE),
+          })
+      /* END TEMP */
       if (country.trim()) qs.set('country', country.trim().toUpperCase())
       if (minFollowers) qs.set('min_followers', minFollowers)
       if (maxFollowers) qs.set('max_followers', maxFollowers)
 
-      const res = await fetch(`/api/discovery/search?${qs}`)
+      const res = await fetch(
+        `/api/discovery/${isClub ? 'club-search' : 'search'}?${qs}`
+      )
       if (res.status === 503) {
         setUnavailable(true)
         setSearchResult(null)
@@ -212,6 +254,23 @@ export default function DiscoverPanel() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
+          {/* TEMP: influencers.club data source picker — remove with
+              lib/influencers-club.ts and app/api/discovery/club-search/ */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Data source</label>
+            <select
+              value={source}
+              onChange={(e) => changeSource(e.target.value as DiscoverySource)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              {(Object.keys(SOURCE_LABELS) as DiscoverySource[]).map((s) => (
+                <option key={s} value={s}>
+                  {SOURCE_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          {/* END TEMP */}
           <div>
             <span className="block text-xs font-medium text-gray-500 mb-1.5">{d.platformsLabel}</span>
             <div className="flex gap-2">
@@ -317,7 +376,10 @@ export default function DiscoverPanel() {
             </h2>
             {searchResult && (
               <p className="text-xs text-gray-400">
-                {d.cacheHits}: {searchResult.cache_hits} · {d.liveCalls}: {searchResult.live_calls}
+                {/* TEMP: club responses report remaining credits instead of cache stats */}
+                {searchResult.credits_left != null
+                  ? `Influencers Club credits left: ${searchResult.credits_left}`
+                  : `${d.cacheHits}: ${searchResult.cache_hits} · ${d.liveCalls}: ${searchResult.live_calls}`}
               </p>
             )}
           </div>
