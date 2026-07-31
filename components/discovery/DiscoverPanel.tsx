@@ -143,10 +143,63 @@ export default function DiscoverPanel() {
     }
   }
 
+  // Contact-the-creator compose modal
+  const [contactOpen, setContactOpen] = useState(false)
+  const [contactMsg, setContactMsg] = useState('')
+  const [contactFiles, setContactFiles] = useState<File[]>([])
+  const [contactSending, setContactSending] = useState(false)
+  const [contactSent, setContactSent] = useState(false)
+  const [contactError, setContactError] = useState<string | null>(null)
+
+  const openContact = () => {
+    setContactMsg('')
+    setContactFiles([])
+    setContactSent(false)
+    setContactError(null)
+    setContactOpen(true)
+  }
+
+  const addContactFiles = (list: FileList | null) => {
+    if (!list) return
+    setContactError(null)
+    const next = [...contactFiles]
+    for (const f of Array.from(list)) {
+      if (next.length >= 3) break
+      if (f.size > 5 * 1024 * 1024) {
+        setContactError(`"${f.name}" exceeds the 5MB limit`)
+        continue
+      }
+      next.push(f)
+    }
+    setContactFiles(next)
+  }
+
+  const sendContact = async () => {
+    if (!detailFor?.handle || contactMsg.trim().length < 10) return
+    setContactSending(true)
+    setContactError(null)
+    try {
+      const fd = new FormData()
+      fd.set('platform', detailFor.platform)
+      fd.set('handle', detailFor.handle)
+      fd.set('message', contactMsg.trim())
+      contactFiles.forEach((f) => fd.append('files', f))
+      const res = await fetch('/api/discovery/club-contact', { method: 'POST', body: fd })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Failed to send message')
+      setContactSent(true)
+    } catch (err: any) {
+      setContactError(err.message || 'Failed to send message')
+    } finally {
+      setContactSending(false)
+    }
+  }
+
   const closeDetail = () => {
     setDetailFor(null)
     setDetail(null)
     setDetailError(null)
+    setContactOpen(false)
   }
 
   // Hashtags can repeat with case/# variants — dedupe for display
@@ -556,20 +609,30 @@ export default function DiscoverPanel() {
       )}
 
       {/* TEMP: influencers.club creator detail popup — remove with the other
-          TEMP blocks, lib/influencers-club.ts and api/discovery/club-enrich */}
+          TEMP blocks, lib/influencers-club.ts, api/discovery/club-enrich and
+          api/discovery/club-contact */}
       {detailFor && (
         <div
           data-solid
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
           onClick={closeDetail}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6"
+            className="bg-white rounded-3xl shadow-2xl max-w-xl w-full max-h-[88vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+            {/* Header band */}
+            <div className="relative h-24 bg-gradient-to-r from-primary-600 via-rose-500 to-orange-400 flex-shrink-0">
+              <button
+                onClick={closeDetail}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white text-lg leading-none transition"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-7 -mt-10 flex items-end gap-4 flex-shrink-0">
+              <div className="w-20 h-20 rounded-full ring-4 ring-white bg-gray-200 overflow-hidden shadow-md flex-shrink-0">
                 {(detail?.avatar_url || detailFor.avatar_url) ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -578,127 +641,305 @@ export default function DiscoverPanel() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg">
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl font-bold">
                     {(detailFor.display_name || detailFor.handle || '?').charAt(0)}
                   </div>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 truncate">
-                  {detail?.name || detailFor.display_name || detailFor.handle}
-                </p>
+              <div className="flex-1 min-w-0 pb-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-gray-900 truncate">
+                    {detail?.name || detailFor.display_name || detailFor.handle}
+                  </h3>
+                  <span className="px-2 py-0.5 bg-gray-900 text-white rounded-full text-[11px] font-medium flex-shrink-0">
+                    {PLATFORM_LABELS[detailFor.platform] || detailFor.platform}
+                  </span>
+                </div>
                 <p className="text-sm text-gray-500 truncate">
-                  @{detailFor.handle?.replace(/^@+/, '')} ·{' '}
-                  {PLATFORM_LABELS[detailFor.platform] || detailFor.platform}
+                  @{detailFor.handle?.replace(/^@+/, '')}
+                  {detail && (detail.location || detail.language) && (
+                    <span className="text-gray-400">
+                      {' '}· {[detail.location, detail.language].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
                 </p>
-                {detail && (detail.location || detail.language) && (
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {[detail.location, detail.language].filter(Boolean).join(' · ')}
-                  </p>
-                )}
               </div>
-              <button
-                onClick={closeDetail}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
-                aria-label="Close"
-              >
-                ×
-              </button>
             </div>
 
-            {detailLoading && (
-              <p className="py-8 text-center text-sm text-gray-500">
-                Loading creator details…
-              </p>
-            )}
-            {detailError && (
-              <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                {detailError}
+            {/* Scrollable body */}
+            <div className="overflow-y-auto px-7 py-5 flex-1">
+              {detailLoading && (
+                <p className="py-10 text-center text-sm text-gray-500">
+                  Loading creator details…
+                </p>
+              )}
+              {detailError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                  {detailError}
+                </div>
+              )}
+
+              {detail && (
+                <>
+                  {/* Key stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      {
+                        label: 'Total followers',
+                        value: formatFollowers(detail.total_followers, locale),
+                        caption: 'all platforms',
+                      },
+                      {
+                        label: 'Engagement',
+                        value:
+                          detail.engagement_percent != null
+                            ? `${Number(detail.engagement_percent).toFixed(1)}%`
+                            : '—',
+                      },
+                      {
+                        label: 'Growth',
+                        value: formatGrowth(detail.follower_growth) || '—',
+                      },
+                      {
+                        label: 'Posts / mo',
+                        value:
+                          detail.posting_frequency_recent_months != null
+                            ? Number(detail.posting_frequency_recent_months).toFixed(1)
+                            : '—',
+                      },
+                    ].map((s) => (
+                      <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">
+                          {s.label}
+                        </p>
+                        <p className="text-base font-bold text-gray-900 mt-0.5 truncate">{s.value}</p>
+                        {s.caption && <p className="text-[10px] text-gray-400">{s.caption}</p>}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* About */}
+                  {detail.bio && (
+                    <div className="mt-6">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-1.5">
+                        About
+                      </p>
+                      <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed line-clamp-6">
+                        {detail.bio}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Categories */}
+                  {detail.niche?.length > 0 && (
+                    <div className="mt-6">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
+                        Categories
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {dedupeTags(detail.niche).map((n) => (
+                          <span
+                            key={n}
+                            className="px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium capitalize"
+                          >
+                            {n}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Platform presence */}
+                  {detail.accounts?.length > 0 && (
+                    <div className="mt-6">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
+                        Platform presence
+                      </p>
+                      <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                        {detail.accounts.map((a: any) => (
+                          <div
+                            key={a.platform}
+                            className="flex items-center justify-between px-4 py-2.5 bg-white"
+                          >
+                            <span className="flex items-center gap-2 text-sm font-medium text-gray-700 capitalize">
+                              <span
+                                className={`w-2 h-2 rounded-full ${
+                                  { instagram: 'bg-pink-500', youtube: 'bg-red-500', tiktok: 'bg-gray-900', twitter: 'bg-sky-400', twitch: 'bg-purple-500' }[
+                                    a.platform as string
+                                  ] || 'bg-gray-300'
+                                }`}
+                              />
+                              {a.platform}
+                            </span>
+                            <span className="text-sm text-gray-600 tabular-nums">
+                              {formatFollowers(a.followers, locale)}
+                              {a.engagement_percent != null && (
+                                <span className="text-gray-400">
+                                  {' '}· {Number(a.engagement_percent).toFixed(1)}%
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer actions */}
+            {detail && (
+              <div className="flex items-center gap-3 px-7 py-4 border-t border-gray-100 flex-shrink-0">
+                <button
+                  onClick={openContact}
+                  disabled={!detail.contactable}
+                  title={detail.contactable ? undefined : 'This creator cannot be reached yet'}
+                  className="flex-1 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Contact the creator
+                </button>
+                {detailFor.profile_url && (
+                  <a
+                    href={detailFor.profile_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition"
+                  >
+                    View profile ↗
+                  </a>
+                )}
               </div>
             )}
+          </div>
+        </div>
+      )}
 
-            {detail && (
-              <>
-                {/* Key stats */}
-                <div className="grid grid-cols-2 gap-3 mt-5">
-                  <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-500">Total followers (all platforms)</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {formatFollowers(detail.total_followers, locale)}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-500">Engagement</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {detail.engagement_percent != null
-                        ? `${Number(detail.engagement_percent).toFixed(1)}%`
-                        : '—'}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-500">Follower growth</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {formatGrowth(detail.follower_growth) || '—'}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-500">Posts / month</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {detail.posting_frequency_recent_months != null
-                        ? Number(detail.posting_frequency_recent_months).toFixed(1)
-                        : '—'}
-                    </p>
-                  </div>
+      {/* TEMP: contact-the-creator compose modal */}
+      {contactOpen && detailFor && (
+        <div
+          data-solid
+          className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
+          onClick={() => !contactSending && setContactOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-7"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {contactSent ? (
+              <div className="text-center py-6">
+                <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl">
+                  ✓
                 </div>
+                <h3 className="text-lg font-bold text-gray-900 mt-4">Message sent</h3>
+                <p className="text-sm text-gray-500 mt-1.5">
+                  Your message is on its way to{' '}
+                  {detail?.name || detailFor.display_name || detailFor.handle}. Replies will
+                  arrive at your account email.
+                </p>
+                <button
+                  onClick={() => setContactOpen(false)}
+                  className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Contact {detail?.name || detailFor.display_name || detailFor.handle}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Delivered by Overseed — the creator can reply directly to your message.
+                </p>
 
-                {/* Bio */}
-                {detail.bio && (
-                  <p className="mt-4 text-sm text-gray-600 whitespace-pre-line">{detail.bio}</p>
-                )}
+                <textarea
+                  value={contactMsg}
+                  onChange={(e) => setContactMsg(e.target.value)}
+                  rows={6}
+                  maxLength={2000}
+                  placeholder="Introduce your brand and describe the collaboration you have in mind…"
+                  className="mt-4 w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                />
+                <p className="text-right text-[11px] text-gray-400 mt-1">
+                  {contactMsg.length}/2000
+                </p>
 
-                {/* Niche + hashtags */}
-                {(detail.niche?.length > 0 || detail.hashtags?.length > 0) && (
-                  <div className="flex flex-wrap gap-1.5 mt-4">
-                    {detail.niche?.map((n: string) => (
-                      <span key={n} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs">
-                        {n}
-                      </span>
-                    ))}
-                    {dedupeTags(detail.hashtags).map((h) => (
-                      <span key={h} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">
-                        #{h}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Cross-platform presence (no usernames/links — contact stays on Overseed) */}
-                {detail.accounts?.length > 0 && (
-                  <div className="mt-5">
-                    <p className="text-xs font-medium text-gray-500 mb-2">Platform presence</p>
-                    <div className="space-y-1.5">
-                      {detail.accounts.map((a: any) => (
-                        <div
-                          key={a.platform}
-                          className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2"
+                {/* Attachments */}
+                <div className="mt-2">
+                  {contactFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {contactFiles.map((f, i) => (
+                        <span
+                          key={`${f.name}-${i}`}
+                          className="flex items-center gap-2 pl-1.5 pr-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600"
                         >
-                          <span className="font-medium text-gray-700 capitalize">{a.platform}</span>
-                          <span className="text-gray-600">
-                            {formatFollowers(a.followers, locale)} {d.followers}
-                            {a.engagement_percent != null && (
-                              <> · {Number(a.engagement_percent).toFixed(1)}%</>
-                            )}
-                          </span>
-                        </div>
+                          {f.type.startsWith('image/') ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={URL.createObjectURL(f)}
+                              alt=""
+                              className="w-6 h-6 rounded object-cover"
+                            />
+                          ) : (
+                            <span className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                              PDF
+                            </span>
+                          )}
+                          <span className="max-w-[140px] truncate">{f.name}</span>
+                          <button
+                            onClick={() =>
+                              setContactFiles(contactFiles.filter((_, j) => j !== i))
+                            }
+                            className="text-gray-400 hover:text-gray-600"
+                            aria-label="Remove attachment"
+                          >
+                            ×
+                          </button>
+                        </span>
                       ))}
                     </div>
+                  )}
+                  <label className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 cursor-pointer">
+                    <span className="text-base leading-none">＋</span> Add photos or files
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        addContactFiles(e.target.files)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                  <span className="ml-2 text-[11px] text-gray-400">
+                    Images or PDF · up to 3 files · 5MB each
+                  </span>
+                </div>
+
+                {contactError && (
+                  <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                    {contactError}
                   </div>
                 )}
 
-                <p className="mt-5 text-xs text-gray-400 border-t border-gray-100 pt-3">
-                  Contact details are hidden. Invite and message creators through Overseed
-                  to keep collaborations safe and on-platform.
-                </p>
+                <div className="flex items-center justify-end gap-3 mt-5">
+                  <button
+                    onClick={() => setContactOpen(false)}
+                    disabled={contactSending}
+                    className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={sendContact}
+                    disabled={contactSending || contactMsg.trim().length < 10}
+                    className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {contactSending ? 'Sending…' : 'Send message'}
+                  </button>
+                </div>
               </>
             )}
           </div>

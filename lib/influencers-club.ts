@@ -189,6 +189,17 @@ const ENRICH_PLATFORM_KEYS = [
 // repeat opens of the same creator cost no credits.
 const enrichCache = new Map<string, any>()
 
+// Creator emails stay SERVER-SIDE ONLY, keyed like enrichCache. Used by the
+// outreach route to deliver messages without ever revealing the address.
+const contactEmailCache = new Map<string, string | null>()
+
+export function getCreatorContactEmail(
+  platform: ClubPlatform,
+  handle: string
+): string | null | undefined {
+  return contactEmailCache.get(`${platform}:${handle.toLowerCase()}`)
+}
+
 function redact(text: unknown): string | null {
   return typeof text === 'string' ? text.replace(EMAIL_RE, '•••') : null
 }
@@ -218,6 +229,13 @@ export async function clubEnrich(platform: ClubPlatform, handle: string) {
   }
   const r = data?.result
   if (!r) throw new Error('No data available for this creator')
+
+  // Stash the email for the server-side outreach route; it is NOT included
+  // in the detail object returned to the client.
+  contactEmailCache.set(
+    cacheKey,
+    typeof r.email === 'string' && r.email.includes('@') ? r.email : null
+  )
 
   // Cross-platform presence with follower counts
   const accounts = ENRICH_PLATFORM_KEYS.flatMap((key) => {
@@ -264,6 +282,9 @@ export async function clubEnrich(platform: ClubPlatform, handle: string) {
     income: main.income ?? null,
     total_followers: totalFollowers,
     accounts,
+    // Whether outreach can be delivered (email exists server-side); the
+    // address itself never leaves the server.
+    contactable: contactEmailCache.get(cacheKey) != null,
   }
 
   enrichCache.set(cacheKey, detail)
