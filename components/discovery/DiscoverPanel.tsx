@@ -66,7 +66,9 @@ export default function DiscoverPanel() {
   const [query, setQuery] = useState('')
   // TEMP: influencers.club source picker state — remove with the TEMP blocks below
   const [source, setSource] = useState<DiscoverySource>('kol')
-  const [platforms, setPlatforms] = useState<string[]>([...PLATFORMS])
+  // The KOL service's live search covers YouTube only (phase 1) — lock the
+  // default source to YouTube so IG/TikTok searches don't dead-end.
+  const [platforms, setPlatforms] = useState<string[]>(['youtube'])
   const [country, setCountry] = useState('')
   const [minFollowers, setMinFollowers] = useState('')
   const [maxFollowers, setMaxFollowers] = useState('')
@@ -84,9 +86,13 @@ export default function DiscoverPanel() {
   const [error, setError] = useState<string | null>(null)
   const [unavailable, setUnavailable] = useState(false)
 
+  // YouTube API source: only YouTube is searchable (phase 1).
+  // TEMP: club source takes exactly one platform per request (and each
+  // returned creator costs credits), so its pills act as radio buttons.
+  const platformDisabled = (p: string) => source === 'kol' && p !== 'youtube'
+
   const togglePlatform = (p: string) => {
-    // TEMP: club searches take exactly one platform per request (and each
-    // returned creator costs credits), so platform pills act as radio buttons
+    if (platformDisabled(p)) return
     if (source === 'club') {
       setPlatforms([p])
       return
@@ -96,12 +102,14 @@ export default function DiscoverPanel() {
     )
   }
 
-  /* TEMP: switch data source — collapse platform selection to one for club */
+  /* TEMP: switch data source — one platform for club, YouTube-only for kol */
   const changeSource = (s: DiscoverySource) => {
     setSource(s)
+    setSearchResult(null)
     if (s === 'club') {
       setPlatforms((prev) => [prev[0] || 'instagram'])
-      setSearchResult(null)
+    } else {
+      setPlatforms(['youtube'])
     }
   }
   /* END TEMP */
@@ -279,10 +287,14 @@ export default function DiscoverPanel() {
                   key={p}
                   type="button"
                   onClick={() => togglePlatform(p)}
+                  disabled={platformDisabled(p)}
+                  title={platformDisabled(p) ? 'Coming soon for this data source' : undefined}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                    platforms.includes(p)
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    platformDisabled(p)
+                      ? 'bg-gray-100 text-gray-400 opacity-60 cursor-not-allowed'
+                      : platforms.includes(p)
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   {PLATFORM_LABELS[p]}
@@ -359,7 +371,10 @@ export default function DiscoverPanel() {
               .filter(([, status]) => status !== 'ok')
               .map(([platform, status]) => (
                 <p key={platform}>
-                  <span className="font-medium">{PLATFORM_LABELS[platform] || platform}:</span> {status}
+                  <span className="font-medium">{PLATFORM_LABELS[platform] || platform}:</span>{' '}
+                  {status === 'unavailable_phase1'
+                    ? 'live search for this platform is coming soon'
+                    : status}
                 </p>
               ))}
             {searchResult.warnings.map((w, i) => (
