@@ -10,7 +10,12 @@ import { useTheme, COLOR_THEMES, type ColorTheme } from '@/components/ThemeProvi
 // the preview cards show exactly what the workspace background will be.
 const THEME_SWATCHES: Record<ColorTheme, string> = {
   default: 'linear-gradient(135deg, #eaf2fb 0%, #f2f6fc 50%, #e7eefb 100%)',
-  dawn: 'linear-gradient(45deg, #b9c7ee 0%, #dde1f0 20%, #f1eeeb 45%, #f6ede1 70%, #f5e3d0 100%)',
+  dawn: [
+    'radial-gradient(85% 75% at 0% 100%, #b4c3f2 0%, #ccd6f6 22%, #dfe1f4 40%, rgba(240, 239, 245, 0) 64%)',
+    'radial-gradient(75% 65% at 100% 18%, #f9e9db 0%, #f8ece4 35%, rgba(248, 236, 228, 0) 68%)',
+    'radial-gradient(55% 38% at 45% 0%, #ebded9 0%, rgba(235, 222, 217, 0) 62%)',
+    'linear-gradient(150deg, #f4ecec 0%, #fbf3ee 45%, #ecebf1 100%)',
+  ].join(', '),
   sunset: 'linear-gradient(180deg, #a3cbe9 0%, #d9e2e1 22%, #efe5d3 33%, #f8d1a2 52%, #f5b87f 75%, #f1a76c 100%)',
   lilac: 'linear-gradient(160deg, #f7e7ec 0%, #eadef4 30%, #d8d3f3 60%, #c4caf1 100%)',
   breeze: 'linear-gradient(135deg, #a9dbe4 0%, #cfe7e0 25%, #f2ecdc 55%, #f7dcbd 80%, #f8cba6 100%)',
