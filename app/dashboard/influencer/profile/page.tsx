@@ -207,8 +207,8 @@ export default function CreatorProfilePage() {
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`pb-3 -mb-px text-sm font-medium border-b-2 transition ${
-                tab === key ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+              className={`pb-3 -mb-px text-sm border-b-2 transition ${
+                tab === key ? 'border-gray-900 text-gray-900 font-bold' : 'border-transparent text-gray-500 font-medium hover:text-gray-700'
               }`}
             >
               {label}
@@ -290,8 +290,8 @@ export default function CreatorProfilePage() {
                         key={lang}
                         type="button"
                         onClick={() => setForm({ ...form, languages: toggleIn(form.languages, lang) })}
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
-                          form.languages.includes(lang) ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        className={`px-2.5 py-1 rounded-full text-xs transition ${
+                          form.languages.includes(lang) ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-600 font-medium hover:bg-gray-200'
                         }`}
                       >
                         {lang}
@@ -309,8 +309,8 @@ export default function CreatorProfilePage() {
                       key={cat}
                       type="button"
                       onClick={() => setForm({ ...form, categories: toggleIn(form.categories, cat) })}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                        form.categories.includes(cat) ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      className={`px-3 py-1.5 rounded-full text-sm transition ${
+                        form.categories.includes(cat) ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
                       }`}
                     >
                       {t.categoryNames[cat] || cat}

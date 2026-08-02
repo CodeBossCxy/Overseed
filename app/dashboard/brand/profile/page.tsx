@@ -328,8 +328,8 @@ export default function BrandProfilePage() {
                     key={c}
                     type="button"
                     onClick={() => setFormData({ ...formData, countries: toggleIn(formData.countries, c) })}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                      formData.countries.includes(c) ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    className={`px-3 py-1.5 rounded-full text-sm transition ${
+                      formData.countries.includes(c) ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
                     }`}
                   >
                     {c}
@@ -346,8 +346,8 @@ export default function BrandProfilePage() {
                     key={ind}
                     type="button"
                     onClick={() => setFormData({ ...formData, industries: toggleIn(formData.industries, ind) })}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                      formData.industries.includes(ind) ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    className={`px-3 py-1.5 rounded-full text-sm transition ${
+                      formData.industries.includes(ind) ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
                     }`}
                   >
                     {t.industries[ind] || ind}

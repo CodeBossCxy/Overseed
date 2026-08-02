@@ -24,8 +24,8 @@ import fs from 'fs'
 import path from 'path'
 
 const COLORS = {
-  creator: { brand: 'E6296B', headerBg: 'FFF1F4', logo: 'icon-pink.png' },
-  brand: { brand: '2563EB', headerBg: 'EFF6FF', logo: 'icon-blue.png' },
+  creator: { brand: 'E6296B', headerBg: 'FFF1F4', logo: 'home/landing-logo-overseed.png' },
+  brand: { brand: '2563EB', headerBg: 'EFF6FF', logo: 'home/landing-logo-overseed.png' },
 }
 
 // Will be set per-request
@@ -33,6 +33,7 @@ let BRAND_COLOR = 'E6296B'
 let HEADER_BG = 'FFF1F4'
 const ALT_ROW_BG = 'FAFAFA'
 const BORDER_COLOR = 'E5E7EB'
+const OVERSEED_WORDMARK_LOGO = 'home/landing-logo-overseed.png'
 
 type DocElement = Paragraph | Table
 
@@ -430,8 +431,7 @@ async function generateExcel(content: string, title: string, theme: string = 'cr
 async function generatePDF(content: string, title: string, theme: string = 'creator'): Promise<Buffer> {
   const PDFDocument = (await import('pdfkit')).default
   const brandHex = theme === 'brand' ? '#2563EB' : '#E6296B'
-  const logoFile = theme === 'brand' ? 'blue_logo_with_txt.png' : 'pink_logo_with_txt.png'
-  const logoPath = path.join(process.cwd(), 'public', logoFile)
+  const logoPath = path.join(process.cwd(), 'public', OVERSEED_WORDMARK_LOGO)
   let hasLogo = false
   try { fs.accessSync(logoPath); hasLogo = true } catch {}
 
@@ -537,11 +537,10 @@ async function generatePDF(content: string, title: string, theme: string = 'crea
 // --- Word generation (existing) ---
 function generateWord(content: string, title: string, theme: string = 'creator') {
   const elements = markdownToDocxElements(content)
-  const headerLogoFile = theme === 'brand' ? 'blue_logo_with_txt.png' : 'pink_logo_with_txt.png'
 
   let headerLogoBuffer: Buffer | null = null
   try {
-    headerLogoBuffer = fs.readFileSync(path.join(process.cwd(), 'public', headerLogoFile))
+    headerLogoBuffer = fs.readFileSync(path.join(process.cwd(), 'public', OVERSEED_WORDMARK_LOGO))
   } catch {}
 
   const headerContent: Paragraph[] = []
@@ -550,7 +549,7 @@ function generateWord(content: string, title: string, theme: string = 'creator')
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new ImageRun({ data: headerLogoBuffer, transformation: { width: 120, height: 80 }, type: 'png' }),
+          new ImageRun({ data: headerLogoBuffer, transformation: { width: 150, height: 39 }, type: 'png' }),
         ],
         spacing: { after: 100 },
       })

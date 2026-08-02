@@ -264,10 +264,10 @@ export default function AdminDashboard() {
                 if (tab === 'brand-verification') fetchBrandVerifications()
                 if (tab === 'campaign-review') fetchCampaignReviews()
               }}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+              className={`px-4 py-2 rounded-md text-sm transition ${
                 activeTab === tab
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-gray-900 font-bold shadow-sm'
+                  : 'text-gray-600 font-medium hover:text-gray-900'
               }`}
             >
               {tab === 'overview' ? 'Overview' : tab === 'users' ? 'Users' : tab === 'ai-usage' ? 'AI Usage' : tab === 'brand-verification' ? 'Brand Verification' : tab === 'campaign-review' ? `Campaign Review${reviewCampaigns.length ? ` (${reviewCampaigns.length})` : ''}` : tab === 'beta-codes' ? 'Beta Codes' : 'Beta Feedback'}
@@ -607,8 +607,8 @@ export default function AdminDashboard() {
                 <button
                   key={s}
                   onClick={() => { setBrandVerifFilter(s); fetchBrandVerifications(s) }}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
-                    brandVerifFilter === s ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  className={`px-3 py-1.5 rounded-md text-sm transition ${
+                    brandVerifFilter === s ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
                   }`}
                 >
                   {s.charAt(0) + s.slice(1).toLowerCase()}

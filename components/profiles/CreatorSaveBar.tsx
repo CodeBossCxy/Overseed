@@ -45,8 +45,8 @@ export default function CreatorSaveBar({ influencerId }: { influencerId: string 
       <button
         onClick={toggle}
         disabled={busy}
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold shadow-sm transition disabled:opacity-50 ${
-          saved ? 'bg-primary-50 text-primary-700 hover:bg-primary-100' : 'bg-white text-gray-700 hover:text-primary-700'
+        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm shadow-sm transition disabled:opacity-50 ${
+          saved ? 'bg-white text-gray-900 font-bold ring-1 ring-gray-200 hover:bg-gray-50' : 'bg-white text-gray-700 font-semibold hover:text-gray-900'
         }`}
       >
         <svg className="w-4 h-4" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">

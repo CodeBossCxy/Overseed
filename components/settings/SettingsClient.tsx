@@ -326,11 +326,11 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
                   onClick={() => setColorTheme(theme)}
                   aria-pressed={selected}
                   className={`relative rounded-2xl border-2 p-2 pb-3 transition text-center ${
-                    selected ? 'border-primary-500 bg-primary-50/40' : 'border-transparent bg-white shadow-sm hover:border-primary-200'
+                    selected ? 'border-gray-900 bg-white/70' : 'border-transparent bg-white shadow-sm hover:border-gray-300'
                   }`}
                 >
                   {selected && (
-                    <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-primary-600 text-white flex items-center justify-center z-10">
+                    <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-gray-900 text-white flex items-center justify-center z-10">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
@@ -352,7 +352,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
                       <div className="rounded-md bg-white/60 h-6" />
                     </div>
                   </div>
-                  <p className={`text-xs font-medium mt-2 ${selected ? 'text-primary-700' : 'text-gray-600'}`}>
+                  <p className={`text-xs mt-2 ${selected ? 'text-gray-900 font-bold' : 'text-gray-600 font-medium'}`}>
                     {themeLabels[theme]}
                   </p>
                 </button>
@@ -370,7 +370,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
             <div className="bg-white/85 rounded-xl p-3">
               <p className="text-[11px] font-semibold text-gray-500 mb-2">{st.previewSidebar}</p>
               <div className="space-y-1">
-                <div className="px-2 py-1.5 rounded-lg bg-primary-50 text-primary-700 text-xs font-medium">{t.workspace.dashboard}</div>
+                <div className="px-2 py-1.5 rounded-lg bg-white text-gray-900 text-xs font-bold shadow-sm">{t.workspace.dashboard}</div>
                 <div className="px-2 py-1.5 rounded-lg text-gray-500 text-xs">{t.workspace.messages}</div>
                 <div className="px-2 py-1.5 rounded-lg text-gray-500 text-xs">{t.workspace.settings}</div>
               </div>
@@ -418,16 +418,16 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
               <div className="inline-flex bg-gray-100 rounded-full p-1">
                 <button
                   onClick={() => setLocale('en')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                    locale === 'en' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                  className={`px-4 py-1.5 rounded-full text-sm transition ${
+                    locale === 'en' ? 'bg-white shadow-sm text-gray-900 font-bold' : 'text-gray-500 font-medium'
                   }`}
                 >
                   English
                 </button>
                 <button
                   onClick={() => setLocale('zh')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                    locale === 'zh' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                  className={`px-4 py-1.5 rounded-full text-sm transition ${
+                    locale === 'zh' ? 'bg-white shadow-sm text-gray-900 font-bold' : 'text-gray-500 font-medium'
                   }`}
                 >
                   简体中文

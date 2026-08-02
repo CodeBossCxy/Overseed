@@ -415,8 +415,8 @@ export default function MessagesPage() {
                   <button
                     key={key}
                     onClick={() => setListFilter(key)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition ${
-                      listFilter === key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    className={`px-3.5 py-1.5 rounded-full text-xs transition ${
+                      listFilter === key ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-600 font-semibold hover:bg-gray-200'
                     }`}
                   >
                     {label}

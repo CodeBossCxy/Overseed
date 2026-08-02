@@ -486,7 +486,7 @@ export default function AIAssistantPage() {
         <div className="max-w-5xl mx-auto px-4 py-10 sm:py-14">
           {/* Hero */}
           <div className="text-center mb-10">
-            <img src={themeIcon} alt="Overseed" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
+            <img src="/home/landing-logo-overseed.png" alt="Overseed" className="h-14 w-auto mx-auto mb-4 overseed-logo-ink" />
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">{ai.title}</h1>
             <p className="mt-3 text-gray-600 max-w-xl mx-auto">{ai.subtitle}</p>
           </div>
@@ -553,7 +553,7 @@ export default function AIAssistantPage() {
     return (
       <RoleShell>
         <div className="max-w-lg mx-auto px-4 py-20 text-center">
-          <img src={themeIcon} alt="Overseed" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
+          <img src="/home/landing-logo-overseed.png" alt="Overseed" className="h-14 w-auto mx-auto mb-4 overseed-logo-ink" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{ai.creatorTitle}</h1>
           <p className="text-gray-600">{ai.creatorDesc}</p>
         </div>

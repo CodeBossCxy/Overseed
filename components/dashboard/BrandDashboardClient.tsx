@@ -34,7 +34,6 @@ interface BrandProfile {
   companyName: string | null
   logoUrl: string | null
   brandVerificationStatus?: string | null
-  rejectionReason?: string | null
 }
 
 interface BrandDashboardClientProps {
@@ -44,7 +43,6 @@ interface BrandDashboardClientProps {
   recentMessages: RecentMessage[]
   brandProfile: BrandProfile
   userName: string
-  subscriptionTier: string
 }
 
 function Avatar({ src, name, className }: { src?: string | null; name: string; className: string }) {
@@ -65,7 +63,6 @@ export default function BrandDashboardClient({
   recentMessages,
   brandProfile,
   userName,
-  subscriptionTier,
 }: BrandDashboardClientProps) {
   const { t, locale } = useLanguage()
   const d = t.brand.dashboard
@@ -92,6 +89,10 @@ export default function BrandDashboardClient({
   // (Not Verified / Under Review / Action Required / Verified).
   const verifState = deriveVerificationStatus(brandProfile.brandVerificationStatus as any, true)
   const verifLabel = (t.status as any)?.verification?.[VERIFICATION_META[verifState].key] ?? verifState
+  const brandDisplayName = brandProfile.companyName || userName
+  const welcomeLine = locale === 'zh'
+    ? `${d.welcomeBack}${brandDisplayName} 👋`
+    : `${d.welcomeBack} ${brandDisplayName} 👋`
 
   const steps = [
     { done: setup.profile, title: d.stepProfile, caption: setup.profile ? d.stepCompleted : d.stepNotStarted, href: '/dashboard/brand/profile' },
@@ -141,88 +142,29 @@ export default function BrandDashboardClient({
   ]
 
   return (
-    <div className="max-w-7xl mx-auto pt-6 pb-8">
-      {/* Verification Status Banners (canonical vocabulary from lib/status) */}
-      {isPending && (
-        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-          <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <h3 className="font-semibold text-amber-800">{d.verifPendingTitle}</h3>
-            <p className="text-sm text-amber-700 mt-0.5">{d.verifPendingDesc}</p>
-          </div>
-        </div>
-      )}
-      {isRejected && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-          <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-          <div>
-            <h3 className="font-semibold text-red-800">{d.verifUnableTitle}</h3>
-            {brandProfile.rejectionReason && (
-              <p className="text-sm text-red-700 mt-0.5"><strong>{d.reasonLabel}</strong> {brandProfile.rejectionReason}</p>
-            )}
-            <p className="text-sm text-red-700 mt-1">{d.verifUnableDesc}</p>
-            <div className="flex gap-4 mt-2">
-              <Link href="/dashboard/brand/profile" className="text-sm font-semibold text-red-700 underline">
-                {t.workspace.brandProfile}
-              </Link>
-              <Link href="/contact" className="text-sm font-semibold text-red-700 underline">
-                {d.contactSupport}
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <div className="max-w-7xl mx-auto pt-0 pb-8 lg:-mt-4">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {d.welcomeBack} {userName}!
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <h1 className="text-3xl sm:text-[34px] font-bold leading-tight text-gray-900">
+            {d.title}
           </h1>
-          <p className="text-gray-500 mt-1">{d.title}</p>
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {brandProfile.companyName && (
-              <span className="text-sm font-semibold text-gray-800">{brandProfile.companyName}</span>
-            )}
-            {isApproved ? (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600">
-                <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
-                </svg>
-                {d.verifiedBusiness}
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-2.5 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">
-                {d.unverifiedBusiness}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span
-            className={`px-4 py-2 rounded-full text-sm font-bold ${
-              subscriptionTier === 'PRO'
-                ? 'bg-indigo-100 text-indigo-900'
-                : 'bg-white shadow-sm text-gray-600'
-            }`}
-          >
-            {subscriptionTier === 'PRO' ? 'PRO' : d.plan.free}
+          <span className={`inline-flex items-center gap-2 text-sm font-semibold ${
+            isApproved ? 'text-gray-700' : isRejected ? 'text-red-700' : isPending ? 'text-amber-700' : 'text-gray-500'
+          }`}>
+            <svg className={`h-5 w-5 flex-shrink-0 ${
+              isApproved ? 'text-[#21466f]' : isRejected ? 'text-red-600' : isPending ? 'text-amber-600' : 'text-gray-400'
+            }`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
+            </svg>
+            {isApproved ? d.verifiedBusiness : verifLabel}
           </span>
-          {isApproved && (
-            <Link
-              href="/dashboard/brand/campaigns/new"
-              className="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:bg-primary-700 transition inline-flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              {d.createCampaign}
-            </Link>
-          )}
+        </div>
+        <div className="mt-8">
+          <p className="text-xl sm:text-2xl font-bold leading-tight text-gray-900">
+            {welcomeLine}
+          </p>
+          <p className="mt-2 text-base text-gray-600">{d.welcomeSubtitle}</p>
         </div>
       </div>
 
@@ -232,20 +174,21 @@ export default function BrandDashboardClient({
           className={`${setupDone ? 'lg:col-span-3' : 'lg:col-span-2'} relative overflow-hidden rounded-3xl bg-[#091326] bg-cover bg-center text-white p-8 sm:p-10 flex flex-col justify-center min-h-[280px]`}
           style={{ backgroundImage: "url('/home/hero-earth.jpg')" }}
         >
-          {/* Left-side scrim keeps the copy readable over the photo */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
-          <p className="relative flex items-center gap-2 text-sm text-white/80 mb-3">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2l1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7L12 2z" />
+          <div className="pointer-events-none absolute inset-0 bg-[#163e75]/35 mix-blend-color" />
+          {/* Left-side scrim keeps the copy readable over the blue-tinted photo. */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#06172d]/75 via-[#0d2a4d]/45 to-[#255f9e]/10" />
+          <p className="relative z-10 mb-4 inline-flex items-center gap-3 text-[15px] font-semibold leading-none text-white/90">
+            <svg className="h-5 w-5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2.75l1.6 5.05a3.7 3.7 0 0 0 2.45 2.45L21.25 12l-5.2 1.75a3.7 3.7 0 0 0-2.45 2.45L12 21.25l-1.6-5.05a3.7 3.7 0 0 0-2.45-2.45L2.75 12l5.2-1.75A3.7 3.7 0 0 0 10.4 7.8L12 2.75Z" />
             </svg>
-            {d.heroKicker}
+            <span>{d.heroKicker}</span>
           </p>
-          <h2 className="relative text-3xl sm:text-4xl font-bold leading-tight max-w-lg">{d.heroTitle}</h2>
-          <p className="relative text-white/70 mt-3 max-w-md text-sm sm:text-base">{d.heroSubtitle}</p>
+          <h2 className="relative z-10 text-3xl sm:text-4xl font-bold leading-tight max-w-lg">{d.heroTitle}</h2>
+          <p className="relative z-10 text-white/70 mt-3 max-w-md text-sm sm:text-base">{d.heroSubtitle}</p>
           {isApproved && (
             <Link
               href="/dashboard/brand/campaigns/new"
-              className="relative mt-6 inline-flex items-center gap-2 self-start px-5 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur border border-white/25 rounded-full text-sm font-semibold transition"
+              className="relative z-10 mt-6 inline-flex items-center gap-2 self-start px-5 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur border border-white/25 rounded-full text-sm font-semibold transition"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

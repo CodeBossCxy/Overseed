@@ -95,10 +95,10 @@ export default function LanguageSetupModal() {
             <button
               key={code}
               onClick={() => setLocale(code)}
-              className={`px-4 py-3 rounded-2xl text-sm font-semibold border-2 transition ${
+              className={`px-4 py-3 rounded-2xl text-sm border-2 transition ${
                 locale === code
-                  ? 'border-primary-500 bg-primary-50/50 text-primary-700'
-                  : 'border-gray-200 text-gray-700 hover:border-primary-200'
+                  ? 'border-gray-900 bg-white text-gray-900 font-bold'
+                  : 'border-gray-200 text-gray-700 font-semibold hover:border-gray-300'
               }`}
             >
               {label}

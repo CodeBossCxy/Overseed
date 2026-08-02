@@ -312,8 +312,8 @@ export default function SavedCreatorsPage() {
               <button
                 key={n}
                 onClick={() => setPage(n)}
-                className={`w-9 h-9 rounded-full text-sm font-semibold transition ${
-                  n === safePage ? 'bg-primary-600 text-white shadow-sm' : 'bg-white shadow-sm text-gray-600 hover:text-primary-700'
+                className={`w-9 h-9 rounded-full text-sm transition ${
+                  n === safePage ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-white shadow-sm text-gray-600 font-semibold hover:text-gray-900'
                 }`}
               >
                 {n}

@@ -84,7 +84,7 @@ export default function ContactPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
             {/* Left: Info */}
             <div>
-              <h1 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: 'var(--font-noto-sans-sc), system-ui, sans-serif', fontWeight: 900 }}>
+              <h1 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: 'var(--font-manrope), var(--font-noto-sans-sc), system-ui, sans-serif', fontWeight: 900 }}>
                 {t.contact.title}
               </h1>
               <p className="text-lg text-white/70 mb-10">{t.contact.subtitle}</p>

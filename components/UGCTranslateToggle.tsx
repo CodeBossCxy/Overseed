@@ -15,10 +15,10 @@ export default function UGCTranslateToggle({ isLoading }: UGCTranslateToggleProp
     <button
       onClick={() => setIsUGCTranslated(!isUGCTranslated)}
       disabled={isLoading}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition border ${
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition border ${
         isUGCTranslated
-          ? 'bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100'
-          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+          ? 'bg-white text-gray-900 font-bold border-gray-200 shadow-sm hover:bg-gray-50'
+          : 'bg-gray-50 text-gray-600 font-medium border-gray-200 hover:bg-gray-100'
       } disabled:opacity-50 disabled:cursor-not-allowed`}
     >
       {isLoading ? (

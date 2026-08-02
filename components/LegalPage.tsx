@@ -45,7 +45,7 @@ export default function LegalPage({ enPath, zhPath, fallbackTitle }: LegalPagePr
                 remarkPlugins={[remarkGfm]}
                 components={{
                   h1: ({ children }) => (
-                    <h1 className="text-3xl md:text-4xl font-bold text-white mb-6" style={{ fontFamily: 'var(--font-noto-sans-sc), system-ui, sans-serif', fontWeight: 900 }}>
+                    <h1 className="text-3xl md:text-4xl font-bold text-white mb-6" style={{ fontFamily: 'var(--font-manrope), var(--font-noto-sans-sc), system-ui, sans-serif', fontWeight: 900 }}>
                       {children}
                     </h1>
                   ),

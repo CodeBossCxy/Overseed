@@ -32,7 +32,7 @@ function LandingLogo() {
         height={98}
         priority
         sizes="(max-width: 640px) 180px, 220px"
-        className="h-12 w-auto object-contain sm:h-14"
+        className="h-12 w-auto object-contain sm:h-14 overseed-logo-ink"
       />
     </span>
   )
@@ -55,7 +55,7 @@ function NavDropdown({ label, items, isGlobal, isLanding }: { label: string; ite
   // The landing page renders in the dark "global" theme but on a light hero,
   // so it needs the dark-text treatment rather than the global light-text one.
   const buttonClass = isLanding
-    ? 'text-base text-[#071735] hover:text-[#2c6fb2]'
+    ? 'text-base text-[#2d314e] hover:text-[#2d314e]'
     : isGlobal
       ? 'text-sm text-gray-200 hover:text-[#ff769f]'
       : 'text-sm text-gray-700 hover:text-primary-600'
@@ -133,7 +133,7 @@ function LanguageDropdown({
   ]
 
   const triggerClass = isLanding
-    ? 'inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#d4e1ef] bg-[#f9fbff]/75 px-4 text-sm font-normal text-[#082052] shadow-[inset_0_1px_8px_rgba(255,255,255,0.9),0_12px_28px_rgba(88,126,171,0.12)] backdrop-blur-md transition hover:bg-white'
+    ? 'inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#d4e1ef] bg-[#f9fbff]/75 px-4 text-sm font-normal text-[#2d314e] shadow-[inset_0_1px_8px_rgba(255,255,255,0.9),0_12px_28px_rgba(88,126,171,0.12)] backdrop-blur-md transition hover:bg-white'
     : isGlobal
       ? 'inline-flex items-center gap-1.5 p-2 rounded-md text-gray-200 hover:text-[#ff769f] hover:bg-[#456fa3]/15 transition'
       : 'inline-flex items-center gap-1.5 p-2 rounded-md text-gray-600 hover:text-primary-600 hover:bg-gray-100 transition'
@@ -143,7 +143,7 @@ function LanguageDropdown({
   return (
     <div ref={ref} className="relative mr-2 sm:mr-3">
       <button onClick={() => setOpen(!open)} className={triggerClass} title={title}>
-        <GlobeIcon className={isLanding ? 'h-4 w-4 text-[#0b3a7c]' : 'w-5 h-5'} />
+        <GlobeIcon className={isLanding ? 'h-4 w-4 text-[#2d314e]' : 'w-5 h-5'} />
         <span className={locale === 'zh' ? 'font-cn' : undefined}>{current}</span>
         <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -162,10 +162,10 @@ function LanguageDropdown({
                 onClick={() => { setLocale(opt.value); setOpen(false) }}
                 className={`flex w-full items-center justify-between px-4 py-2 text-sm transition ${opt.value === 'zh' ? 'font-cn' : ''} ${
                   useLightPanel
-                    ? `${active ? 'text-primary-600 font-medium' : 'text-gray-700'} hover:bg-primary-50`
-                    : `${active ? 'text-[#ff769f]' : ''} hover:bg-white/10`
+                    ? `${active ? 'text-gray-900 font-bold' : 'text-gray-700'} hover:bg-primary-50`
+                    : `${active ? 'font-bold' : ''} hover:bg-white/10`
                 }`}
-                style={useLightPanel || active ? undefined : { color: 'rgba(255,255,255,0.85)' }}
+                style={useLightPanel ? undefined : { color: 'rgba(255,255,255,0.85)' }}
               >
                 {opt.label}
                 {active && (
@@ -336,10 +336,8 @@ export default function Header() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {isLandingPage ? (
               <LandingLogo />
-            ) : isGlobal ? (
-              <img src="/gray_logo_with_txt.png" alt="Overseed" className="h-28 -my-4 translate-y-[2px] w-auto object-contain brightness-200" />
             ) : (
-              <img src={themeMode === 'brand' ? "/blue_overseed.png" : "/pink_overseed.png"} alt="Overseed" className="h-28 -my-4 translate-y-[2px] w-auto object-contain" />
+              <LandingLogo />
             )}
             {!isLandingPage && (
               <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-400 text-amber-900 rounded uppercase">{t.nav.beta}</span>
@@ -355,7 +353,7 @@ export default function Header() {
                   href={menu.href}
                   className={`transition font-normal ${
                     isLandingPage
-                      ? 'text-base text-[#071735] hover:text-[#2c6fb2]'
+                      ? 'text-base text-[#2d314e] hover:text-[#2d314e]'
                       : isGlobal
                         ? 'text-sm text-gray-200 hover:text-[#ff769f]'
                         : 'text-sm text-gray-700 hover:text-primary-600'
@@ -451,7 +449,7 @@ export default function Header() {
                   href="/auth/signup"
                   className={
                     isLandingPage
-                      ? 'inline-flex min-h-[56px] items-center gap-4 rounded-full border border-white/80 bg-[#f8fbff]/75 px-8 text-base font-normal text-[#082052] shadow-[inset_0_1px_12px_rgba(255,255,255,0.95),0_14px_30px_rgba(81,124,174,0.16)] transition hover:bg-white'
+                      ? 'inline-flex min-h-[56px] items-center gap-4 rounded-full border border-white/80 bg-[#f8fbff]/75 px-8 text-base font-normal text-[#2d314e] shadow-[inset_0_1px_12px_rgba(255,255,255,0.95),0_14px_30px_rgba(81,124,174,0.16)] transition hover:bg-white'
                       : 'px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 transition text-sm'
                   }
                 >
@@ -466,7 +464,7 @@ export default function Header() {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={`lg:hidden p-2 rounded-md ${
                 isLandingPage
-                  ? 'text-[#071735] hover:bg-[#dcecff]/70'
+                  ? 'text-[#2d314e] hover:bg-[#dcecff]/70'
                   : isGlobal
                     ? 'hover:bg-[#456fa3]/15 text-gray-200'
                     : 'hover:bg-gray-100'
@@ -496,7 +494,7 @@ export default function Header() {
                     href={menu.href}
                     className={`block py-2 transition font-normal ${
                       isLandingPage
-                        ? 'text-[#071735] hover:text-[#2c6fb2]'
+                        ? 'text-[#2d314e] hover:text-[#2d314e]'
                         : isGlobal
                           ? 'text-gray-200 hover:text-[#ff769f]'
                           : 'text-gray-700 hover:text-primary-600'
@@ -511,7 +509,7 @@ export default function Header() {
                       onClick={() => setMobileExpanded(mobileExpanded === menu.key ? null : menu.key)}
                       className={`flex items-center justify-between w-full py-2 transition font-normal ${
                         isLandingPage
-                          ? 'text-[#071735] hover:text-[#2c6fb2]'
+                          ? 'text-[#2d314e] hover:text-[#2d314e]'
                           : isGlobal
                             ? 'text-gray-200 hover:text-[#ff769f]'
                             : 'text-gray-700 hover:text-primary-600'
@@ -530,7 +528,7 @@ export default function Header() {
                             href={item.href}
                             className={`block py-2 text-sm transition ${
                               isLandingPage
-                                ? 'text-[#35547a] hover:text-[#2c6fb2]'
+                                ? 'text-[#2d314e] hover:text-[#2d314e]'
                                 : isGlobal
                                   ? 'text-gray-400 hover:text-[#ff769f]'
                                   : 'text-gray-600 hover:text-primary-600'
@@ -567,14 +565,14 @@ export default function Header() {
                     )}
                     <Link
                       href="/dashboard/messages"
-                      className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
+                      className={`block transition ${isLandingPage ? 'text-[#2d314e] hover:text-[#2d314e]' : 'text-gray-700 hover:text-primary-600'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.messages?.title || 'Messages'}
                     </Link>
                     <Link
                       href={dashboardLink}
-                      className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
+                      className={`block transition ${isLandingPage ? 'text-[#2d314e] hover:text-[#2d314e]' : 'text-gray-700 hover:text-primary-600'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.nav.myCenter}
@@ -582,7 +580,7 @@ export default function Header() {
                     {(session.user as any)?.userType === 'ADMIN' && (
                       <Link
                         href="/admin"
-                        className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
+                        className={`block transition ${isLandingPage ? 'text-[#2d314e] hover:text-[#2d314e]' : 'text-gray-700 hover:text-primary-600'}`}
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         {t.nav.admin}
@@ -590,7 +588,7 @@ export default function Header() {
                     )}
                     <Link
                       href="/settings"
-                      className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
+                      className={`block transition ${isLandingPage ? 'text-[#2d314e] hover:text-[#2d314e]' : 'text-gray-700 hover:text-primary-600'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.nav.settings}
@@ -600,7 +598,7 @@ export default function Header() {
                         setMobileMenuOpen(false)
                         signOut()
                       }}
-                      className={`text-left transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
+                      className={`text-left transition ${isLandingPage ? 'text-[#2d314e] hover:text-[#2d314e]' : 'text-gray-700 hover:text-primary-600'}`}
                     >
                       {t.nav.logout}
                     </button>
@@ -609,14 +607,14 @@ export default function Header() {
                   <>
                     <Link
                       href="/auth/signin"
-                      className={`block transition ${isLandingPage ? 'text-[#071735] hover:text-[#2c6fb2]' : 'text-gray-700 hover:text-primary-600'}`}
+                      className={`block transition ${isLandingPage ? 'text-[#2d314e] hover:text-[#2d314e]' : 'text-gray-700 hover:text-primary-600'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.nav.login}
                     </Link>
                     <Link
                       href="/auth/signup"
-                      className={`block font-normal transition ${isLandingPage ? 'text-[#0a4d9c] hover:text-[#2c6fb2]' : 'text-primary-600 hover:text-primary-700'}`}
+                      className={`block font-normal transition ${isLandingPage ? 'text-[#2d314e] hover:text-[#2d314e]' : 'text-primary-600 hover:text-primary-700'}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {t.nav.signup}

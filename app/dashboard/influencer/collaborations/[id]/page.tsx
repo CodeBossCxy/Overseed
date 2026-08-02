@@ -361,10 +361,10 @@ export default function CreatorManageCollaborationPage() {
                 {paymentStates.map((st, i) => (
                   <div key={st.key} className="flex gap-3">
                     <div className="flex flex-col items-center">
-                      <span className={`w-4 h-4 rounded-full border-2 ${st.active ? 'border-primary-600 bg-primary-600' : 'border-gray-200 bg-white'}`} />
+                      <span className={`w-4 h-4 rounded-full border-2 ${st.active ? 'border-gray-900 bg-gray-900' : 'border-gray-200 bg-white'}`} />
                       {i < paymentStates.length - 1 && <span className="w-0.5 flex-1 min-h-[16px] bg-gray-100" />}
                     </div>
-                    <p className={`text-sm pb-4 ${st.active ? 'font-bold text-primary-700' : 'text-gray-400'}`}>{st.label}</p>
+                    <p className={`text-sm pb-4 ${st.active ? 'font-bold text-gray-900' : 'text-gray-400'}`}>{st.label}</p>
                   </div>
                 ))}
               </div>

@@ -244,7 +244,7 @@ function ButtonShell({
       ? 'bg-[#6f9bd0] text-white shadow-[inset_0_1px_10px_rgba(255,255,255,0.6),0_18px_36px_rgba(74,124,184,0.35)] hover:bg-[#5f8fc6]'
       : tone === 'dark'
         ? 'border border-white/20 bg-white/5 text-white shadow-[inset_0_1px_12px_rgba(255,255,255,0.08)] hover:bg-white/10'
-        : 'border border-[#c9daf0] bg-[#f8fbff]/75 text-[#0a2d62] shadow-[inset_0_1px_10px_rgba(255,255,255,0.9),0_14px_30px_rgba(89,132,181,0.16)] hover:bg-white',
+        : 'border border-[#c9daf0] bg-[#f8fbff]/75 text-[#2d314e] shadow-[inset_0_1px_10px_rgba(255,255,255,0.9),0_14px_30px_rgba(89,132,181,0.16)] hover:bg-white',
   ].join(' ')
 
   if (href) {
@@ -268,7 +268,7 @@ function SectionLabel({ children, dark = false }: { children: React.ReactNode; d
       className={`mx-auto mb-5 inline-flex min-h-[42px] items-center rounded-full px-7 text-base font-normal shadow-[inset_0_1px_12px_rgba(255,255,255,0.7)] ${
         dark
           ? 'border border-white/15 bg-white/5 text-white'
-          : 'border border-[#c6dcf4] bg-[#f8fbff]/70 text-[#0a1735]'
+          : 'border border-[#c6dcf4] bg-[#f8fbff]/70 text-[#2d314e]'
       }`}
     >
       {children}
@@ -399,7 +399,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="overflow-hidden bg-[#f4f9ff] font-normal text-[#071735]">
+    <div className="overflow-hidden bg-[#f4f9ff] font-normal text-[#2d314e]">
       <section className="hp-themed-bg relative min-h-screen-safe snap-start overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
         <Image
           src="/home/hero-bridge.png"
@@ -413,7 +413,7 @@ export default function HomePage() {
 
         <div className="relative z-10 mx-auto flex min-h-hero-safe w-full max-w-[1440px] flex-col justify-between rounded-[30px] px-2 py-4 sm:px-8 lg:px-12">
           <div className="max-w-3xl pt-12 lg:pt-16">
-            <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-[#d4e1ef] bg-[#f9fbff]/75 px-6 py-3 text-base font-normal text-[#0b3a7c] shadow-[inset_0_1px_8px_rgba(255,255,255,0.9),0_12px_28px_rgba(88,126,171,0.12)] backdrop-blur-md">
+            <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-[#d4e1ef] bg-[#f9fbff]/75 px-6 py-3 text-base font-normal text-[#2d314e] shadow-[inset_0_1px_8px_rgba(255,255,255,0.9),0_12px_28px_rgba(88,126,171,0.12)] backdrop-blur-md">
               <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
                 <Image
                   src="/home/hero-icon-spark.png"
@@ -427,13 +427,13 @@ export default function HomePage() {
               {home.hero.badge}
             </div>
 
-            <h1 className="max-w-3xl text-[clamp(3rem,5.2vw,4.9rem)] font-light leading-[1.08] text-[#082052]">
+            <h1 className="max-w-3xl text-[clamp(3rem,5.2vw,4.9rem)] font-light leading-[1.08] text-[#2d314e]">
               <span className="sm:block">{home.hero.title1} </span>
               <span className="sm:block">{home.hero.title2} </span>
               {home.hero.title3 && <span className="sm:block">{home.hero.title3}</span>}
             </h1>
 
-            <p className="mt-7 max-w-sm text-xl leading-9 text-[#35547a]">
+            <p className="mt-7 max-w-sm text-xl leading-9 text-[#2d314e]">
               {home.hero.description}
             </p>
 
@@ -463,8 +463,8 @@ export default function HomePage() {
                   sizes="56px"
                   className="mx-auto mb-5 h-14 w-14 object-contain"
                 />
-                <p className="text-base font-normal leading-7 text-[#0d244c]">{item.title}</p>
-                {item.subtitle && <p className="text-base font-normal leading-7 text-[#0d244c]">{item.subtitle}</p>}
+                <p className="text-base font-normal leading-7 text-[#2d314e]">{item.title}</p>
+                {item.subtitle && <p className="text-base font-normal leading-7 text-[#2d314e]">{item.subtitle}</p>}
               </div>
             ))}
           </div>
@@ -475,9 +475,9 @@ export default function HomePage() {
                 <Image src="/home/product-headphones.png" alt="" fill sizes="200px" className="object-cover object-center" />
               </div>
               <div className="px-4 pb-4 pt-3">
-                <p className="text-base font-normal leading-snug text-[#0d244c]">{home.hero.product1Name}</p>
-                <p className="mt-1 text-sm text-[#557199]">{home.hero.product1Category}</p>
-                <div className="mt-3 flex items-center gap-2 text-sm text-[#557199]">
+                <p className="text-base font-normal leading-snug text-[#2d314e]">{home.hero.product1Name}</p>
+                <p className="mt-1 text-sm text-[#2d314e]">{home.hero.product1Category}</p>
+                <div className="mt-3 flex items-center gap-2 text-sm text-[#2d314e]">
                   <AvatarStack />
                   <span>{home.hero.product1Creators}</span>
                 </div>
@@ -490,9 +490,9 @@ export default function HomePage() {
                 <Image src="/home/product-serum.png" alt="" fill sizes="300px" className="object-cover object-center" />
               </div>
               <div className="px-5 pb-4 pt-3">
-                <p className="text-base font-normal text-[#0d244c]">{home.hero.product2Name}</p>
-                <p className="text-sm text-[#557199]">{home.hero.product2Category}</p>
-                <div className="mt-3 flex items-center gap-3 text-sm text-[#557199]">
+                <p className="text-base font-normal text-[#2d314e]">{home.hero.product2Name}</p>
+                <p className="text-sm text-[#2d314e]">{home.hero.product2Category}</p>
+                <div className="mt-3 flex items-center gap-3 text-sm text-[#2d314e]">
                   <AvatarStack variant={1} />
                   <span>{home.hero.product2Creators}</span>
                 </div>
@@ -507,10 +507,10 @@ export default function HomePage() {
         <div className="hp-themed-gradient absolute inset-0" />
         <div className="relative mx-auto w-full max-w-7xl text-center">
           <SectionLabel>{home.platform.label}</SectionLabel>
-          <h2 className="mx-auto max-w-5xl text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-[1.1] text-[#08132d]">
+          <h2 className="mx-auto max-w-5xl text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-[1.1] text-[#2d314e]">
             {home.platform.title}
           </h2>
-          <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-[#5c6e8d]">
+          <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-[#2d314e]">
             {home.platform.description}
           </p>
 
@@ -521,8 +521,8 @@ export default function HomePage() {
                 className="rounded-[30px] border border-[#dbe9f8] bg-[#f8fbff]/75 px-8 pb-8 pt-7 shadow-[inset_0_1px_16px_rgba(255,255,255,0.95),0_18px_46px_rgba(85,126,174,0.12)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:scale-[1.02]"
               >
                 <PlatformCardVisual image={card.image} title={card.title} />
-                <h3 className="mt-6 text-2xl font-normal leading-tight text-[#071735]">{card.title}</h3>
-                <p className="mt-3 text-base leading-7 text-[#5b6d8c]">{card.body}</p>
+                <h3 className="mt-6 text-2xl font-normal leading-tight text-[#2d314e]">{card.title}</h3>
+                <p className="mt-3 text-base leading-7 text-[#2d314e]">{card.body}</p>
               </div>
             ))}
           </div>
@@ -617,7 +617,7 @@ export default function HomePage() {
         <div className="hp-themed-gradient absolute inset-0" />
         <div className="relative mx-auto w-full max-w-5xl text-center">
           <SectionLabel>{home.features.label}</SectionLabel>
-          <h2 className="text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-tight text-[#1d2638]">
+          <h2 className="text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-tight text-[#2d314e]">
             {home.features.title}
           </h2>
 
@@ -637,13 +637,13 @@ export default function HomePage() {
                     className="h-16 w-16 object-contain mix-blend-multiply"
                   />
                 </div>
-                <h3 className="mt-4 text-xl font-normal text-[#071735]">{feature.title}</h3>
-                <p className="mt-2 text-base leading-7 text-[#4f5f77]">{feature.body}</p>
+                <h3 className="mt-4 text-xl font-normal text-[#2d314e]">{feature.title}</h3>
+                <p className="mt-2 text-base leading-7 text-[#2d314e]">{feature.body}</p>
               </div>
             ))}
           </div>
 
-          <p className="mx-auto mt-6 max-w-4xl text-base leading-7 text-[#4f5f77]">
+          <p className="mx-auto mt-6 max-w-4xl text-base leading-7 text-[#2d314e]">
             {home.features.moreFeatures}
           </p>
         </div>
@@ -655,10 +655,10 @@ export default function HomePage() {
         </div>
         <div className="relative mx-auto w-full max-w-[1220px] text-center">
           <SectionLabel>{home.earlyAccess.label}</SectionLabel>
-          <h2 className="text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-tight text-[#08132d]">
+          <h2 className="text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-tight text-[#2d314e]">
             {home.earlyAccess.title}
           </h2>
-          <p className="mx-auto mt-4 max-w-3xl text-lg leading-8 text-[#445c83]">
+          <p className="mx-auto mt-4 max-w-3xl text-lg leading-8 text-[#2d314e]">
             {home.earlyAccess.description}
           </p>
 
@@ -678,13 +678,13 @@ export default function HomePage() {
                     className="h-16 w-16 object-contain mix-blend-multiply"
                   />
                 </div>
-                <h3 className="mt-5 text-lg font-normal leading-tight text-[#071735]">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#536785]">{item.body}</p>
+                <h3 className="mt-5 text-lg font-normal leading-tight text-[#2d314e]">{item.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-[#2d314e]">{item.body}</p>
               </div>
             ))}
 
             <div className="rounded-[28px] border border-[#d2e3f7] bg-[#f3f9ff]/75 p-6 shadow-[inset_0_1px_18px_rgba(255,255,255,0.95),0_20px_46px_rgba(82,128,181,0.16)] backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:scale-[1.02]">
-              <p className="text-center text-base font-normal text-[#1a315b]">{home.earlyAccess.betaLabel}</p>
+              <p className="text-center text-base font-normal text-[#2d314e]">{home.earlyAccess.betaLabel}</p>
               <div className="mx-auto mt-5 h-24 w-24 overflow-hidden rounded-full shadow-[0_18px_38px_rgba(69,119,180,0.16)]">
                 <Image
                   src="/home/ea-beta.png"
@@ -697,8 +697,8 @@ export default function HomePage() {
               </div>
               <div className="mt-5 space-y-3">
                 {[home.earlyAccess.betaItem1, home.earlyAccess.betaItem2, home.earlyAccess.betaItem3].map((item) => (
-                  <div key={item} className="flex items-center gap-3 text-base text-[#1f3152]">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#7fb0ff] text-[#477ee8]">
+                  <div key={item} className="flex items-center gap-3 text-base text-[#2d314e]">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#7fb0ff] text-[#2d314e]">
                       <CheckIcon className="h-3.5 w-3.5" />
                     </span>
                     {item}
@@ -808,7 +808,7 @@ function StepsSection({
       <div className="absolute inset-0 bg-[linear-gradient(180deg,#ffffff_0%,#f0f8ff_100%)]" />
       <div className="relative mx-auto w-full max-w-[1320px] text-center">
         <SectionLabel>{label}</SectionLabel>
-        <h2 className="mx-auto max-w-5xl text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-[1.12] text-[#1d2638]">
+        <h2 className="mx-auto max-w-5xl text-[clamp(2.4rem,3.6vw,4.2rem)] font-light leading-[1.12] text-[#2d314e]">
           {title}
         </h2>
 
@@ -841,7 +841,7 @@ function StepsSection({
               >
                 <div
                   className={`mb-4 flex h-10 w-10 items-center justify-center rounded-full text-lg font-normal transition-colors duration-300 ${
-                    isActive ? 'bg-[#5f8fc6] text-white' : 'bg-[#edf3fb] text-[#1d2638]'
+                    isActive ? 'bg-[#5f8fc6] text-white' : 'bg-[#edf3fb] text-[#2d314e]'
                   }`}
                 >
                   {index + 1}
@@ -864,8 +864,8 @@ function StepsSection({
                     />
                   </div>
                 </div>
-                <h3 className="text-xl font-normal text-[#1d2638]">{step.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-[#4e5d73]">{step.body}</p>
+                <h3 className="text-xl font-normal text-[#2d314e]">{step.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-[#2d314e]">{step.body}</p>
               </div>
             )
           })}

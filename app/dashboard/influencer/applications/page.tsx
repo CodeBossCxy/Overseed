@@ -186,8 +186,8 @@ export default function InfluencerApplicationsPage() {
             <button
               key={tb.key}
               onClick={() => setTab(tb.key)}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition ${
-                tab === tb.key ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              className={`px-6 py-2.5 rounded-xl text-sm transition ${
+                tab === tb.key ? 'bg-white shadow-sm text-gray-900 font-bold' : 'text-gray-500 font-semibold hover:text-gray-700'
               }`}
             >
               {tb.label}

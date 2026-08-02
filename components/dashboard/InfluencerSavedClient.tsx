@@ -130,10 +130,10 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
           <div className="relative">
             <button
               onClick={() => setFiltersOpen((o) => !o)}
-              className={`px-4 py-2 rounded-full text-sm font-medium shadow-sm flex items-center gap-2 transition ${
+              className={`px-4 py-2 rounded-full text-sm shadow-sm flex items-center gap-2 transition ${
                 compFilter.length > 0 || urgentOnly
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                  ? 'bg-white text-gray-900 font-bold ring-1 ring-gray-200'
+                  : 'bg-white text-gray-700 font-medium hover:bg-gray-50'
               }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

@@ -359,10 +359,10 @@ export default function CreatorPayoutsPage() {
             <button
               key={tb.key}
               onClick={() => setTab(tb.key)}
-              className={`pb-3 -mb-px text-sm font-medium border-b-2 transition ${
+              className={`pb-3 -mb-px text-sm border-b-2 transition ${
                 tab === tb.key
-                  ? 'border-primary-600 text-primary-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-gray-900 text-gray-900 font-bold'
+                  : 'border-transparent text-gray-500 font-medium hover:text-gray-700'
               }`}
             >
               {tb.label}

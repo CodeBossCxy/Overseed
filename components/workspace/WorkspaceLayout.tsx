@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import type { MouseEvent } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { useViewMode } from '@/lib/hooks/useViewMode'
@@ -53,12 +54,14 @@ export default function WorkspaceLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const { data: session } = useSession()
   const { locale, setLocale, t } = useLanguage()
   const { switchView, isSwitching } = useViewMode()
   const w = t.workspace
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
   const [unread, setUnread] = useState(0)
 
   const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
@@ -108,8 +111,7 @@ export default function WorkspaceLayout({
 
   const profileHref = role === 'creator' ? '/dashboard/influencer/profile' : '/dashboard/brand/profile'
   const roleLabel = role === 'creator' ? w.creator : w.brand
-  const resourcesLabel = role === 'creator' ? w.creatorResources : w.brandResources
-  const logo = role === 'creator' ? '/pink_overseed.png' : '/blue_overseed.png'
+  const isNavigating = !!pendingHref && pendingHref !== pathname
 
   const isActive = (item: NavItem) => {
     if (item.exact) return pathname === item.href
@@ -118,6 +120,41 @@ export default function WorkspaceLayout({
     const longest = matches.sort((a, b) => b.href.length - a.href.length)[0]
     return longest?.href === item.href
   }
+
+  const prefetchRoute = useCallback((href: string) => {
+    router.prefetch(href)
+  }, [router])
+
+  const handleSidebarNavigate = useCallback((
+    href: string,
+    event?: MouseEvent<HTMLAnchorElement>
+  ) => {
+    if (event && (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )) {
+      return
+    }
+
+    setMobileOpen(false)
+    setAccountOpen(false)
+    prefetchRoute(href)
+    if (href !== pathname) setPendingHref(href)
+  }, [pathname, prefetchRoute])
+
+  useEffect(() => {
+    setPendingHref(null)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!pendingHref) return
+    const timeout = window.setTimeout(() => setPendingHref(null), 12000)
+    return () => window.clearTimeout(timeout)
+  }, [pendingHref])
 
   const userName = session?.user?.name || roleLabel
   const initials = userName
@@ -130,29 +167,37 @@ export default function WorkspaceLayout({
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <Link href="/" className="flex items-center px-4 pt-2 pb-4">
+      <Link href="/" className="flex w-full items-center justify-center gap-2.5 px-4 pt-9 pb-12">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logo} alt="Overseed" className="h-20 -my-4 w-auto object-contain" />
+        <img src="/home/landing-logo-overseed.png" alt="Overseed" className="h-14 w-auto object-contain overseed-logo-ink" />
       </Link>
 
       {/* Nav */}
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const active = isActive(item)
+          const pending = pendingHref === item.href && pendingHref !== pathname
+          const highlighted = active || pending
           return (
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition ${
-                active
-                  ? 'bg-white text-primary-700 shadow-sm'
-                  : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
+              prefetch
+              onClick={(event) => handleSidebarNavigate(item.href, event)}
+              onMouseEnter={() => prefetchRoute(item.href)}
+              onFocus={() => prefetchRoute(item.href)}
+              aria-current={active ? 'page' : undefined}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition ${
+                highlighted
+                  ? 'selected-option-glass text-gray-900 font-bold'
+                  : 'text-gray-600 font-medium hover:bg-white/60 hover:text-gray-900'
               }`}
             >
               <NavIcon d={item.icon} />
               <span className="truncate flex-1">{item.label}</span>
-              {item.href === '/dashboard/messages' && unread > 0 && (
+              {pending ? (
+                <span className="h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 border-gray-300 border-t-gray-900 animate-spin" />
+              ) : item.href === '/dashboard/messages' && unread > 0 && (
                 <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                   {unread > 9 ? '9+' : unread}
                 </span>
@@ -161,27 +206,6 @@ export default function WorkspaceLayout({
           )
         })}
       </nav>
-
-      {/* Resources */}
-      <div className="px-3 pt-3 mt-2 border-t border-white/60">
-        <p className="px-4 text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">
-          {resourcesLabel}
-        </p>
-        {[
-          { href: '/faq', label: w.resourceFaq },
-          { href: '/guidelines', label: w.resourceGuidelines },
-          { href: '/contact', label: w.resourceContact },
-        ].map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={() => setMobileOpen(false)}
-            className="block px-4 py-1.5 rounded-lg text-[13px] text-gray-500 hover:text-gray-900 hover:bg-white/60 transition"
-          >
-            {item.label}
-          </Link>
-        ))}
-      </div>
 
       {/* Account chip: avatar · name · role, with an upward menu */}
       <div className="relative m-3">
@@ -204,6 +228,13 @@ export default function WorkspaceLayout({
             >
               {role === 'creator' ? t.nav.switchToBrand : t.nav.switchToCreator}
             </button>
+            <Link
+              href="/contact"
+              onClick={() => setAccountOpen(false)}
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              {t.nav.helpAndSupport}
+            </Link>
             <div className="my-1 border-t border-gray-100" />
             <button
               onClick={() => signOut({ callbackUrl: '/' })}
@@ -215,7 +246,7 @@ export default function WorkspaceLayout({
         )}
         <button
           onClick={() => setAccountOpen((o) => !o)}
-          className="w-full flex items-center gap-3 rounded-2xl bg-white/80 px-3 py-2.5 shadow-sm hover:bg-white transition text-left"
+          className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 transition text-left hover:bg-white/20"
         >
           <span className="w-9 h-9 rounded-full bg-white border border-gray-200 text-gray-800 flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0">
             {session?.user?.image ? (
@@ -266,7 +297,14 @@ export default function WorkspaceLayout({
         )}
 
         {/* Content */}
-        <div className="flex-1 min-w-0 flex flex-col">
+        <div className="relative flex-1 min-w-0 flex flex-col">
+          <div
+            className={`pointer-events-none absolute left-4 right-4 top-0 z-30 h-0.5 overflow-hidden rounded-full bg-white/40 transition-opacity duration-150 sm:left-8 sm:right-8 ${
+              isNavigating ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            <span className="workspace-route-progress block h-full w-1/3 rounded-full bg-gray-900/70" />
+          </div>
           {/* Top bar */}
           <div className="flex items-center justify-between gap-3 px-4 sm:px-8 pt-5">
             <button
@@ -314,7 +352,14 @@ export default function WorkspaceLayout({
             </div>
           </div>
 
-          <main className="flex-1 px-4 sm:px-8 pb-10">{children}</main>
+          <main
+            className={`flex-1 px-4 sm:px-8 pb-10 transition-opacity duration-150 ${
+              isNavigating ? 'opacity-80' : 'opacity-100'
+            }`}
+            aria-busy={isNavigating}
+          >
+            {children}
+          </main>
         </div>
       </div>
 

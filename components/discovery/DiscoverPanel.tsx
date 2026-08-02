@@ -402,12 +402,12 @@ export default function DiscoverPanel() {
                   onClick={() => togglePlatform(p)}
                   disabled={platformDisabled(p)}
                   title={platformDisabled(p) ? 'Coming soon for this data source' : undefined}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                  className={`px-3 py-1.5 rounded-full text-sm transition ${
                     platformDisabled(p)
                       ? 'bg-gray-100 text-gray-400 opacity-60 cursor-not-allowed'
                       : platforms.includes(p)
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
+                        : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
                   }`}
                 >
                   {PLATFORM_LABELS[p]}

@@ -45,7 +45,7 @@ export default function FAQPage() {
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: 'var(--font-noto-sans-sc), system-ui, sans-serif', fontWeight: 900 }}>
+            <h1 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: 'var(--font-manrope), var(--font-noto-sans-sc), system-ui, sans-serif', fontWeight: 900 }}>
               {t.faq.title}
             </h1>
             <p className="text-lg text-white/70 max-w-2xl mx-auto">

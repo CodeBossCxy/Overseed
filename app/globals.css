@@ -4,7 +4,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #2d314e;
 
   /* ── Neutral scale (Tailwind gray) ── */
   --gray-50:  #f9fafb;
@@ -63,6 +63,7 @@
   /* ── Chat/social brand anchors ── */
   --wechat-green: #07C160;
   --verified-blue: #3b82f6;
+  --logo-ink-filter: brightness(0) saturate(100%) invert(19%) sepia(14%) saturate(1251%) hue-rotate(195deg) brightness(92%) contrast(91%);
 
   /* ── Primary aliases — default to Creator pink ── */
   --primary-50:  var(--creator-50);
@@ -250,7 +251,7 @@ html:not([data-theme='global'])[data-color-theme] body {
   background: var(--user-theme-gradient) fixed;
 }
 html:not([data-theme='global'])[data-color-theme] .bg-white:not([data-solid]):not([data-solid] *) {
-  background-color: rgba(255, 255, 255, 0.55);
+  background-color: rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
@@ -259,26 +260,63 @@ html:not([data-theme='global'])[data-color-theme] .bg-white\/85:not([data-solid]
 html:not([data-theme='global'])[data-color-theme] .bg-white\/80:not([data-solid] *),
 html:not([data-theme='global'])[data-color-theme] .bg-white\/75:not([data-solid] *),
 html:not([data-theme='global'])[data-color-theme] .bg-white\/70:not([data-solid] *),
-html:not([data-theme='global'])[data-color-theme] .bg-white\/60:not([data-solid] *) {
-  background-color: rgba(255, 255, 255, 0.5);
+html:not([data-theme='global'])[data-color-theme] .bg-white\/60:not([data-solid] *),
+html:not([data-theme='global'])[data-color-theme] .bg-white\/55:not([data-solid] *) {
+  background-color: rgba(255, 255, 255, 0.24);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
 html:not([data-theme='global'])[data-color-theme] .bg-gray-50:not([data-solid] *),
 html:not([data-theme='global'])[data-color-theme] .bg-gray-50\/50:not([data-solid] *),
 html:not([data-theme='global'])[data-color-theme] .bg-gray-50\/40:not([data-solid] *) {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.16);
 }
 html:not([data-theme='global'])[data-color-theme] .bg-gray-100:not([data-solid] *) {
-  background-color: rgba(255, 255, 255, 0.42);
+  background-color: rgba(255, 255, 255, 0.22);
 }
 html:not([data-theme='global'])[data-color-theme] .shadow-md,
 html:not([data-theme='global'])[data-color-theme] .shadow-sm,
 html:not([data-theme='global'])[data-color-theme] .shadow-lg {
-  box-shadow: 0 8px 24px rgba(96, 68, 44, 0.1), 0 1px 2px rgba(96, 68, 44, 0.06);
+  box-shadow: 0 8px 24px rgba(96, 68, 44, 0.06), 0 1px 2px rgba(96, 68, 44, 0.03);
 }
-html:not([data-theme='global'])[data-color-theme] .border-gray-100 { border-color: rgba(255, 255, 255, 0.55); }
-html:not([data-theme='global'])[data-color-theme] .border-gray-200 { border-color: rgba(255, 255, 255, 0.65); }
+html:not([data-theme='global'])[data-color-theme] .border-gray-100 { border-color: rgba(255, 255, 255, 0.32); }
+html:not([data-theme='global'])[data-color-theme] .border-gray-200 { border-color: rgba(255, 255, 255, 0.38); }
+
+/* Liquid-glass panels should reveal more of the workspace gradient while
+   preserving readable controls inside the glass. */
+html:not([data-theme='global']) .bg-white\/90.backdrop-blur:not([data-solid]):not([data-solid] *),
+html:not([data-theme='global']) .bg-white\/85.backdrop-blur:not([data-solid]):not([data-solid] *),
+html:not([data-theme='global']) .bg-white\/80.backdrop-blur:not([data-solid]):not([data-solid] *),
+html:not([data-theme='global']) .bg-white\/75.backdrop-blur:not([data-solid]):not([data-solid] *),
+html:not([data-theme='global']) .bg-white\/70.backdrop-blur:not([data-solid]):not([data-solid] *),
+html:not([data-theme='global']) .bg-white\/60.backdrop-blur:not([data-solid]):not([data-solid] *),
+html:not([data-theme='global']) .bg-white\/55.backdrop-blur:not([data-solid]):not([data-solid] *) {
+  background-color: rgba(255, 255, 255, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.76),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 0 22px rgba(255, 255, 255, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 0 28px rgba(255, 255, 255, 0.42),
+    0 14px 34px rgba(96, 68, 44, 0.06);
+}
+html:not([data-theme='global']) .bg-white.backdrop-blur:not([data-solid]):not([data-solid] *) {
+  background-color: rgba(255, 255, 255, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.76),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 0 22px rgba(255, 255, 255, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 0 28px rgba(255, 255, 255, 0.42),
+    0 14px 34px rgba(96, 68, 44, 0.06);
+}
+html:not([data-theme='global']) .backdrop-blur.hover\:bg-white:hover:not([data-solid]):not([data-solid] *) {
+  background-color: rgba(255, 255, 255, 0.34);
+}
+html:not([data-theme='global']) .border-white\/70.backdrop-blur:not([data-solid]):not([data-solid] *),
+html:not([data-theme='global']) .border-white\/60.backdrop-blur:not([data-solid]):not([data-solid] *) {
+  border-color: rgba(255, 255, 255, 0.34);
+}
 
 /* Workspace shell background: the chosen theme's gradient everywhere, with
    the default soft blue when no theme is selected. Fixed attachment so the
@@ -296,7 +334,175 @@ html:not([data-theme='global'])[data-color-theme] .border-gray-200 { border-colo
 body {
   color: var(--foreground);
   background: var(--background);
+  font-family: var(--font-manrope), var(--font-noto-sans-sc), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-weight: 900;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+:root {
+  --primary-button-gradient:
+    linear-gradient(92deg, #6474ff 0%, #7d63f7 54%, #9757ee 100%);
+  --primary-button-gradient-hover:
+    linear-gradient(92deg, #5c6dff 0%, #755bf6 52%, #8c4ee9 100%);
+  --primary-button-shadow:
+    0 10px 22px rgba(114, 97, 246, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+:is(a, button)[class*="text-white"]:is(
+  [class*="bg-primary-600"],
+  [class*="bg-blue-600"],
+  [class*="bg-indigo-600"],
+  [class*="bg-purple-600"],
+  [class*="from-primary-600"],
+  [class*="from-pink-500"],
+  [class*="from-amber-500"]
+) {
+  color: #ffffff !important;
+  background: var(--primary-button-gradient) !important;
+  border-color: transparent !important;
+  border-radius: 999px !important;
+  box-shadow: var(--primary-button-shadow) !important;
+  font-weight: 800;
+}
+
+:is(a, button)[class*="text-white"]:is(
+  [class*="bg-primary-600"],
+  [class*="bg-blue-600"],
+  [class*="bg-indigo-600"],
+  [class*="bg-purple-600"],
+  [class*="from-primary-600"],
+  [class*="from-pink-500"],
+  [class*="from-amber-500"]
+):hover:not(:disabled) {
+  background: var(--primary-button-gradient-hover) !important;
+  box-shadow:
+    0 12px 26px rgba(114, 97, 246, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
+  transform: translateY(-1px);
+}
+
+:is(a, button)[class*="text-white"]:is(
+  [class*="bg-primary-600"],
+  [class*="bg-blue-600"],
+  [class*="bg-indigo-600"],
+  [class*="bg-purple-600"],
+  [class*="from-primary-600"],
+  [class*="from-pink-500"],
+  [class*="from-amber-500"]
+):active:not(:disabled) {
+  transform: translateY(0);
+}
+
+:is(a, button)[class*="text-white"]:is(
+  [class*="bg-primary-600"],
+  [class*="bg-blue-600"],
+  [class*="bg-indigo-600"],
+  [class*="bg-purple-600"],
+  [class*="from-primary-600"],
+  [class*="from-pink-500"],
+  [class*="from-amber-500"]
+):disabled,
+:is(a, button)[class*="text-white"][aria-disabled="true"]:is(
+  [class*="bg-primary-600"],
+  [class*="bg-blue-600"],
+  [class*="bg-indigo-600"],
+  [class*="bg-purple-600"],
+  [class*="from-primary-600"],
+  [class*="from-pink-500"],
+  [class*="from-amber-500"]
+) {
+  transform: none;
+  box-shadow: none !important;
+}
+
+.overseed-logo-ink {
+  filter: var(--logo-ink-filter);
+}
+
+.selected-option-glass,
+.bg-white.text-gray-900.font-bold,
+.bg-white\/70.text-gray-900.font-bold,
+.border-gray-900.bg-white.text-gray-900.font-bold,
+.border-gray-900.bg-white\/70 {
+  color: var(--foreground);
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(110deg, rgba(255, 255, 255, 0.92) 0%, rgba(234, 242, 255, 0.7) 22%, rgba(255, 244, 252, 0.62) 40%, rgba(229, 255, 250, 0.48) 55%, rgba(235, 244, 255, 0.68) 74%, rgba(255, 255, 255, 0.9) 100%),
+    radial-gradient(110% 120% at 7% 0%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.5) 32%, rgba(255, 255, 255, 0) 68%),
+    radial-gradient(86% 90% at 88% 100%, rgba(190, 211, 255, 0.46) 0%, rgba(244, 233, 255, 0.24) 42%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58) 0%, rgba(229, 236, 255, 0.34) 56%, rgba(255, 255, 255, 0.52) 100%) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.94),
+    inset 0 -1px 0 rgba(170, 193, 243, 0.22),
+    inset 1px 0 1px rgba(255, 255, 255, 0.58),
+    inset -1px 0 1px rgba(202, 218, 255, 0.26),
+    0 0 0 1px rgba(255, 255, 255, 0.62),
+    0 0 22px rgba(204, 221, 255, 0.26),
+    8px 8px 22px rgba(45, 49, 78, 0.08),
+    -7px -7px 18px rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
+}
+
+.selected-option-glass > svg,
+.bg-white.text-gray-900.font-bold > svg,
+.bg-white\/70.text-gray-900.font-bold > svg,
+.border-gray-900.bg-white.text-gray-900.font-bold > svg {
+  color: rgba(255, 255, 255, 0.96);
+  filter: drop-shadow(0 1px 2px rgba(45, 49, 78, 0.34));
+}
+
+@keyframes workspace-route-progress {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(360%); }
+}
+
+.workspace-route-progress {
+  animation: workspace-route-progress 1s ease-in-out infinite;
+}
+
+:is(
+  .text-black,
+  .text-gray-400,
+  .text-gray-500,
+  .text-gray-600,
+  .text-gray-700,
+  .text-gray-800,
+  .text-gray-900,
+  .text-slate-400,
+  .text-slate-500,
+  .text-slate-600,
+  .text-slate-700,
+  .text-slate-800,
+  .text-slate-900,
+  .text-zinc-400,
+  .text-zinc-500,
+  .text-zinc-600,
+  .text-zinc-700,
+  .text-zinc-800,
+  .text-zinc-900,
+  .text-neutral-400,
+  .text-neutral-500,
+  .text-neutral-600,
+  .text-neutral-700,
+  .text-neutral-800,
+  .text-neutral-900,
+  .text-stone-400,
+  .text-stone-500,
+  .text-stone-600,
+  .text-stone-700,
+  .text-stone-800,
+  .text-stone-900
+) {
+  color: var(--foreground);
 }
 
 @layer utilities {

@@ -258,10 +258,10 @@ export default function SocialAccountForm({
               setActiveTab(tab.key)
               setError(null)
             }}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+            className={`px-4 py-2 rounded-full text-sm transition ${
               activeTab === tab.key
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
+                : 'bg-gray-100 text-gray-600 font-medium hover:bg-gray-200'
             }`}
           >
             {tab.label}

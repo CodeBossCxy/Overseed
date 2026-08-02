@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next'
 import { DM_Serif_Display, Manrope, Noto_Sans_SC } from 'next/font/google'
-import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
 import { getServerSession } from 'next-auth'

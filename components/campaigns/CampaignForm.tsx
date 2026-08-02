@@ -312,7 +312,7 @@ export default function CampaignForm({
               onClick={() => handleCategoryToggle(cat.id)}
               className={`px-3 py-1.5 rounded-full text-sm transition ${
                 formData.categoryIds.includes(cat.id)
-                  ? 'bg-primary-600 text-white'
+                  ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -589,7 +589,7 @@ export default function CampaignForm({
               onClick={() => handlePlatformToggle(plat.id)}
               className={`px-4 py-2 rounded-md text-sm transition ${
                 formData.platformIds.includes(plat.id)
-                  ? 'bg-primary-600 text-white'
+                  ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -728,7 +728,7 @@ export default function CampaignForm({
                 onClick={() => setStep(s)}
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition ${
                   step === s
-                    ? 'bg-primary-600 text-white'
+                    ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-300'
                     : step > s
                       ? 'bg-green-500 text-white'
                       : 'bg-gray-200 text-gray-600'
