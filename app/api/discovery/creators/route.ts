@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { KOL_API_URL, sanitizeResults } from '@/lib/discovery'
+import { KOL_API_URL, safeLocalCreatorDiscovery, sanitizeResults } from '@/lib/discovery'
 
 // GET /api/discovery/creators
 // Brand-only proxy to the KOL service's creator database browse endpoint.
@@ -31,28 +31,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   }
 
-  const target = new URL('/creators', KOL_API_URL)
   const incoming = req.nextUrl.searchParams
-  for (const key of FORWARDED_PARAMS) {
-    const value = incoming.get(key)
-    if (value) target.searchParams.set(key, value)
-  }
 
   try {
+    const target = new URL('/creators', KOL_API_URL)
+    for (const key of FORWARDED_PARAMS) {
+      const value = incoming.get(key)
+      if (value) target.searchParams.set(key, value)
+    }
     const res = await fetch(target, {
       cache: 'no-store',
       signal: AbortSignal.timeout(30000),
     })
     const data = await res.json().catch(() => null)
-    if (!res.ok) {
-      const detail = typeof data?.detail === 'string' ? data.detail : 'Creator browse failed'
-      return NextResponse.json({ message: detail }, { status: res.status })
-    }
+    if (!res.ok) return NextResponse.json(await safeLocalCreatorDiscovery(incoming))
     return NextResponse.json(sanitizeResults(data))
   } catch {
-    return NextResponse.json(
-      { message: 'Discovery service unavailable' },
-      { status: 503 }
-    )
+    return NextResponse.json(await safeLocalCreatorDiscovery(incoming))
   }
 }

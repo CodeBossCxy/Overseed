@@ -86,7 +86,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     if (country) qs.set('country', country.toUpperCase())
     if (minFollowers) qs.set('min_followers', minFollowers)
     try {
-      const endpoint = search.trim() ? (source === 'club' ? 'club-search' : 'search') : 'creators'
+      const endpoint = source === 'club' ? 'club-search' : (search.trim() ? 'search' : 'creators')
       const res = await fetch(`/api/discovery/${endpoint}?${qs}`)
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Creator discovery is temporarily unavailable.')

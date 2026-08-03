@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { clubConfigured, clubSearch, type ClubPlatform } from '@/lib/influencers-club'
+import { safeLocalCreatorDiscovery } from '@/lib/discovery'
 
 // TEMP: GET /api/discovery/club-search — influencers.club-backed creator
 // search, brand-only like /api/discovery/search. The API key never leaves
@@ -26,10 +27,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!clubConfigured()) {
-    return NextResponse.json(
-      { message: 'Influencers Club API not configured' },
-      { status: 503 }
-    )
+    return NextResponse.json(await safeLocalCreatorDiscovery(req.nextUrl.searchParams, true))
   }
 
   const params = req.nextUrl.searchParams
@@ -58,9 +56,7 @@ export async function GET(req: NextRequest) {
     })
     return NextResponse.json(result)
   } catch (err: any) {
-    return NextResponse.json(
-      { message: err?.message || 'Influencers Club search failed' },
-      { status: 502 }
-    )
+    console.warn('Influencers Club search unavailable; using Overseed creator index:', err?.message)
+    return NextResponse.json(await safeLocalCreatorDiscovery(params, true))
   }
 }

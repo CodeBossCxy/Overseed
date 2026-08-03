@@ -163,7 +163,7 @@ export default async function BrowsePage({
 
   return (
     <Shell>
-      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
+      <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
         <BrowseTitle recommended={canSave} />
 
         <BrowseCampaignList

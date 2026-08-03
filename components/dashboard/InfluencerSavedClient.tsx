@@ -92,7 +92,7 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
     )
 
   return (
-    <div className="max-w-6xl mx-auto workspace-page-tight">
+    <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">{s.title}</h1>
