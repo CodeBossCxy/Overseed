@@ -49,7 +49,7 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-4xl mx-auto pt-6 pb-8">
+      <div className="max-w-4xl mx-auto workspace-page-tight pb-8">
         <EditCampaignHeading />
 
         {/* Overseed review requested changes: In Review → Draft + note */}

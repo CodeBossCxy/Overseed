@@ -25,15 +25,25 @@ export default function CampaignDiscoverPage() {
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-6xl mx-auto pt-6 pb-8">
-        <div className="mb-8">
-          <Link href="/dashboard/brand/campaigns" className="text-primary-600 hover:underline text-sm mb-2 inline-block">
-            {t.brand.applications.backToCampaigns}
-          </Link>
+      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
+        <div className="mb-6">
+          <p className="text-sm text-gray-500 mb-1">
+            <Link href="/dashboard/brand/campaigns" className="hover:text-primary-700">
+              {t.brand.applications.breadcrumbPipeline}
+            </Link>
+            {campaign && (
+              <>
+                <span className="mx-2">›</span>
+                <Link href={`/dashboard/brand/campaigns/${campaignId}`} className="hover:text-primary-700">{campaign.title}</Link>
+                <span className="mx-2">›</span>
+                <span className="font-semibold text-gray-700">{d.tabFind}</span>
+              </>
+            )}
+          </p>
           <h1 className="text-3xl font-bold">{d.title}</h1>
           {campaign && (
             <p className="text-gray-600 mt-1">
-              {t.brand.applications.forCampaign} {campaign.title}
+              {d.tabFindDesc}
             </p>
           )}
         </div>

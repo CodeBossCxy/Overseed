@@ -123,7 +123,7 @@ export default function InfluencerDashboardClient({
   ]
 
   return (
-    <div className="max-w-7xl mx-auto pt-6 pb-8">
+    <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 flex-wrap">
@@ -144,7 +144,7 @@ export default function InfluencerDashboardClient({
 
       {/* Onboarding banner — hides once all 4 steps are done */}
       {!setupDone && (
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 mb-6 flex flex-col lg:flex-row lg:items-center gap-8">
+        <div className="workspace-glass-card rounded-3xl p-6 mb-6 flex flex-col lg:flex-row lg:items-center gap-8">
           <div className="lg:w-64 flex-shrink-0">
             <h2 className="text-lg font-bold text-gray-900">{d.setupTitle}</h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -194,7 +194,7 @@ export default function InfluencerDashboardClient({
           <Link
             key={card.label}
             href={card.href}
-            className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-5 flex gap-4 hover:bg-white transition"
+            className="workspace-glass-card rounded-2xl p-5 flex gap-4 hover:bg-white/45 transition"
           >
             <div className="w-12 h-12 rounded-2xl bg-gray-50 shadow-sm flex items-center justify-center flex-shrink-0 text-gray-500">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
@@ -216,7 +216,7 @@ export default function InfluencerDashboardClient({
       {/* Bottom row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recommended campaigns */}
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+        <div className="workspace-glass-card rounded-3xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-gray-900">{d.recommended}</h3>
             <Link href="/browse" className="text-xs font-medium text-gray-500 hover:text-primary-700 transition">
@@ -274,7 +274,7 @@ export default function InfluencerDashboardClient({
         </div>
 
         {/* Recent messages */}
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+        <div className="workspace-glass-card rounded-3xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-gray-900">{d.recentMessages}</h3>
             <Link href="/dashboard/messages" className="text-xs font-medium text-gray-500 hover:text-primary-700 transition">
@@ -310,7 +310,7 @@ export default function InfluencerDashboardClient({
         </div>
 
         {/* This week */}
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 flex flex-col">
+        <div className="workspace-glass-card rounded-3xl p-6 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-gray-900">{d.thisWeek}</h3>
             <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">

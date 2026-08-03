@@ -79,25 +79,38 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
     return { caption: null, extra: days >= 0 ? `${days} ${c.daysLeft}` : '' }
   }
 
+  const statusCaption = (cp: Campaign) => {
+    if (cp.status === 'ACTIVE' && cp.publishedAt) {
+      return `${c.liveSince} ${formatDate(cp.publishedAt, locale)}`
+    }
+    if (cp.status === 'COMPLETED') {
+      return `${c.closedOn} ${formatDate(cp.updatedAt, locale)}`
+    }
+    if (cp.status === 'CANCELLED') {
+      return `${c.cancelledOn} ${formatDate(cp.updatedAt, locale)}`
+    }
+    return null
+  }
+
+  const statusDotClass = (status: string) =>
+    status === 'ACTIVE' ? 'bg-emerald-400'
+      : status === 'COMPLETED' ? 'bg-blue-500'
+        : status === 'CANCELLED' ? 'bg-red-500'
+          : 'bg-gray-300'
+
   return (
-    <div className="max-w-6xl mx-auto pt-6 pb-8">
+    <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+      <div className="mb-7">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{c.title}</h1>
           <p className="text-gray-500 mt-1">{c.subtitle}</p>
         </div>
-        <Link
-          href="/dashboard/brand/campaigns/new"
-          className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-medium shadow-sm hover:bg-primary-700 transition"
-        >
-          {c.createCampaign}
-        </Link>
       </div>
 
-      {/* Toolbar */}
-      <div className="mb-6 bg-white/70 backdrop-blur rounded-2xl shadow-sm px-5 py-3 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[220px]">
+      {/* Filters */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="relative w-full sm:w-[320px]">
           <svg className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -106,54 +119,69 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(1) }}
             placeholder={c.searchPlaceholder}
-            className="w-full pl-10 pr-4 py-2 bg-white rounded-full text-sm border border-transparent focus:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-100"
+            className="h-11 w-full pl-10 pr-4 workspace-glass-control text-sm focus:outline-none"
           />
         </div>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex flex-wrap items-center gap-3">
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-            className="px-3 py-2 bg-white rounded-full text-sm font-medium text-gray-700 shadow-sm border-0 focus:outline-none focus:ring-2 focus:ring-primary-100"
+            className="h-11 min-w-[180px] px-5 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none"
           >
             <option value="">{c.allStatuses}</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>{statusLabel(s)}</option>
             ))}
           </select>
+          <button
+            type="button"
+            className="h-11 w-11 inline-flex items-center justify-center workspace-glass-control text-gray-600 transition hover:text-gray-900"
+            aria-label="Filter"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h18l-7 8v5l-4 2v-7L3 5z" />
+            </svg>
+          </button>
           <select
             value={sort}
             onChange={(e) => { setSort(e.target.value as any); setPage(1) }}
-            className="px-3 py-2 bg-white rounded-full text-sm font-medium text-gray-700 shadow-sm border-0 focus:outline-none focus:ring-2 focus:ring-primary-100"
+            className="h-11 min-w-[230px] px-5 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none"
           >
-            <option value="deadline">{c.sortDeadlineSoonest}</option>
-            <option value="newest">{c.sortNewest}</option>
+            <option value="deadline">{locale === 'zh' ? '排序：' : 'Sort by: '}{c.sortDeadlineSoonest}</option>
+            <option value="newest">{locale === 'zh' ? '排序：' : 'Sort by: '}{c.sortNewest}</option>
           </select>
         </div>
       </div>
 
       {/* Campaign cards */}
       {campaigns.length === 0 ? (
-        <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-12 text-center">
+        <div className="workspace-glass-card rounded-2xl p-12 text-center">
           <p className="text-gray-500 text-lg mb-4">{c.noCampaigns}</p>
           <p className="text-gray-400 mb-6">{c.noCampaignsDesc}</p>
           <Link
             href="/dashboard/brand/campaigns/new"
-            className="inline-block px-6 py-3 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 transition"
+            className="inline-block px-6 py-3 bg-primary-600 text-white rounded-full font-semibold hover:bg-primary-700 transition"
           >
             {c.createFirst}
           </Link>
         </div>
       ) : paged.length === 0 ? (
-        <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-10 text-center text-gray-500">{c.noMatches}</div>
+        <div className="workspace-glass-card rounded-2xl p-10 text-center text-gray-500">{c.noMatches}</div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {paged.map((cp) => {
             const dl = deadlineInfo(cp)
+            const caption = statusCaption(cp)
             return (
-              <div key={cp.id} className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-5">
+              <Link
+                key={cp.id}
+                href={`/dashboard/brand/campaigns/${cp.id}`}
+                aria-label={`${c.manageCampaign}: ${cp.title}`}
+                className="group workspace-glass-card workspace-glass-option rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8 min-h-[108px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+              >
                 {/* Thumb + title */}
-                <div className="flex items-center gap-4 flex-1 min-w-0 lg:max-w-md">
-                  <div className="w-24 h-20 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                <div className="flex items-center gap-5 flex-1 min-w-0 lg:max-w-[440px]">
+                  <div className="w-28 h-20 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
                     {cp.images?.[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={cp.images[0]} alt="" className="w-full h-full object-cover" />
@@ -164,9 +192,9 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
                     )}
                   </div>
                   <div className="min-w-0">
-                    <Link href={`/dashboard/brand/campaigns/${cp.id}`} className="text-lg font-bold text-gray-900 hover:text-primary-700 transition block truncate">
+                    <span className="text-base font-semibold text-gray-900 group-hover:text-primary-700 transition block truncate">
                       {cp.title}
-                    </Link>
+                    </span>
                     <p className="text-xs text-gray-500 truncate">
                       {[
                         cp.categories?.[0] ? t.categoryNames[cp.categories[0].category?.name] || cp.categories[0].category?.name : null,
@@ -174,42 +202,42 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
                       ].filter(Boolean).join(' · ')}
                     </p>
                     {cp.description && (
-                      <p className="text-sm text-gray-500 mt-1 line-clamp-2">{cp.description}</p>
+                      <p className="text-xs text-gray-500 mt-1.5 leading-relaxed line-clamp-2 max-w-[300px]">{cp.description}</p>
                     )}
                   </div>
                 </div>
 
                 {/* Status */}
-                <div className="lg:w-32 flex-shrink-0">
-                  <p className="text-xs text-gray-400 mb-1.5">{t.brand.campaigns.thStatus}</p>
+                <div className="lg:w-36 flex-shrink-0">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">{t.brand.campaigns.thStatus}</p>
                   <StatusBadge machine="campaign" status={cp.status} size="sm" />
-                  {cp.status === 'ACTIVE' && cp.publishedAt && (
-                    <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      {c.liveSince} {formatDate(cp.publishedAt, locale)}
+                  {caption && (
+                    <p className="text-[11px] text-gray-500 mt-2 flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusDotClass(cp.status)}`} />
+                      {caption}
                     </p>
                   )}
                 </div>
 
                 {/* Applications */}
-                <div className="lg:w-32 flex-shrink-0">
-                  <p className="text-xs text-gray-400 mb-1">{t.brand.campaigns.thApplications}</p>
-                  <p className="text-2xl font-bold text-gray-900 tabular-nums leading-none">{cp._count.applications}</p>
-                  <p className="text-[11px] text-gray-400 mt-1">{c.creatorsApplied}</p>
+                <div className="lg:w-36 flex-shrink-0">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">{t.brand.campaigns.thApplications}</p>
+                  <p className="text-2xl font-semibold text-gray-900 tabular-nums leading-none">{cp._count.applications}</p>
+                  <p className="text-[11px] text-gray-500 mt-2">{c.creatorsApplied}</p>
                 </div>
 
                 {/* Deadline */}
-                <div className="lg:w-36 flex-shrink-0">
-                  <p className="text-xs text-gray-400 mb-1">{c.ddlLabel}</p>
+                <div className="lg:w-44 flex-shrink-0">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">{c.ddlLabel}</p>
                   {cp.deadline ? (
                     <>
-                      <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                      <p className="text-sm font-normal text-gray-900 flex items-center gap-1.5">
                         <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                         {formatDate(cp.deadline, locale)}
                       </p>
-                      <p className="text-[11px] text-gray-400 mt-1">
+                      <p className="text-[11px] text-gray-500 mt-2">
                         {cp.status === 'COMPLETED'
                           ? statusLabel('COMPLETED')
                           : cp.status === 'CANCELLED'
@@ -223,16 +251,13 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
                 </div>
 
                 {/* Action */}
-                <div className="flex-shrink-0">
-                  <Link
-                    href={`/dashboard/brand/campaigns/${cp.id}`}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-white shadow-sm rounded-xl text-sm font-semibold text-gray-800 hover:text-primary-700 hover:shadow transition"
-                  >
+                <div className="flex-shrink-0 lg:ml-auto">
+                  <span className="inline-flex items-center justify-center gap-3 text-sm font-semibold text-gray-700 group-hover:text-primary-700 transition">
                     {c.manageCampaign}
-                    <span aria-hidden>→</span>
-                  </Link>
+                    <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
+                  </span>
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>

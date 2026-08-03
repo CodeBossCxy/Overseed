@@ -16,7 +16,11 @@ const THEME_SWATCHES: Record<ColorTheme, string> = {
     'radial-gradient(55% 38% at 45% 0%, #ebded9 0%, rgba(235, 222, 217, 0) 62%)',
     'linear-gradient(150deg, #f4ecec 0%, #fbf3ee 45%, #ecebf1 100%)',
   ].join(', '),
-  sunset: 'linear-gradient(180deg, #a3cbe9 0%, #d9e2e1 22%, #efe5d3 33%, #f8d1a2 52%, #f5b87f 75%, #f1a76c 100%)',
+  sunset: [
+    'radial-gradient(72% 58% at 86% 12%, rgba(255, 211, 171, 0.92) 0%, rgba(255, 225, 201, 0.55) 38%, rgba(255, 255, 255, 0) 72%)',
+    'radial-gradient(88% 70% at 12% 100%, rgba(174, 199, 244, 0.86) 0%, rgba(202, 217, 248, 0.54) 36%, rgba(255, 255, 255, 0) 68%)',
+    'linear-gradient(145deg, #eef5ff 0%, #f9f1ed 44%, #ffd9ad 72%, #f6a65f 100%)',
+  ].join(', '),
   lilac: 'linear-gradient(160deg, #f7e7ec 0%, #eadef4 30%, #d8d3f3 60%, #c4caf1 100%)',
   breeze: 'linear-gradient(135deg, #a9dbe4 0%, #cfe7e0 25%, #f2ecdc 55%, #f7dcbd 80%, #f8cba6 100%)',
 }
@@ -280,7 +284,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
   const joinDate = formatDate(user.createdAt, locale)
 
   return (
-    <div className="max-w-6xl mx-auto pt-6 pb-8">
+    <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div>
@@ -302,7 +306,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
 
       {/* ── 1 Appearance + Preview ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <section className="lg:col-span-2 bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+        <section className="lg:col-span-2 workspace-glass-card rounded-3xl p-6">
           <SectionHeader
             n={1}
             title={st.sectionAppearance}
@@ -362,12 +366,12 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
         </section>
 
         {/* Preview */}
-        <section className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+        <section className="workspace-glass-card rounded-3xl p-6">
           <h2 className="text-lg font-bold text-gray-900">{st.previewTitle}</h2>
           <p className="text-sm text-gray-500 mb-4">{st.previewRealtime}</p>
 
           <div className="rounded-2xl p-4 space-y-4" style={{ background: THEME_SWATCHES[colorTheme] }}>
-            <div className="bg-white/85 rounded-xl p-3">
+            <div className="bg-white/50 rounded-xl p-3">
               <p className="text-[11px] font-semibold text-gray-500 mb-2">{st.previewSidebar}</p>
               <div className="space-y-1">
                 <div className="px-2 py-1.5 rounded-lg bg-white text-gray-900 text-xs font-bold shadow-sm">{t.workspace.dashboard}</div>
@@ -375,7 +379,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
                 <div className="px-2 py-1.5 rounded-lg text-gray-500 text-xs">{t.workspace.settings}</div>
               </div>
             </div>
-            <div className="bg-white/85 rounded-xl p-3">
+            <div className="bg-white/50 rounded-xl p-3">
               <p className="text-[11px] font-semibold text-gray-500 mb-2">{st.previewButton}</p>
               <div className="space-y-2">
                 <button type="button" className="w-full px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-semibold shadow-sm">
@@ -386,7 +390,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
                 </button>
               </div>
             </div>
-            <div className="bg-white/85 rounded-xl p-3">
+            <div className="bg-white/50 rounded-xl p-3">
               <p className="text-[11px] font-semibold text-gray-500 mb-2">{st.previewCard}</p>
               <p className="text-xs font-bold text-gray-900">{st.previewCardTitle}</p>
               <p className="text-[11px] text-gray-500 mt-1">{st.previewCardBody}</p>
@@ -399,7 +403,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
       </div>
 
       {/* ── 2 Language & Region ── */}
-      <section className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 mb-6">
+      <section className="workspace-glass-card rounded-3xl p-6 mb-6">
         <SectionHeader
           n={2}
           title={st.sectionLanguageRegion}
@@ -519,7 +523,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
       </section>
 
       {/* ── 3 Notifications ── */}
-      <section className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 mb-6">
+      <section className="workspace-glass-card rounded-3xl p-6 mb-6">
         <SectionHeader n={3} title={st.sectionNotifications} />
         <div className="flex flex-col xl:flex-row gap-6 mt-4 ml-0 lg:ml-10">
           <div className="xl:w-56 flex-shrink-0">
@@ -560,7 +564,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
       </section>
 
       {/* ── 4 Account & Privacy ── */}
-      <section className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+      <section className="workspace-glass-card rounded-3xl p-6">
         <SectionHeader n={4} title={st.sectionAccountPrivacy} />
 
         <div className="mt-2 ml-0 lg:ml-10">

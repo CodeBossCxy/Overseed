@@ -5,10 +5,12 @@ import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import RoleShell from '@/components/workspace/RoleShell'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { useViewMode } from '@/lib/hooks/useViewMode'
 
 export default function UpgradePage() {
   const { data: session, update } = useSession()
   const { t, locale } = useLanguage()
+  const { isInfluencer } = useViewMode()
   const searchParams = useSearchParams()
   const cancelled = searchParams.get('cancelled')
   const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
@@ -22,6 +24,57 @@ export default function UpgradePage() {
     { icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z', label: locale === 'zh' ? 'AI 助手无限对话' : 'AI Assistant with full access' },
     { icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z', label: locale === 'zh' ? '安全支付与达人结算' : 'Secure payments & creator payouts' },
   ]
+
+  const creatorFreeFeatures = [
+    locale === 'zh' ? '浏览并收藏品牌活动' : 'Browse and save brand campaigns',
+    locale === 'zh' ? '提交活动申请并管理合作' : 'Apply to campaigns and manage collaborations',
+    locale === 'zh' ? '站内消息与自动翻译' : 'In-app messaging and auto translation',
+    locale === 'zh' ? '达人资料与社交账号认证' : 'Creator profile and social account verification',
+    locale === 'zh' ? '收款与合作进度管理' : 'Payouts and collaboration tracking',
+  ]
+
+  if (isInfluencer) {
+    return (
+      <RoleShell>
+        <div className="max-w-3xl mx-auto px-4 workspace-page-tight pb-10">
+          <div className="workspace-glass-card rounded-3xl overflow-hidden">
+            <div className="px-8 py-8 text-center">
+              <span className="inline-flex px-3 py-1 rounded-full selected-option-glass text-xs font-bold">
+                {locale === 'zh' ? '限时免费' : 'Limited-time free'}
+              </span>
+              <h1 className="mt-5 text-3xl font-bold text-gray-900">
+                {locale === 'zh' ? '达人端目前免费开放' : 'Creator access is free for now'}
+              </h1>
+              <p className="mt-3 text-gray-500">
+                {locale === 'zh'
+                  ? '在早期阶段，达人可以免费使用核心工作区功能。'
+                  : 'During this launch period, creators can use the core workspace features at no cost.'}
+              </p>
+              <div className="mt-6 flex items-baseline justify-center gap-2">
+                <span className="text-5xl font-bold text-gray-900">$0</span>
+                <span className="text-gray-500">{locale === 'zh' ? '/ 月' : '/ mo'}</span>
+              </div>
+            </div>
+
+            <div className="px-8 pb-8">
+              <div className="grid sm:grid-cols-2 gap-3">
+                {creatorFreeFeatures.map((label) => (
+                  <div key={label} className="flex items-center gap-3 rounded-2xl bg-white/55 px-4 py-3">
+                    <span className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </span>
+                    <span className="text-sm font-semibold text-gray-800">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </RoleShell>
+    )
+  }
 
   const handleUpgrade = async () => {
     setIsLoading(true)
@@ -44,7 +97,7 @@ export default function UpgradePage() {
   if (isPro) {
     return (
       <RoleShell>
-        <div className="max-w-lg mx-auto px-4 py-20 text-center">
+      <div className="max-w-lg mx-auto px-4 workspace-page-tight pb-10 text-center">
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
             <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -63,7 +116,7 @@ export default function UpgradePage() {
 
   return (
     <RoleShell>
-      <div className="max-w-lg mx-auto px-4 py-16">
+      <div className="max-w-lg mx-auto px-4 workspace-page-tight pb-10">
         {cancelled && (
           <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
             {locale === 'zh' ? '支付已取消。您可以随时再次升级。' : 'Payment cancelled. You can upgrade anytime.'}

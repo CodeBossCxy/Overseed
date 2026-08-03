@@ -10,7 +10,7 @@ import UGCTranslateToggle from '../UGCTranslateToggle'
 export function BrowseTitle({ recommended = false }: { recommended?: boolean }) {
   const { t } = useLanguage()
   return (
-    <div className="mb-6">
+    <div className="mb-5">
       <h1 className="text-3xl font-bold mb-2 text-gray-900">
         {recommended ? t.browse.recommendedTitle : t.browse.title}
       </h1>
@@ -22,7 +22,7 @@ export function BrowseTitle({ recommended = false }: { recommended?: boolean }) 
 export function BrowseEmpty() {
   const { t } = useLanguage()
   return (
-    <div className="text-center py-12 bg-white/85 backdrop-blur rounded-2xl shadow-sm">
+    <div className="text-center py-12 workspace-glass-card rounded-2xl">
       <p className="text-gray-500 text-lg mb-4">{t.browse.noResults}</p>
       <a href="/browse" className="text-primary-600 hover:underline">
         {t.browse.clearFilters}
@@ -174,7 +174,7 @@ export function BrowseCampaignList({
   return (
     <div>
       {/* Toolbar per mockup: search + inline filters, then count + sort */}
-      <div className="mb-4 bg-white/70 backdrop-blur rounded-2xl shadow-sm px-5 py-3 flex flex-wrap items-center gap-3">
+      <div className="mb-4 workspace-glass-toolbar rounded-2xl px-5 py-3 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <svg className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -184,13 +184,13 @@ export function BrowseCampaignList({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t.browse.searchPlaceholder}
-            className="w-full pl-10 pr-4 py-2 bg-white rounded-full text-sm border border-transparent focus:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-100"
+            className="w-full pl-10 pr-4 py-2 workspace-glass-control text-sm focus:outline-none"
           />
         </div>
         <select
           value={filters.category || ''}
           onChange={(e) => pushWith({ category: e.target.value })}
-          className="px-3 py-2 bg-white rounded-full text-sm font-medium text-gray-700 shadow-sm border-0 focus:outline-none focus:ring-2 focus:ring-primary-100"
+          className="px-3 py-2 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none"
         >
           <option value="">{ft.allCategories}</option>
           {categories.map((cat) => (
@@ -200,7 +200,7 @@ export function BrowseCampaignList({
         <select
           value={filters.platform || ''}
           onChange={(e) => pushWith({ platform: e.target.value })}
-          className="px-3 py-2 bg-white rounded-full text-sm font-medium text-gray-700 shadow-sm border-0 focus:outline-none focus:ring-2 focus:ring-primary-100"
+          className="px-3 py-2 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none"
         >
           <option value="">{ft.allPlatforms}</option>
           {platforms.map((plat) => (
@@ -210,7 +210,7 @@ export function BrowseCampaignList({
         <select
           value={filters.compensation || ''}
           onChange={(e) => pushWith({ compensation: e.target.value })}
-          className="px-3 py-2 bg-white rounded-full text-sm font-medium text-gray-700 shadow-sm border-0 focus:outline-none focus:ring-2 focus:ring-primary-100"
+          className="px-3 py-2 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none"
         >
           <option value="">{ft.compensation}</option>
           <option value="PAID">{ft.paid}</option>
@@ -222,7 +222,7 @@ export function BrowseCampaignList({
         <select
           value={filters.minFollowers || ''}
           onChange={(e) => pushWith({ minFollowers: e.target.value })}
-          className="px-3 py-2 bg-white rounded-full text-sm font-medium text-gray-700 shadow-sm border-0 focus:outline-none focus:ring-2 focus:ring-primary-100"
+          className="px-3 py-2 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none"
         >
           <option value="">{t.browse.minFollowersLabel}</option>
           {FOLLOWER_RANGES.map((v) => (
@@ -232,7 +232,7 @@ export function BrowseCampaignList({
         {activeFilterCount > 0 && (
           <button
             onClick={clearFilters}
-            className="px-3 py-2 rounded-full text-sm font-medium text-primary-600 hover:bg-white transition"
+            className="px-3 py-2 rounded-full text-sm font-semibold text-primary-600 hover:bg-white/55 transition"
           >
             ↺ {ft.clearAll}
           </button>
@@ -250,7 +250,7 @@ export function BrowseCampaignList({
           <select
             value={filters.sort || (recommendedAvailable ? 'recommended' : 'latest')}
             onChange={(e) => pushWith({ sort: e.target.value })}
-            className="px-3 py-2 bg-white rounded-full text-sm font-medium text-gray-700 shadow-sm border-0 focus:outline-none focus:ring-2 focus:ring-primary-100"
+            className="px-3 py-2 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none"
           >
             {recommendedAvailable && <option value="recommended">{t.browse.sortRecommended}</option>}
             <option value="latest">{t.browse.sortLatest}</option>
@@ -284,7 +284,7 @@ export function BrowseProGate({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { t } = useLanguage()
   return (
     <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-      <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-10">
+      <div className="workspace-glass-card rounded-2xl p-10">
         <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />

@@ -70,11 +70,13 @@ export async function GET(
       return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
     }
 
-    // Increment view count
-    await prisma.campaign.update({
-      where: { id: id },
-      data: { viewCount: { increment: 1 } },
-    })
+    // Internal workspace translation fetches should not inflate public views.
+    if (searchParams.get('track') !== '0') {
+      await prisma.campaign.update({
+        where: { id: id },
+        data: { viewCount: { increment: 1 } },
+      })
+    }
 
     // Translate campaign if needed
     const translatedCampaign = await getTranslatedEntity(

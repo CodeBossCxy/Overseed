@@ -120,7 +120,7 @@ export default function CampaignRowCard({
   }
 
   return (
-    <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col md:flex-row gap-5">
+    <div className="workspace-glass-card workspace-glass-option rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row gap-5">
       {/* Thumbnail */}
       <div className="relative w-full md:w-40 h-40 md:h-32 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100">
         {image ? (
@@ -175,7 +175,7 @@ export default function CampaignRowCard({
           )}
         </div>
         <Link href={`/campaign/${c.id}`} className="group inline-flex items-center gap-1.5 max-w-full">
-          <h3 className="text-lg font-bold text-gray-900 group-hover:text-primary-700 transition truncate">
+          <h3 className="text-lg font-extrabold text-gray-900 group-hover:text-primary-700 transition truncate">
             {c.title}
           </h3>
           {c.brand?.isVerified && (
@@ -186,7 +186,7 @@ export default function CampaignRowCard({
         </Link>
         <p className="text-sm font-medium text-gray-600">{c.brand?.companyName || t.campaign.anonymousBrand}</p>
         {c.description && (
-          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{c.description}</p>
+          <p className="text-sm text-gray-500 mt-1.5 leading-relaxed line-clamp-2">{c.description}</p>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-xs text-gray-600">
           <span className="flex items-center gap-1.5">

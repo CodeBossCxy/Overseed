@@ -15,21 +15,22 @@ export default function PipelineTabs({
   const { t } = useLanguage()
   const d = t.brand.discover
   const tabs = [
-    { key: 'pipeline', label: d.tabPipeline, href: `/dashboard/brand/campaigns/${campaignId}/applications` },
-    { key: 'discover', label: d.tabFind, href: `/dashboard/brand/campaigns/${campaignId}/discover` },
+    { key: 'discover', label: d.tabFind, desc: d.tabFindDesc, href: `/dashboard/brand/campaigns/${campaignId}/discover` },
+    { key: 'pipeline', label: d.tabPipeline, desc: d.tabPipelineDesc, href: `/dashboard/brand/campaigns/${campaignId}/applications` },
   ] as const
 
   return (
-    <div className="mb-6 border-b border-gray-200 flex gap-6">
+    <div className="mb-6 inline-flex flex-wrap gap-2 rounded-2xl p-1.5 workspace-glass-toolbar">
       {tabs.map((tab) => (
         <Link
           key={tab.key}
           href={tab.href}
           aria-current={active === tab.key ? 'page' : undefined}
-          className={`pb-3 -mb-px text-sm border-b-2 transition ${
+          title={tab.desc}
+          className={`rounded-xl px-5 py-2.5 text-sm transition ${
             active === tab.key
-              ? 'border-gray-900 text-gray-900 font-bold'
-              : 'border-transparent text-gray-500 font-medium hover:text-gray-700 hover:border-gray-300'
+              ? 'selected-option-glass text-gray-900 font-bold'
+              : 'text-gray-500 font-semibold hover:bg-white/45 hover:text-gray-900'
           }`}
         >
           {tab.label}

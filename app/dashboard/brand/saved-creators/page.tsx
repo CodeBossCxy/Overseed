@@ -18,6 +18,33 @@ const FOLLOWER_BUCKETS = [
   { value: '500000', label: '500K+' },
 ]
 
+const COUNTRY_LABELS: Record<string, { en: string; zh: string }> = {
+  US: { en: 'United States', zh: '美国' },
+  USA: { en: 'United States', zh: '美国' },
+  UK: { en: 'United Kingdom', zh: '英国' },
+  CA: { en: 'Canada', zh: '加拿大' },
+  Canada: { en: 'Canada', zh: '加拿大' },
+  AU: { en: 'Australia', zh: '澳大利亚' },
+  DE: { en: 'Germany', zh: '德国' },
+  FR: { en: 'France', zh: '法国' },
+  ES: { en: 'Spain', zh: '西班牙' },
+  IT: { en: 'Italy', zh: '意大利' },
+  CN: { en: 'China', zh: '中国' },
+  China: { en: 'China', zh: '中国' },
+  HK: { en: 'Hong Kong SAR', zh: '中国香港特别行政区' },
+  'Hong Kong': { en: 'Hong Kong SAR', zh: '中国香港特别行政区' },
+  MO: { en: 'Macao SAR', zh: '中国澳门特别行政区' },
+  Macau: { en: 'Macao SAR', zh: '中国澳门特别行政区' },
+  SG: { en: 'Singapore', zh: '新加坡' },
+  JP: { en: 'Japan', zh: '日本' },
+  KR: { en: 'South Korea', zh: '韩国' },
+  Korea: { en: 'South Korea', zh: '韩国' },
+  AE: { en: 'United Arab Emirates', zh: '阿联酋' },
+  UAE: { en: 'United Arab Emirates', zh: '阿联酋' },
+  BR: { en: 'Brazil', zh: '巴西' },
+  MX: { en: 'Mexico', zh: '墨西哥' },
+}
+
 export default function SavedCreatorsPage() {
   const { t, locale } = useLanguage()
   const s = t.brand.savedCreators
@@ -126,13 +153,15 @@ export default function SavedCreatorsPage() {
 
   const compact = (n: number) =>
     new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+  const countryLabel = (value?: string | null) =>
+    value ? (COUNTRY_LABELS[value]?.[locale === 'zh' ? 'zh' : 'en'] || value) : '—'
 
   const selectClass =
-    'px-3 py-2 bg-white rounded-full text-sm font-medium text-gray-700 shadow-sm border-0 focus:outline-none focus:ring-2 focus:ring-primary-100'
+    'px-3 py-2 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none'
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-6xl mx-auto pt-6 pb-8">
+      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header */}
         <div className="mb-6">
           <p className="text-sm text-gray-500 mb-1">
@@ -143,7 +172,7 @@ export default function SavedCreatorsPage() {
         </div>
 
         {/* Toolbar */}
-        <div className="mb-4 bg-white/70 backdrop-blur rounded-2xl shadow-sm px-5 py-3 flex flex-wrap items-center gap-3">
+        <div className="mb-4 workspace-glass-toolbar rounded-2xl px-5 py-3 flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[220px]">
             <svg className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -153,7 +182,7 @@ export default function SavedCreatorsPage() {
               value={query}
               onChange={(e) => { setQuery(e.target.value); setPage(1) }}
               placeholder={s.searchPlaceholder}
-              className="w-full pl-10 pr-4 py-2 bg-white rounded-full text-sm border border-transparent focus:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              className="w-full pl-10 pr-4 py-2 workspace-glass-control text-sm focus:outline-none"
             />
           </div>
           <select value={platform} onChange={(e) => { setPlatform(e.target.value); setPage(1) }} className={selectClass} title={s.platform}>
@@ -162,7 +191,7 @@ export default function SavedCreatorsPage() {
           </select>
           <select value={country} onChange={(e) => { setCountry(e.target.value); setPage(1) }} className={selectClass} title={s.country}>
             <option value="">{s.country}: {s.all}</option>
-            {countries.map((cn) => <option key={cn} value={cn}>{cn}</option>)}
+            {countries.map((cn) => <option key={cn} value={cn}>{countryLabel(cn)}</option>)}
           </select>
           <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }} className={selectClass} title={s.category}>
             <option value="">{s.category}: {s.all}</option>
@@ -179,28 +208,27 @@ export default function SavedCreatorsPage() {
             <option value="recent">{s.sortRecentlySaved}</option>
             <option value="followers">{s.sortFollowers}</option>
           </select>
-          {hasFilters && (
-            <button
-              onClick={() => { setQuery(''); setPlatform(''); setCountry(''); setCategory(''); setMinFollowers(''); setPage(1) }}
-              className="px-4 py-2 rounded-full text-sm font-medium text-primary-600 hover:bg-white transition"
-            >
-              ↺ {s.clearFilters}
-            </button>
-          )}
+          <button
+            onClick={() => { setQuery(''); setPlatform(''); setCountry(''); setCategory(''); setMinFollowers(''); setPage(1) }}
+            disabled={!hasFilters}
+            className="px-4 py-2 rounded-full text-sm font-semibold text-primary-600 hover:bg-white/55 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ↺ {s.clearFilters}
+          </button>
         </div>
 
         <p className="text-sm text-gray-500 font-medium mb-4">{visible.length} {s.count}</p>
 
         {/* Grid */}
         {loading ? (
-          <div className="bg-white/85 rounded-2xl shadow-sm p-10 text-center text-gray-400 text-sm">…</div>
+          <div className="workspace-glass-card rounded-2xl p-10 text-center text-gray-400 text-sm">…</div>
         ) : saved.length === 0 ? (
-          <div className="bg-white/85 rounded-2xl shadow-sm p-12 text-center">
+          <div className="workspace-glass-card rounded-2xl p-12 text-center">
             <p className="text-gray-500 text-lg mb-2">{s.empty}</p>
             <p className="text-gray-400">{s.emptyDesc}</p>
           </div>
         ) : paged.length === 0 ? (
-          <div className="bg-white/85 rounded-2xl shadow-sm p-10 text-center text-gray-500">{s.noMatches}</div>
+          <div className="workspace-glass-card rounded-2xl p-10 text-center text-gray-500">{s.noMatches}</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {paged.map((row) => {
@@ -210,7 +238,7 @@ export default function SavedCreatorsPage() {
               const followers = maxFollowers(inf)
               const eng = topEngagement(inf)
               return (
-                <div key={row.influencerId} className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-5">
+                <div key={row.influencerId} className="workspace-glass-card rounded-2xl p-5">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs text-gray-400">{savedAgo(row.savedAt)}</span>
                     <button
@@ -266,7 +294,7 @@ export default function SavedCreatorsPage() {
                       <p className="text-[11px] text-gray-400">{s.followers}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-gray-900">{inf?.locationCountry || '—'}</p>
+                      <p className="text-sm font-bold text-gray-900">{countryLabel(inf?.locationCountry)}</p>
                       <p className="text-[11px] text-gray-400">{s.country}</p>
                     </div>
                     <div>
@@ -280,13 +308,13 @@ export default function SavedCreatorsPage() {
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     <Link
                       href={`/influencer/${row.influencerId}`}
-                      className="text-center px-4 py-2 bg-indigo-100 text-primary-700 rounded-xl text-sm font-semibold hover:bg-indigo-200/70 transition"
+                      className="text-center px-4 py-2 bg-indigo-100 text-primary-700 rounded-full text-sm font-semibold hover:bg-indigo-200/70 transition"
                     >
                       {s.viewProfile}
                     </Link>
                     <Link
                       href="/dashboard/messages"
-                      className="text-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition"
+                      className="text-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full text-sm font-semibold hover:bg-gray-50 transition"
                     >
                       {s.message}
                     </Link>

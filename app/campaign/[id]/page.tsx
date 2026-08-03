@@ -176,7 +176,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
   return (
     <RoleShell>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8">
         <CampaignDetailWrapper
           initialCampaign={campaign as any}
           isOwner={isOwner}

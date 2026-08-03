@@ -144,27 +144,29 @@ export default function BrandDashboardClient({
   return (
     <div className="max-w-7xl mx-auto pt-0 pb-8 lg:-mt-4">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 className="text-3xl sm:text-[34px] font-bold leading-tight text-gray-900">
-            {d.title}
-          </h1>
-          <span className={`inline-flex items-center gap-2 text-sm font-semibold ${
-            isApproved ? 'text-gray-700' : isRejected ? 'text-red-700' : isPending ? 'text-amber-700' : 'text-gray-500'
-          }`}>
-            <svg className={`h-5 w-5 flex-shrink-0 ${
-              isApproved ? 'text-[#21466f]' : isRejected ? 'text-red-600' : isPending ? 'text-amber-600' : 'text-gray-400'
-            }`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
-            </svg>
-            {isApproved ? d.verifiedBusiness : verifLabel}
-          </span>
-        </div>
-        <div className="mt-8">
-          <p className="text-xl sm:text-2xl font-bold leading-tight text-gray-900">
-            {welcomeLine}
-          </p>
-          <p className="mt-2 text-base text-gray-600">{d.welcomeSubtitle}</p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h1 className="text-3xl sm:text-[34px] font-bold leading-tight text-gray-900">
+              {d.title}
+            </h1>
+            <span className={`inline-flex items-center gap-2 text-sm font-semibold ${
+              isApproved ? 'text-gray-700' : isRejected ? 'text-red-700' : isPending ? 'text-amber-700' : 'text-gray-500'
+            }`}>
+              <svg className={`h-5 w-5 flex-shrink-0 ${
+                isApproved ? 'text-[#21466f]' : isRejected ? 'text-red-600' : isPending ? 'text-amber-600' : 'text-gray-400'
+              }`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
+              </svg>
+              {isApproved ? d.verifiedBusiness : verifLabel}
+            </span>
+          </div>
+          <div className="mt-8">
+            <p className="text-xl sm:text-2xl font-bold leading-tight text-gray-900">
+              {welcomeLine}
+            </p>
+            <p className="mt-2 text-base text-gray-600">{d.welcomeSubtitle}</p>
+          </div>
         </div>
       </div>
 
@@ -199,7 +201,7 @@ export default function BrandDashboardClient({
         </div>
 
         {!setupDone && (
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 flex flex-col">
+        <div className="workspace-glass-card rounded-3xl p-6 flex flex-col">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="font-bold text-gray-900">{d.setupTitle}</h3>
@@ -246,7 +248,7 @@ export default function BrandDashboardClient({
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {statCards.map((card) => (
-          <Link key={card.label} href={card.href} className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-5 flex gap-4 hover:bg-white transition">
+          <Link key={card.label} href={card.href} className="workspace-glass-card rounded-2xl p-5 flex gap-4 hover:bg-white/45 transition">
             <div className="w-11 h-11 rounded-full bg-gray-50 shadow-sm flex items-center justify-center flex-shrink-0 text-gray-600">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d={card.icon} />
@@ -263,7 +265,7 @@ export default function BrandDashboardClient({
 
       {/* Activity + right column */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+        <div className="lg:col-span-2 workspace-glass-card rounded-3xl p-6">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
               <h3 className="font-bold text-gray-900">{d.activityTitle}</h3>
@@ -377,7 +379,7 @@ export default function BrandDashboardClient({
 
         {/* Right column */}
         <div className="space-y-6">
-          <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+          <div className="workspace-glass-card rounded-3xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-gray-900">{d.recentMessages}</h3>
               <Link href="/dashboard/messages" className="text-xs font-medium text-gray-500 hover:text-primary-700 transition">
@@ -409,7 +411,7 @@ export default function BrandDashboardClient({
 
           <Link
             href="/ai-assistant"
-            className="block bg-gradient-to-r from-indigo-50 to-purple-50 rounded-3xl shadow-sm p-5 hover:from-indigo-100 hover:to-purple-100 transition"
+            className="block workspace-glass-toolbar rounded-3xl p-5 transition hover:bg-white/45"
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center text-primary-600 flex-shrink-0">

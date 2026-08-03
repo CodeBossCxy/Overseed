@@ -15,13 +15,13 @@ export interface AiModelDef {
 }
 
 export const AI_MODELS: AiModelDef[] = [
-  { id: 'gpt-5.6-luna', label: 'OpenAI GPT-5.6 Luna', provider: 'openai', model: process.env.AI_MODEL_GPT_LUNA || 'gpt-5.6-luna' },
-  { id: 'gpt-5.6-sol', label: 'OpenAI GPT-5.6 Sol', provider: 'openai', model: process.env.AI_MODEL_GPT_SOL || 'gpt-5.6-sol' },
-  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', provider: 'anthropic', model: process.env.AI_MODEL_CLAUDE || 'claude-sonnet-5' },
-  { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash', provider: 'deepseek', model: process.env.AI_MODEL_DEEPSEEK_FLASH || 'deepseek-v4-flash' },
-  { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro', provider: 'deepseek', model: process.env.AI_MODEL_DEEPSEEK_PRO || 'deepseek-v4-pro' },
-  { id: 'kimi-k2.6', label: 'Kimi K2.6', provider: 'kimi', model: process.env.AI_MODEL_KIMI_K26 || 'kimi-k2.6' },
-  { id: 'kimi-k3', label: 'Kimi K3', provider: 'kimi', model: process.env.AI_MODEL_KIMI_K3 || 'kimi-k3' },
+  { id: 'gpt-5.6-luna', label: 'Advanced', provider: 'openai', model: process.env.AI_MODEL_GPT_LUNA || 'gpt-5.6-luna' },
+  { id: 'gpt-5.6-sol', label: 'Advanced Plus', provider: 'openai', model: process.env.AI_MODEL_GPT_SOL || 'gpt-5.6-sol' },
+  { id: 'claude-sonnet-5', label: 'Advanced Reasoning', provider: 'anthropic', model: process.env.AI_MODEL_CLAUDE || 'claude-sonnet-5' },
+  { id: 'deepseek-v4-flash', label: 'Standard Fast', provider: 'deepseek', model: process.env.AI_MODEL_DEEPSEEK_FLASH || 'deepseek-v4-flash' },
+  { id: 'deepseek-v4-pro', label: 'Standard Pro', provider: 'deepseek', model: process.env.AI_MODEL_DEEPSEEK_PRO || 'deepseek-v4-pro' },
+  { id: 'kimi-k2.6', label: 'Standard', provider: 'kimi', model: process.env.AI_MODEL_KIMI_K26 || 'kimi-k2.6' },
+  { id: 'kimi-k3', label: 'Standard Creative', provider: 'kimi', model: process.env.AI_MODEL_KIMI_K3 || 'kimi-k3' },
 ]
 
 export const DEFAULT_MODEL_ID = 'claude-sonnet-5'

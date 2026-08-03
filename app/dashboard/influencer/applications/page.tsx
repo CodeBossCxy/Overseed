@@ -173,7 +173,7 @@ export default function InfluencerApplicationsPage() {
 
   return (
     <CreatorWorkspaceLayout>
-      <div className="max-w-6xl mx-auto pt-6 pb-8">
+      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">{c.pageTitle}</h1>
@@ -181,13 +181,13 @@ export default function InfluencerApplicationsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="inline-flex bg-white/70 backdrop-blur rounded-2xl shadow-sm p-1.5 mb-6">
+        <div className="inline-flex workspace-glass-toolbar rounded-2xl p-1.5 mb-6">
           {tabs.map((tb) => (
             <button
               key={tb.key}
               onClick={() => setTab(tb.key)}
               className={`px-6 py-2.5 rounded-xl text-sm transition ${
-                tab === tb.key ? 'bg-white shadow-sm text-gray-900 font-bold' : 'text-gray-500 font-semibold hover:text-gray-700'
+                tab === tb.key ? 'selected-option-glass text-gray-900 font-bold' : 'text-gray-500 font-semibold hover:bg-white/45 hover:text-gray-700'
               }`}
             >
               {tb.label}
@@ -198,7 +198,7 @@ export default function InfluencerApplicationsPage() {
 
         {/* Info banner (Applications tab) */}
         {tab === 'applications' && (
-          <div className="mb-6 bg-white/70 backdrop-blur rounded-2xl shadow-sm px-5 py-3.5 flex items-center gap-3 text-sm text-gray-600">
+          <div className="mb-6 workspace-glass-toolbar rounded-2xl px-5 py-3.5 flex items-center gap-3 text-sm text-gray-600">
             <svg className="w-5 h-5 text-primary-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -206,7 +206,7 @@ export default function InfluencerApplicationsPage() {
           </div>
         )}
 
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+        <div className="workspace-glass-card rounded-3xl p-6">
           {isLoading ? (
             <p className="py-10 text-center text-sm text-gray-400">{c.loading}</p>
           ) : tab === 'applications' ? (

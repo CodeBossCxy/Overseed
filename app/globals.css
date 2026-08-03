@@ -239,7 +239,10 @@
   radial-gradient(75% 65% at 100% 18%, #f9e9db 0%, #f8ece4 35%, rgba(248, 236, 228, 0) 68%),
   radial-gradient(55% 38% at 45% 0%, #ebded9 0%, rgba(235, 222, 217, 0) 62%),
   linear-gradient(150deg, #f4ecec 0%, #fbf3ee 45%, #ecebf1 100%); }
-[data-color-theme='sunset'] { --user-theme-gradient: linear-gradient(180deg, #a3cbe9 0%, #d9e2e1 22%, #efe5d3 33%, #f8d1a2 52%, #f5b87f 75%, #f1a76c 100%); }
+[data-color-theme='sunset'] { --user-theme-gradient:
+  radial-gradient(72% 58% at 86% 12%, rgba(255, 211, 171, 0.92) 0%, rgba(255, 225, 201, 0.55) 38%, rgba(255, 255, 255, 0) 72%),
+  radial-gradient(88% 70% at 12% 100%, rgba(174, 199, 244, 0.86) 0%, rgba(202, 217, 248, 0.54) 36%, rgba(255, 255, 255, 0) 68%),
+  linear-gradient(145deg, #eef5ff 0%, #f9f1ed 44%, #ffd9ad 72%, #f6a65f 100%); }
 [data-color-theme='lilac']  { --user-theme-gradient: linear-gradient(160deg, #f7e7ec 0%, #eadef4 30%, #d8d3f3 60%, #c4caf1 100%); }
 [data-color-theme='breeze'] { --user-theme-gradient: linear-gradient(135deg, #a9dbe4 0%, #cfe7e0 25%, #f2ecdc 55%, #f7dcbd 80%, #f8cba6 100%); }
 
@@ -335,7 +338,7 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: var(--font-manrope), var(--font-noto-sans-sc), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-weight: 900;
+  font-weight: 400;
 }
 
 button,
@@ -360,6 +363,7 @@ select {
   [class*="bg-blue-600"],
   [class*="bg-indigo-600"],
   [class*="bg-purple-600"],
+  [class*="bg-gray-900"],
   [class*="from-primary-600"],
   [class*="from-pink-500"],
   [class*="from-amber-500"]
@@ -377,6 +381,7 @@ select {
   [class*="bg-blue-600"],
   [class*="bg-indigo-600"],
   [class*="bg-purple-600"],
+  [class*="bg-gray-900"],
   [class*="from-primary-600"],
   [class*="from-pink-500"],
   [class*="from-amber-500"]
@@ -393,6 +398,7 @@ select {
   [class*="bg-blue-600"],
   [class*="bg-indigo-600"],
   [class*="bg-purple-600"],
+  [class*="bg-gray-900"],
   [class*="from-primary-600"],
   [class*="from-pink-500"],
   [class*="from-amber-500"]
@@ -405,6 +411,7 @@ select {
   [class*="bg-blue-600"],
   [class*="bg-indigo-600"],
   [class*="bg-purple-600"],
+  [class*="bg-gray-900"],
   [class*="from-primary-600"],
   [class*="from-pink-500"],
   [class*="from-amber-500"]
@@ -414,6 +421,7 @@ select {
   [class*="bg-blue-600"],
   [class*="bg-indigo-600"],
   [class*="bg-purple-600"],
+  [class*="bg-gray-900"],
   [class*="from-primary-600"],
   [class*="from-pink-500"],
   [class*="from-amber-500"]
@@ -429,9 +437,12 @@ select {
 .selected-option-glass,
 .bg-white.text-gray-900.font-bold,
 .bg-white\/70.text-gray-900.font-bold,
+.bg-white.shadow-sm.text-gray-900.font-bold,
+.border-gray-900.text-gray-900.font-bold,
 .border-gray-900.bg-white.text-gray-900.font-bold,
 .border-gray-900.bg-white\/70 {
   color: var(--foreground);
+  font-weight: 500 !important;
   position: relative;
   overflow: hidden;
   background:
@@ -452,12 +463,137 @@ select {
   -webkit-backdrop-filter: blur(20px) saturate(165%);
 }
 
+.selected-option-glass *,
+.bg-white.text-gray-900.font-bold *,
+.bg-white\/70.text-gray-900.font-bold *,
+.bg-white.shadow-sm.text-gray-900.font-bold *,
+.border-gray-900.text-gray-900.font-bold *,
+.border-gray-900.bg-white.text-gray-900.font-bold *,
+.border-gray-900.bg-white\/70 * {
+  font-weight: 500 !important;
+}
+
+:is(a, button)[aria-current="page"] {
+  font-weight: 500 !important;
+}
+
+:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):active,
+:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):focus-visible {
+  color: var(--foreground) !important;
+  background:
+    linear-gradient(110deg, rgba(255, 255, 255, 0.92) 0%, rgba(234, 242, 255, 0.7) 22%, rgba(255, 244, 252, 0.62) 40%, rgba(229, 255, 250, 0.48) 55%, rgba(235, 244, 255, 0.68) 74%, rgba(255, 255, 255, 0.9) 100%),
+    radial-gradient(110% 120% at 7% 0%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.5) 32%, rgba(255, 255, 255, 0) 68%),
+    radial-gradient(86% 90% at 88% 100%, rgba(190, 211, 255, 0.46) 0%, rgba(244, 233, 255, 0.24) 42%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58) 0%, rgba(229, 236, 255, 0.34) 56%, rgba(255, 255, 255, 0.52) 100%) !important;
+  border-color: rgba(255, 255, 255, 0.62) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.94),
+    inset 0 -1px 0 rgba(170, 193, 243, 0.22),
+    inset 1px 0 1px rgba(255, 255, 255, 0.58),
+    inset -1px 0 1px rgba(202, 218, 255, 0.26),
+    0 0 0 1px rgba(255, 255, 255, 0.62),
+    0 0 22px rgba(204, 221, 255, 0.26),
+    8px 8px 22px rgba(45, 49, 78, 0.08),
+    -7px -7px 18px rgba(255, 255, 255, 0.68) !important;
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
+  outline: none;
+}
+
+:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):active *,
+:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):focus-visible * {
+  color: inherit !important;
+}
+
 .selected-option-glass > svg,
 .bg-white.text-gray-900.font-bold > svg,
 .bg-white\/70.text-gray-900.font-bold > svg,
 .border-gray-900.bg-white.text-gray-900.font-bold > svg {
   color: rgba(255, 255, 255, 0.96);
   filter: drop-shadow(0 1px 2px rgba(45, 49, 78, 0.34));
+}
+
+.workspace-page-tight {
+  padding-top: 0;
+}
+
+.workspace-glass-card {
+  background: rgba(255, 255, 255, 0.30);
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 12px 28px rgba(45, 49, 78, 0.06);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+.workspace-glass-option {
+  position: relative;
+  overflow: hidden;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.workspace-glass-option:hover,
+.workspace-glass-option:active,
+.workspace-glass-option:focus-within {
+  background:
+    linear-gradient(110deg, rgba(255, 255, 255, 0.92) 0%, rgba(234, 242, 255, 0.7) 22%, rgba(255, 244, 252, 0.62) 40%, rgba(229, 255, 250, 0.48) 55%, rgba(235, 244, 255, 0.68) 74%, rgba(255, 255, 255, 0.9) 100%),
+    radial-gradient(110% 120% at 7% 0%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.5) 32%, rgba(255, 255, 255, 0) 68%),
+    radial-gradient(86% 90% at 88% 100%, rgba(190, 211, 255, 0.46) 0%, rgba(244, 233, 255, 0.24) 42%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58) 0%, rgba(229, 236, 255, 0.34) 56%, rgba(255, 255, 255, 0.52) 100%);
+  border-color: rgba(255, 255, 255, 0.62);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.94),
+    inset 0 -1px 0 rgba(170, 193, 243, 0.22),
+    inset 1px 0 1px rgba(255, 255, 255, 0.58),
+    inset -1px 0 1px rgba(202, 218, 255, 0.26),
+    0 0 0 1px rgba(255, 255, 255, 0.62),
+    0 0 24px rgba(204, 221, 255, 0.3),
+    10px 10px 26px rgba(45, 49, 78, 0.08),
+    -8px -8px 20px rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+}
+
+.workspace-glass-option:active {
+  transform: translateY(1px);
+}
+
+.workspace-glass-toolbar {
+  background:
+    linear-gradient(116deg, rgba(255, 255, 255, 0.34), rgba(236, 244, 255, 0.18), rgba(255, 247, 252, 0.24));
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    inset 0 -1px 0 rgba(188, 207, 246, 0.12),
+    0 8px 22px rgba(45, 49, 78, 0.035);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+
+.workspace-glass-control {
+  background: rgba(255, 255, 255, 0.36) !important;
+  border: 1px solid rgba(255, 255, 255, 0.48) !important;
+  border-radius: 999px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 5px 16px rgba(45, 49, 78, 0.035) !important;
+}
+
+.workspace-glass-control:focus {
+  border-color: rgba(125, 99, 247, 0.42) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 0 0 3px rgba(125, 99, 247, 0.14) !important;
+}
+
+.workspace-top-pill {
+  min-width: 64px;
+  justify-content: center;
 }
 
 @keyframes workspace-route-progress {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import CampaignDetail from './CampaignDetail'
 import UGCTranslateToggle from '../UGCTranslateToggle'
@@ -24,7 +25,7 @@ export default function CampaignDetailWrapper({
   userType,
   subscriptionTier,
 }: CampaignDetailWrapperProps) {
-  const { locale, isUGCTranslated } = useLanguage()
+  const { t, locale, isUGCTranslated } = useLanguage()
   const [campaign, setCampaign] = useState(initialCampaign)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -70,7 +71,16 @@ export default function CampaignDetailWrapper({
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <Link
+          href={isOwner ? '/dashboard/brand/campaigns' : '/browse'}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-primary-700 transition"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          {isOwner ? t.brand.campaigns.title : t.workspace.browseCampaigns}
+        </Link>
         <UGCTranslateToggle isLoading={isLoading} />
       </div>
       <CampaignDetail

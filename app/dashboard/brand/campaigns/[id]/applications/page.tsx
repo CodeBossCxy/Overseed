@@ -164,27 +164,29 @@ export default function CampaignApplicationsPage() {
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-6xl mx-auto pt-6 pb-8">
+      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header */}
         <div className="mb-6">
           <p className="text-sm text-gray-500 mb-1">
-            <Link href="/dashboard/brand/campaigns" className="hover:text-primary-700">{t.brand.campaigns.title}</Link>
+            <Link href="/dashboard/brand/campaigns" className="hover:text-primary-700">{a.breadcrumbPipeline}</Link>
             {campaign && (
               <>
                 {' › '}
                 <Link href={`/dashboard/brand/campaigns/${campaignId}`} className="hover:text-primary-700">{campaign.title}</Link>
+                {' › '}
+                <span className="font-semibold text-gray-700">{a.breadcrumbManage}</span>
               </>
             )}
           </p>
           <h1 className="text-3xl font-bold text-gray-900">{a.pageTitle}</h1>
-          <p className="text-gray-500 mt-1">{a.pageSubtitle}</p>
+          <p className="text-gray-500 mt-1">{t.brand.discover.tabPipelineDesc}</p>
         </div>
 
         <PipelineTabs campaignId={campaignId} active="pipeline" />
 
         {/* Campaign summary */}
         {campaign && (
-          <div className="mb-6 bg-white/85 backdrop-blur rounded-2xl shadow-sm p-4 sm:p-5 flex flex-wrap items-center gap-x-8 gap-y-4">
+          <div className="mb-6 workspace-glass-card rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-x-8 gap-y-4">
             <div className="flex items-center gap-4 min-w-0 flex-1">
               <div className="w-20 h-14 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
                 {campaign.images?.[0] ? (
@@ -227,7 +229,7 @@ export default function CampaignApplicationsPage() {
         )}
 
         {/* ── Applications ── */}
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 mb-6">
+        <div className="workspace-glass-card rounded-3xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-gray-900 flex items-center gap-2">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
@@ -283,7 +285,7 @@ export default function CampaignApplicationsPage() {
                           <div className="flex items-center gap-1.5">
                             <Link
                               href={`/influencer/${app.influencer?.id}`}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white shadow-sm rounded-lg text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white shadow-sm rounded-full text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
                             >
                               {a.thViewProfile}
                             </Link>
@@ -306,7 +308,7 @@ export default function CampaignApplicationsPage() {
                           <button
                             onClick={() => message(app.id)}
                             disabled={busyId === app.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white shadow-sm rounded-lg text-xs font-semibold text-gray-700 hover:text-primary-700 transition disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white shadow-sm rounded-full text-xs font-semibold text-gray-700 hover:text-primary-700 transition disabled:opacity-50 whitespace-nowrap"
                           >
                             {a.thMessage}
                           </button>
@@ -320,14 +322,14 @@ export default function CampaignApplicationsPage() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setConfirmFor(app)}
-                                className="px-4 py-1.5 border border-primary-200 text-primary-700 rounded-lg text-xs font-semibold hover:bg-primary-50 transition whitespace-nowrap"
+                              className="px-4 py-1.5 border border-primary-200 text-primary-700 rounded-full text-xs font-semibold hover:bg-primary-50 transition whitespace-nowrap"
                               >
                                 {a.selectBtn}
                               </button>
                               <button
                                 onClick={() => decline(app.id)}
                                 disabled={busyId === app.id}
-                                className="px-4 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-50 transition disabled:opacity-50 whitespace-nowrap"
+                                className="px-4 py-1.5 border border-gray-200 text-gray-600 rounded-full text-xs font-semibold hover:bg-gray-50 transition disabled:opacity-50 whitespace-nowrap"
                               >
                                 {a.declineBtn}
                               </button>
@@ -346,7 +348,7 @@ export default function CampaignApplicationsPage() {
         </div>
 
         {/* ── Collaborations ── */}
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+        <div className="workspace-glass-card rounded-3xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-gray-900 flex items-center gap-2">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
@@ -403,7 +405,7 @@ export default function CampaignApplicationsPage() {
                       <td className="py-3 pl-3">
                         <Link
                           href={`/dashboard/brand/collaborations/${col.id}`}
-                          className="inline-flex items-center px-4 py-1.5 bg-white shadow-sm rounded-lg text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
+                          className="inline-flex items-center px-4 py-1.5 bg-white shadow-sm rounded-full text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
                         >
                           {a.manageCollab}
                         </Link>

@@ -347,19 +347,19 @@ export default function DiscoverPanel() {
   return (
     <div>
       {/* Search + filters */}
-      <form onSubmit={submit} className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-5 mb-6">
+      <form onSubmit={submit} className="workspace-glass-toolbar rounded-2xl p-5 mb-6">
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={d.searchPlaceholder}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="flex-1 px-4 py-2.5 workspace-glass-control focus:outline-none"
           />
           <button
             type="submit"
             disabled={isLoading || platforms.length === 0}
-            className="px-6 py-2.5 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2.5 bg-primary-600 text-white rounded-full font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? d.searching : d.searchButton}
           </button>
@@ -367,7 +367,7 @@ export default function DiscoverPanel() {
             <button
               type="button"
               onClick={clearSearch}
-              className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition"
+              className="px-4 py-2.5 bg-white/50 text-gray-700 rounded-full font-semibold hover:bg-white/70 transition"
             >
               {d.clearSearch}
             </button>
@@ -382,7 +382,7 @@ export default function DiscoverPanel() {
             <select
               value={source}
               onChange={(e) => changeSource(e.target.value as DiscoverySource)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
             >
               {(Object.keys(SOURCE_LABELS) as DiscoverySource[]).map((s) => (
                 <option key={s} value={s}>
@@ -423,7 +423,7 @@ export default function DiscoverPanel() {
               onChange={(e) => setCountry(e.target.value)}
               placeholder={d.countryPlaceholder}
               maxLength={2}
-              className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-24 px-3 py-1.5 workspace-glass-control text-sm uppercase focus:outline-none"
             />
           </div>
           <div>
@@ -434,7 +434,7 @@ export default function DiscoverPanel() {
               value={minFollowers}
               onChange={(e) => setMinFollowers(e.target.value)}
               placeholder="10000"
-              className="w-32 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-32 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
             />
           </div>
           <div>
@@ -445,7 +445,7 @@ export default function DiscoverPanel() {
               value={maxFollowers}
               onChange={(e) => setMaxFollowers(e.target.value)}
               placeholder="1000000"
-              className="w-32 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-32 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
             />
           </div>
           {isBrowsing && (
@@ -454,7 +454,7 @@ export default function DiscoverPanel() {
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as 'followers' | 'recent')}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
               >
                 <option value="followers">{d.sortFollowers}</option>
                 <option value="recent">{d.sortRecent}</option>
@@ -513,7 +513,7 @@ export default function DiscoverPanel() {
           </div>
 
           {!isLoading && creators.length === 0 ? (
-            <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-8 text-center text-gray-500">{d.noResults}</div>
+            <div className="workspace-glass-card rounded-2xl p-8 text-center text-gray-500">{d.noResults}</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {creators.map((creator) => (
@@ -523,7 +523,7 @@ export default function DiscoverPanel() {
                   onClick={
                     creator.id.startsWith('club:') ? () => openDetail(creator) : undefined
                   }
-                  className={`bg-white/85 backdrop-blur rounded-2xl shadow-sm p-5 flex gap-4 ${
+                  className={`workspace-glass-card rounded-2xl p-5 flex gap-4 ${
                     creator.id.startsWith('club:')
                       ? 'cursor-pointer hover:shadow-md transition'
                       : ''
@@ -599,7 +599,7 @@ export default function DiscoverPanel() {
               <button
                 onClick={() => fetchBrowse(rawOffset, true)}
                 disabled={isLoadingMore}
-                className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition disabled:opacity-50"
+                className="px-6 py-2.5 bg-white/55 text-gray-700 rounded-full font-semibold hover:bg-white/75 transition disabled:opacity-50"
               >
                 {isLoadingMore ? d.loadingCreators : d.loadMore}
               </button>

@@ -26,10 +26,47 @@ const INDUSTRY_KEYS = [
   'Other',
 ]
 const COMPANY_SIZE_KEYS = ['startup', 'small', 'medium', 'enterprise']
-const COUNTRY_OPTIONS = ['US', 'UK', 'CA', 'AU', 'DE', 'FR', 'ES', 'IT', 'CN', 'HK', 'SG', 'JP', 'KR', 'AE', 'BR', 'MX']
+const COUNTRY_OPTIONS = [
+  { value: 'US', flag: '🇺🇸', en: 'United States', zh: '美国' },
+  { value: 'UK', flag: '🇬🇧', en: 'United Kingdom', zh: '英国' },
+  { value: 'CA', flag: '🇨🇦', en: 'Canada', zh: '加拿大' },
+  { value: 'AU', flag: '🇦🇺', en: 'Australia', zh: '澳大利亚' },
+  { value: 'DE', flag: '🇩🇪', en: 'Germany', zh: '德国' },
+  { value: 'FR', flag: '🇫🇷', en: 'France', zh: '法国' },
+  { value: 'ES', flag: '🇪🇸', en: 'Spain', zh: '西班牙' },
+  { value: 'IT', flag: '🇮🇹', en: 'Italy', zh: '意大利' },
+  { value: 'CN', flag: '🇨🇳', en: 'China', zh: '中国' },
+  { value: 'HK', flag: '🇭🇰', en: 'Hong Kong SAR', zh: '中国香港特别行政区' },
+  { value: 'MO', flag: '🇲🇴', en: 'Macao SAR', zh: '中国澳门特别行政区' },
+  { value: 'SG', flag: '🇸🇬', en: 'Singapore', zh: '新加坡' },
+  { value: 'JP', flag: '🇯🇵', en: 'Japan', zh: '日本' },
+  { value: 'KR', flag: '🇰🇷', en: 'South Korea', zh: '韩国' },
+  { value: 'AE', flag: '🇦🇪', en: 'United Arab Emirates', zh: '阿联酋' },
+  { value: 'BR', flag: '🇧🇷', en: 'Brazil', zh: '巴西' },
+  { value: 'MX', flag: '🇲🇽', en: 'Mexico', zh: '墨西哥' },
+]
+
+const LEGACY_COUNTRY_LABELS: Record<string, { en: string; zh: string }> = {
+  USA: { en: 'United States', zh: '美国' },
+  'United States': { en: 'United States', zh: '美国' },
+  'United Kingdom': { en: 'United Kingdom', zh: '英国' },
+  Canada: { en: 'Canada', zh: '加拿大' },
+  Australia: { en: 'Australia', zh: '澳大利亚' },
+  Germany: { en: 'Germany', zh: '德国' },
+  France: { en: 'France', zh: '法国' },
+  Spain: { en: 'Spain', zh: '西班牙' },
+  Italy: { en: 'Italy', zh: '意大利' },
+  China: { en: 'China', zh: '中国' },
+  'Hong Kong': { en: 'Hong Kong SAR', zh: '中国香港特别行政区' },
+  Macau: { en: 'Macao SAR', zh: '中国澳门特别行政区' },
+  Korea: { en: 'South Korea', zh: '韩国' },
+  UAE: { en: 'United Arab Emirates', zh: '阿联酋' },
+  Brazil: { en: 'Brazil', zh: '巴西' },
+  Mexico: { en: 'Mexico', zh: '墨西哥' },
+}
 
 export default function BrandProfilePage() {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const p = t.brand.profile
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -154,6 +191,15 @@ export default function BrandProfilePage() {
 
   const accountTypeLabel = (v: string) =>
     v === 'agency' ? p.accountTypeAgency : v === 'individual_pr' ? p.accountTypeIndividual : v === 'brand' ? p.accountTypeBrand : '—'
+  const countryOptionLabel = (option: (typeof COUNTRY_OPTIONS)[number]) =>
+    `${option.flag} ${locale === 'zh' ? option.zh : option.en}`
+  const countryLabel = (value?: string | null) => {
+    if (!value) return '—'
+    const byCode = COUNTRY_OPTIONS.find((c) => c.value === value)
+    if (byCode) return countryOptionLabel(byCode)
+    const legacy = LEGACY_COUNTRY_LABELS[value]
+    return legacy ? legacy[locale === 'zh' ? 'zh' : 'en'] : value
+  }
 
   if (isLoading) {
     return (
@@ -168,7 +214,7 @@ export default function BrandProfilePage() {
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-4xl mx-auto pt-6 pb-8">
+      <div className="max-w-4xl mx-auto workspace-page-tight pb-8">
         {/* Header + actions */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
@@ -182,13 +228,6 @@ export default function BrandProfilePage() {
             >
               {p.previewProfile}
             </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:bg-primary-700 transition disabled:opacity-50"
-            >
-              {isSaving ? p.saving : p.saveChanges}
-            </button>
           </div>
         </div>
 
@@ -196,7 +235,7 @@ export default function BrandProfilePage() {
         {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-600">{p.success}</div>}
 
         {/* ── Card 1: Account & Verification ── */}
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 mb-6">
+        <div className="workspace-glass-card rounded-3xl p-6 mb-6">
           <h2 className="font-bold text-gray-900 mb-4">{p.accountVerification}</h2>
           <div className="divide-y divide-gray-100">
             <div className="flex items-center justify-between py-3">
@@ -222,9 +261,20 @@ export default function BrandProfilePage() {
         </div>
 
         {/* ── Card 2a: Public Profile ── */}
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 mb-6">
-          <h2 className="font-bold text-gray-900">{p.publicProfile}</h2>
-          <p className="text-xs text-gray-500 mt-1 mb-5">{p.publicProfileNote}</p>
+        <div className="workspace-glass-card rounded-3xl p-6 mb-6">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
+            <div>
+              <h2 className="font-bold text-gray-900">{p.publicProfile}</h2>
+              <p className="text-xs text-gray-500 mt-1">{p.publicProfileNote}</p>
+            </div>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="px-5 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold shadow-sm hover:bg-primary-700 transition disabled:opacity-50"
+            >
+              {isSaving ? p.saving : p.saveChanges}
+            </button>
+          </div>
 
           <div className="space-y-5">
             {/* Logo upload */}
@@ -252,7 +302,7 @@ export default function BrandProfilePage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
-                  className="px-4 py-2 bg-white shadow-sm rounded-xl text-sm font-semibold text-gray-700 hover:text-primary-700 transition disabled:opacity-50"
+                  className="px-4 py-2 bg-white shadow-sm rounded-full text-sm font-semibold text-gray-700 hover:text-primary-700 transition disabled:opacity-50"
                 >
                   {isUploading ? p.uploading : p.uploadLogo}
                 </button>
@@ -321,25 +371,25 @@ export default function BrandProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{p.countryRegion} *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{p.countryRegion} <span className="text-gray-400 font-normal">({p.multipleSelections})</span> *</label>
               <div className="flex flex-wrap gap-2">
                 {COUNTRY_OPTIONS.map((c) => (
                   <button
-                    key={c}
+                    key={c.value}
                     type="button"
-                    onClick={() => setFormData({ ...formData, countries: toggleIn(formData.countries, c) })}
+                    onClick={() => setFormData({ ...formData, countries: toggleIn(formData.countries, c.value) })}
                     className={`px-3 py-1.5 rounded-full text-sm transition ${
-                      formData.countries.includes(c) ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
+                      formData.countries.includes(c.value) ? 'selected-option-glass text-gray-900 font-bold' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
                     }`}
                   >
-                    {c}
+                    {countryOptionLabel(c)}
                   </button>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{p.industryCategory} *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{p.industryCategory} <span className="text-gray-400 font-normal">({p.multipleSelections})</span> *</label>
               <div className="flex flex-wrap gap-2">
                 {INDUSTRY_KEYS.map((ind) => (
                   <button
@@ -347,7 +397,7 @@ export default function BrandProfilePage() {
                     type="button"
                     onClick={() => setFormData({ ...formData, industries: toggleIn(formData.industries, ind) })}
                     className={`px-3 py-1.5 rounded-full text-sm transition ${
-                      formData.industries.includes(ind) ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
+                      formData.industries.includes(ind) ? 'selected-option-glass text-gray-900 font-bold' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
                     }`}
                   >
                     {t.industries[ind] || ind}
@@ -399,7 +449,7 @@ export default function BrandProfilePage() {
         </div>
 
         {/* ── Card 2b: Business Information ── */}
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+        <div className="workspace-glass-card rounded-3xl p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="font-bold text-gray-900">{p.businessInfo}</h2>
@@ -408,7 +458,7 @@ export default function BrandProfilePage() {
             {!isVerified && (
               <Link
                 href="/contact"
-                className="px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-semibold hover:bg-primary-700 transition whitespace-nowrap"
+                className="px-4 py-2 bg-primary-600 text-white rounded-full text-xs font-semibold hover:bg-primary-700 transition whitespace-nowrap"
               >
                 {p.startVerification}
               </Link>
@@ -444,7 +494,7 @@ export default function BrandProfilePage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{p.regCountry}</label>
-              <p className={lockedClass}>{profile?.businessCountry || '—'}</p>
+              <p className={lockedClass}>{countryLabel(profile?.businessCountry)}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -547,7 +597,7 @@ export default function BrandProfilePage() {
                   </span>
                 ))}
                 {formData.countries.map((c) => (
-                  <span key={c} className="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">{c}</span>
+                  <span key={c} className="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">{countryLabel(c)}</span>
                 ))}
               </div>
             )}

@@ -92,7 +92,7 @@ export default function MyPlanPage() {
 
   return (
     <RoleShell>
-      <div className="max-w-6xl mx-auto pt-6 pb-8">
+      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header + usage strip */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
           <div>
@@ -101,7 +101,7 @@ export default function MyPlanPage() {
           </div>
 
           {session?.user && usageStrip.length > 0 && (
-            <div className="bg-white/85 backdrop-blur rounded-2xl shadow-sm px-6 py-4">
+            <div className="workspace-glass-toolbar rounded-2xl px-6 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-3">{m.currentUsage}</p>
               <div className="flex flex-wrap gap-x-8 gap-y-3">
                 {usageStrip.map((item) => (
@@ -120,7 +120,7 @@ export default function MyPlanPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* Free plan */}
-          <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+          <div className="workspace-glass-card rounded-3xl p-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-500 flex items-center justify-center">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
@@ -161,7 +161,7 @@ export default function MyPlanPage() {
           </div>
 
           {/* Pro plan */}
-          <div className="bg-white/90 backdrop-blur rounded-3xl shadow-md ring-1 ring-primary-100 p-6">
+          <div className="workspace-glass-card rounded-3xl ring-1 ring-primary-100 p-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-500 flex items-center justify-center">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -208,7 +208,7 @@ export default function MyPlanPage() {
           </div>
 
           {/* Buy image credits */}
-          <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6 lg:mt-16">
+          <div className="workspace-glass-card rounded-3xl p-6 lg:mt-16">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0">
                 <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">

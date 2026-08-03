@@ -17,7 +17,7 @@ const PLATFORM_OPTIONS = ['Instagram', 'TikTok', 'YouTube', 'Other']
 
 function SectionCard({ title, subtitle, right, children }: { title: string; subtitle: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+    <section className="workspace-glass-card rounded-3xl p-6">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h2 className="font-bold text-gray-900">{title}</h2>
@@ -180,7 +180,7 @@ export default function CreatorManageCollaborationPage() {
 
   return (
     <CreatorWorkspaceLayout>
-      <div className="max-w-6xl mx-auto pt-6 pb-8">
+      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">{c.manage}</h1>

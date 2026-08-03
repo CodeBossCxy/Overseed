@@ -148,7 +148,7 @@ export default function BrandManageCollaborationPage() {
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-5xl mx-auto workspace-page-tight pb-8">
         <Link href={`/dashboard/brand/campaigns/${collab.campaign?.id}/applications`} className="text-primary-600 hover:underline text-sm mb-2 inline-block">
           ← {c.backToPipeline}
         </Link>
@@ -161,7 +161,7 @@ export default function BrandManageCollaborationPage() {
         </div>
 
         {/* Creator header */}
-        <div className="bg-white rounded-xl shadow-sm p-5 mb-6 flex items-center gap-4">
+        <div className="workspace-glass-card rounded-2xl p-5 mb-6 flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
             {collab.influencer?.avatarUrl ? (
               <img src={collab.influencer.avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -187,7 +187,7 @@ export default function BrandManageCollaborationPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Overview — locked terms */}
           <div className="lg:col-span-2 space-y-6">
-            <section className="bg-white rounded-xl shadow-sm p-5">
+            <section className="workspace-glass-card rounded-2xl p-5">
               <h2 className="text-lg font-semibold mb-3">{c.overview}</h2>
               {term(c.deliverables, collab.deliverables)}
               {term(c.fee, collab.fee != null ? `${collab.currency} ${Number(collab.fee).toLocaleString()}` : null)}
@@ -202,7 +202,7 @@ export default function BrandManageCollaborationPage() {
             </section>
 
             {/* Timeline */}
-            <section className="bg-white rounded-xl shadow-sm p-5">
+            <section className="workspace-glass-card rounded-2xl p-5">
               <h2 className="text-lg font-semibold mb-4">{c.timeline}</h2>
               <div className="flex items-center">
                 {STAGES.map((stage, i) => {
@@ -237,7 +237,7 @@ export default function BrandManageCollaborationPage() {
 
             {/* Published evidence */}
             {collab.status === 'SUBMITTED' || collab.status === 'COMPLETED' ? (
-              <section className="bg-white rounded-xl shadow-sm p-5">
+              <section className="workspace-glass-card rounded-2xl p-5">
                 <h2 className="text-lg font-semibold mb-3">{c.publishedEvidence}</h2>
                 {collab.publishedUrl ? (
                   <div className="space-y-2 text-sm">
@@ -254,7 +254,7 @@ export default function BrandManageCollaborationPage() {
 
           {/* Actions + payment */}
           <div className="space-y-6">
-            <section className="bg-white rounded-xl shadow-sm p-5">
+            <section className="workspace-glass-card rounded-2xl p-5">
               <h2 className="text-lg font-semibold mb-3">{c.actions}</h2>
               {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
               <div className="space-y-2">
@@ -326,7 +326,7 @@ export default function BrandManageCollaborationPage() {
             </section>
 
             {collab.payment && (
-              <section className="bg-white rounded-xl shadow-sm p-5">
+              <section className="workspace-glass-card rounded-2xl p-5">
                 <h2 className="text-lg font-semibold mb-3">Payment</h2>
                 <PaymentStatusBadge
                   status={collab.payment.status}

@@ -16,7 +16,25 @@ const CATEGORY_OPTIONS = [
   'Health & Fitness', 'Travel', 'Parenting & Family', 'Home & Decor', 'Finance', 'Pets', 'Entertainment',
 ]
 const LANGUAGE_OPTIONS = ['English', 'Chinese', 'Spanish', 'French', 'German', 'Japanese', 'Korean', 'Portuguese', 'Arabic', 'Hindi']
-const COUNTRY_OPTIONS = ['USA', 'UK', 'Canada', 'Australia', 'Germany', 'France', 'Spain', 'Italy', 'China', 'Hong Kong', 'Singapore', 'Japan', 'Korea', 'UAE', 'Brazil', 'Mexico']
+const COUNTRY_OPTIONS = [
+  'USA',
+  'UK',
+  'Canada',
+  'Australia',
+  'Germany',
+  'France',
+  'Spain',
+  'Italy',
+  'China',
+  'Hong Kong SAR',
+  'Macao SAR',
+  'Singapore',
+  'Japan',
+  'South Korea',
+  'UAE',
+  'Brazil',
+  'Mexico',
+]
 const COLLAB_TYPES = ['gifted', 'paid', 'performance'] as const
 
 function accountVerifState(acc: any): string {
@@ -157,7 +175,7 @@ export default function CreatorProfilePage() {
 
   return (
     <CreatorWorkspaceLayout>
-      <div className="max-w-6xl mx-auto pt-6 pb-8">
+      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header + top bar */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
@@ -184,9 +202,13 @@ export default function CreatorProfilePage() {
               <Link
                 href={`/influencer/${profile.id}`}
                 target="_blank"
-                className="px-4 py-2 bg-white shadow-sm rounded-full text-sm font-semibold text-gray-700 hover:text-primary-700 transition"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white shadow-sm rounded-full text-sm font-semibold text-gray-700 hover:text-primary-700 transition"
               >
-                👁 {p.previewProfile}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                {p.previewProfile}
               </Link>
             )}
             <button
@@ -217,9 +239,9 @@ export default function CreatorProfilePage() {
         </div>
 
         {tab === 'public' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+          <div className="grid grid-cols-1 gap-6 items-start">
             {/* Form */}
-            <div className="lg:col-span-3 bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
+            <div className="workspace-glass-card rounded-3xl p-6">
               <h2 className="font-bold text-gray-900">{p.tabPublic}</h2>
               <p className="text-xs text-gray-500 mt-0.5 mb-5">{p.publicNote}</p>
 
@@ -291,7 +313,7 @@ export default function CreatorProfilePage() {
                         type="button"
                         onClick={() => setForm({ ...form, languages: toggleIn(form.languages, lang) })}
                         className={`px-2.5 py-1 rounded-full text-xs transition ${
-                          form.languages.includes(lang) ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-600 font-medium hover:bg-gray-200'
+                          form.languages.includes(lang) ? 'selected-option-glass text-gray-900 font-bold' : 'bg-gray-100 text-gray-600 font-medium hover:bg-gray-200'
                         }`}
                       >
                         {lang}
@@ -310,7 +332,7 @@ export default function CreatorProfilePage() {
                       type="button"
                       onClick={() => setForm({ ...form, categories: toggleIn(form.categories, cat) })}
                       className={`px-3 py-1.5 rounded-full text-sm transition ${
-                        form.categories.includes(cat) ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
+                        form.categories.includes(cat) ? 'selected-option-glass text-gray-900 font-bold' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
                       }`}
                     >
                       {t.categoryNames[cat] || cat}
@@ -333,95 +355,29 @@ export default function CreatorProfilePage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{p.collabTypes}</label>
-                  <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-wrap gap-2">
                     {COLLAB_TYPES.map((ct) => (
-                      <label key={ct} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={form.preferredCollabTypes.includes(ct)}
-                          onChange={() => setForm({ ...form, preferredCollabTypes: toggleIn(form.preferredCollabTypes, ct) })}
-                          className="rounded text-primary-600 focus:ring-primary-500"
-                        />
+                      <button
+                        key={ct}
+                        type="button"
+                        onClick={() => setForm({ ...form, preferredCollabTypes: toggleIn(form.preferredCollabTypes, ct) })}
+                        className={`px-3 py-1.5 rounded-full text-sm transition ${
+                          form.preferredCollabTypes.includes(ct) ? 'selected-option-glass text-gray-900 font-bold' : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
+                        }`}
+                      >
                         {collabLabel(ct)}
-                      </label>
+                      </button>
                     ))}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Live preview */}
-            <div className="lg:col-span-2 bg-white/85 backdrop-blur rounded-3xl shadow-sm p-6">
-              <h2 className="font-bold text-gray-900">{p.previewTitle}</h2>
-              <p className="text-xs text-gray-500 mt-0.5 mb-5">{p.previewNote}</p>
-
-              <div className="bg-white rounded-2xl shadow-sm p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0">
-                      {form.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={form.avatarUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-lg font-bold text-gray-300">{(form.displayName || '?').charAt(0)}</span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900">{form.displayName || '—'}</p>
-                      <p className="text-xs text-gray-500">{handle}</p>
-                    </div>
-                  </div>
-                  {hasVerifiedAccount && (
-                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-semibold whitespace-nowrap">
-                      ✓ {p.verifiedBadge}
-                    </span>
-                  )}
-                </div>
-
-                {form.bio && <p className="text-sm text-gray-600 mt-3">{form.bio}</p>}
-
-                <p className="text-xs text-gray-500 mt-3 flex items-center gap-2 flex-wrap">
-                  {form.locationCountry && <span>📍 {form.locationCountry}</span>}
-                  {form.languages.length > 0 && <span>🌐 {form.languages.join(', ')}</span>}
-                </p>
-
-                {form.categories.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">{p.contentCategories}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {form.categories.map((cat) => (
-                        <span key={cat} className="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">{t.categoryNames[cat] || cat}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {accounts.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">{p.preferredPlatforms}</p>
-                    <div className="flex gap-1.5">
-                      {accounts.map((acc) => <PlatformIcon key={acc.id} name={acc.platform?.name || ''} />)}
-                    </div>
-                  </div>
-                )}
-
-                {form.preferredCollabTypes.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">{p.collabTypes}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {form.preferredCollabTypes.map((ct) => (
-                        <span key={ct} className="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">{collabLabel(ct)}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         ) : (
           /* ── Social Accounts tab ── */
           <div>
-            <div className="mb-5 bg-white/70 backdrop-blur rounded-2xl shadow-sm px-5 py-3.5 flex items-center gap-3 text-sm text-gray-600">
+            <div className="mb-5 workspace-glass-toolbar rounded-2xl px-5 py-3.5 flex items-center gap-3 text-sm text-gray-600">
               <svg className="w-5 h-5 text-primary-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -432,7 +388,7 @@ export default function CreatorProfilePage() {
               {accounts.map((acc) => {
                 const state = accountVerifState(acc)
                 return (
-                  <div key={acc.id} className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-5">
+                  <div key={acc.id} className="workspace-glass-card rounded-2xl p-5">
                     <div className="flex items-start gap-3">
                       <PlatformIcon name={acc.platform?.name || ''} />
                       <div className="flex-1 min-w-0">

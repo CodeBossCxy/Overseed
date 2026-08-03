@@ -317,12 +317,21 @@ export default function WorkspaceLayout({
               </svg>
             </button>
             <div className="flex items-center gap-3 ml-auto">
+              {role === 'brand' && (
+                <Link
+                  href="/dashboard/brand/campaigns/new"
+                  className="hidden sm:inline-flex h-10 items-center gap-2 px-5 rounded-full bg-primary-600 text-white text-sm font-bold shadow-sm hover:bg-primary-700 transition"
+                >
+                  <span aria-hidden className="text-lg leading-none">+</span>
+                  {t.nav?.createCampaign || 'Create Campaign'}
+                </Link>
+              )}
               {/* Subscription status */}
               <Link
                 href={role === 'creator' ? '/dashboard/upgrade' : '/pricing/brand'}
-                className={`h-10 px-5 rounded-full text-sm font-bold flex items-center transition ${
+                className={`h-10 px-5 rounded-full text-sm font-bold flex items-center transition workspace-top-pill ${
                   isPro
-                    ? 'bg-indigo-100 text-indigo-900 hover:bg-indigo-200/80'
+                    ? 'selected-option-glass text-gray-900 hover:bg-white/70'
                     : 'bg-white shadow-sm text-gray-600 hover:text-gray-900'
                 }`}
                 title={w.myPlan}

@@ -92,7 +92,7 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
     )
 
   return (
-    <div className="max-w-6xl mx-auto pt-6">
+    <div className="max-w-6xl mx-auto workspace-page-tight">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">{s.title}</h1>
@@ -100,7 +100,7 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
       </div>
 
       {/* Toolbar */}
-      <div className="mb-6 bg-white/70 backdrop-blur rounded-2xl shadow-sm px-5 py-3 flex flex-wrap items-center gap-3">
+      <div className="relative z-20 mb-6 workspace-glass-toolbar rounded-2xl px-5 py-3 flex flex-wrap items-center gap-3 overflow-visible">
         <span className="text-sm text-gray-600 font-medium whitespace-nowrap">
           {items.length} {s.savedCount}
         </span>
@@ -113,7 +113,7 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={s.searchPlaceholder}
-            className="w-full pl-10 pr-4 py-2 bg-white rounded-full text-sm border border-transparent focus:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-100"
+            className="w-full pl-10 pr-4 py-2 workspace-glass-control text-sm focus:outline-none"
           />
         </div>
         <div className="flex items-center gap-2 ml-auto">
@@ -121,7 +121,7 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as any)}
-            className="px-3 py-2 bg-white rounded-full text-sm font-medium text-gray-700 shadow-sm border-0 focus:outline-none focus:ring-2 focus:ring-primary-100"
+            className="px-3 py-2 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none"
           >
             <option value="recent">{s.sortRecentlySaved}</option>
             <option value="deadline">{s.sortDeadline}</option>
@@ -142,7 +142,7 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
               {s.filters}
             </button>
             {filtersOpen && (
-              <div data-solid className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 p-3 z-30">
+              <div data-solid className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 p-3 z-50">
                 <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{s.filterCompensation}</p>
                 {['PAID', 'GIFTED', 'PAID_PLUS_GIFT', 'AFFILIATE', 'NEGOTIABLE'].map((type) => (
                   <label key={type} className="flex items-center gap-2 py-1 text-sm text-gray-700 cursor-pointer">
@@ -174,7 +174,7 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
 
       {/* Empty state */}
       {items.length === 0 ? (
-        <div className="bg-white/80 rounded-2xl shadow-sm p-12 text-center">
+        <div className="workspace-glass-card rounded-2xl p-12 text-center">
           <p className="text-gray-500 text-lg mb-2">{s.empty}</p>
           <p className="text-gray-400 mb-6">{s.emptyDesc}</p>
           <Link
@@ -185,7 +185,7 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
           </Link>
         </div>
       ) : visible.length === 0 ? (
-        <div className="bg-white/80 rounded-2xl shadow-sm p-10 text-center text-gray-500">{s.noMatches}</div>
+        <div className="workspace-glass-card rounded-2xl p-10 text-center text-gray-500">{s.noMatches}</div>
       ) : (
         <div className="space-y-4">
           {visible.map((item) => (

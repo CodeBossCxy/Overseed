@@ -13,13 +13,13 @@ import { useTheme } from '@/components/ThemeProvider'
 // Keep in sync with lib/ai-models.ts (client components can't import it
 // directly without leaking env handling).
 const AI_MODEL_OPTIONS = [
-  { id: 'gpt-5.6-luna', label: 'OpenAI GPT-5.6 Luna' },
-  { id: 'gpt-5.6-sol', label: 'OpenAI GPT-5.6 Sol' },
-  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
-  { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-  { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
-  { id: 'kimi-k2.6', label: 'Kimi K2.6' },
-  { id: 'kimi-k3', label: 'Kimi K3' },
+  { id: 'gpt-5.6-luna', label: 'Advanced' },
+  { id: 'gpt-5.6-sol', label: 'Advanced Plus' },
+  { id: 'claude-sonnet-5', label: 'Advanced Reasoning' },
+  { id: 'deepseek-v4-flash', label: 'Standard Fast' },
+  { id: 'deepseek-v4-pro', label: 'Standard Pro' },
+  { id: 'kimi-k2.6', label: 'Standard' },
+  { id: 'kimi-k3', label: 'Standard Creative' },
 ]
 
 interface Message {
@@ -62,9 +62,40 @@ export default function AIAssistantPage() {
   const [editingTitle, setEditingTitle] = useState('')
   const [usagePercent, setUsagePercent] = useState<number | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [toolBusy, setToolBusy] = useState(false)
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const aiAttachmentRef = useRef<HTMLInputElement>(null)
+
+  const attachToPrompt = async (file: File) => {
+    setToolBusy(true)
+    try {
+      const form = new FormData(); form.set('file', file)
+      const res = await fetch('/api/messages/upload', { method: 'POST', body: form })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || 'Upload failed')
+      setInput(prev => `${prev}${prev ? '\n\n' : ''}Attached file: [${data.name}](${data.url})`)
+      inputRef.current?.focus()
+    } catch (error: any) { alert(error.message || 'Upload failed') }
+    finally { setToolBusy(false) }
+  }
+
+  const generateImage = async () => {
+    const prompt = window.prompt('Describe the image you want Overseed AI to create:')
+    if (!prompt?.trim()) return
+    setToolBusy(true)
+    const userMessage: Message = { id: `image-prompt-${Date.now()}`, role: 'user', content: `Create an image: ${prompt.trim()}`, timestamp: new Date() }
+    setMessages(prev => [...prev, userMessage])
+    try {
+      const res = await fetch('/api/ai-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || 'Image generation failed')
+      setMessages(prev => [...prev, { id: `image-${Date.now()}`, role: 'assistant', content: `![Generated image](${data.url})\n\nGenerated from: ${prompt.trim()}`, timestamp: new Date() }])
+    } catch (error: any) {
+      setMessages(prev => [...prev, { id: `image-error-${Date.now()}`, role: 'assistant', content: error.message || 'Image generation failed', timestamp: new Date() }])
+    } finally { setToolBusy(false) }
+  }
 
   const startProgress = () => {
     setProgress(0)
@@ -563,15 +594,15 @@ export default function AIAssistantPage() {
 
   return (
     <RoleShell noFooter>
-      <div className="h-full flex overflow-hidden">
+      <div className="h-full flex overflow-hidden rounded-3xl workspace-glass-card">
         {/* Sidebar */}
         {isProUser && sidebarOpen && (
-          <div className="w-72 flex-shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col">
+          <div className="w-72 flex-shrink-0 bg-white/25 border-r border-white/60 flex flex-col">
             {/* Sidebar header */}
             <div className="p-4 flex items-center justify-between">
               <button
                 onClick={startNewChat}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-medium hover:bg-primary-700 transition shadow-sm"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -605,8 +636,8 @@ export default function AIAssistantPage() {
                       onClick={() => editingChatId !== chat.id && loadChat(chat.id)}
                       className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
                         chatId === chat.id
-                          ? 'bg-primary-100/60 text-primary-900'
-                          : 'hover:bg-gray-100 text-gray-700'
+                          ? 'selected-option-glass text-gray-900 font-bold'
+                          : 'hover:bg-white/45 text-gray-700'
                       }`}
                     >
                       <img src={themeIcon} alt="Overseed" className="w-7 h-7 rounded-lg flex-shrink-0" />
@@ -693,9 +724,9 @@ export default function AIAssistantPage() {
         )}
 
         {/* Main chat area */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 border-l border-white/50">
           {/* Top bar */}
-          <div className="h-14 flex items-center justify-between px-4 border-b border-gray-100 bg-white flex-shrink-0">
+          <div className="h-14 flex items-center justify-between px-4 border-b border-white/55 bg-white/35 backdrop-blur flex-shrink-0">
             <div className="flex items-center gap-3">
               {isProUser && !sidebarOpen && (
                 <button
@@ -723,7 +754,7 @@ export default function AIAssistantPage() {
                 <select
                   value={provider}
                   onChange={(e) => setProvider(e.target.value)}
-                  className="px-3 py-1.5 bg-gray-100 rounded-full text-xs font-medium text-gray-800 border-0 focus:outline-none focus:ring-2 focus:ring-primary-100 cursor-pointer"
+                  className="px-3 py-1.5 workspace-glass-control text-xs font-medium text-gray-800 focus:outline-none cursor-pointer"
                   title="AI model"
                 >
                   {AI_MODEL_OPTIONS.map((m) => (
@@ -975,6 +1006,11 @@ export default function AIAssistantPage() {
           {/* Input */}
           <div className="border-t border-gray-100 bg-white px-4 py-3 flex-shrink-0">
             <div className="max-w-3xl mx-auto">
+              <div className="flex gap-2 mb-2">
+                <input ref={aiAttachmentRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f) attachToPrompt(f); e.currentTarget.value='' }} />
+                <button type="button" disabled={!isProUser || toolBusy} onClick={() => aiAttachmentRef.current?.click()} className="px-3 py-1.5 rounded-full workspace-glass-control text-xs font-semibold disabled:opacity-50">📎 Attach</button>
+                <button type="button" disabled={!isProUser || toolBusy} onClick={generateImage} className="px-3 py-1.5 rounded-full selected-option-glass text-xs font-semibold disabled:opacity-50">✦ Generate image</button>
+              </div>
               <form onSubmit={handleSubmit} className="relative">
                 <textarea
                   ref={inputRef}

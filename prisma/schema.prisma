@@ -447,11 +447,51 @@ model Campaign {
   applications         Application[]
   savedBy              SavedCampaign[]
   collaborations       Collaboration[]
+  outreachQueue        CampaignOutreach[]
 
   @@index([status, createdAt])
   @@index([brandId])
   @@index([deadline])
   @@map("campaigns")
+}
+
+// Creators selected by a brand for Overseed-managed outreach. Contact details
+// are deliberately not stored here or exposed to the brand workspace.
+model CampaignOutreach {
+  id                String   @id @default(cuid())
+  campaignId        String
+  externalCreatorId String
+  platform          String
+  handle            String?
+  displayName       String?
+  avatarUrl         String?
+  followerCount     Int?
+  engagementRate    Decimal? @db.Decimal(7, 3)
+  country           String?
+  nicheTags         String[] @default([])
+  status            String   @default("SHORTLISTED")
+  requestedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, externalCreatorId])
+  @@index([campaignId, status])
+  @@map("campaign_outreach")
+}
+
+// Lightweight product analytics. It intentionally stores only the signed-in
+// user id and route, never search terms or creator contact information.
+model PageViewEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  path      String
+  createdAt DateTime @default(now())
+
+  @@index([path, createdAt])
+  @@index([userId, createdAt])
+  @@map("page_view_events")
 }
 
 model CampaignPlatform {
@@ -575,6 +615,9 @@ model Message {
   senderId        String
   content         String   @db.Text
   messageType     String   @default("text")
+  attachmentUrl   String?
+  attachmentName  String?
+  attachmentMime  String?
   isSystemMessage Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

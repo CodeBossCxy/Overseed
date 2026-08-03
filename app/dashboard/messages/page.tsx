@@ -43,6 +43,9 @@ interface MessageItem {
   messageType: string
   isSystemMessage: boolean
   createdAt: string
+  attachmentUrl?: string | null
+  attachmentName?: string | null
+  attachmentMime?: string | null
 }
 
 export default function MessagesPage() {
@@ -71,6 +74,8 @@ export default function MessagesPage() {
   })
   const [showSettings, setShowSettings] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [attachment, setAttachment] = useState<{ file: File; preview?: string } | null>(null)
+  const attachmentRef = useRef<HTMLInputElement>(null)
   const [savedCreatorIds, setSavedCreatorIds] = useState<Set<string>>(new Set())
   const [listQuery, setListQuery] = useState('')
   const [listFilter, setListFilter] = useState<'all' | 'unread' | 'favorites'>('all')
@@ -262,11 +267,13 @@ export default function MessagesPage() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || !selectedConvId || sendingMessage) return
+    if ((!input.trim() && !attachment) || !selectedConvId || sendingMessage) return
 
     setSendingMessage(true)
     const content = input.trim()
+    const selectedAttachment = attachment
     setInput('')
+    setAttachment(null)
 
     // Optimistic update
     const optimisticMsg: MessageItem = {
@@ -277,16 +284,27 @@ export default function MessagesPage() {
       messageType: 'text',
       isSystemMessage: false,
       createdAt: new Date().toISOString(),
+      attachmentName: selectedAttachment?.file.name,
+      attachmentMime: selectedAttachment?.file.type,
+      attachmentUrl: selectedAttachment?.preview,
     }
     setMessages((prev) => [...prev, optimisticMsg])
 
     try {
+      let uploaded: { url: string; name: string; mime: string } | null = null
+      if (selectedAttachment) {
+        const form = new FormData(); form.set('file', selectedAttachment.file)
+        const uploadRes = await fetch('/api/messages/upload', { method: 'POST', body: form })
+        const uploadData = await uploadRes.json().catch(() => ({}))
+        if (!uploadRes.ok) throw new Error(uploadData.message || 'Attachment upload failed')
+        uploaded = uploadData
+      }
       const res = await fetch(
         `/api/messages/conversations/${selectedConvId}/messages`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content, attachmentUrl: uploaded?.url, attachmentName: uploaded?.name, attachmentMime: uploaded?.mime }),
         }
       )
 
@@ -300,6 +318,7 @@ export default function MessagesPage() {
         // Remove the optimistic message; restore the input so nothing is lost
         setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
         setInput(content)
+        if (selectedAttachment) setAttachment(selectedAttachment)
         setSendError(
           data.code === 'BANNED_CONTENT'
             ? (t.messages as any)?.bannedWarning ||
@@ -307,10 +326,12 @@ export default function MessagesPage() {
             : data.message || 'Failed to send message'
         )
       }
-    } catch (error) {
-      console.error('Error sending message:', error)
+    } catch (error: any) {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
       setInput(content)
+      if (selectedAttachment) setAttachment(selectedAttachment)
+      setSendError(error?.message || 'Failed to send message')
+      console.error('Error sending message:', error)
     } finally {
       setSendingMessage(false)
     }
@@ -376,7 +397,7 @@ export default function MessagesPage() {
   return (
     <Shell>
       <div
-        className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col"
+        className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8 flex flex-col"
         style={{ height: 'calc(100vh - 64px)' }}
       >
         {/* Header */}
@@ -390,7 +411,7 @@ export default function MessagesPage() {
         </div>
 
         {/* Main container */}
-        <div className="flex-1 bg-white rounded-2xl shadow-lg border border-gray-100 flex overflow-hidden">
+        <div className="flex-1 workspace-glass-card rounded-2xl flex overflow-hidden">
           {/* Conversation List (left panel) */}
           <div
             className={`w-full md:w-80 lg:w-96 border-r border-gray-100 flex flex-col ${
@@ -415,8 +436,8 @@ export default function MessagesPage() {
                   <button
                     key={key}
                     onClick={() => setListFilter(key)}
-                    className={`px-3.5 py-1.5 rounded-full text-xs transition ${
-                      listFilter === key ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200' : 'bg-gray-100 text-gray-600 font-semibold hover:bg-gray-200'
+                  className={`px-3.5 py-1.5 rounded-full text-xs transition ${
+                      listFilter === key ? 'selected-option-glass text-gray-900 font-bold' : 'bg-gray-100/70 text-gray-600 font-semibold hover:bg-white/55'
                     }`}
                   >
                     {label}
@@ -576,12 +597,21 @@ export default function MessagesPage() {
                         {(t.messages as any)?.viewBrandProfile || 'View Brand Profile'}
                       </Link>
                     )}
-                    <Link
-                      href={`/campaign/${convDetails.campaignId}`}
-                      className="text-xs text-gray-500 hover:text-primary-600"
-                    >
-                      {t.messages?.viewCampaign || 'View Campaign'}
-                    </Link>
+                    {isBrand && selectedConv?.influencerId ? (
+                      <Link
+                        href={`/influencer/${selectedConv.influencerId}`}
+                        className="text-xs text-gray-500 hover:text-primary-600"
+                      >
+                        {(t.messages as any)?.viewCreatorProfile || 'View Creator Profile'}
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/campaign/${convDetails.campaignId}`}
+                        className="text-xs text-gray-500 hover:text-primary-600"
+                      >
+                        {t.messages?.viewCampaign || 'View Campaign'}
+                      </Link>
+                    )}
                     {/* Settings button */}
                     <div className="relative">
                       <button
@@ -645,6 +675,11 @@ export default function MessagesPage() {
                             <p className="text-sm whitespace-pre-wrap">
                               {msg.content}
                             </p>
+                            {msg.attachmentUrl && (msg.attachmentMime?.startsWith('image/') ? (
+                              <a href={msg.attachmentUrl} target="_blank" rel="noreferrer"><img src={msg.attachmentUrl} alt={msg.attachmentName || 'Attachment'} className="mt-2 max-h-56 rounded-xl object-cover" /></a>
+                            ) : (
+                              <a href={msg.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-xl bg-white/20 px-3 py-2 text-sm underline">📎 {msg.attachmentName || 'Attachment'}</a>
+                            ))}
                             {/* Translated text */}
                             {translations[msg.id] && (
                               <div
@@ -707,6 +742,8 @@ export default function MessagesPage() {
                     </div>
                   )}
                   <form onSubmit={handleSend} className="flex items-end gap-3">
+                    <input ref={attachmentRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f) setAttachment({file:f, preview:f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined}); e.currentTarget.value='' }} />
+                    <button type="button" onClick={() => attachmentRef.current?.click()} className="p-3 rounded-xl workspace-glass-control text-gray-500" title="Attach image or PDF">📎</button>
                     <textarea
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
@@ -720,7 +757,7 @@ export default function MessagesPage() {
                     />
                     <button
                       type="submit"
-                      disabled={!input.trim() || sendingMessage}
+                      disabled={(!input.trim() && !attachment) || sendingMessage}
                       className="px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                     >
                       <svg
@@ -738,6 +775,7 @@ export default function MessagesPage() {
                       </svg>
                     </button>
                   </form>
+                  {attachment && <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/50 px-3 py-1.5 text-xs"><span>📎 {attachment.file.name}</span><button onClick={() => setAttachment(null)} aria-label="Remove attachment">×</button></div>}
                   {/* Safety note */}
                   <div className="mt-2.5 flex items-center justify-between gap-3 text-[11px] text-gray-400">
                     <span className="flex items-center gap-1.5">

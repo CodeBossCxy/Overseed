@@ -30,16 +30,20 @@ export async function POST(
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }
 
-    const { content } = await req.json()
+    const { content, attachmentUrl, attachmentName, attachmentMime } = await req.json()
 
-    if (!content || typeof content !== 'string' || !content.trim()) {
+    if ((!content || typeof content !== 'string' || !content.trim()) && !attachmentUrl) {
       return NextResponse.json(
         { message: 'Message content is required' },
         { status: 400 }
       )
     }
 
-    if (containsBannedContent(content)) {
+    if (attachmentUrl && (typeof attachmentUrl !== 'string' || (!attachmentUrl.startsWith('/uploads/message_attachment/') && !attachmentUrl.startsWith('/api/s3-image/message_attachment/')))) {
+      return NextResponse.json({ message: 'Invalid attachment URL' }, { status: 400 })
+    }
+
+    if (content && containsBannedContent(content)) {
       return NextResponse.json(
         { message: 'Message contains prohibited content', code: 'BANNED_CONTENT' },
         { status: 422 }
@@ -52,7 +56,11 @@ export async function POST(
         data: {
           conversationId,
           senderId: userId,
-          content: content.trim(),
+          content: typeof content === 'string' ? content.trim() : '',
+          messageType: attachmentUrl ? 'attachment' : 'text',
+          attachmentUrl: attachmentUrl || null,
+          attachmentName: attachmentName || null,
+          attachmentMime: attachmentMime || null,
         },
       }),
       prisma.conversation.update({

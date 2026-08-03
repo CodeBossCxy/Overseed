@@ -136,7 +136,7 @@ export default function CampaignDetail({
       {/* Main Content */}
       <div className="lg:col-span-2 space-y-6">
         {/* Header Card */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="workspace-glass-card rounded-3xl overflow-hidden">
           {/* Header */}
           <div className="p-6 border-b">
             <div className="flex items-start justify-between mb-4">
@@ -317,7 +317,7 @@ export default function CampaignDetail({
 
       {/* Sidebar */}
       <div className="lg:col-span-1">
-        <div className="bg-white rounded-lg shadow-md p-6 sticky top-20 space-y-6">
+        <div className="workspace-glass-card rounded-3xl p-6 sticky top-20 space-y-6">
           {/* Compensation */}
           <div>
             <h3 className="text-lg font-semibold mb-3">{t.campaign.compensation}</h3>
@@ -359,7 +359,7 @@ export default function CampaignDetail({
             {isOwner ? (
               <Link
                 href={`/dashboard/brand/campaigns/${campaign.id}`}
-                className="block w-full px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-center font-medium"
+                className="block w-full px-4 py-3 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition text-center font-semibold"
               >
                 {t.campaign.manageCampaignLink}
               </Link>
@@ -375,28 +375,28 @@ export default function CampaignDetail({
                       hasApplied ? (
                         <button
                           disabled
-                          className="w-full px-4 py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed text-center font-medium"
+                          className="w-full px-4 py-3 bg-gray-300 text-gray-600 rounded-full cursor-not-allowed text-center font-semibold"
                         >
                           {t.campaign.alreadyApplied}
                         </button>
                       ) : isAuthenticated && subscriptionTier === 'FREE' ? (
                         <Link
                           href="/dashboard/upgrade"
-                          className="block w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg hover:from-amber-600 hover:to-orange-600 transition text-center font-medium"
+                          className="block w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full hover:from-amber-600 hover:to-orange-600 transition text-center font-semibold"
                         >
                           {t.campaign.upgradeToProToApply}
                         </Link>
                       ) : isAuthenticated ? (
                         <Link
                           href={`/campaign/${campaign.id}/apply`}
-                          className="block w-full px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-center font-medium"
+                          className="block w-full px-4 py-3 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition text-center font-semibold"
                         >
                           {t.campaign.applyNow}
                         </Link>
                       ) : (
                         <Link
                           href="/auth/signin"
-                          className="block w-full px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-center font-medium"
+                          className="block w-full px-4 py-3 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition text-center font-semibold"
                         >
                           {t.campaign.signInToApply}
                         </Link>
@@ -416,7 +416,7 @@ export default function CampaignDetail({
                       <button
                         onClick={toggleSave}
                         disabled={saveBusy}
-                        className={`w-full px-4 py-3 rounded-lg transition text-center font-medium flex items-center justify-center gap-2 disabled:opacity-50 ${
+                        className={`w-full px-4 py-3 rounded-full transition text-center font-semibold flex items-center justify-center gap-2 disabled:opacity-50 ${
                           saved
                             ? 'bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100'
                             : 'border border-gray-300 text-gray-700 hover:bg-gray-50'

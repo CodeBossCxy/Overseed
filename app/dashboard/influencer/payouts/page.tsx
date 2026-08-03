@@ -296,7 +296,7 @@ export default function CreatorPayoutsPage() {
 
   return (
     <CreatorWorkspaceLayout>
-      <div className="max-w-6xl mx-auto pt-6 pb-8">
+      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">{p.title}</h1>
@@ -305,7 +305,7 @@ export default function CreatorPayoutsPage() {
 
         {/* Setup banner — hidden automatically once Stripe is connected */}
         {!stripeLoading && stripeInfo && !stripeInfo.connected && (
-          <div className="mb-6 bg-white/85 backdrop-blur border border-primary-100 rounded-2xl shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="mb-6 workspace-glass-card border border-primary-100 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="w-11 h-11 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -318,7 +318,7 @@ export default function CreatorPayoutsPage() {
             <button
               onClick={openStripe}
               disabled={managing}
-              className="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-50 flex-shrink-0"
+              className="px-5 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-50 flex-shrink-0"
             >
               {p.setupCta}
             </button>
@@ -328,7 +328,7 @@ export default function CreatorPayoutsPage() {
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {stats.map((s) => (
-            <div key={s.label} className="bg-white/85 backdrop-blur rounded-2xl shadow-sm p-5 flex items-center gap-4">
+            <div key={s.label} className="workspace-glass-card rounded-2xl p-5 flex items-center gap-4">
               <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${s.tint}`}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d={s.icon} />
@@ -410,7 +410,7 @@ export default function CreatorPayoutsPage() {
         )}
 
         {/* Tab content */}
-        <div className="bg-white/85 backdrop-blur rounded-3xl shadow-sm mt-6">
+        <div className="workspace-glass-card rounded-3xl mt-6">
           {tab === 'payments' &&
             (loading ? (
               <div className="p-10 text-center text-gray-400 text-sm">{p.loading}</div>
@@ -521,7 +521,7 @@ export default function CreatorPayoutsPage() {
                     <button
                       onClick={openStripe}
                       disabled={managing}
-                      className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-50 flex-shrink-0"
+                      className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-50 flex-shrink-0"
                     >
                       {stripeInfo?.connected ? p.manageWithStripe : p.connectWithStripe}
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -653,7 +653,7 @@ export default function CreatorPayoutsPage() {
 
               <Link
                 href={`/dashboard/influencer/collaborations/${detail.id}`}
-                className="block text-center px-5 py-2.5 bg-indigo-50 text-primary-700 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition"
+                className="block text-center px-5 py-2.5 bg-indigo-50 text-primary-700 rounded-full text-sm font-semibold hover:bg-indigo-100 transition"
               >
                 {t.collab.manage || 'View collaboration'} →
               </Link>

@@ -106,9 +106,9 @@ export default function SocialAccountsPage() {
   if (subscriptionTier === 'FREE') {
     return (
       <CreatorWorkspaceLayout>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-3xl mx-auto workspace-page-tight pb-8">
           <h1 className="text-3xl font-bold mb-8">{t.influencer.accounts.title}</h1>
-          <div className="bg-white rounded-lg shadow-md">
+          <div className="workspace-glass-card rounded-2xl">
             <UpgradePrompt feature="social-accounts" />
           </div>
         </div>
@@ -118,7 +118,7 @@ export default function SocialAccountsPage() {
 
   return (
     <CreatorWorkspaceLayout>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-3xl mx-auto workspace-page-tight pb-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">{t.influencer.accounts.title}</h1>
@@ -127,7 +127,7 @@ export default function SocialAccountsPage() {
           {!showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition"
+              className="px-4 py-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition"
             >
               {t.influencer.accounts.addAccount}
             </button>
@@ -135,7 +135,7 @@ export default function SocialAccountsPage() {
         </div>
 
         {showForm ? (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="workspace-glass-card rounded-2xl p-6 mb-6">
             <h2 className="text-lg font-semibold mb-4">{t.influencer.accounts.linkNew}</h2>
             <SocialAccountForm
               platforms={platforms}
@@ -147,7 +147,7 @@ export default function SocialAccountsPage() {
           </div>
         ) : null}
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="workspace-glass-card rounded-2xl p-6">
           <h2 className="text-lg font-semibold mb-4">{t.influencer.accounts.connectedAccounts}</h2>
           <SocialAccountList
             accounts={accounts as any}
@@ -157,7 +157,7 @@ export default function SocialAccountsPage() {
           />
         </div>
 
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+        <div className="mt-6 p-4 workspace-glass-toolbar rounded-2xl">
           <h3 className="font-medium text-blue-800 mb-2">{t.influencer.accounts.whyLink}</h3>
           <ul className="text-sm text-blue-700 space-y-1">
             <li>{t.influencer.accounts.reason1}</li>
