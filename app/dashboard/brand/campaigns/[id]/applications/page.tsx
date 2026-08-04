@@ -6,7 +6,6 @@ import Link from 'next/link'
 import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import StatusBadge from '@/components/StatusBadge'
 import ConfirmCollaborationModal from '@/components/collaborations/ConfirmCollaborationModal'
-import PipelineTabs from '@/components/PipelineTabs'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 
@@ -27,6 +26,18 @@ function Avatar({ src, name }: { src?: string | null; name: string }) {
       )}
     </div>
   )
+}
+
+function RowIcon({ children }: { children: React.ReactNode }) {
+  return <span className="inline-flex h-5 w-5 items-center justify-center text-[#5571c7]">{children}</span>
+}
+
+function PlatformMark({ platform }: { platform: string }) {
+  const key = platform.toLowerCase()
+  if (key.includes('instagram')) return <span className="font-bold text-pink-500">◎</span>
+  if (key.includes('tiktok')) return <span className="font-bold text-gray-900">♪</span>
+  if (key.includes('youtube')) return <span className="font-bold text-red-500">▶</span>
+  return <span className="h-2 w-2 rounded-full bg-[#7085c8]" />
 }
 
 export default function CampaignApplicationsPage() {
@@ -164,31 +175,29 @@ export default function CampaignApplicationsPage() {
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
+      <div className="max-w-[1240px] mx-auto workspace-page-tight pb-8 text-[#182860]">
         {/* Header */}
-        <div className="mb-6">
-          <p className="text-sm text-gray-500 mb-1">
+        <div className="mb-7">
+          <p className="mb-5 flex flex-wrap items-center gap-3 text-sm font-semibold text-[#6680b8]">
             <Link href="/dashboard/brand/campaigns" className="hover:text-primary-700">{a.breadcrumbPipeline}</Link>
             {campaign && (
               <>
-                {' › '}
+                <span className="text-lg font-normal text-[#8ba0c9]">›</span>
                 <Link href={`/dashboard/brand/campaigns/${campaignId}`} className="hover:text-primary-700">{campaign.title}</Link>
-                {' › '}
-                <span className="font-semibold text-gray-700">{a.breadcrumbManage}</span>
+                <span className="text-lg font-normal text-[#8ba0c9]">›</span>
+                <span>{a.breadcrumbManage}</span>
               </>
             )}
           </p>
-          <h1 className="text-3xl font-bold text-gray-900">{a.pageTitle}</h1>
-          <p className="text-gray-500 mt-1">{t.brand.discover.tabPipelineDesc}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#122a75]">{a.pageTitle}</h1>
+          <p className="mt-1 text-sm font-medium text-[#7182aa]">{t.brand.discover.tabPipelineDesc}</p>
         </div>
-
-        <PipelineTabs campaignId={campaignId} active="pipeline" />
 
         {/* Campaign summary */}
         {campaign && (
-          <div className="mb-6 workspace-glass-card rounded-2xl p-4 sm:p-5 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <div className="flex items-center gap-4 min-w-0 flex-1">
-              <div className="w-20 h-14 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+          <div className="mb-5 workspace-glass-card rounded-2xl px-4 py-4 flex flex-wrap items-stretch gap-y-4">
+            <div className="flex min-w-[340px] flex-1 items-center gap-5 pr-6">
+              <div className="w-32 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
                 {campaign.images?.[0] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={campaign.images[0]} alt="" className="w-full h-full object-cover" />
@@ -199,7 +208,7 @@ export default function CampaignApplicationsPage() {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="font-bold text-gray-900 truncate">{campaign.title}</p>
+                <p className="text-lg font-bold text-[#172760] truncate">{campaign.title}</p>
                 {campaign.categories?.[0] && (
                   <span className="inline-block mt-1 px-2.5 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium">
                     {t.categoryNames[campaign.categories[0].category?.name] || campaign.categories[0].category?.name}
@@ -207,37 +216,37 @@ export default function CampaignApplicationsPage() {
                 )}
               </div>
             </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-1">{a.thStatus}</p>
+            <div className="flex min-w-[155px] flex-col justify-center border-l border-[#dfe5f2] px-8">
+              <p className="text-xs font-semibold text-[#7084b1] mb-2">{a.thStatus}</p>
               <StatusBadge machine="campaign" status={campaign.status} size="sm" dot />
             </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-1">{a.applicationsSection}</p>
-              <p className="text-xl font-bold text-gray-900 tabular-nums">{applications.length}</p>
+            <div className="flex min-w-[155px] flex-col justify-center border-l border-[#dfe5f2] px-8">
+              <p className="text-xs font-semibold text-[#7084b1] mb-2">{a.applicationsSection}</p>
+              <p className="text-xl font-bold text-[#172760] tabular-nums">{applications.length}</p>
             </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-1">{a.selectedCreators}</p>
-              <p className="text-xl font-bold text-gray-900 tabular-nums">{collaborations.length}</p>
+            <div className="flex min-w-[165px] flex-col justify-center border-l border-[#dfe5f2] px-8">
+              <p className="text-xs font-semibold text-[#7084b1] mb-2">{a.selectedCreators}</p>
+              <p className="text-xl font-bold text-[#172760] tabular-nums">{collaborations.length}</p>
             </div>
             {campaign.deadline && (
-              <div>
-                <p className="text-xs text-gray-400 mb-1">{a.thDeadline}</p>
-                <p className="text-sm font-semibold text-gray-900">{formatDate(campaign.deadline, locale)}</p>
+              <div className="flex min-w-[170px] flex-col justify-center border-l border-[#dfe5f2] px-8">
+                <p className="text-xs font-semibold text-[#7084b1] mb-2">{a.thDeadline}</p>
+                <p className="text-sm font-semibold text-[#172760]">{formatDate(campaign.deadline, locale)}</p>
               </div>
             )}
           </div>
         )}
 
         {/* ── Applications ── */}
-        <div className="workspace-glass-card rounded-3xl p-6 mb-6">
+        <div className="workspace-glass-card rounded-2xl px-5 py-4 mb-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-gray-900 flex items-center gap-2">
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
+            <h2 className="font-bold text-[#172760] flex items-center gap-2">
+              <svg className="w-5 h-5 text-[#5571c7]" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
               {a.applicationsSection}
             </h2>
-            <span className="text-xs text-gray-400">{applications.length} {a.applicationsCount}</span>
+            <span className="text-xs font-semibold text-[#7084b1]">{applications.length} {a.applicationsCount}</span>
           </div>
 
           {applications.length === 0 ? (
@@ -246,7 +255,7 @@ export default function CampaignApplicationsPage() {
             <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead>
-                  <tr className="text-left text-xs text-gray-400">
+                  <tr className="border-b border-[#e5e9f3] text-left text-xs text-[#7084b1]">
                     <th className="py-2 pr-4 font-medium">{a.thCreator}</th>
                     <th className="py-2 px-3 font-medium">{a.thPlatform}</th>
                     <th className="py-2 px-3 font-medium">{a.thFollowers}</th>
@@ -257,13 +266,13 @@ export default function CampaignApplicationsPage() {
                     <th className="py-2 pl-3 font-medium">{a.thSelectCol}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-[#e8ecf4]">
                   {applications.map((app) => {
                     const name = creatorName(app)
                     const hasCollab = !!collabByApp[app.id]
                     const selectable = ['PENDING', 'UNDER_REVIEW'].includes(app.status) && !hasCollab
                     return (
-                      <tr key={app.id} className="hover:bg-white/70 transition">
+                      <tr key={app.id} className="hover:bg-white/45 transition">
                         <td className="py-3 pr-4">
                           <div className="flex items-center gap-3 min-w-[160px]">
                             <Avatar src={app.influencer?.avatarUrl || app.influencer?.user?.image} name={name} />
@@ -275,7 +284,7 @@ export default function CampaignApplicationsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-sm text-gray-700 whitespace-nowrap">{platformOf(app)}</td>
+                        <td className="py-3 px-3 text-sm text-[#32416d] whitespace-nowrap"><span className="flex items-center gap-2"><PlatformMark platform={platformOf(app)} />{platformOf(app)}</span></td>
                         <td className="py-3 px-3 text-sm text-gray-700 tabular-nums">{followersOf(app)}</td>
                         <td className="py-3 px-3 text-sm text-gray-700">{app.influencer?.locationCountry || '—'}</td>
                         <td className="py-3 px-3">
@@ -285,8 +294,9 @@ export default function CampaignApplicationsPage() {
                           <div className="flex items-center gap-1.5">
                             <Link
                               href={`/influencer/${app.influencer?.id}`}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white shadow-sm rounded-full text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
+                              className="inline-flex items-center gap-2 px-3 py-2 border border-[#d9e0ee] bg-white/60 rounded-lg text-xs font-semibold text-[#38528f] hover:text-primary-700 transition whitespace-nowrap"
                             >
+                              <RowIcon><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 19a6 6 0 00-12 0m6-8a4 4 0 100-8 4 4 0 000 8zm8-1v6m3-3h-6" /></svg></RowIcon>
                               {a.thViewProfile}
                             </Link>
                             <button
@@ -308,8 +318,9 @@ export default function CampaignApplicationsPage() {
                           <button
                             onClick={() => message(app.id)}
                             disabled={busyId === app.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white shadow-sm rounded-full text-xs font-semibold text-gray-700 hover:text-primary-700 transition disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex items-center gap-2 px-3 py-2 border border-[#d9e0ee] bg-white/60 rounded-lg text-xs font-semibold text-[#38528f] hover:text-primary-700 transition disabled:opacity-50 whitespace-nowrap"
                           >
+                            <RowIcon><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M8 10h8m-8 4h5m8-2a9 9 0 11-4-7.48L21 3v9z" /></svg></RowIcon>
                             {a.thMessage}
                           </button>
                         </td>
@@ -322,14 +333,14 @@ export default function CampaignApplicationsPage() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setConfirmFor(app)}
-                              className="px-4 py-1.5 border border-primary-200 text-primary-700 rounded-full text-xs font-semibold hover:bg-primary-50 transition whitespace-nowrap"
+                              className="min-w-[82px] px-4 py-2 border border-[#b7adff] text-[#6654d9] rounded-lg text-xs font-semibold hover:bg-primary-50 transition whitespace-nowrap"
                               >
                                 {a.selectBtn}
                               </button>
                               <button
                                 onClick={() => decline(app.id)}
                                 disabled={busyId === app.id}
-                                className="px-4 py-1.5 border border-gray-200 text-gray-600 rounded-full text-xs font-semibold hover:bg-gray-50 transition disabled:opacity-50 whitespace-nowrap"
+                                className="min-w-[82px] px-4 py-2 border border-[#d5dce9] text-[#536384] rounded-lg text-xs font-semibold hover:bg-gray-50 transition disabled:opacity-50 whitespace-nowrap"
                               >
                                 {a.declineBtn}
                               </button>
@@ -348,15 +359,15 @@ export default function CampaignApplicationsPage() {
         </div>
 
         {/* ── Collaborations ── */}
-        <div className="workspace-glass-card rounded-3xl p-6">
+        <div className="workspace-glass-card rounded-2xl px-5 py-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-gray-900 flex items-center gap-2">
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
+            <h2 className="font-bold text-[#172760] flex items-center gap-2">
+              <svg className="w-5 h-5 text-[#5571c7]" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               {a.collaborationsSection}
             </h2>
-            <span className="text-xs text-gray-400">{collaborations.length} {a.selectedCreatorsCount}</span>
+            <span className="text-xs font-semibold text-[#7084b1]">{collaborations.length} {a.selectedCreatorsCount}</span>
           </div>
 
           {collaborations.length === 0 ? (
@@ -365,7 +376,7 @@ export default function CampaignApplicationsPage() {
             <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead>
-                  <tr className="text-left text-xs text-gray-400">
+                  <tr className="border-b border-[#e5e9f3] text-left text-xs text-[#7084b1]">
                     <th className="py-2 pr-4 font-medium">{a.thCreator}</th>
                     <th className="py-2 px-3 font-medium">{a.thCollabStatus}</th>
                     <th className="py-2 px-3 font-medium">{a.thPayment}</th>
@@ -373,7 +384,7 @@ export default function CampaignApplicationsPage() {
                     <th className="py-2 pl-3 font-medium">{a.thAction}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-[#e8ecf4]">
                   {collaborations.map((col) => (
                     <tr key={col.id} className="hover:bg-white/70 transition">
                       <td className="py-3 pr-4">
@@ -382,9 +393,7 @@ export default function CampaignApplicationsPage() {
                             src={col.influencer?.avatarUrl || col.influencer?.user?.image}
                             name={col.influencer?.displayName || col.influencer?.user?.name || 'C'}
                           />
-                          <p className="text-sm font-semibold text-gray-900 truncate">
-                            {col.influencer?.displayName || col.influencer?.user?.name}
-                          </p>
+                          <div className="min-w-0"><p className="text-sm font-semibold text-gray-900 truncate">{col.influencer?.displayName || col.influencer?.user?.name}</p>{col.influencer?.socialAccounts?.[0]?.username && <p className="text-xs text-gray-400 truncate">@{col.influencer.socialAccounts[0].username}</p>}</div>
                         </div>
                       </td>
                       <td className="py-3 px-3">
@@ -405,7 +414,7 @@ export default function CampaignApplicationsPage() {
                       <td className="py-3 pl-3">
                         <Link
                           href={`/dashboard/brand/collaborations/${col.id}`}
-                          className="inline-flex items-center px-4 py-1.5 bg-white shadow-sm rounded-full text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
+                          className="inline-flex min-w-[164px] items-center justify-center px-4 py-2 border border-[#b7adff] bg-white/45 rounded-lg text-xs font-semibold text-[#6654d9] hover:bg-primary-50 transition whitespace-nowrap"
                         >
                           {a.manageCollab}
                         </Link>

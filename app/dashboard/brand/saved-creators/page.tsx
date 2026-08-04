@@ -308,9 +308,9 @@ export default function SavedCreatorsPage() {
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     <Link
                       href={`/influencer/${row.influencerId}`}
-                      className="text-center px-4 py-2 bg-indigo-100 text-primary-700 rounded-full text-sm font-semibold hover:bg-indigo-200/70 transition"
+                      className="prismatic-primary-button bg-primary-600 text-white text-center px-4 py-2 rounded-full text-sm font-bold transition"
                     >
-                      {s.viewProfile}
+                      <span className="relative z-10">{s.viewProfile}</span>
                     </Link>
                     <Link
                       href="/dashboard/messages"

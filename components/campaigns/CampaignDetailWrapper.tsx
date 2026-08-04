@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
-import CampaignDetail from './CampaignDetail'
+import CreatorCampaignDetail from './CreatorCampaignDetail'
 import UGCTranslateToggle from '../UGCTranslateToggle'
 
 interface CampaignDetailWrapperProps {
@@ -71,7 +71,7 @@ export default function CampaignDetailWrapper({
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex min-h-16 items-center justify-between gap-3 mb-2">
         <Link
           href={isOwner ? '/dashboard/brand/campaigns' : '/browse'}
           className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-primary-700 transition"
@@ -83,7 +83,7 @@ export default function CampaignDetailWrapper({
         </Link>
         <UGCTranslateToggle isLoading={isLoading} />
       </div>
-      <CampaignDetail
+      <CreatorCampaignDetail
         campaign={campaign}
         isOwner={isOwner}
         hasApplied={hasApplied}

@@ -515,6 +515,41 @@ select {
 
 .workspace-page-tight {
   padding-top: 0;
+  /* Every creator/brand workspace page uses one content rail. Individual
+     sections may still set narrower inner widths, but page titles no longer
+     drift as routes switch between 4xl/6xl/7xl wrappers. */
+  width: 100%;
+  max-width: 80rem !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* One title scale for every creator and brand workspace route. Using the
+   workspace shell as the scope also covers full-height pages such as Messages
+   that intentionally do not use workspace-page-tight. */
+.ws-themed-bg main {
+  /* Reserve one shared header row. Page content can use any internal width,
+     while its h1 stays locked to the workspace grid. */
+  position: relative;
+  padding-top: 3.25rem;
+}
+
+.ws-themed-bg main h1 {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 2rem;
+  margin: 0 !important;
+  font-size: 1.875rem !important;
+  line-height: 2.25rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em;
+}
+
+@media (max-width: 639px) {
+  .ws-themed-bg main h1 {
+    left: 1rem;
+  }
 }
 
 .workspace-glass-card {
@@ -594,6 +629,53 @@ select {
 .workspace-top-pill {
   min-width: 64px;
   justify-content: center;
+}
+
+/* Primary CTA with a subtle spectral refraction over the shared purple
+   campaign-button gradient. Kept low-opacity so labels remain crisp. */
+.prismatic-primary-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-shadow:
+    0 10px 24px rgba(111, 89, 246, 0.28),
+    0 0 18px rgba(120, 187, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44) !important;
+}
+
+.prismatic-primary-button::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -80% -25%;
+  pointer-events: none;
+  background: conic-gradient(
+    from 105deg,
+    transparent 0deg,
+    rgba(111, 236, 255, 0.42) 42deg,
+    rgba(255, 255, 255, 0.5) 72deg,
+    rgba(255, 150, 224, 0.34) 108deg,
+    transparent 150deg,
+    transparent 360deg
+  );
+  mix-blend-mode: screen;
+  transform: translateX(-34%) rotate(-8deg);
+  transition: transform 520ms cubic-bezier(.2,.8,.2,1);
+}
+
+.prismatic-primary-button::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 1px;
+  pointer-events: none;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(115deg, rgba(255,255,255,.2), transparent 32%, transparent 66%, rgba(177,235,255,.16));
+}
+
+.prismatic-primary-button:hover::before {
+  transform: translateX(34%) rotate(8deg);
 }
 
 @keyframes workspace-route-progress {

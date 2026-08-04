@@ -594,7 +594,9 @@ export default function AIAssistantPage() {
 
   return (
     <RoleShell noFooter>
-      <div className="h-full flex overflow-hidden rounded-3xl workspace-glass-card">
+      <div className="h-full min-h-0 flex flex-col">
+        <h1 className="text-3xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
+        <div className="min-h-0 flex-1 flex overflow-hidden rounded-3xl workspace-glass-card">
         {/* Sidebar */}
         {isProUser && sidebarOpen && (
           <div className="w-72 flex-shrink-0 bg-white/25 border-r border-white/60 flex flex-col">
@@ -739,9 +741,9 @@ export default function AIAssistantPage() {
                 </button>
               )}
               <div>
-                <h1 className="text-sm font-semibold text-gray-900">
+                <h2 className="text-sm font-semibold text-gray-900">
                   {chatId ? (chatList.find(c => c.id === chatId)?.title || 'Chat') : t.aiAssistant.title}
-                </h1>
+                </h2>
                 {!chatId && (
                   <p className="text-[11px] text-gray-400 leading-tight">{t.aiAssistant.subtitle}</p>
                 )}
@@ -1038,6 +1040,7 @@ export default function AIAssistantPage() {
               </p>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </RoleShell>

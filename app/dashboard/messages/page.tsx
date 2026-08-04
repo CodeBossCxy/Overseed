@@ -397,7 +397,7 @@ export default function MessagesPage() {
   return (
     <Shell>
       <div
-        className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8 flex flex-col"
+        className="w-full max-w-none mx-0 px-0 pt-0 pb-8 flex flex-col"
         style={{ height: 'calc(100vh - 64px)' }}
       >
         {/* Header */}

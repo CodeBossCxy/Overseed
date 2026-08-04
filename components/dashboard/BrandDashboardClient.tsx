@@ -142,7 +142,7 @@ export default function BrandDashboardClient({
   ]
 
   return (
-    <div className="max-w-7xl mx-auto pt-0 pb-8 lg:-mt-4">
+    <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
