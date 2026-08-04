@@ -146,25 +146,25 @@ export default function BrandDashboardClient({
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <h1 className="text-3xl sm:text-[34px] font-bold leading-tight text-gray-900">
-              {d.title}
-            </h1>
-            <span className={`inline-flex items-center gap-2 text-sm font-semibold ${
-              isApproved ? 'text-gray-700' : isRejected ? 'text-red-700' : isPending ? 'text-amber-700' : 'text-gray-500'
-            }`}>
-              <svg className={`h-5 w-5 flex-shrink-0 ${
-                isApproved ? 'text-[#21466f]' : isRejected ? 'text-red-600' : isPending ? 'text-amber-600' : 'text-gray-400'
-              }`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
-              </svg>
-              {isApproved ? d.verifiedBusiness : verifLabel}
-            </span>
-          </div>
-          <div className="mt-8">
-            <p className="text-xl sm:text-2xl font-bold leading-tight text-gray-900">
-              {welcomeLine}
-            </p>
+          <h1 className="text-3xl sm:text-[34px] font-bold leading-tight text-gray-900">
+            {d.title}
+          </h1>
+          <div className="mt-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <p className="text-xl sm:text-2xl font-bold leading-tight text-gray-900">
+                {welcomeLine}
+              </p>
+              <span className={`inline-flex items-center gap-2 text-sm font-semibold ${
+                isApproved ? 'text-gray-700' : isRejected ? 'text-red-700' : isPending ? 'text-amber-700' : 'text-gray-500'
+              }`}>
+                <svg className={`h-5 w-5 flex-shrink-0 ${
+                  isApproved ? 'text-[#21466f]' : isRejected ? 'text-red-600' : isPending ? 'text-amber-600' : 'text-gray-400'
+                }`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
+                </svg>
+                {isApproved ? d.verifiedBusiness : verifLabel}
+              </span>
+            </div>
             <p className="mt-2 text-base text-gray-600">{d.welcomeSubtitle}</p>
           </div>
         </div>
