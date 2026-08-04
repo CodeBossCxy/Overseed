@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTranslatedEntities } from '@/lib/translation-service'
+import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
 
 // GET: Get my applications (influencer)
 export async function GET(req: NextRequest) {
@@ -15,6 +17,7 @@ export async function GET(req: NextRequest) {
     const userId = (session.user as any).id
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')
+    const lang = searchParams.get('lang')
 
     // Check if user has an influencer profile
     const influencerProfile = await prisma.influencerProfile.findUnique({
@@ -68,6 +71,26 @@ export async function GET(req: NextRequest) {
         appliedAt: 'desc',
       },
     })
+
+    // Translate campaigns only when a language is explicitly requested,
+    // so omitting lang returns the original (untranslated) text
+    if (lang && isSupportedLanguage(lang)) {
+      const targetLanguage: SupportedLanguage = lang
+      const translatedCampaigns = await getTranslatedEntities(
+        'Campaign',
+        applications.map((a) => a.campaign),
+        targetLanguage
+      )
+
+      // Brand profile isn't fetched with `description` on this list route (only
+      // id/companyName/logoUrl/isVerified are shown), so there's nothing to translate there.
+      const reassembledApplications = applications.map((application, index) => ({
+        ...application,
+        campaign: translatedCampaigns[index],
+      }))
+
+      return NextResponse.json(reassembledApplications)
+    }
 
     return NextResponse.json(applications)
   } catch (error) {

@@ -13,8 +13,10 @@ export async function GET(
   try {
     const { id } = await params
     const { searchParams } = new URL(req.url)
-    const lang = searchParams.get('lang') || 'en'
-    const targetLanguage: SupportedLanguage = isSupportedLanguage(lang) ? lang : 'en'
+    // Translate only when a language is explicitly requested, so omitting
+    // lang returns the original (untranslated) text
+    const lang = searchParams.get('lang')
+    const targetLanguage: SupportedLanguage | null = lang && isSupportedLanguage(lang) ? lang : null
 
     const campaign = await prisma.campaign.findUnique({
       where: { id: id },
@@ -28,6 +30,7 @@ export async function GET(
             websiteUrl: true,
             description: true,
             industry: true,
+            countries: true,
             isVerified: true,
           },
         },
@@ -76,6 +79,10 @@ export async function GET(
         where: { id: id },
         data: { viewCount: { increment: 1 } },
       })
+    }
+
+    if (!targetLanguage) {
+      return NextResponse.json(campaign)
     }
 
     // Translate campaign if needed

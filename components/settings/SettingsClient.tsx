@@ -585,16 +585,19 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
           <AccountRow
             title={st.displayName}
             value={
-              <div className="flex items-center gap-2 w-full max-w-sm">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-100"
-                />
-                {nameMsg && (
-                  <span className={`text-xs ${nameMsg.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{nameMsg.text}</span>
-                )}
+              <div className="w-full max-w-lg">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-100"
+                  />
+                  {nameMsg && (
+                    <span className={`text-xs ${nameMsg.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>{nameMsg.text}</span>
+                  )}
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-gray-500">{st.displayNameHelp}</p>
               </div>
             }
             action={

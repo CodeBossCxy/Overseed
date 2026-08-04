@@ -7,6 +7,7 @@ import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import StatusBadge from '@/components/StatusBadge'
 import PaymentStatusBadge from '@/components/payments/PaymentStatus'
 import PaymentModal from '@/components/payments/PaymentModal'
+import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 
@@ -16,7 +17,7 @@ export default function BrandManageCollaborationPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
-  const { t, locale } = useLanguage()
+  const { t, locale, isUGCTranslated } = useLanguage()
   const c = t.collab
 
   const [collab, setCollab] = useState<any>(null)
@@ -81,7 +82,8 @@ export default function BrandManageCollaborationPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/collaborations/${id}`)
+      const url = isUGCTranslated ? `/api/collaborations/${id}?lang=${locale}` : `/api/collaborations/${id}`
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
         setCollab(data.collaboration)
@@ -89,7 +91,7 @@ export default function BrandManageCollaborationPage() {
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, locale, isUGCTranslated])
 
   useEffect(() => { load() }, [load])
 
@@ -157,7 +159,10 @@ export default function BrandManageCollaborationPage() {
             <h1 className="text-2xl font-bold">{c.manage}</h1>
             <p className="text-gray-600 mt-1">{c.manageSubtitle}</p>
           </div>
-          <StatusBadge machine="collaboration" status={collab.status} size="lg" dot />
+          <div className="flex items-center gap-3">
+            <UGCTranslateToggle isLoading={loading} />
+            <StatusBadge machine="collaboration" status={collab.status} size="lg" dot />
+          </div>
         </div>
 
         {/* Creator header */}

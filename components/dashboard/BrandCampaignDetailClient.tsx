@@ -159,7 +159,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       <div className="flex items-center gap-2 text-sm text-[#6272a4] mb-5"><Link href="/dashboard/brand/campaigns">Campaign Pipeline</Link><span>›</span><b className="text-[#17255f]">{campaign.title}</b></div>
       {campaignTabs}
       <div className="grid xl:grid-cols-[minmax(0,1fr)_390px] gap-5 items-start">
-        <main className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-4">
           <header>
             <h1 className="text-4xl font-bold tracking-tight">{campaign.title}</h1>
             <p className="text-[#6876a1] mt-1">Manage and track your campaign performance.</p>
@@ -190,7 +190,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           </div>
 
           <section className="workspace-glass-card rounded-3xl p-6 flex gap-5"><span className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">▣</span><div className="grid md:grid-cols-3 gap-6 flex-1 text-sm"><div><p className="text-[#7884a8]">Application Window</p><b>{campaign.deadline ? `Until ${new Date(campaign.deadline).toLocaleDateString()}` : 'Open-ended'}</b></div><div><p className="text-[#7884a8]">Content Due</p><b>{campaign.campaignEndDate ? new Date(campaign.campaignEndDate).toLocaleDateString() : 'To be confirmed'}</b></div><div><p className="text-[#7884a8]">Notes</p><b>{campaign.hashtagsRequired || 'Managed through Overseed'}</b></div></div></section>
-        </main>
+        </div>
 
         <aside className="workspace-glass-card rounded-3xl p-7 xl:sticky xl:top-5">
           <div className="flex justify-between"><b>Status</b><span className="px-3 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold capitalize">● &nbsp;{statusLabel}</span></div>
@@ -227,7 +227,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     </section>
 
     <div className="grid xl:grid-cols-[minmax(0,1fr)_390px] gap-4 items-start">
-      <main className="min-w-0">
+      <div className="min-w-0">
         <>
           <section className="workspace-glass-card rounded-3xl p-5 mb-4">
             <div className="flex gap-4 items-center"><div className="w-12 h-12 rounded-2xl bg-white/70 text-indigo-600 flex items-center justify-center">{icon(sparkle)}</div><div className="flex-1"><b>Contact details are managed by Overseed.</b><p className="text-sm text-[#7180ad] mt-1">Shortlist creators here. Overseed handles invitations, replies, and next steps on your behalf.</p></div><span className="hidden md:block text-sm font-semibold">Learn how it works &nbsp;→</span></div>
@@ -255,7 +255,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             </article>)}
           </div>
         </>
-      </main>
+      </div>
 
       <aside className="workspace-glass-card rounded-3xl p-5 xl:sticky xl:top-5">
         <div className="flex justify-between items-center"><h2 className="text-xl font-bold">Outreach Queue <span className="text-sm border border-white rounded-lg px-2 py-1 ml-1">{queue.length}</span></h2><span>⌃</span></div>

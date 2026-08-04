@@ -6,6 +6,7 @@ import StatusBadge from '@/components/StatusBadge'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 
 // My Applications & Collaborations per spec 4.4: three tabs — Applications
 // (Applied/Selected/Not Selected/Withdrawn), Active (Awaiting Confirmation /
@@ -45,7 +46,7 @@ function BrandCell({ brand }: { brand: any }) {
 }
 
 export default function InfluencerApplicationsPage() {
-  const { t, locale } = useLanguage()
+  const { t, locale, isUGCTranslated } = useLanguage()
   const c = t.collab
   const [tab, setTab] = useState<Tab>('applications')
   const [applications, setApplications] = useState<any[]>([])
@@ -54,8 +55,9 @@ export default function InfluencerApplicationsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
+    const applicationsUrl = isUGCTranslated ? `/api/applications?lang=${locale}` : '/api/applications'
     Promise.all([
-      fetch('/api/applications').then((r) => (r.ok ? r.json() : [])),
+      fetch(applicationsUrl).then((r) => (r.ok ? r.json() : [])),
       fetch('/api/collaborations?role=creator').then((r) => (r.ok ? r.json() : { collaborations: [] })),
     ])
       .then(([apps, cols]) => {
@@ -64,7 +66,7 @@ export default function InfluencerApplicationsPage() {
       })
       .catch(() => {})
       .finally(() => setIsLoading(false))
-  }, [])
+  }, [locale, isUGCTranslated])
 
   const collabByApp: Record<string, any> = {}
   collaborations.forEach((col) => {
@@ -175,9 +177,12 @@ export default function InfluencerApplicationsPage() {
     <CreatorWorkspaceLayout>
       <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">{c.pageTitle}</h1>
-          <p className="text-gray-500 mt-1">{c.pageSubtitle}</p>
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{c.pageTitle}</h1>
+            <p className="text-gray-500 mt-1">{c.pageSubtitle}</p>
+          </div>
+          <UGCTranslateToggle isLoading={isLoading} />
         </div>
 
         {/* Tabs */}

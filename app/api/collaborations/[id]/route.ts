@@ -3,12 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Collaboration as CollaborationSM, assertTransition, type CollaborationStatus } from '@/lib/status'
+import { getTranslatedEntity } from '@/lib/translation-service'
+import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
 
 async function loadCollaboration(id: string) {
   return prisma.collaboration.findUnique({
     where: { id },
     include: {
-      campaign: { select: { id: true, title: true, images: true } },
+      campaign: { select: { id: true, title: true, images: true, originalLanguage: true } },
       brand: { select: { id: true, userId: true, companyName: true, logoUrl: true } },
       influencer: { select: { id: true, userId: true, displayName: true, avatarUrl: true } },
       application: { select: { id: true } },
@@ -18,7 +20,7 @@ async function loadCollaboration(id: string) {
   })
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -31,7 +33,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const isCreator = collaboration.influencer.userId === userId
   if (!isBrand && !isCreator) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
 
-  return NextResponse.json({ collaboration, viewerRole: isBrand ? 'brand' : 'creator' })
+  const { searchParams } = new URL(req.url)
+  const lang = searchParams.get('lang')
+  let result: any = collaboration
+  if (lang && isSupportedLanguage(lang)) {
+    const targetLanguage: SupportedLanguage = lang
+    let translatedCampaign = collaboration.campaign
+    if (translatedCampaign) {
+      translatedCampaign = await getTranslatedEntity('Campaign', translatedCampaign, targetLanguage)
+    }
+    result = { ...collaboration, campaign: translatedCampaign }
+  }
+
+  return NextResponse.json({ collaboration: result, viewerRole: isBrand ? 'brand' : 'creator' })
 }
 
 // PATCH: drive the collaboration lifecycle. Body: { action, ...payload }.

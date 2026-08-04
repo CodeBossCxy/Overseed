@@ -7,6 +7,7 @@ import ApplicationStatus from '@/components/applications/ApplicationStatus'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 
 interface ApplicationDetail {
   id: string
@@ -50,7 +51,7 @@ export default function ApplicationDetailPage() {
   const params = useParams()
   const router = useRouter()
   const applicationId = params.id as string
-  const { t, locale } = useLanguage()
+  const { t, locale, isUGCTranslated } = useLanguage()
 
   const [application, setApplication] = useState<ApplicationDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -59,7 +60,10 @@ export default function ApplicationDetailPage() {
   useEffect(() => {
     const fetchApplication = async () => {
       try {
-        const res = await fetch(`/api/applications/${applicationId}`)
+        const url = isUGCTranslated
+          ? `/api/applications/${applicationId}?lang=${locale}`
+          : `/api/applications/${applicationId}`
+        const res = await fetch(url)
         if (res.ok) {
           const data = await res.json()
           setApplication(data)
@@ -75,7 +79,7 @@ export default function ApplicationDetailPage() {
       }
     }
     fetchApplication()
-  }, [applicationId])
+  }, [applicationId, locale, isUGCTranslated])
 
   const handleMessage = async () => {
     try {
@@ -162,12 +166,15 @@ export default function ApplicationDetailPage() {
     <RoleShell>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back link */}
-        <Link
-          href="/dashboard/influencer/applications"
-          className="text-primary-600 hover:underline text-sm mb-6 inline-block"
-        >
-          {t.applications.detail.backToApplications}
-        </Link>
+        <div className="flex items-center justify-between mb-6">
+          <Link
+            href="/dashboard/influencer/applications"
+            className="text-primary-600 hover:underline text-sm inline-block"
+          >
+            {t.applications.detail.backToApplications}
+          </Link>
+          <UGCTranslateToggle isLoading={isLoading} />
+        </div>
 
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

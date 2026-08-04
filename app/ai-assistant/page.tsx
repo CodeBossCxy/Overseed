@@ -13,13 +13,13 @@ import { useTheme } from '@/components/ThemeProvider'
 // Keep in sync with lib/ai-models.ts (client components can't import it
 // directly without leaking env handling).
 const AI_MODEL_OPTIONS = [
-  { id: 'gpt-5.6-luna', label: 'Advanced' },
-  { id: 'gpt-5.6-sol', label: 'Advanced Plus' },
-  { id: 'claude-sonnet-5', label: 'Advanced Reasoning' },
-  { id: 'deepseek-v4-flash', label: 'Standard Fast' },
-  { id: 'deepseek-v4-pro', label: 'Standard Pro' },
-  { id: 'kimi-k2.6', label: 'Standard' },
-  { id: 'kimi-k3', label: 'Standard Creative' },
+  { id: 'gpt-5.6-luna', label: 'ChatGPT · Advanced' },
+  { id: 'gpt-5.6-sol', label: 'ChatGPT · Advanced Plus' },
+  { id: 'claude-sonnet-5', label: 'Claude · Advanced Reasoning' },
+  { id: 'deepseek-v4-flash', label: 'DeepSeek · Standard Fast' },
+  { id: 'deepseek-v4-pro', label: 'DeepSeek · Standard Pro' },
+  { id: 'kimi-k2.6', label: 'Kimi · Standard' },
+  { id: 'kimi-k3', label: 'Kimi · Standard Creative' },
 ]
 
 interface Message {

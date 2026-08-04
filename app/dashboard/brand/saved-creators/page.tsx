@@ -5,6 +5,7 @@ import Link from 'next/link'
 import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import { PlatformIcon } from '@/components/campaigns/CampaignRowCard'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 
 // Saved Creators: the brand's bookmarked platform creators, as a filterable
 // card grid. Bookmarks come from the applications table and creator profiles.
@@ -46,7 +47,7 @@ const COUNTRY_LABELS: Record<string, { en: string; zh: string }> = {
 }
 
 export default function SavedCreatorsPage() {
-  const { t, locale } = useLanguage()
+  const { t, locale, isUGCTranslated } = useLanguage()
   const s = t.brand.savedCreators
 
   const [saved, setSaved] = useState<any[]>([])
@@ -61,12 +62,14 @@ export default function SavedCreatorsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/saved-creators')
+    setLoading(true)
+    const url = isUGCTranslated ? `/api/saved-creators?lang=${locale}` : '/api/saved-creators'
+    fetch(url)
       .then((res) => (res.ok ? res.json() : { saved: [] }))
       .then((data) => setSaved(data.saved || []))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [isUGCTranslated, locale])
 
   const maxFollowers = (inf: any) =>
     Math.max(0, ...(inf?.socialAccounts || []).map((a: any) => a.followerCount || 0))
@@ -163,12 +166,15 @@ export default function SavedCreatorsPage() {
     <BrandWorkspaceLayout>
       <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header */}
-        <div className="mb-6">
-          <p className="text-sm text-gray-500 mb-1">
-            {s.title} › {s.breadcrumb}
-          </p>
-          <h1 className="text-3xl font-bold text-gray-900">{s.title}</h1>
-          <p className="text-gray-500 mt-1">{s.subtitle}</p>
+        <div className="mb-6 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-gray-500 mb-1">
+              {s.title} › {s.breadcrumb}
+            </p>
+            <h1 className="text-3xl font-bold text-gray-900">{s.title}</h1>
+            <p className="text-gray-500 mt-1">{s.subtitle}</p>
+          </div>
+          <UGCTranslateToggle isLoading={loading} />
         </div>
 
         {/* Toolbar */}

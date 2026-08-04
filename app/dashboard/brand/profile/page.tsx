@@ -320,6 +320,7 @@ export default function BrandProfilePage() {
                   className={inputClass}
                   placeholder={p.companyNamePlaceholder}
                 />
+                <p className="mt-1.5 text-xs leading-relaxed text-gray-500">{p.displayNameHelp}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{p.companySize} <span className="text-gray-400 font-normal">({p.optionalTag})</span></label>

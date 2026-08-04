@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { isSupportedLanguage } from '@/lib/db/translations'
+import { getTranslatedEntities } from '@/lib/translation-service'
 
 async function getBrandId(userId: string) {
   const brand = await prisma.brandProfile.findUnique({
@@ -46,6 +48,18 @@ export async function GET(req: NextRequest) {
       },
     },
   })
+
+  const lang = req.nextUrl.searchParams.get('lang')
+  if (lang && isSupportedLanguage(lang)) {
+    const translatedProfiles = await getTranslatedEntities(
+      'InfluencerProfile',
+      saved.map((row) => row.influencer),
+      lang
+    )
+    const translatedSaved = saved.map((row, i) => ({ ...row, influencer: translatedProfiles[i] }))
+    return NextResponse.json({ saved: translatedSaved })
+  }
+
   return NextResponse.json({ saved })
 }
 

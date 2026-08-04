@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import CreatorWorkspaceLayout from '@/components/workspace/CreatorWorkspaceLayout'
 import StatusBadge from '@/components/StatusBadge'
+import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 
@@ -34,7 +35,7 @@ export default function CreatorManageCollaborationPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
-  const { t, locale } = useLanguage()
+  const { t, locale, isUGCTranslated } = useLanguage()
   const c = t.collab
 
   const [collab, setCollab] = useState<any>(null)
@@ -53,8 +54,10 @@ export default function CreatorManageCollaborationPage() {
   const [uploadingShot, setUploadingShot] = useState(false)
 
   const load = useCallback(async () => {
+    setLoading(true)
     try {
-      const res = await fetch(`/api/collaborations/${id}`)
+      const url = isUGCTranslated ? `/api/collaborations/${id}?lang=${locale}` : `/api/collaborations/${id}`
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
         setCollab(data.collaboration)
@@ -62,7 +65,7 @@ export default function CreatorManageCollaborationPage() {
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, locale, isUGCTranslated])
 
   useEffect(() => {
     load()
@@ -182,13 +185,16 @@ export default function CreatorManageCollaborationPage() {
     <CreatorWorkspaceLayout>
       <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">{c.manage}</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            <Link href="/dashboard/influencer/applications" className="hover:text-primary-700">{c.pageTitle}</Link>
-            {' › '}
-            {collab.campaign?.title} · {collab.brand?.companyName}
-          </p>
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <p className="text-sm text-gray-500">
+              <Link href="/dashboard/influencer/applications" className="hover:text-primary-700">{c.pageTitle}</Link>
+              {' › '}
+              {collab.campaign?.title} · {collab.brand?.companyName}
+            </p>
+            <h1 className="mt-2 text-3xl font-bold text-gray-900">{c.manage}</h1>
+          </div>
+          <UGCTranslateToggle isLoading={loading} />
         </div>
 
         {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>}

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTranslatedEntity } from '@/lib/translation-service'
+import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
 
 // GET: Get single application details
 export async function GET(
@@ -17,6 +19,8 @@ export async function GET(
     }
 
     const userId = (session.user as any).id
+    const { searchParams } = new URL(req.url)
+    const lang = searchParams.get('lang')
 
     const application = await prisma.application.findUnique({
       where: { id },
@@ -62,6 +66,34 @@ export async function GET(
 
     if (!isApplicant && !isCampaignOwner) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
+
+    // Translate only when a language is explicitly requested, so omitting
+    // lang returns the original (untranslated) text
+    if (lang && isSupportedLanguage(lang)) {
+      const targetLanguage: SupportedLanguage = lang
+      const translatedCampaign = await getTranslatedEntity(
+        'Campaign',
+        application.campaign,
+        targetLanguage
+      )
+
+      let translatedBrand = translatedCampaign.brand
+      if (translatedCampaign.brand?.description) {
+        translatedBrand = await getTranslatedEntity(
+          'BrandProfile',
+          { ...translatedCampaign.brand, id: translatedCampaign.brand.id },
+          targetLanguage
+        )
+      }
+
+      return NextResponse.json({
+        ...application,
+        campaign: {
+          ...translatedCampaign,
+          brand: translatedBrand,
+        },
+      })
     }
 
     return NextResponse.json(application)

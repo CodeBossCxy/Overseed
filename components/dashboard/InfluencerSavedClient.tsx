@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import CampaignRowCard from '@/components/campaigns/CampaignRowCard'
+import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 
 interface InfluencerSavedClientProps {
   savedCampaigns: any[]
@@ -12,7 +13,7 @@ interface InfluencerSavedClientProps {
 const URGENT_WINDOW_DAYS = 14
 
 export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSavedClientProps) {
-  const { t } = useLanguage()
+  const { t, locale, isUGCTranslated } = useLanguage()
   const s = t.influencer.saved
 
   const [items, setItems] = useState<any[]>(savedCampaigns)
@@ -22,6 +23,32 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
   const [compFilter, setCompFilter] = useState<string[]>([])
   const [urgentOnly, setUrgentOnly] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [isTranslating, setIsTranslating] = useState(false)
+
+  useEffect(() => {
+    if (!isUGCTranslated) {
+      setItems(savedCampaigns)
+      return
+    }
+
+    async function fetchTranslatedSaved() {
+      setIsTranslating(true)
+      try {
+        const response = await fetch(`/api/campaigns/saved?lang=${locale}`)
+        const data = await response.json()
+        if (Array.isArray(data)) {
+          setItems(data)
+        }
+      } catch (error) {
+        console.error('Error fetching saved campaigns:', error)
+      } finally {
+        setIsTranslating(false)
+      }
+    }
+
+    fetchTranslatedSaved()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale, isUGCTranslated, savedCampaigns])
 
   const isUrgent = (campaign: any) => {
     if (!campaign.deadline) return false
@@ -94,9 +121,12 @@ export default function InfluencerSavedClient({ savedCampaigns }: InfluencerSave
   return (
     <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">{s.title}</h1>
-        <p className="text-gray-500 mt-1">{s.subtitle}</p>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">{s.title}</h1>
+          <p className="text-gray-500 mt-1">{s.subtitle}</p>
+        </div>
+        <UGCTranslateToggle isLoading={isTranslating} />
       </div>
 
       {/* Toolbar */}

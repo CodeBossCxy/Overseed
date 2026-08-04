@@ -76,6 +76,8 @@ export default function MessagesPage() {
   const [sendError, setSendError] = useState<string | null>(null)
   const [attachment, setAttachment] = useState<{ file: File; preview?: string } | null>(null)
   const attachmentRef = useRef<HTMLInputElement>(null)
+  const composerRef = useRef<HTMLTextAreaElement>(null)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [savedCreatorIds, setSavedCreatorIds] = useState<Set<string>>(new Set())
   const [listQuery, setListQuery] = useState('')
   const [listFilter, setListFilter] = useState<'all' | 'unread' | 'favorites'>('all')
@@ -140,6 +142,15 @@ export default function MessagesPage() {
       }
     }
   }, [searchParams, conversations])
+
+  // Keep the desktop workspace populated like a conventional two-pane inbox.
+  // Mobile still opens on the conversation list unless a URL targets a thread.
+  useEffect(() => {
+    if (selectedConvId || conversations.length === 0 || searchParams.get('conv')) return
+    if (window.matchMedia('(min-width: 768px)').matches) {
+      setSelectedConvId(conversations[0].id)
+    }
+  }, [conversations, searchParams, selectedConvId])
 
   // Fetch messages when conversation is selected
   useEffect(() => {
@@ -344,6 +355,18 @@ export default function MessagesPage() {
     }
   }
 
+  const insertEmoji = (emoji: string) => {
+    const textarea = composerRef.current
+    const start = textarea?.selectionStart ?? input.length
+    const end = textarea?.selectionEnd ?? input.length
+    setInput((current) => `${current.slice(0, start)}${emoji}${current.slice(end)}`)
+    setShowEmojiPicker(false)
+    requestAnimationFrame(() => {
+      textarea?.focus()
+      textarea?.setSelectionRange(start + emoji.length, start + emoji.length)
+    })
+  }
+
   const localeTag = locale === 'zh' ? 'zh-CN' : 'en-US'
 
   const formatTime = (dateStr: string) => {
@@ -397,11 +420,11 @@ export default function MessagesPage() {
   return (
     <Shell>
       <div
-        className="w-full max-w-none mx-0 px-0 pt-0 pb-8 flex flex-col"
-        style={{ height: 'calc(100vh - 64px)' }}
+        className="w-full max-w-none mx-0 px-0 pt-0 pb-4 flex flex-col"
+        style={{ height: 'calc(100vh - 76px)' }}
       >
         {/* Header */}
-        <div className="mb-4">
+        <div className="mb-5">
           <h1 className="text-2xl font-bold text-gray-900">
             {t.messages?.title || 'Messages'}
           </h1>
@@ -411,15 +434,16 @@ export default function MessagesPage() {
         </div>
 
         {/* Main container */}
-        <div className="flex-1 workspace-glass-card rounded-2xl flex overflow-hidden">
+        <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
           {/* Conversation List (left panel) */}
           <div
-            className={`w-full md:w-80 lg:w-96 border-r border-gray-100 flex flex-col ${
+            className={`w-full md:w-[360px] xl:w-[430px] flex-shrink-0 workspace-glass-card rounded-3xl overflow-hidden flex flex-col ${
               showMobileThread ? 'hidden md:flex' : 'flex'
             }`}
           >
-            <div className="p-4 border-b border-gray-100 space-y-3">
-              <div className="relative">
+            <div className="p-5 pb-3 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
                 <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
@@ -428,15 +452,19 @@ export default function MessagesPage() {
                   value={listQuery}
                   onChange={(e) => setListQuery(e.target.value)}
                   placeholder={(t.messages as any)?.searchMessages || 'Search messages...'}
-                  className="w-full pl-9 pr-3 py-2 bg-gray-50 rounded-full text-sm border border-transparent focus:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                  className="w-full h-11 pl-10 pr-4 workspace-glass-control rounded-full text-sm focus:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-100"
                 />
+                </div>
+                <button type="button" className="h-11 w-11 flex-shrink-0 rounded-full workspace-glass-control inline-flex items-center justify-center text-primary-600" aria-label="Message filters">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" d="M4 7h16M7 12h10M10 17h4" /></svg>
+                </button>
               </div>
-              <div className="flex gap-1.5">
+              <div className="flex gap-3">
                 {([['all', (t.messages as any)?.tabAll || 'All'], ['unread', (t.messages as any)?.tabUnread || 'Unread'], ['favorites', (t.messages as any)?.tabFavorites || 'Favorites']] as const).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => setListFilter(key)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs transition ${
+                    className={`px-5 py-2 rounded-full text-sm transition ${
                       listFilter === key ? 'selected-option-glass text-gray-900 font-bold' : 'bg-gray-100/70 text-gray-600 font-semibold hover:bg-white/55'
                     }`}
                   >
@@ -446,7 +474,7 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto px-3 pb-3">
               {loading ? (
                 <div className="p-6 text-center text-gray-500 text-sm">
                   {t.common.loading}
@@ -481,20 +509,20 @@ export default function MessagesPage() {
                   <button
                     key={conv.id}
                     onClick={() => handleSelectConversation(conv.id)}
-                    className={`w-full p-4 flex items-start gap-3 hover:bg-gray-50 transition text-left border-b border-gray-50 ${
-                      selectedConvId === conv.id ? 'bg-primary-50' : ''
+                    className={`w-full px-4 py-4 flex items-start gap-4 rounded-2xl hover:bg-white/35 transition text-left mb-1 ${
+                      selectedConvId === conv.id ? 'bg-gradient-to-r from-indigo-50/90 to-purple-50/70 shadow-sm ring-1 ring-white/60' : ''
                     }`}
                   >
                     {/* Avatar */}
-                    <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-14 h-14 bg-white/65 ring-1 ring-white rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {conv.otherUser?.image ? (
                         <img
                           src={conv.otherUser.image}
                           alt=""
-                          className="w-10 h-10 rounded-full object-cover"
+                          className="w-14 h-14 rounded-full object-cover"
                         />
                       ) : (
-                        <span className="text-primary-600 font-medium text-sm">
+                        <span className="text-primary-700 font-bold text-lg">
                           {conv.otherUser?.name?.charAt(0)?.toUpperCase() || '?'}
                         </span>
                       )}
@@ -503,7 +531,7 @@ export default function MessagesPage() {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm text-gray-900 truncate flex items-center gap-1.5">
+                        <span className="font-bold text-base text-[#172760] truncate flex items-center gap-1.5">
                           {conv.otherUser?.name || t.messages.unknownUser}
                           {isFavorited(conv) && (
                             <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -517,19 +545,14 @@ export default function MessagesPage() {
                             : ''}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 truncate mt-0.5">
-                        {conv.campaignTitle}
-                      </p>
-                      <div className="flex items-center justify-between mt-1">
-                        <p className="text-sm text-gray-600 truncate">
+                      <div className="flex items-center justify-between mt-1.5">
+                        <p className="text-sm text-[#61719a] line-clamp-2 leading-5">
                           {conv.lastMessage?.isSystemMessage
                             ? `${t.messages.systemPrefix} ${conv.lastMessage.content}`
                             : conv.lastMessage?.content || ''}
                         </p>
                         {conv.unreadCount > 0 && (
-                          <span className="bg-primary-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center flex-shrink-0 ml-2">
-                            {conv.unreadCount}
-                          </span>
+                          <span className="w-2.5 h-2.5 bg-primary-600 rounded-full flex-shrink-0 ml-2" title={`${conv.unreadCount} unread`} />
                         )}
                       </div>
                     </div>
@@ -541,14 +564,14 @@ export default function MessagesPage() {
 
           {/* Message Thread (right panel) */}
           <div
-            className={`flex-1 flex flex-col ${
+            className={`flex-1 min-w-0 workspace-glass-card rounded-3xl overflow-hidden flex flex-col ${
               !showMobileThread ? 'hidden md:flex' : 'flex'
             }`}
           >
             {selectedConvId && convDetails ? (
               <>
                 {/* Thread header */}
-                <div className="p-4 border-b border-gray-100 flex items-center gap-3">
+                <div className="px-6 py-5 flex items-center gap-4">
                   <button
                     onClick={() => setShowMobileThread(false)}
                     className="md:hidden p-1 hover:bg-gray-100 rounded"
@@ -567,8 +590,11 @@ export default function MessagesPage() {
                       />
                     </svg>
                   </button>
+                  <div className="w-14 h-14 rounded-full bg-white/65 ring-1 ring-white flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {convDetails.otherUser?.image ? <img src={convDetails.otherUser.image} alt="" className="w-full h-full object-cover" /> : <span className="text-xl font-bold text-primary-700">{convDetails.otherUser?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                    <h3 className="text-lg font-bold text-[#172760] truncate flex items-center gap-2">
                       {convDetails.otherUser?.name || t.messages.unknownUser}
                       {selectedConv && isFavorited(selectedConv) && (
                         <>
@@ -581,18 +607,13 @@ export default function MessagesPage() {
                         </>
                       )}
                     </h3>
-                    <Link
-                      href={`/campaign/${convDetails.campaignId}`}
-                      className="text-xs text-primary-600 hover:underline truncate block"
-                    >
-                      {(t.messages as any)?.messageContext || 'Message context:'} {convDetails.campaignTitle}
-                    </Link>
+                    <p className="text-sm text-[#6b7ba3] mt-1">{isBrand ? 'Creator collaboration' : 'Brand collaboration'}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {!isBrand && selectedConv?.brandProfileId && (
                       <Link
                         href={`/brand/${selectedConv.brandProfileId}`}
-                        className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 hover:text-primary-700 transition whitespace-nowrap"
+                        className="px-5 py-2.5 bg-white/55 border border-white/80 shadow-sm rounded-xl text-sm font-semibold text-[#25386f] hover:text-primary-700 transition whitespace-nowrap"
                       >
                         {(t.messages as any)?.viewBrandProfile || 'View Brand Profile'}
                       </Link>
@@ -600,14 +621,14 @@ export default function MessagesPage() {
                     {isBrand && selectedConv?.influencerId ? (
                       <Link
                         href={`/influencer/${selectedConv.influencerId}`}
-                        className="text-xs text-gray-500 hover:text-primary-600"
+                        className="px-4 py-2 text-sm text-gray-600 hover:text-primary-600"
                       >
                         {(t.messages as any)?.viewCreatorProfile || 'View Creator Profile'}
                       </Link>
                     ) : (
                       <Link
                         href={`/campaign/${convDetails.campaignId}`}
-                        className="text-xs text-gray-500 hover:text-primary-600"
+                        className="px-4 py-2 text-sm text-gray-600 hover:text-primary-600"
                       >
                         {t.messages?.viewCampaign || 'View Campaign'}
                       </Link>
@@ -616,7 +637,7 @@ export default function MessagesPage() {
                     <div className="relative">
                       <button
                         onClick={() => setShowSettings(!showSettings)}
-                        className="p-1.5 hover:bg-gray-100 rounded-lg transition"
+                        className="h-11 w-11 inline-flex items-center justify-center bg-white/45 border border-white/70 hover:bg-white/70 rounded-xl transition"
                         title={t.nav.settings}
                       >
                         <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -646,8 +667,15 @@ export default function MessagesPage() {
                   </div>
                 </div>
 
+                <div className="mx-6 border-y border-white/60 px-1 py-3 text-sm text-[#6075a8]">
+                  <Link href={`/campaign/${convDetails.campaignId}`} className="font-semibold hover:text-primary-700">
+                    <span className="text-[#25386f]">{(t.messages as any)?.messageContext || 'Message context:'}</span> {convDetails.campaignTitle} <span className="ml-2">⌄</span>
+                  </Link>
+                </div>
+
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                <div className="flex-1 overflow-y-auto px-7 py-5 space-y-3">
+                  {messages.length > 0 && <div className="flex items-center gap-4 py-1 text-xs text-[#8290b1]"><span className="h-px flex-1 bg-white/70" /><span>{new Date(messages[0].createdAt).toLocaleDateString(localeTag, { month: 'long', day: 'numeric', year: 'numeric' })}</span><span className="h-px flex-1 bg-white/70" /></div>}
                   {messages.map((msg) =>
                     msg.isSystemMessage ? (
                       <div key={msg.id} className="text-center">
@@ -664,12 +692,12 @@ export default function MessagesPage() {
                             : 'justify-start'
                         }`}
                       >
-                        <div className="max-w-[75%]">
+                        <div className="max-w-[68%]">
                           <div
-                            className={`rounded-2xl px-4 py-2 ${
+                            className={`rounded-2xl px-5 py-3 shadow-sm ring-1 ring-white/50 ${
                               msg.senderId === userId
-                                ? 'bg-primary-600 text-white'
-                                : 'bg-gray-100 text-gray-800'
+                                ? 'bg-gradient-to-br from-blue-50/90 to-indigo-100/80 text-[#263b72]'
+                                : 'bg-white/55 text-[#263b72]'
                             }`}
                           >
                             <p className="text-sm whitespace-pre-wrap">
@@ -685,7 +713,7 @@ export default function MessagesPage() {
                               <div
                                 className={`mt-2 pt-2 border-t text-sm whitespace-pre-wrap ${
                                   msg.senderId === userId
-                                    ? 'border-primary-400/30 text-primary-100'
+                                    ? 'border-primary-200/50 text-[#52699b]'
                                     : 'border-gray-200 text-gray-600'
                                 }`}
                               >
@@ -695,7 +723,7 @@ export default function MessagesPage() {
                             <p
                               className={`text-xs mt-1 ${
                                 msg.senderId === userId
-                                  ? 'text-primary-200'
+                                  ? 'text-[#8190b1]'
                                   : 'text-gray-400'
                               }`}
                             >
@@ -731,7 +759,7 @@ export default function MessagesPage() {
                 </div>
 
                 {/* Input */}
-                <div className="border-t border-gray-100 p-4">
+                <div className="px-6 pb-4 pt-2">
                   {sendError && (
                     <div className="mb-3 flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-sm text-red-700">
                       <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -741,10 +769,23 @@ export default function MessagesPage() {
                       <button type="button" onClick={() => setSendError(null)} className="text-red-400 hover:text-red-600" aria-label="Dismiss">✕</button>
                     </div>
                   )}
-                  <form onSubmit={handleSend} className="flex items-end gap-3">
+                  <form onSubmit={handleSend} className="relative min-h-[88px] rounded-2xl bg-white/45 border border-white/75 shadow-sm p-3 pb-12">
                     <input ref={attachmentRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f) setAttachment({file:f, preview:f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined}); e.currentTarget.value='' }} />
-                    <button type="button" onClick={() => attachmentRef.current?.click()} className="p-3 rounded-xl workspace-glass-control text-gray-500" title="Attach image or PDF">📎</button>
+                    {showEmojiPicker && (
+                      <div className="absolute bottom-12 left-3 z-20 grid w-56 grid-cols-6 gap-1 rounded-2xl border border-white/80 bg-white/90 p-3 shadow-xl backdrop-blur-xl">
+                        {['😀', '😂', '🥰', '😍', '😊', '👍', '👏', '🙌', '🎉', '❤️', '✨', '🔥', '💡', '✅', '🙏', '🤝', '💬', '📎'].map((emoji) => (
+                          <button key={emoji} type="button" onClick={() => insertEmoji(emoji)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:bg-indigo-50" aria-label={`Insert ${emoji}`}>
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="absolute left-3 bottom-2.5 flex h-8 items-center gap-1">
+                      <button type="button" onClick={() => setShowEmojiPicker((open) => !open)} className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-base leading-none text-[#536a9e] hover:bg-white/60 ${showEmojiPicker ? 'bg-white/70' : ''}`} aria-label="Add emoji" aria-expanded={showEmojiPicker}>☺</button>
+                      <button type="button" onClick={() => attachmentRef.current?.click()} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-base leading-none text-[#536a9e] hover:bg-white/60" title="Attach image or PDF" aria-label="Attach image or PDF">📎</button>
+                    </div>
                     <textarea
+                      ref={composerRef}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={handleKeyDown}
@@ -752,27 +793,15 @@ export default function MessagesPage() {
                         t.messages?.typeMessage || 'Type a message...'
                       }
                       rows={1}
-                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none text-sm"
+                      className="w-full bg-transparent px-1 py-1 border-0 focus:ring-0 focus:outline-none resize-none text-sm text-[#263b72] placeholder:text-[#8d9aba]"
                       style={{ maxHeight: '120px' }}
                     />
                     <button
                       type="submit"
                       disabled={(!input.trim() && !attachment) || sendingMessage}
-                      className="px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                      className="absolute right-3 bottom-2.5 min-w-[92px] px-5 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                        />
-                      </svg>
+                      {sendingMessage ? '…' : 'Send'}
                     </button>
                   </form>
                   {attachment && <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/50 px-3 py-1.5 text-xs"><span>📎 {attachment.file.name}</span><button onClick={() => setAttachment(null)} aria-label="Remove attachment">×</button></div>}

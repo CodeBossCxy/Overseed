@@ -40,6 +40,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           websiteUrl: true,
           description: true,
           industry: true,
+          countries: true,
           isVerified: true,
         },
       },

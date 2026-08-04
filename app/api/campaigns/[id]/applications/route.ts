@@ -75,16 +75,20 @@ export async function GET(
       },
     })
 
-    // Translate pitch messages if language specified
-    const lang = searchParams.get('lang') || 'en'
-    const targetLanguage: SupportedLanguage = isSupportedLanguage(lang) ? lang : 'en'
-    const translatedApplications = await getTranslatedEntities(
-      'Application',
-      applications,
-      targetLanguage
-    )
+    // Translate pitch messages only when a language is explicitly requested,
+    // so omitting lang returns the original (untranslated) text
+    const lang = searchParams.get('lang')
+    if (lang && isSupportedLanguage(lang)) {
+      const targetLanguage: SupportedLanguage = lang
+      const translatedApplications = await getTranslatedEntities(
+        'Application',
+        applications,
+        targetLanguage
+      )
+      return NextResponse.json(translatedApplications)
+    }
 
-    return NextResponse.json(translatedApplications)
+    return NextResponse.json(applications)
   } catch (error) {
     console.error('Error fetching applications:', error)
     return NextResponse.json(

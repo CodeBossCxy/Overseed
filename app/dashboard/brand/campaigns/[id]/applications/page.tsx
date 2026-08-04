@@ -6,6 +6,7 @@ import Link from 'next/link'
 import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import StatusBadge from '@/components/StatusBadge'
 import ConfirmCollaborationModal from '@/components/collaborations/ConfirmCollaborationModal'
+import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 
@@ -44,7 +45,7 @@ export default function CampaignApplicationsPage() {
   const params = useParams()
   const router = useRouter()
   const campaignId = params.id as string
-  const { t, locale } = useLanguage()
+  const { t, locale, isUGCTranslated } = useLanguage()
   const a = t.brand.applications
 
   const [campaign, setCampaign] = useState<any>(null)
@@ -89,8 +90,8 @@ export default function CampaignApplicationsPage() {
   const fetchData = useCallback(async () => {
     try {
       const [campaignRes, appsRes, colRes] = await Promise.all([
-        fetch(`/api/campaigns/${campaignId}?lang=${locale}`),
-        fetch(`/api/campaigns/${campaignId}/applications?lang=${locale}`),
+        fetch(`/api/campaigns/${campaignId}${isUGCTranslated ? `?lang=${locale}` : ''}`),
+        fetch(`/api/campaigns/${campaignId}/applications${isUGCTranslated ? `?lang=${locale}` : ''}`),
         fetch(`/api/collaborations?role=brand&campaignId=${campaignId}`),
       ])
       if (campaignRes.ok) setCampaign(await campaignRes.json())
@@ -104,7 +105,7 @@ export default function CampaignApplicationsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [campaignId, locale])
+  }, [campaignId, locale, isUGCTranslated])
 
   useEffect(() => {
     fetchData()
@@ -189,8 +190,13 @@ export default function CampaignApplicationsPage() {
               </>
             )}
           </p>
-          <h1 className="text-3xl font-bold tracking-tight text-[#122a75]">{a.pageTitle}</h1>
-          <p className="mt-1 text-sm font-medium text-[#7182aa]">{t.brand.discover.tabPipelineDesc}</p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-[#122a75]">{a.pageTitle}</h1>
+              <p className="mt-1 text-sm font-medium text-[#7182aa]">{t.brand.discover.tabPipelineDesc}</p>
+            </div>
+            <UGCTranslateToggle isLoading={isLoading} />
+          </div>
         </div>
 
         {/* Campaign summary */}

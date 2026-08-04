@@ -71,18 +71,22 @@ export default function CampaignDetailWrapper({
 
   return (
     <div>
-      <div className="flex min-h-16 items-center justify-between gap-3 mb-2">
-        <Link
-          href={isOwner ? '/dashboard/brand/campaigns' : '/browse'}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-primary-700 transition"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          {isOwner ? t.brand.campaigns.title : t.workspace.browseCampaigns}
-        </Link>
-        <UGCTranslateToggle isLoading={isLoading} />
-      </div>
+      <header className="mb-3 text-[#17255f]">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href={isOwner ? '/dashboard/brand/campaigns' : '/browse'}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-primary-700 transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            {isOwner ? t.brand.campaigns.title : t.workspace.browseCampaigns}
+          </Link>
+          <UGCTranslateToggle isLoading={isLoading} />
+        </div>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Campaign Details</h1>
+        <p className="mt-2 text-[#6876a1]">{isOwner ? 'Preview how creators see your campaign.' : 'Recommended opportunity for you'}</p>
+      </header>
       <CreatorCampaignDetail
         campaign={campaign}
         isOwner={isOwner}
