@@ -167,7 +167,7 @@ export default function WorkspaceLayout({
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <Link href="/" className="flex w-full items-center justify-center gap-2.5 px-4 pt-9 pb-12">
+      <Link href="/" className="workspace-logo-link flex w-full items-center justify-center gap-2.5 px-4 pt-9 pb-12">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/home/landing-logo-overseed.png" alt="Overseed" className="h-14 w-auto object-contain overseed-logo-ink" />
       </Link>

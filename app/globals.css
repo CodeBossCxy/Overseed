@@ -477,8 +477,8 @@ select {
   font-weight: 500 !important;
 }
 
-:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):active,
-:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):focus-visible {
+:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):not(.workspace-logo-link):active,
+:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):not(.workspace-logo-link):focus-visible {
   color: var(--foreground) !important;
   background:
     linear-gradient(110deg, rgba(255, 255, 255, 0.92) 0%, rgba(234, 242, 255, 0.7) 22%, rgba(255, 244, 252, 0.62) 40%, rgba(229, 255, 250, 0.48) 55%, rgba(235, 244, 255, 0.68) 74%, rgba(255, 255, 255, 0.9) 100%),
@@ -500,8 +500,8 @@ select {
   outline: none;
 }
 
-:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):active *,
-:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):focus-visible * {
+:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):not(.workspace-logo-link):active *,
+:is(a[href], button, [role="button"]):not(:disabled):not([aria-disabled="true"]):not(.workspace-logo-link):focus-visible * {
   color: inherit !important;
 }
 
@@ -511,6 +511,20 @@ select {
 .border-gray-900.bg-white.text-gray-900.font-bold > svg {
   color: rgba(255, 255, 255, 0.96);
   filter: drop-shadow(0 1px 2px rgba(45, 49, 78, 0.34));
+}
+
+/* The brand mark is navigation, not a button; keep it visually static when
+   pressed even though workspace links normally receive a glass click state. */
+.workspace-logo-link:active,
+.workspace-logo-link:focus,
+.workspace-logo-link:focus-visible {
+  color: inherit !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transform: none !important;
 }
 
 .workspace-page-tight {

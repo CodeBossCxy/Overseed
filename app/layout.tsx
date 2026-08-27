@@ -37,7 +37,10 @@ export const metadata: Metadata = {
   },
   description: 'A global platform connecting brands with creators for cross-border marketing collaborations.',
   keywords: 'creator marketing, brand collaborations, content creators, influencer marketing, cross-border marketing, KOL',
-  metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3333'),
+  metadataBase: new URL('https://overseed.net'),
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: 'Overseed - Connect Brands with Creators',
     description: 'AI-powered cross-border creator collaboration platform. Launch campaigns, discover creators, manage partnerships.',
@@ -50,8 +53,8 @@ export const metadata: Metadata = {
     description: 'AI-powered cross-border creator collaboration platform.',
   },
   robots: {
-    index: false,
-    follow: false,
+    index: true,
+    follow: true,
   },
 }
 
@@ -66,6 +69,20 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning style={{ colorScheme: 'light' }}>
       <head>
         <link rel="icon" type="image/png" href="/icon-pink.png" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Organization',
+              name: 'Overseed',
+              url: 'https://overseed.net',
+              logo: 'https://overseed.net/icon-pink.png',
+              description:
+                'AI-powered cross-border creator collaboration platform connecting brands with creators.',
+            }),
+          }}
+        />
       </head>
       <body className={`${manrope.variable} ${notoSansSC.variable} ${GeistMono.variable} ${dmSerifDisplay.variable} font-sans`}>
         <SessionProvider session={session}>
