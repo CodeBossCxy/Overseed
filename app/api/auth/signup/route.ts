@@ -100,7 +100,6 @@ export async function POST(request: Request) {
           businessCountry: businessCountry || null,
           businessWebsite: businessWebsite || null,
           brandVerificationStatus: 'PENDING',
-          verificationSubmittedAt: new Date(),
         },
       })
     }

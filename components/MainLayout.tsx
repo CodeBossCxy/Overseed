@@ -2,7 +2,6 @@ import Header from './Header'
 import Footer from './Footer'
 import CreateCampaignFAB from './CreateCampaignFAB'
 import BetaBanner from './BetaBanner'
-import BetaFeedbackWidget from './BetaFeedbackWidget'
 
 export default function MainLayout({
   children,
@@ -22,7 +21,6 @@ export default function MainLayout({
       </main>
       {!noFooter && !hideFooter && <Footer />}
       <CreateCampaignFAB />
-      <BetaFeedbackWidget />
     </div>
   )
 }

@@ -34,6 +34,7 @@ interface BrandProfile {
   companyName: string | null
   logoUrl: string | null
   brandVerificationStatus?: string | null
+  accountType?: string | null
 }
 
 interface BrandDashboardClientProps {
@@ -162,7 +163,13 @@ export default function BrandDashboardClient({
                 }`} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
                 </svg>
-                {isApproved ? d.verifiedBusiness : verifLabel}
+                {isApproved
+                  ? brandProfile.accountType === 'individual_pr'
+                    ? t.status.badge.verifiedIndividualPr
+                    : brandProfile.accountType === 'agency'
+                      ? t.status.badge.verifiedAgency
+                      : d.verifiedBusiness
+                  : verifLabel}
               </span>
             </div>
             <p className="mt-2 text-base text-gray-600">{d.welcomeSubtitle}</p>

@@ -203,9 +203,11 @@ export function deriveAccountStatus(isActive: boolean): AccountStatus {
 }
 
 /** Public verified badge label key by account type (per spec). */
-export function verifiedBadgeKey(userType: string): string {
+export function verifiedBadgeKey(userType: string, accountType?: string | null): string {
   switch (userType) {
     case 'BRAND':
+      if (accountType === 'individual_pr') return 'verifiedIndividualPr'
+      if (accountType === 'agency') return 'verifiedAgency'
       return 'verifiedBusiness'
     case 'AGENCY':
       return 'verifiedAgency'

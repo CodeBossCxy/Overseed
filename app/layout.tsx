@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth'
 import SessionProvider from '@/components/SessionProvider'
 import { LanguageProvider } from '@/lib/i18n/LanguageContext'
 import ThemeProvider from '@/components/ThemeProvider'
+import BetaFeedbackWidget from '@/components/BetaFeedbackWidget'
 
 const dmSerifDisplay = DM_Serif_Display({
   subsets: ['latin'],
@@ -89,6 +90,7 @@ export default async function RootLayout({
           <LanguageProvider>
             <ThemeProvider>
               {children}
+              <BetaFeedbackWidget />
             </ThemeProvider>
           </LanguageProvider>
         </SessionProvider>

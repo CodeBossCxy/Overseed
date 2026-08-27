@@ -584,7 +584,15 @@ export default function BrandProfilePage() {
                     </svg>
                   )}
                 </p>
-                {isVerified && <p className="text-xs text-gray-500">{t.brand.dashboard.verifiedBusiness}</p>}
+                {isVerified && (
+                  <p className="text-xs text-gray-500">
+                    {formData.accountType === 'individual_pr'
+                      ? t.status.badge.verifiedIndividualPr
+                      : formData.accountType === 'agency'
+                        ? t.status.badge.verifiedAgency
+                        : t.brand.dashboard.verifiedBusiness}
+                  </p>
+                )}
               </div>
             </div>
 

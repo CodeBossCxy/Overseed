@@ -343,6 +343,8 @@ model BrandProfile {
   businessCountry         String?
   businessWebsite         String?
   businessDocuments       String[]       @default([])
+  // Full structured verification submission (per account type + country flow)
+  verificationData        Json?
 
   stripeCustomerId    String?
 

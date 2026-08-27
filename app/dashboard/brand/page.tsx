@@ -36,7 +36,6 @@ export default async function BrandDashboardPage() {
         userId,
         companyName: session.user.name,
         brandVerificationStatus: 'PENDING',
-        verificationSubmittedAt: new Date(),
       },
     })
   }

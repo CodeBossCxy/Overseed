@@ -19,6 +19,12 @@ export default function BetaFeedbackWidget() {
 
   if (!session) return null
 
+  // The Create Campaign FAB (verified brands, public pages) occupies bottom-right;
+  // stack the feedback button above it in that case.
+  const fabMayBePresent =
+    (session.user as any)?.brandVerificationStatus === 'APPROVED' &&
+    !pathname.startsWith('/dashboard')
+
   const handleSubmit = async () => {
     if (!content.trim()) return
     setIsSubmitting(true)
@@ -57,7 +63,7 @@ export default function BetaFeedbackWidget() {
       {/* Floating feedback button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 bg-amber-500 hover:bg-amber-600 text-white rounded-full px-4 py-3 shadow-lg transition-all hover:shadow-xl flex items-center gap-2 group"
+        className={`fixed ${fabMayBePresent ? 'bottom-24' : 'bottom-6'} right-6 z-40 bg-amber-500 hover:bg-amber-600 text-white rounded-full px-4 py-3 shadow-lg transition-all hover:shadow-xl flex items-center gap-2 group`}
         title={t.beta?.feedbackButton || 'Send Feedback'}
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,6 +78,7 @@ export default function BetaFeedbackWidget() {
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsOpen(false)}>
           <div
+            data-solid
             className="bg-white rounded-xl shadow-2xl w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
