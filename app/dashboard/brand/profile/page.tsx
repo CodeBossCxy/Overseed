@@ -458,7 +458,7 @@ export default function BrandProfilePage() {
             </div>
             {!isVerified && (
               <Link
-                href="/contact"
+                href="/dashboard/brand/verification"
                 className="px-4 py-2 bg-primary-600 text-white rounded-full text-xs font-semibold hover:bg-primary-700 transition whitespace-nowrap"
               >
                 {p.startVerification}
