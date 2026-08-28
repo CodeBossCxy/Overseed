@@ -166,13 +166,20 @@ export default function CreatorManageCollaborationPage() {
     { label: c.stepCompleted, done: status === 'COMPLETED' },
   ]
 
-  const paymentStates = [
-    { key: 'required', label: t.status.payment.required, active: !!pay && ['PENDING', 'PROCESSING'].includes(pay.status) },
-    { key: 'secured', label: t.status.payment.secured, active: !!pay && ['HELD', 'RELEASE_PENDING'].includes(pay.status) },
-    { key: 'released', label: t.status.payment.released, active: !!pay && ['RELEASED', 'PAYOUT_PROCESSING', 'PAID'].includes(pay.status) },
-    { key: 'refunded', label: t.status.payment.refunded, active: pay?.status === 'REFUNDED' },
-    { key: 'na', label: 'N/A', active: !pay },
-  ]
+  // Monetary payment exists (or is expected). Product-only deals have neither.
+  const hasPayment = !!pay || collab.fee != null
+  const paymentDoneCount = !pay || ['PENDING', 'PROCESSING', 'FAILED'].includes(pay.status)
+    ? 0
+    : ['HELD', 'RELEASE_PENDING'].includes(pay.status)
+    ? 2
+    : ['RELEASED', 'PAYOUT_PROCESSING', 'PAID'].includes(pay.status)
+    ? 3
+    : 0 // REFUNDED / DISPUTED — surfaced via the status badge instead
+  const paymentSteps = [
+    t.status.payment.required,
+    t.status.payment.secured,
+    t.status.payment.released,
+  ].map((label, i) => ({ label, done: i < paymentDoneCount }))
 
   const term = (label: string, value: React.ReactNode) => (
     <div className="flex items-start justify-between gap-4 py-2.5 border-b border-gray-50 last:border-b-0">
@@ -362,34 +369,49 @@ export default function CreatorManageCollaborationPage() {
 
           {/* ── 3. Payment ── */}
           <SectionCard title={`3. ${c.paymentSection}`} subtitle={c.paymentSubtitle}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-0">
-                {paymentStates.map((st, i) => (
-                  <div key={st.key} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <span className={`w-4 h-4 rounded-full border-2 ${st.active ? 'border-gray-900 bg-gray-900' : 'border-gray-200 bg-white'}`} />
-                      {i < paymentStates.length - 1 && <span className="w-0.5 flex-1 min-h-[16px] bg-gray-100" />}
+            {!hasPayment ? (
+              <p className="text-sm text-gray-500 bg-gray-50 rounded-xl px-4 py-3">🎁 {c.noPaymentNote}</p>
+            ) : (
+              <>
+                {/* Progress timeline (read-only), matching the Deliverables tracker */}
+                <div className="flex items-start mb-6">
+                  {paymentSteps.map((step, i) => (
+                    <div key={step.label} className="flex items-start flex-1 last:flex-none">
+                      <div className="flex flex-col items-center text-center w-[86px] flex-shrink-0">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step.done ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-300'}`}>
+                          {step.done ? (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <span className="text-xs">{i + 1}</span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-gray-500 mt-1.5 leading-tight">{step.label}</span>
+                      </div>
+                      {i < paymentSteps.length - 1 && (
+                        <div className={`h-0.5 flex-1 mt-4 ${paymentSteps[i + 1].done ? 'bg-primary-600' : 'bg-gray-200'}`} />
+                      )}
                     </div>
-                    <p className={`text-sm pb-4 ${st.active ? 'font-bold text-gray-900' : 'text-gray-400'}`}>{st.label}</p>
-                  </div>
-                ))}
-              </div>
-              <div>
-                {term(c.amountLabel, pay
-                  ? `$${Number(pay.creatorPayout ?? pay.amount).toLocaleString()}`
-                  : collab.fee != null ? `${collab.currency} ${Number(collab.fee).toLocaleString()}` : null)}
-                {pay?.paidAt && term(c.securedOn, formatDate(pay.paidAt, locale))}
-                {pay?.releasedAt && term(c.releasedOn, formatDate(pay.releasedAt, locale))}
-                {pay && (
-                  <div className="mt-3">
-                    <StatusBadge machine="payment" status={pay.status} size="sm" dot />
-                  </div>
-                )}
-                {paymentSecured && (
-                  <p className="mt-3 text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">🔒 {c.fundsHeldNote}</p>
-                )}
-              </div>
-            </div>
+                  ))}
+                </div>
+                <div>
+                  {term(c.amountLabel, pay
+                    ? `$${Number(pay.creatorPayout ?? pay.amount).toLocaleString()}`
+                    : collab.fee != null ? `${collab.currency} ${Number(collab.fee).toLocaleString()}` : null)}
+                  {pay?.paidAt && term(c.securedOn, formatDate(pay.paidAt, locale))}
+                  {pay?.releasedAt && term(c.releasedOn, formatDate(pay.releasedAt, locale))}
+                  {pay && (
+                    <div className="mt-3">
+                      <StatusBadge machine="payment" status={pay.status} size="sm" dot />
+                    </div>
+                  )}
+                  {paymentSecured && (
+                    <p className="mt-3 text-xs text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">🔒 {c.fundsHeldNote}</p>
+                  )}
+                </div>
+              </>
+            )}
           </SectionCard>
 
           {/* ── 4. Brand ── */}
