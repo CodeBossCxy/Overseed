@@ -67,8 +67,9 @@ interface BetaFeedbackItem {
 }
 
 export default function AdminDashboard() {
-  const { data: session, status } = useSession()
+  const { data: session, status, update } = useSession()
   const router = useRouter()
+  const [triedRefresh, setTriedRefresh] = useState(false)
   const { t, locale } = useLanguage()
   const [overview, setOverview] = useState<Overview | null>(null)
   const [users, setUsers] = useState<UserData[]>([])
@@ -96,9 +97,15 @@ export default function AdminDashboard() {
   const [isGenerating, setIsGenerating] = useState(false)
 
   useEffect(() => {
-    if (status === 'loading') return
-    if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      router.push('/')
+    // Access control is enforced server-side in app/admin/layout.tsx (DB check).
+    // Here we only make sure the JWT is fresh so /api/admin/* calls (which read
+    // userType from the token) succeed for a recently-promoted admin.
+    if (status === 'loading' || !session?.user) return
+    if ((session.user as any).userType !== 'ADMIN') {
+      if (!triedRefresh) {
+        setTriedRefresh(true)
+        update()
+      }
       return
     }
 
@@ -122,7 +129,7 @@ export default function AdminDashboard() {
     fetchBetaFeedback()
     fetchBrandVerifications('PENDING')
     fetchCampaignReviews()
-  }, [session, status, router])
+  }, [session, status, router, triedRefresh, update])
 
   const fetchBrandVerifications = async (filterStatus?: string) => {
     try {

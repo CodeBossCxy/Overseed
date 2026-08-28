@@ -281,7 +281,7 @@ export default function CampaignForm({
       <h2 className="text-xl font-semibold">{cf.basicInfo}</h2>
 
       <div>
-        <label className="block text-sm font-medium mb-1">{cf.campaignTitle}</label>
+        <label className="block text-sm font-medium mb-1">{cf.campaignTitle} *</label>
         <input
           type="text"
           required

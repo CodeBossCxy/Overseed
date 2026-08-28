@@ -146,9 +146,14 @@ export default function SignInPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                {t.auth.signin.password}
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  {t.auth.signin.password}
+                </label>
+                <Link href="/auth/forgot-password" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                  {t.auth.signin.forgotPassword}
+                </Link>
+              </div>
               <input
                 id="password"
                 type="password"

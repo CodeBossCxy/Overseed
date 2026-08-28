@@ -240,15 +240,53 @@ export default function BrandManageCollaborationPage() {
               )}
             </section>
 
-            {/* Published evidence */}
-            {collab.status === 'SUBMITTED' || collab.status === 'COMPLETED' ? (
+            {/* Submitted drafts */}
+            {(collab.deliverableItems || []).filter((d: any) => d.type === 'draft').length > 0 && (
+              <section className="workspace-glass-card rounded-2xl p-5">
+                <h2 className="text-lg font-semibold mb-3">{c.draftsTitle}</h2>
+                <div className="space-y-3">
+                  {(collab.deliverableItems || [])
+                    .filter((d: any) => d.type === 'draft')
+                    .map((d: any) => (
+                      <div key={d.id} className="flex items-start gap-3 text-sm">
+                        {d.fileUrl && (
+                          <a href={d.fileUrl} target="_blank" rel="noreferrer" className="flex-shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={d.fileUrl} alt="" className="w-20 h-20 rounded-lg object-cover bg-gray-100" />
+                          </a>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900">{d.title}</p>
+                          {d.note && <p className="text-gray-600 mt-0.5 whitespace-pre-wrap">{d.note}</p>}
+                          {d.submittedAt && <p className="text-xs text-gray-400 mt-1">{formatDate(d.submittedAt, locale)}</p>}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </section>
+            )}
+
+            {/* Published evidence — stays visible once submitted, incl. while a revision is in progress */}
+            {collab.status === 'SUBMITTED' || collab.status === 'COMPLETED' || collab.publishedUrl || collab.evidenceScreenshot ? (
               <section className="workspace-glass-card rounded-2xl p-5">
                 <h2 className="text-lg font-semibold mb-3">{c.publishedEvidence}</h2>
-                {collab.publishedUrl ? (
+                {collab.publishedUrl || collab.evidenceScreenshot ? (
                   <div className="space-y-2 text-sm">
-                    {term(c.publishedUrl, <a href={collab.publishedUrl} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline break-all">{collab.publishedUrl}</a>)}
+                    {collab.status === 'ACTIVE' && (
+                      <p className="mb-2 p-2.5 bg-amber-50 rounded-lg text-xs text-amber-800">{c.previousSubmissionNote}</p>
+                    )}
+                    {collab.publishedUrl && term(c.publishedUrl, <a href={collab.publishedUrl} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline break-all">{collab.publishedUrl}</a>)}
                     {term('Platform', collab.publishedPlatform)}
                     {term(c.deadline, collab.publishedAt ? formatDate(collab.publishedAt, locale) : null)}
+                    {collab.evidenceScreenshot && (
+                      <div>
+                        <p className="text-gray-500 mb-1.5">{c.evidenceScreenshot}</p>
+                        <a href={collab.evidenceScreenshot} target="_blank" rel="noreferrer" className="inline-block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={collab.evidenceScreenshot} alt="" className="max-h-64 rounded-lg object-contain bg-gray-100" />
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500">{c.notSubmittedYet}</p>
