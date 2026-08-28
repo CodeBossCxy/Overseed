@@ -69,10 +69,19 @@ export default function CampaignForm({
     images: initialData?.images || [],
   })
 
+  const spotsInvalid = formData.totalSlots === '' || parseInt(String(formData.totalSlots)) < 1
+
   const handleSubmit = async (e: React.FormEvent, asDraft = false) => {
     e.preventDefault()
     setIsSubmitting(true)
     setError(null)
+
+    // Number of spots must be at least 1 (drafts included)
+    if (!formData.totalSlots || parseInt(String(formData.totalSlots)) < 1) {
+      setError(cf.spotsMinError)
+      setIsSubmitting(false)
+      return
+    }
 
     // Validate required fields when publishing (not drafts)
     if (!asDraft) {
@@ -108,6 +117,7 @@ export default function CampaignForm({
       const submitData = {
         ...formData,
         status: asDraft ? 'DRAFT' : 'ACTIVE',
+        totalSlots: parseInt(String(formData.totalSlots)),
         paymentMin: formData.paymentMin ? parseFloat(formData.paymentMin) : null,
         paymentMax: formData.paymentMax ? parseFloat(formData.paymentMax) : null,
         giftValue: formData.giftValue ? parseFloat(formData.giftValue) : null,
@@ -335,15 +345,20 @@ export default function CampaignForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">{cf.numberOfSpots} *</label>
+          <label className="block text-sm font-medium mb-1">
+            {cf.numberOfSpots} * <span className="text-xs text-gray-400 font-normal">({cf.spotsMinHint})</span>
+          </label>
           <input
             type="number"
             min="1"
             required
             value={formData.totalSlots}
-            onChange={(e) => setFormData({ ...formData, totalSlots: parseInt(e.target.value) || 1 })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+            onChange={(e) => setFormData({ ...formData, totalSlots: e.target.value === '' ? '' : parseInt(e.target.value) || 0 })}
+            className={`w-full px-4 py-2 border rounded-md focus:ring-2 ${
+              spotsInvalid ? 'border-red-400 focus:ring-red-400' : 'border-gray-300 focus:ring-primary-500'
+            }`}
           />
+          {spotsInvalid && <p className="mt-1 text-xs text-red-600">{cf.spotsMinError}</p>}
         </div>
       </div>
 
@@ -733,7 +748,7 @@ export default function CampaignForm({
               <div className="flex flex-col items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setStep(s)}
+                  onClick={() => { if (s > 1 && spotsInvalid) return; setStep(s) }}
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition ${
                     step === s
                       ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-300'
@@ -793,8 +808,9 @@ export default function CampaignForm({
             <button
               key="next"
               type="button"
+              disabled={step === 1 && spotsInvalid}
               onClick={() => setStep(step + 1)}
-              className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition"
+              className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {cf.next}
             </button>

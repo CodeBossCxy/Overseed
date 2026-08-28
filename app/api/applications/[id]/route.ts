@@ -4,6 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getTranslatedEntity } from '@/lib/translation-service'
 import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
+import {
+  sendApplicationApprovedEmail,
+  sendApplicationRejectedEmail,
+} from '@/lib/notification-emails'
 
 // GET: Get single application details
 export async function GET(
@@ -230,12 +234,30 @@ export async function PATCH(
                 select: {
                   name: true,
                   email: true,
+                  preferredLanguage: true,
+                  emailNotifications: true,
+                  emailCampaignUpdates: true,
+                  emailCollaborationUpdates: true,
                 },
               },
             },
           },
         },
       })
+
+      // Fire-and-forget status notifications to the creator
+      if (data.status === 'APPROVED') {
+        void sendApplicationApprovedEmail(updated.influencer.user, {
+          campaignTitle: updated.campaign.title,
+          brandName: updated.campaign.brand.companyName,
+        })
+      } else if (data.status === 'REJECTED') {
+        void sendApplicationRejectedEmail(updated.influencer.user, {
+          campaignTitle: updated.campaign.title,
+          brandName: updated.campaign.brand.companyName,
+          rejectionReason: updated.rejectionReason,
+        })
+      }
 
       return NextResponse.json(updated)
     } else if (isApplicant) {

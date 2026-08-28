@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { getTranslatedEntity } from '@/lib/translation-service'
 import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
 import { Campaign, assertTransition, type CampaignStatus } from '@/lib/status'
+import { sendCampaignCancelledEmail } from '@/lib/notification-emails'
 
 export async function GET(
   req: NextRequest,
@@ -313,6 +314,39 @@ export async function DELETE(
         where: { id: id },
         data: { status: 'CANCELLED' },
       })
+
+      // Fire-and-forget: notify active applicants that the campaign was cancelled
+      void (async () => {
+        const applications = await prisma.application.findMany({
+          where: {
+            campaignId: id,
+            status: { in: ['PENDING', 'UNDER_REVIEW', 'APPROVED'] },
+          },
+          select: {
+            influencer: {
+              select: {
+                user: {
+                  select: {
+                    name: true,
+                    email: true,
+                    preferredLanguage: true,
+                    emailNotifications: true,
+                    emailCampaignUpdates: true,
+                    emailCollaborationUpdates: true,
+                  },
+                },
+              },
+            },
+          },
+        })
+        for (const app of applications) {
+          await sendCampaignCancelledEmail(app.influencer.user, {
+            campaignTitle: campaign.title,
+            brandName: campaign.brand.companyName,
+          })
+        }
+      })().catch((err) => console.error('Campaign cancellation notifications failed:', err))
+
       return NextResponse.json({ message: 'Campaign cancelled successfully' })
     }
 

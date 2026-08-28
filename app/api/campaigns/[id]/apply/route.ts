@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sendApplicationSubmittedEmail } from '@/lib/notification-emails'
 
 // POST: Apply to a campaign (influencer only)
 export async function POST(
@@ -56,6 +57,21 @@ export async function POST(
       where: { id: id },
       include: {
         followerRequirements: true,
+        brand: {
+          select: {
+            companyName: true,
+            user: {
+              select: {
+                name: true,
+                email: true,
+                preferredLanguage: true,
+                emailNotifications: true,
+                emailCampaignUpdates: true,
+                emailCollaborationUpdates: true,
+              },
+            },
+          },
+        },
       },
     })
 
@@ -132,6 +148,13 @@ export async function POST(
           },
         },
       },
+    })
+
+    // Fire-and-forget: notify the brand of the new application
+    void sendApplicationSubmittedEmail(campaign.brand.user, {
+      campaignId: id,
+      campaignTitle: campaign.title,
+      creatorName: influencerProfile.displayName,
     })
 
     return NextResponse.json(application, { status: 201 })

@@ -87,6 +87,7 @@ export async function PATCH(req: NextRequest) {
         update: {
           displayName: profileData.displayName,
           avatarUrl: profileData.avatarUrl,
+          coverImageUrl: profileData.coverImageUrl,
           bio: profileData.bio,
           locationCity: profileData.locationCity,
           locationState: profileData.locationState,
@@ -102,6 +103,7 @@ export async function PATCH(req: NextRequest) {
           userId,
           displayName: profileData.displayName,
           avatarUrl: profileData.avatarUrl,
+          coverImageUrl: profileData.coverImageUrl,
           bio: profileData.bio,
           locationCity: profileData.locationCity,
           locationState: profileData.locationState,

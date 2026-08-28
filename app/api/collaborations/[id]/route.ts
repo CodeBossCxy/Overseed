@@ -5,6 +5,23 @@ import { prisma } from '@/lib/prisma'
 import { Collaboration as CollaborationSM, assertTransition, type CollaborationStatus } from '@/lib/status'
 import { getTranslatedEntity } from '@/lib/translation-service'
 import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
+import {
+  sendCollaborationAcceptedEmail,
+  sendCollaborationDeclinedEmail,
+  sendWorkSubmittedEmail,
+  sendWorkApprovedEmail,
+  sendRevisionRequestedEmail,
+  sendCollaborationCancelledEmail,
+} from '@/lib/notification-emails'
+
+const NOTIFY_USER_SELECT = {
+  name: true,
+  email: true,
+  preferredLanguage: true,
+  emailNotifications: true,
+  emailCampaignUpdates: true,
+  emailCollaborationUpdates: true,
+} as const
 
 async function loadCollaboration(id: string) {
   return prisma.collaboration.findUnique({
@@ -180,6 +197,63 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       return col
     })
+
+    // Fire-and-forget status notifications to the counterparty
+    void (async () => {
+      const notifyBrand = ['accept', 'decline', 'submit'].includes(action)
+      const notifyCreator = ['approve', 'request_revision'].includes(action)
+      const recipientUserId =
+        action === 'cancel'
+          ? isBrand
+            ? collaboration.influencer.userId
+            : collaboration.brand.userId
+          : notifyBrand
+            ? collaboration.brand.userId
+            : notifyCreator
+              ? collaboration.influencer.userId
+              : null
+      if (!recipientUserId) return
+
+      const recipient = await prisma.user.findUnique({
+        where: { id: recipientUserId },
+        select: NOTIFY_USER_SELECT,
+      })
+      if (!recipient) return
+
+      const campaignTitle = collaboration.campaign?.title || 'Collaboration'
+      const creatorName = collaboration.influencer.displayName
+      const brandName = collaboration.brand.companyName
+
+      switch (action) {
+        case 'accept':
+          await sendCollaborationAcceptedEmail(recipient, { collaborationId: id, campaignTitle, creatorName })
+          break
+        case 'decline':
+          await sendCollaborationDeclinedEmail(recipient, { collaborationId: id, campaignTitle, creatorName })
+          break
+        case 'submit':
+          await sendWorkSubmittedEmail(recipient, { collaborationId: id, campaignTitle, creatorName })
+          break
+        case 'approve':
+          await sendWorkApprovedEmail(recipient, { collaborationId: id, campaignTitle, brandName })
+          break
+        case 'request_revision':
+          await sendRevisionRequestedEmail(recipient, {
+            collaborationId: id,
+            campaignTitle,
+            brandName,
+            reviewNote: body.reviewNote,
+          })
+          break
+        case 'cancel':
+          await sendCollaborationCancelledEmail(recipient, {
+            collaborationId: id,
+            campaignTitle,
+            recipientRole: isBrand ? 'creator' : 'brand',
+          })
+          break
+      }
+    })().catch((err) => console.error('Collaboration notification failed:', err))
 
     return NextResponse.json({ collaboration: updated })
   } catch (error) {

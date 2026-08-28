@@ -442,9 +442,14 @@ export default function BrandManageCollaborationPage() {
                   </button>
                 </>
               ) : (
-                <button onClick={() => setRevisionAlert(null)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition">
-                  {c.gotIt}
-                </button>
+                <>
+                  <button onClick={() => setRevisionAlert(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition">
+                    {c.gotIt}
+                  </button>
+                  <Link href="/contact" className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition">
+                    {c.contactOverseed}
+                  </Link>
+                </>
               )}
             </div>
           </div>

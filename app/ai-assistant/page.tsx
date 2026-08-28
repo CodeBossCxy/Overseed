@@ -8,6 +8,7 @@ import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useTheme } from '@/components/ThemeProvider'
+import ImageGenerationPanel from '@/components/ai/ImageGenerationPanel'
 
 
 // Keep in sync with lib/ai-models.ts (client components can't import it
@@ -63,6 +64,7 @@ export default function AIAssistantPage() {
   const [usagePercent, setUsagePercent] = useState<number | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [toolBusy, setToolBusy] = useState(false)
+  const [activeTab, setActiveTab] = useState<'chat' | 'image'>('chat')
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -79,22 +81,6 @@ export default function AIAssistantPage() {
       inputRef.current?.focus()
     } catch (error: any) { alert(error.message || 'Upload failed') }
     finally { setToolBusy(false) }
-  }
-
-  const generateImage = async () => {
-    const prompt = window.prompt('Describe the image you want Overseed AI to create:')
-    if (!prompt?.trim()) return
-    setToolBusy(true)
-    const userMessage: Message = { id: `image-prompt-${Date.now()}`, role: 'user', content: `Create an image: ${prompt.trim()}`, timestamp: new Date() }
-    setMessages(prev => [...prev, userMessage])
-    try {
-      const res = await fetch('/api/ai-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message || 'Image generation failed')
-      setMessages(prev => [...prev, { id: `image-${Date.now()}`, role: 'assistant', content: `![Generated image](${data.url})\n\nGenerated from: ${prompt.trim()}`, timestamp: new Date() }])
-    } catch (error: any) {
-      setMessages(prev => [...prev, { id: `image-error-${Date.now()}`, role: 'assistant', content: error.message || 'Image generation failed', timestamp: new Date() }])
-    } finally { setToolBusy(false) }
   }
 
   const startProgress = () => {
@@ -596,9 +582,41 @@ export default function AIAssistantPage() {
     <RoleShell noFooter>
       <div className="h-full min-h-0 flex flex-col">
         <h1 className="text-3xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
+        {/* Chat / Image Generation tabs */}
+        <div className="flex items-center gap-2 mt-3 mb-4 flex-shrink-0">
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm transition ${
+              activeTab === 'chat'
+                ? 'selected-option-glass text-gray-900 font-bold'
+                : 'bg-gray-100/70 text-gray-600 font-semibold hover:bg-white/55'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            {t.aiAssistant.tabChat}
+          </button>
+          <button
+            onClick={() => setActiveTab('image')}
+            className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm transition ${
+              activeTab === 'image'
+                ? 'selected-option-glass text-gray-900 font-bold'
+                : 'bg-gray-100/70 text-gray-600 font-semibold hover:bg-white/55'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
+            </svg>
+            {t.aiAssistant.tabImage}
+          </button>
+        </div>
         <div className="min-h-0 flex-1 flex overflow-hidden rounded-3xl workspace-glass-card">
+        {/* Image Generation tab */}
+        {activeTab === 'image' && <ImageGenerationPanel isProUser={isProUser} />}
+
         {/* Sidebar */}
-        {isProUser && sidebarOpen && (
+        {activeTab === 'chat' && isProUser && sidebarOpen && (
           <div className="w-72 flex-shrink-0 bg-white/25 border-r border-white/60 flex flex-col">
             {/* Sidebar header */}
             <div className="p-4 flex items-center justify-between">
@@ -725,8 +743,8 @@ export default function AIAssistantPage() {
           </div>
         )}
 
-        {/* Main chat area */}
-        <div className="flex-1 flex flex-col min-w-0 border-l border-white/50">
+        {/* Main chat area (kept mounted so chat state survives tab switches) */}
+        <div className={`flex-1 ${activeTab === 'chat' ? 'flex' : 'hidden'} flex-col min-w-0 border-l border-white/50`}>
           {/* Top bar */}
           <div className="h-14 flex items-center justify-between px-4 border-b border-white/55 bg-white/35 backdrop-blur flex-shrink-0">
             <div className="flex items-center gap-3">
@@ -1011,7 +1029,7 @@ export default function AIAssistantPage() {
               <div className="flex gap-2 mb-2">
                 <input ref={aiAttachmentRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f) attachToPrompt(f); e.currentTarget.value='' }} />
                 <button type="button" disabled={!isProUser || toolBusy} onClick={() => aiAttachmentRef.current?.click()} className="px-3 py-1.5 rounded-full workspace-glass-control text-xs font-semibold disabled:opacity-50">📎 Attach</button>
-                <button type="button" disabled={!isProUser || toolBusy} onClick={generateImage} className="px-3 py-1.5 rounded-full selected-option-glass text-xs font-semibold disabled:opacity-50">✦ Generate image</button>
+                <button type="button" disabled={!isProUser} onClick={() => setActiveTab('image')} className="px-3 py-1.5 rounded-full selected-option-glass text-xs font-semibold disabled:opacity-50">✦ {t.aiAssistant.tabImage}</button>
               </div>
               <form onSubmit={handleSubmit} className="relative">
                 <textarea
