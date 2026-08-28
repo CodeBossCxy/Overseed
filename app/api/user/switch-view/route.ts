@@ -25,12 +25,18 @@ export async function POST(request: Request) {
     )
   }
 
-  // Update userType in DB — but never demote an ADMIN account
+  // Update userType in DB — but never demote an ADMIN account.
+  // Admins switch views via activeView instead, keeping userType=ADMIN.
   const current = await prisma.user.findUnique({
     where: { id: userId },
     select: { userType: true },
   })
-  if (current?.userType !== 'ADMIN') {
+  if (current?.userType === 'ADMIN') {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { activeView: viewMode },
+    })
+  } else {
     await prisma.user.update({
       where: { id: userId },
       data: { userType: viewMode },

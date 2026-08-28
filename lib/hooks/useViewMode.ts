@@ -12,9 +12,13 @@ export function useViewMode() {
   const [isSwitching, setIsSwitching] = useState(false)
 
   const userType = (session?.user as any)?.userType
-  // ADMIN accounts operate the workspace in brand view
+  const activeView = (session?.user as any)?.activeView
+  // ADMIN accounts keep userType=ADMIN and switch views via activeView
+  // (defaulting to brand view); other users' view is their userType.
   const currentMode: ViewMode =
-    userType === 'BRAND' || userType === 'ADMIN' ? 'BRAND' : 'INFLUENCER'
+    userType === 'ADMIN'
+      ? (activeView === 'INFLUENCER' ? 'INFLUENCER' : 'BRAND')
+      : userType === 'BRAND' ? 'BRAND' : 'INFLUENCER'
 
   const isBrand = currentMode === 'BRAND'
   const isInfluencer = currentMode === 'INFLUENCER'

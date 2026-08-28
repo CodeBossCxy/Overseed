@@ -127,6 +127,9 @@ model User {
   image         String?
   password      String?
   userType         UserType         @default(INFLUENCER)
+  // Workspace view for ADMIN accounts ('BRAND' | 'INFLUENCER'); admins keep
+  // userType=ADMIN and switch views via this field instead. Null = brand view.
+  activeView       String?
   subscriptionTier SubscriptionTier @default(FREE)
   // Set when PRO was granted as a limited verified-user trial (early-stage
   // promo); null for paid PRO. Lazily downgraded once expired.

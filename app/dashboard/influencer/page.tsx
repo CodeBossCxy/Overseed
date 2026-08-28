@@ -19,11 +19,12 @@ export default async function InfluencerDashboardPage() {
   // Read userType from DB (not JWT session) to avoid stale-token redirects
   const dbUser = await prisma.user.findUnique({
     where: { id: userId },
-    select: { userType: true },
+    select: { userType: true, activeView: true },
   })
   const userType = dbUser?.userType || 'INFLUENCER'
 
-  if (userType === 'BRAND' || userType === 'ADMIN') {
+  // Admins follow their chosen activeView; brand users always redirect
+  if (userType === 'BRAND' || (userType === 'ADMIN' && dbUser?.activeView !== 'INFLUENCER')) {
     redirect('/dashboard/brand')
   }
 

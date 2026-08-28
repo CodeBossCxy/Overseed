@@ -18,7 +18,7 @@ export async function GET() {
     const userId = (session.user as any).id
     const influencer = await prisma.influencerProfile.findUnique({
       where: { userId },
-      select: { stripeConnectId: true },
+      select: { stripeConnectId: true, stripeOnboardingComplete: true },
     })
     if (!influencer?.stripeConnectId) {
       return NextResponse.json({ connected: false })
@@ -26,6 +26,15 @@ export async function GET() {
 
     try {
       const account = await stripe.accounts.retrieve(influencer.stripeConnectId)
+
+      // A Connect account is created the moment the user clicks "Connect with
+      // Stripe" — before onboarding. Only count it as connected once the user
+      // actually submitted the Stripe onboarding form; otherwise they'd see
+      // "Connected" after abandoning setup.
+      if (!account.details_submitted) {
+        return NextResponse.json({ connected: false, setupInProgress: true })
+      }
+
       const external = (account.external_accounts?.data || [])[0] as any
       return NextResponse.json({
         connected: true,
@@ -41,8 +50,12 @@ export async function GET() {
           : null,
       })
     } catch {
-      // Account exists in our DB but Stripe is unreachable/misconfigured.
-      return NextResponse.json({ connected: true, unavailable: true })
+      // Stripe is unreachable/misconfigured — fall back to our own record of
+      // whether onboarding was ever completed instead of assuming connected.
+      return NextResponse.json({
+        connected: !!influencer.stripeOnboardingComplete,
+        unavailable: true,
+      })
     }
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
