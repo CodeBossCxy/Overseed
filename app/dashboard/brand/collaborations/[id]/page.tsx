@@ -25,6 +25,7 @@ export default function BrandManageCollaborationPage() {
   const [busy, setBusy] = useState(false)
   const [revisionOpen, setRevisionOpen] = useState(false)
   const [revisionNote, setRevisionNote] = useState('')
+  const [revisionAlert, setRevisionAlert] = useState<'last' | 'limit' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [payBusy, setPayBusy] = useState(false)
   const [paymentModal, setPaymentModal] = useState<{
@@ -106,6 +107,12 @@ export default function BrandManageCollaborationPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
+        // Safety net: server rejected because revision rounds are exhausted
+        if (action === 'request_revision' && res.status === 400) {
+          setRevisionOpen(false)
+          setRevisionAlert('limit')
+          return
+        }
         throw new Error(data.message || c.actionFailed)
       }
       setRevisionOpen(false)
@@ -140,6 +147,12 @@ export default function BrandManageCollaborationPage() {
   const currentStageIndex = STAGES.indexOf(collab.status)
   const isCancelled = collab.status === 'CANCELLED'
   const isTerminal = collab.status === 'COMPLETED' || isCancelled
+  const revisionsUsed = Number(collab.revisionsUsed ?? 0)
+  const revisionRounds = Number(collab.revisionRounds ?? 0)
+  const revisionsExhausted = revisionsUsed >= revisionRounds
+  const isLastRevision = revisionsUsed === revisionRounds - 1
+  const fillRevision = (s: string) =>
+    s.replace('{used}', String(revisionsUsed + 1)).replace('{total}', String(revisionRounds))
 
   const term = (label: string, value: React.ReactNode) => (
     <div className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-b-0">
@@ -327,7 +340,11 @@ export default function BrandManageCollaborationPage() {
                       {c.approve}
                     </button>
                     {!revisionOpen ? (
-                      <button onClick={() => setRevisionOpen(true)} disabled={busy} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">
+                      <button
+                        onClick={() => (revisionsExhausted ? setRevisionAlert('limit') : setRevisionOpen(true))}
+                        disabled={busy}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50"
+                      >
                         {c.requestRevision}
                       </button>
                     ) : (
@@ -340,7 +357,15 @@ export default function BrandManageCollaborationPage() {
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
                         <div className="flex gap-2">
-                          <button onClick={() => doAction('request_revision', { reviewNote: revisionNote })} disabled={busy} className="flex-1 px-3 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition disabled:opacity-50">
+                          <button
+                            onClick={() => {
+                              if (revisionsExhausted) { setRevisionAlert('limit'); return }
+                              if (isLastRevision) { setRevisionAlert('last'); return }
+                              doAction('request_revision', { reviewNote: revisionNote })
+                            }}
+                            disabled={busy}
+                            className="flex-1 px-3 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition disabled:opacity-50"
+                          >
                             {c.requestRevision}
                           </button>
                           <button onClick={() => { setRevisionOpen(false); setRevisionNote('') }} className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition">
@@ -383,6 +408,48 @@ export default function BrandManageCollaborationPage() {
           </div>
         </div>
       </div>
+
+      {revisionAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setRevisionAlert(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${revisionAlert === 'last' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold text-gray-900">
+                  {revisionAlert === 'last' ? c.lastRevisionTitle : c.revisionLimitTitle}
+                </h3>
+                <p className="text-sm text-gray-600 mt-1.5">
+                  {revisionAlert === 'last' ? fillRevision(c.lastRevisionBody) : fillRevision(c.revisionLimitBody)}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end mt-5">
+              {revisionAlert === 'last' ? (
+                <>
+                  <button onClick={() => setRevisionAlert(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition">
+                    {c.cancel}
+                  </button>
+                  <button
+                    onClick={() => { setRevisionAlert(null); doAction('request_revision', { reviewNote: revisionNote }) }}
+                    disabled={busy}
+                    className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition disabled:opacity-50"
+                  >
+                    {c.lastRevisionConfirm}
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setRevisionAlert(null)} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition">
+                  {c.gotIt}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {paymentModal && (
         <PaymentModal

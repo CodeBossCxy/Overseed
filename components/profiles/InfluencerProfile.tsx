@@ -72,7 +72,9 @@ export default function InfluencerProfile({ influencer }: InfluencerProfileProps
             </div>
             <div className="min-w-0 pb-1">
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-gray-900 truncate">{displayName}</h1>
+                {/* h2, not h1: the workspace shell absolutely-positions every
+                    `main h1` into the shared page-title slot (globals.css) */}
+                <h2 className="text-2xl font-bold text-gray-900 truncate">{displayName}</h2>
                 {influencer.isVerified && (
                   <svg className="w-6 h-6 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
