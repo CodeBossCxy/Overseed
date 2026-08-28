@@ -53,15 +53,15 @@ export default function InfluencerProfile({ influencer }: InfluencerProfileProps
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header Card */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
         {/* Cover/Banner */}
         <div className="h-32 bg-gradient-to-r from-primary-400 to-primary-600" />
 
         {/* Profile Info */}
         <div className="px-6 pb-6">
-          {/* Avatar */}
-          <div className="relative -mt-16 mb-4">
-            <div className="w-32 h-32 rounded-full border-4 border-white bg-gray-200 overflow-hidden shadow-lg">
+          {/* Avatar + name row: avatar straddles the banner, name sits beside it on the white area */}
+          <div className="flex items-end gap-5 -mt-14 mb-5">
+            <div className="w-28 h-28 rounded-full border-4 border-white bg-gray-200 overflow-hidden shadow-lg flex-shrink-0">
               {avatar ? (
                 <img src={avatar} alt={displayName} className="w-full h-full object-cover" />
               ) : (
@@ -70,32 +70,30 @@ export default function InfluencerProfile({ influencer }: InfluencerProfileProps
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Name and Verification */}
-          <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-2xl font-bold">{displayName}</h1>
-            {influencer.isVerified && (
-              <svg className="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            )}
-          </div>
-
-          {/* Location and Member Since */}
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-4">
-            {location && (
-              <span className="flex items-center gap-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                {location}
-              </span>
-            )}
-            <span>
-              {locale === 'zh' ? '加入于 ' : 'Member since '}{formatMonthYear(influencer.user.createdAt, locale)}
-            </span>
+            <div className="min-w-0 pb-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900 truncate">{displayName}</h1>
+                {influencer.isVerified && (
+                  <svg className="w-6 h-6 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 mt-1">
+                {location && (
+                  <span className="flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {location}
+                  </span>
+                )}
+                <span>
+                  {locale === 'zh' ? '加入于 ' : 'Member since '}{formatMonthYear(influencer.user.createdAt, locale)}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Niches */}
