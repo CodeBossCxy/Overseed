@@ -97,8 +97,6 @@ export default function CampaignForm({
       // Step 3
       if (formData.platformIds.length === 0) missing.push(cf.targetPlatforms)
       if (!formData.contentGuidelines.trim()) missing.push(cf.contentGuidelines)
-      if (!formData.hashtagsRequired.trim()) missing.push(cf.requiredHashtags)
-      if (!formData.mentionsRequired.trim()) missing.push(cf.requiredMentions)
       if (missing.length > 0) {
         setError(`${cf.requiredFields}: ${missing.join(', ')}`)
         setIsSubmitting(false)
@@ -119,6 +117,10 @@ export default function CampaignForm({
         deadline: formData.deadline || null,
         campaignStartDate: formData.campaignStartDate || null,
         campaignEndDate: formData.campaignEndDate || null,
+        followerRequirements: formData.followerRequirements.map((r: any) => ({
+          ...r,
+          minFollowers: parseInt(r.minFollowers) || 0,
+        })),
       }
 
       const url = isEditing ? `/api/campaigns/${initialData.id}` : '/api/campaigns'
@@ -136,7 +138,7 @@ export default function CampaignForm({
       }
 
       const campaign = await response.json()
-      router.push(`/dashboard/brand/campaigns/${campaign.id}`)
+      router.push(asDraft ? '/dashboard/brand/campaigns' : `/dashboard/brand/campaigns/${campaign.id}`)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -614,7 +616,8 @@ export default function CampaignForm({
                       type="number"
                       min="0"
                       value={req.minFollowers}
-                      onChange={(e) => updateFollowerRequirement(req.platformId, 'minFollowers', parseInt(e.target.value) || 0)}
+                      onChange={(e) => updateFollowerRequirement(req.platformId, 'minFollowers', e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
+                      placeholder="0"
                       className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
                     />
                   </div>
@@ -666,7 +669,7 @@ export default function CampaignForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">{cf.requiredHashtags} *</label>
+          <label className="block text-sm font-medium mb-1">{cf.requiredHashtags}</label>
           <input
             type="text"
             required
@@ -677,7 +680,7 @@ export default function CampaignForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">{cf.requiredMentions} *</label>
+          <label className="block text-sm font-medium mb-1">{cf.requiredMentions}</label>
           <input
             type="text"
             required
@@ -720,32 +723,34 @@ export default function CampaignForm({
     <form onSubmit={(e) => handleSubmit(e, false)} className="max-w-3xl mx-auto">
       {/* Progress Steps */}
       <div className="mb-8">
-        <div className="flex items-center justify-between">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center">
-              <button
-                type="button"
-                onClick={() => setStep(s)}
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition ${
-                  step === s
-                    ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-300'
-                    : step > s
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                }`}
-              >
-                {step > s ? '✓' : s}
-              </button>
+        <div className="flex items-start">
+          {[
+            { s: 1, label: cf.stepBasicInfo },
+            { s: 2, label: cf.stepCompensation },
+            { s: 3, label: cf.stepRequirements },
+          ].map(({ s, label }) => (
+            <div key={s} className="contents">
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStep(s)}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition ${
+                    step === s
+                      ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-300'
+                      : step > s
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  {step > s ? '✓' : s}
+                </button>
+                <span className="text-sm text-gray-600 whitespace-nowrap">{label}</span>
+              </div>
               {s < 3 && (
-                <div className={`w-24 md:w-32 h-1 mx-2 ${step > s ? 'bg-green-500' : 'bg-gray-200'}`} />
+                <div className={`flex-1 h-1 mx-2 mt-[18px] ${step > s ? 'bg-green-500' : 'bg-gray-200'}`} />
               )}
             </div>
           ))}
-        </div>
-        <div className="flex justify-between mt-2 text-sm text-gray-600">
-          <span>{cf.stepBasicInfo}</span>
-          <span>{cf.stepCompensation}</span>
-          <span>{cf.stepRequirements}</span>
         </div>
       </div>
 
@@ -786,6 +791,7 @@ export default function CampaignForm({
           </button>
           {step < 3 ? (
             <button
+              key="next"
               type="button"
               onClick={() => setStep(step + 1)}
               className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition"
@@ -794,6 +800,7 @@ export default function CampaignForm({
             </button>
           ) : (
             <button
+              key="submit"
               type="submit"
               disabled={isSubmitting}
               className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition disabled:opacity-50"

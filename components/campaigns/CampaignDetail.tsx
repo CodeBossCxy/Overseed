@@ -365,7 +365,7 @@ export default function CampaignDetail({
               </Link>
             ) : (
               <>
-                {userType === 'BRAND' ? (
+                {userType === 'BRAND' || userType === 'ADMIN' ? (
                   <div className="text-center text-gray-500 text-sm py-2">
                     {t.campaign.onlyCreatorsCanApply}
                   </div>

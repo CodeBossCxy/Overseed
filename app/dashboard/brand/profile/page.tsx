@@ -6,6 +6,7 @@ import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import StatusBadge from '@/components/StatusBadge'
 import { deriveVerificationStatus } from '@/lib/status'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import ImageCropModal from '@/components/ui/ImageCropModal'
 
 // Company Profile per spec: (1) Account & Verification summary card;
 // (2) Public Profile (creator-visible, always editable, logo upload) +
@@ -74,6 +75,7 @@ export default function BrandProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [profile, setProfile] = useState<any>(null)
@@ -147,12 +149,17 @@ export default function BrandProfilePage() {
   const toggleIn = (list: string[], value: string) =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
 
-  const uploadLogo = async (file: File) => {
+  const closeCrop = () => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc)
+    setCropSrc(null)
+  }
+
+  const uploadLogo = async (blob: Blob) => {
     setIsUploading(true)
     setError(null)
     try {
       const fd = new FormData()
-      fd.append('files', file)
+      fd.append('files', new File([blob], 'logo.jpg', { type: 'image/jpeg' }))
       const res = await fetch('/api/upload', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok || !data.urls?.[0]) throw new Error(data.message || p.errorUpdate)
@@ -296,7 +303,11 @@ export default function BrandProfilePage() {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) setCropSrc(URL.createObjectURL(file))
+                    e.target.value = ''
+                  }}
                 />
                 <button
                   type="button"
@@ -620,6 +631,17 @@ export default function BrandProfilePage() {
             )}
           </div>
         </div>
+      )}
+      {cropSrc && (
+        <ImageCropModal
+          imageSrc={cropSrc}
+          cropShape="rect"
+          onConfirm={(blob) => {
+            closeCrop()
+            uploadLogo(blob)
+          }}
+          onCancel={closeCrop}
+        />
       )}
     </BrandWorkspaceLayout>
   )

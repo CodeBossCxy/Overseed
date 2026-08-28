@@ -4,6 +4,14 @@ import { prisma } from '@/lib/prisma'
 
 export const KOL_API_URL = process.env.KOL_API_URL || 'http://localhost:8000'
 
+// Auth headers for the deployed KOL service (KOL_API_KEY must match the
+// service's env). Empty locally, where the sidecar runs unauthenticated.
+export function kolAuthHeaders(): Record<string, string> {
+  return process.env.KOL_API_KEY
+    ? { Authorization: `Bearer ${process.env.KOL_API_KEY}` }
+    : {}
+}
+
 const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g
 
 // Brands must not see creator contact info: drop contact_email entirely and

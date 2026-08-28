@@ -21,7 +21,7 @@ export default async function NewCampaignPage() {
     select: { userType: true },
   })
 
-  if (dbUser?.userType !== 'BRAND') {
+  if (dbUser?.userType !== 'BRAND' && dbUser?.userType !== 'ADMIN') {
     redirect('/dashboard/influencer')
   }
 

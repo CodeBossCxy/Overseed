@@ -11,8 +11,10 @@ export function useViewMode() {
   const router = useRouter()
   const [isSwitching, setIsSwitching] = useState(false)
 
+  const userType = (session?.user as any)?.userType
+  // ADMIN accounts operate the workspace in brand view
   const currentMode: ViewMode =
-    (session?.user as any)?.userType === 'BRAND' ? 'BRAND' : 'INFLUENCER'
+    userType === 'BRAND' || userType === 'ADMIN' ? 'BRAND' : 'INFLUENCER'
 
   const isBrand = currentMode === 'BRAND'
   const isInfluencer = currentMode === 'INFLUENCER'

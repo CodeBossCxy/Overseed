@@ -24,7 +24,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
   const subscriptionTier = (session.user as any).subscriptionTier || 'FREE'
 
   // Only influencers/creators can apply
-  if (userType === 'BRAND') {
+  if (userType === 'BRAND' || userType === 'ADMIN') {
     redirect(`/campaign/${id}`)
   }
 

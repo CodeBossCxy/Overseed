@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     // Get or create Stripe customer
     let stripeCustomerId: string | null = null
 
-    if (userType === 'BRAND') {
+    if (userType === 'BRAND' || userType === 'ADMIN') {
       const brand = await prisma.brandProfile.findUnique({ where: { userId } })
       stripeCustomerId = brand?.stripeCustomerId || null
       if (!stripeCustomerId) {
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     }
 
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const dashboardPath = userType === 'BRAND' ? '/dashboard/brand' : '/dashboard/influencer'
+    const dashboardPath = userType === 'BRAND' || userType === 'ADMIN' ? '/dashboard/brand' : '/dashboard/influencer'
 
     // Create Checkout Session for subscription
     const checkoutSession = await stripe.checkout.sessions.create({

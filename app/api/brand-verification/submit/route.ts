@@ -19,7 +19,7 @@ const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user || (session.user as any).userType !== 'BRAND') {
+    if (!session?.user || !['BRAND', 'ADMIN'].includes((session.user as any).userType)) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }
     const userId = (session.user as any).id

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 type Creator = {
@@ -26,6 +27,7 @@ type Campaign = {
   categories: { categoryId: string; category: { name: string } }[]
   platforms: { platformId: string; platform: { name: string } }[]
   followerRequirements?: { id: string; minFollowers: number; maxFollowers: number | null; minEngagementRate?: string | number | null; platform: { name: string } }[]
+  brand?: { companyName: string | null; logoUrl: string | null } | null
 }
 
 const PLATFORM_LABEL: Record<string, string> = { youtube: 'YouTube', instagram: 'Instagram', tiktok: 'TikTok' }
@@ -53,7 +55,59 @@ type CampaignStats = { total: number; pending: number; approved: number; rejecte
 
 export default function BrandCampaignDetailClient({ campaign: initialCampaign, stats }: { campaign: Campaign; stats: CampaignStats }) {
   const { locale } = useLanguage()
+  const router = useRouter()
   const [campaign, setCampaign] = useState(initialCampaign)
+  const [showDelete, setShowDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const removeCampaign = async (mode: 'delete' | 'cancel') => {
+    setDeleting(true)
+    try {
+      const res = await fetch(
+        `/api/campaigns/${campaign.id}${mode === 'cancel' ? '?mode=cancel' : ''}`,
+        { method: 'DELETE' }
+      )
+      if (res.ok) {
+        if (mode === 'delete') {
+          router.push('/dashboard/brand/campaigns')
+        } else {
+          setShowDelete(false)
+          setCampaign((cp) => ({ ...cp, status: 'CANCELLED' }))
+          router.refresh()
+        }
+      }
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const canCancel = ['ACTIVE', 'PENDING_REVIEW', 'PAUSED'].includes(campaign.status)
+
+  const deleteModal = showDelete && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !deleting && setShowDelete(false)}>
+      <div data-solid className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 text-[#17255f]" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-bold text-lg">Delete this campaign?</h3>
+        <p className="text-sm text-[#59678f] mt-2">This will permanently delete the campaign and all related data. This cannot be undone.</p>
+        {canCancel && (
+          <p className="text-sm text-[#59678f] mt-2">You can also cancel the campaign instead — it stays in your pipeline with its history, but stops accepting applications.</p>
+        )}
+        <p className="text-sm font-semibold mt-3 truncate">{campaign.title}</p>
+        <div className="flex flex-wrap justify-end gap-2 mt-6">
+          <button onClick={() => setShowDelete(false)} disabled={deleting} className="px-4 py-2 text-sm font-medium text-[#59678f] hover:text-[#17255f] rounded-xl transition disabled:opacity-50">
+            Keep campaign
+          </button>
+          {canCancel && (
+            <button onClick={() => removeCampaign('cancel')} disabled={deleting} className="px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-xl transition disabled:opacity-50">
+              Cancel campaign
+            </button>
+          )}
+          <button onClick={() => removeCampaign('delete')} disabled={deleting} className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition disabled:opacity-50">
+            {deleting ? '…' : 'Delete permanently'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
   const [tab, setTab] = useState<'detail' | 'direct'>('detail')
   const [query, setQuery] = useState('')
   const [platform, setPlatform] = useState('youtube')
@@ -186,7 +240,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
 
           <div className="grid md:grid-cols-2 gap-4">
             <section className="workspace-glass-card rounded-3xl p-6"><h2 className="text-xl font-bold mb-4">Requirements</h2>{requirements.length ? <ul className="space-y-3 text-sm text-[#59678f]">{requirements.map(r => <li key={r} className="flex gap-2"><span className="text-violet-500">●</span>{r}</li>)}</ul> : <p className="text-sm text-[#7884a8]">No additional creator requirements.</p>}</section>
-            <section className="workspace-glass-card rounded-3xl p-6"><h2 className="text-xl font-bold mb-4">Deliverables</h2><div className="flex gap-3"><span className="w-12 h-12 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600">▣</span><div><b>{campaign.contentType ? campaign.contentType.replaceAll('_', ' ').toLowerCase() : 'Campaign content'}</b><p className="text-sm text-[#66739a] mt-1 whitespace-pre-line">{campaign.contentGuidelines || 'Final deliverables will be confirmed through Overseed.'}</p></div></div></section>
+            <section className="workspace-glass-card rounded-3xl p-6"><h2 className="text-xl font-bold mb-4">Deliverables</h2><div className="flex gap-3"><span className="w-12 h-12 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600">▣</span><div><b>{campaign.contentType ? campaign.contentType.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (ch) => ch.toUpperCase()) : 'Campaign content'}</b><p className="text-sm text-[#66739a] mt-1 whitespace-pre-line">{campaign.contentGuidelines || 'Final deliverables will be confirmed through Overseed.'}</p></div></div></section>
           </div>
 
           <section className="workspace-glass-card rounded-3xl p-6 flex gap-5"><span className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">▣</span><div className="grid md:grid-cols-3 gap-6 flex-1 text-sm"><div><p className="text-[#7884a8]">Application Window</p><b>{campaign.deadline ? `Until ${new Date(campaign.deadline).toLocaleDateString()}` : 'Open-ended'}</b></div><div><p className="text-[#7884a8]">Content Due</p><b>{campaign.campaignEndDate ? new Date(campaign.campaignEndDate).toLocaleDateString() : 'To be confirmed'}</b></div><div><p className="text-[#7884a8]">Notes</p><b>{campaign.hashtagsRequired || 'Managed through Overseed'}</b></div></div></section>
@@ -196,10 +250,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           <div className="flex justify-between"><b>Status</b><span className="px-3 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold capitalize">● &nbsp;{statusLabel}</span></div>
           <div className="mt-7"><p className="text-sm text-[#7180ad]">Compensation</p><div className="flex justify-between items-end mt-2"><b className="text-2xl capitalize">{campaign.compensationType.toLowerCase().replaceAll('_',' ')}</b>{campaign.giftValue && <div className="text-right"><p className="text-xs text-[#7180ad]">Gift value</p><b className="text-xl">${Number(campaign.giftValue).toLocaleString()}</b></div>}</div></div>
           <div className="border-t border-white/70 mt-6 pt-6 space-y-5"><div className="flex justify-between"><span>Applications</span><b>{stats.total}</b></div><div><div className="flex justify-between"><span>Spots Filled</span><b>{campaign.filledSlots} / {campaign.totalSlots}</b></div><div className="h-2 bg-slate-200/70 rounded-full mt-3"><div className="h-full bg-blue-500 rounded-full" style={{width:`${progress}%`}}/></div><p className="text-xs text-[#7884a8] mt-2">{remaining} spots remaining</p></div><div className="flex justify-between border-t border-white/70 pt-5"><span>Views</span><b>{campaign.viewCount}</b></div></div>
-          <div className="space-y-3 mt-7"><Link href={`/dashboard/brand/campaigns/${campaign.id}/applications`} className="block text-center py-4 rounded-xl bg-blue-600 text-white font-semibold">View Applications</Link><Link href={`/dashboard/brand/campaigns/${campaign.id}/edit`} className="block text-center py-4 rounded-xl border border-white bg-white/25 font-semibold">Edit Campaign</Link></div>
-          <div className="border-t border-white/70 mt-7 pt-6"><p className="text-xs text-[#7884a8]">Campaign owner</p><div className="flex gap-3 items-center mt-3"><span className="w-11 h-11 rounded-full bg-white/70 flex items-center justify-center font-bold">OV</span><div><b>Overseed Team</b><p className="text-xs text-[#7884a8]">Brand Account</p></div></div></div>
+          <div className="space-y-3 mt-7"><Link href={`/dashboard/brand/campaigns/${campaign.id}/applications`} className="block text-center py-4 rounded-xl bg-blue-600 text-white font-semibold">View Applications</Link><Link href={`/dashboard/brand/campaigns/${campaign.id}/edit`} className="block text-center py-4 rounded-xl border border-white bg-white/25 font-semibold">Edit Campaign</Link><button type="button" onClick={() => setShowDelete(true)} className="block w-full text-center py-4 rounded-xl border border-red-200 bg-red-50/60 text-red-600 font-semibold hover:bg-red-100 transition">Delete Campaign</button></div>
+          <div className="border-t border-white/70 mt-7 pt-6"><p className="text-xs text-[#7884a8]">Campaign owner</p><div className="flex gap-3 items-center mt-3"><span className="w-11 h-11 rounded-full bg-white/70 flex items-center justify-center font-bold overflow-hidden">{campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt="" className="w-full h-full object-cover"/> : (campaign.brand?.companyName || 'B').slice(0, 2).toUpperCase()}</span><div><b>{campaign.brand?.companyName || 'Brand'}</b><p className="text-xs text-[#7884a8]">Brand Account</p></div></div></div>
         </aside>
       </div>
+      {deleteModal}
     </div>
   }
 

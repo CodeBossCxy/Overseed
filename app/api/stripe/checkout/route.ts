@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const userId = (session.user as any).id
     const userType = (session.user as any).userType
 
-    if (userType !== 'BRAND') {
+    if (userType !== 'BRAND' && userType !== 'ADMIN') {
       return NextResponse.json(
         { error: 'Only brands can create payments' },
         { status: 403 },

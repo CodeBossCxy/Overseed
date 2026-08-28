@@ -117,7 +117,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
   const { colorTheme, setColorTheme } = useTheme()
   const st = t.settings
 
-  const isBrandSide = user.userType === 'BRAND' || user.userType === 'AGENCY'
+  const isBrandSide = user.userType === 'BRAND' || user.userType === 'AGENCY' || user.userType === 'ADMIN'
   const isCreator = user.userType === 'INFLUENCER'
 
   const [savedFlash, setSavedFlash] = useState(false)

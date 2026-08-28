@@ -8,7 +8,7 @@ const ALLOWED_DOC_TYPES = [...ALLOWED_IMAGE_TYPES, 'application/pdf']
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
-  if (!session?.user || (session.user as any).userType !== 'BRAND') {
+  if (!session?.user || !['BRAND', 'ADMIN'].includes((session.user as any).userType)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

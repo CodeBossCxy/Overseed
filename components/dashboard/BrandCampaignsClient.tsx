@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 import StatusBadge from '@/components/StatusBadge'
@@ -34,10 +35,30 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
   const { t, locale } = useLanguage()
   const c = t.brand.campaigns
 
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sort, setSort] = useState<'deadline' | 'newest'>('deadline')
   const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const removeCampaign = async (mode: 'delete' | 'cancel') => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch(
+        `/api/campaigns/${deleteTarget.id}${mode === 'cancel' ? '?mode=cancel' : ''}`,
+        { method: 'DELETE' }
+      )
+      if (res.ok) {
+        setDeleteTarget(null)
+        router.refresh()
+      }
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const statusLabel = (status: string) => {
     const keyMap: Record<string, string> = {
@@ -251,11 +272,22 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
                 </div>
 
                 {/* Action */}
-                <div className="flex-shrink-0 lg:ml-auto">
+                <div className="flex-shrink-0 lg:ml-auto flex items-center gap-4">
                   <span className="inline-flex items-center justify-center gap-3 text-sm font-semibold text-gray-700 group-hover:text-primary-700 transition">
                     {c.manageCampaign}
                     <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
                   </span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(cp) }}
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                    aria-label={`${c.deleteCampaign}: ${cp.title}`}
+                    title={c.deleteCampaign}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </Link>
             )
@@ -293,6 +325,45 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
           >
             ›
           </button>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div data-solid className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-gray-900 text-lg">{c.deleteConfirmTitle}</h3>
+            <p className="text-sm text-gray-600 mt-2">{c.deleteConfirmDesc}</p>
+            {['ACTIVE', 'PENDING_REVIEW', 'PAUSED'].includes(deleteTarget.status) && (
+              <p className="text-sm text-gray-600 mt-2">{c.cancelConfirmDesc}</p>
+            )}
+            <p className="text-sm font-semibold text-gray-900 mt-3 truncate">{deleteTarget.title}</p>
+            <div className="flex flex-wrap justify-end gap-2 mt-6">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-xl transition disabled:opacity-50"
+              >
+                {c.keepCampaign}
+              </button>
+              {['ACTIVE', 'PENDING_REVIEW', 'PAUSED'].includes(deleteTarget.status) && (
+                <button
+                  onClick={() => removeCampaign('cancel')}
+                  disabled={deleting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition disabled:opacity-50"
+                >
+                  {c.cancelCampaign}
+                </button>
+              )}
+              <button
+                onClick={() => removeCampaign('delete')}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition disabled:opacity-50"
+              >
+                {deleting ? '…' : c.deletePermanently}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

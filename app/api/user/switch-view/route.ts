@@ -25,11 +25,17 @@ export async function POST(request: Request) {
     )
   }
 
-  // Update userType in DB
-  await prisma.user.update({
+  // Update userType in DB — but never demote an ADMIN account
+  const current = await prisma.user.findUnique({
     where: { id: userId },
-    data: { userType: viewMode },
+    select: { userType: true },
   })
+  if (current?.userType !== 'ADMIN') {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { userType: viewMode },
+    })
+  }
 
   // Auto-create the corresponding profile if it doesn't exist
   if (viewMode === 'BRAND') {

@@ -189,8 +189,8 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.userType = (user as any).userType
         token.subscriptionTier = (user as any).subscriptionTier || 'FREE'
-        // Load brand verification status for brand users
-        if ((user as any).userType === 'BRAND') {
+        // Load brand verification status for brand users (ADMIN acts as brand)
+        if ((user as any).userType === 'BRAND' || (user as any).userType === 'ADMIN') {
           const bp = await prisma.brandProfile.findUnique({
             where: { userId: user.id },
             select: { brandVerificationStatus: true },

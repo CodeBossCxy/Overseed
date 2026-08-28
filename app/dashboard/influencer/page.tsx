@@ -23,7 +23,7 @@ export default async function InfluencerDashboardPage() {
   })
   const userType = dbUser?.userType || 'INFLUENCER'
 
-  if (userType === 'BRAND') {
+  if (userType === 'BRAND' || userType === 'ADMIN') {
     redirect('/dashboard/brand')
   }
 

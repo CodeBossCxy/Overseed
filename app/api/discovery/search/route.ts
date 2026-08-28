@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { KOL_API_URL, safeLocalCreatorDiscovery, sanitizeResults } from '@/lib/discovery'
+import { KOL_API_URL, kolAuthHeaders, safeLocalCreatorDiscovery, sanitizeResults } from '@/lib/discovery'
 
 // GET /api/discovery/search
 // Brand-only proxy to the KOL discovery service (cache-first creator search).
@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
     }
     const res = await fetch(target, {
       cache: 'no-store',
+      headers: kolAuthHeaders(),
       signal: AbortSignal.timeout(30000),
     })
     const data = await res.json().catch(() => null)

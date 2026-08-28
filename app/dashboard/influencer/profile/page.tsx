@@ -6,6 +6,7 @@ import CreatorWorkspaceLayout from '@/components/workspace/CreatorWorkspaceLayou
 import StatusBadge from '@/components/StatusBadge'
 import { PlatformIcon } from '@/components/campaigns/CampaignRowCard'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import ImageCropModal from '@/components/ui/ImageCropModal'
 
 // Creator Profile per spec 4.5 — two tabs: Public Profile (brand-visible
 // info + live preview) and Social Accounts (per-platform cards; at least one
@@ -52,6 +53,7 @@ export default function CreatorProfilePage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
 
   const [profile, setProfile] = useState<any>(null)
@@ -107,17 +109,22 @@ export default function CreatorProfilePage() {
 
   const toggleIn = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v])
 
-  const uploadPhoto = async (file: File) => {
+  const uploadPhoto = async (blob: Blob) => {
     setUploading(true)
     try {
       const fd = new FormData()
-      fd.append('files', file)
+      fd.append('files', new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
       const res = await fetch('/api/upload', { method: 'POST', body: fd })
       const data = await res.json()
       if (res.ok && data.urls?.[0]) setForm((f) => ({ ...f, avatarUrl: data.urls[0] }))
     } finally {
       setUploading(false)
     }
+  }
+
+  const closeCrop = () => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc)
+    setCropSrc(null)
   }
 
   const save = async () => {
@@ -258,7 +265,17 @@ export default function CreatorProfilePage() {
                         <span className="text-2xl font-bold text-gray-300">{(form.displayName || '?').charAt(0)}</span>
                       )}
                     </div>
-                    <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadPhoto(e.target.files[0])} />
+                    <input
+                      ref={photoRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) setCropSrc(URL.createObjectURL(file))
+                        e.target.value = ''
+                      }}
+                    />
                     <button
                       onClick={() => photoRef.current?.click()}
                       disabled={uploading}
@@ -447,6 +464,18 @@ export default function CreatorProfilePage() {
           </div>
         )}
       </div>
+
+      {cropSrc && (
+        <ImageCropModal
+          imageSrc={cropSrc}
+          cropShape="round"
+          onConfirm={(blob) => {
+            closeCrop()
+            uploadPhoto(blob)
+          }}
+          onCancel={closeCrop}
+        />
+      )}
     </CreatorWorkspaceLayout>
   )
 }

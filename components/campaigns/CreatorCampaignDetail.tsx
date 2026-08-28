@@ -86,11 +86,11 @@ export default function CreatorCampaignDetail({
     }
   }
 
-  const canSave = !isOwner && isAuthenticated && userType !== 'BRAND'
+  const canSave = !isOwner && isAuthenticated && userType !== 'BRAND' && userType !== 'ADMIN'
 
   const primaryAction = () => {
     if (isOwner) return <Link href={`/dashboard/brand/campaigns/${campaign.id}`} className="block rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 py-4 text-center font-semibold text-white">Manage Campaign</Link>
-    if (userType === 'BRAND') return <p className="py-3 text-center text-sm text-[#7180ad]">{t.campaign.onlyCreatorsCanApply}</p>
+    if (userType === 'BRAND' || userType === 'ADMIN') return <p className="py-3 text-center text-sm text-[#7180ad]">{t.campaign.onlyCreatorsCanApply}</p>
     if (isDeadlinePassed) return <p className="py-3 text-center font-semibold text-red-600">{t.campaign.deadlinePassed}</p>
     if (spotsLeft === 0) return <p className="py-3 text-center font-semibold text-orange-600">{t.campaign.allSpotsFilled}</p>
     if (hasApplied) return <button disabled className="w-full rounded-xl bg-slate-200 py-4 font-semibold text-slate-500">{t.campaign.alreadyApplied}</button>
@@ -234,7 +234,7 @@ export default function CreatorCampaignDetail({
           {primaryAction()}
           {canSave && <button onClick={toggleSave} disabled={saveBusy} className={`w-full rounded-xl border py-4 font-semibold transition disabled:opacity-50 ${saved ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-white bg-white/25'}`}>{saved ? '♥ Saved Campaign' : '♡ Save Campaign'}</button>}
         </div>
-        {!isOwner && userType !== 'BRAND' && (
+        {!isOwner && userType !== 'BRAND' && userType !== 'ADMIN' && (
           <div className="mt-6 space-y-4 rounded-2xl bg-white/35 p-4 text-sm">
             <div className="flex gap-3"><span className="text-violet-600">⛉</span><div><b>Save this campaign</b><p className="mt-0.5 text-xs text-[#6775a0]">We&apos;ll add this to your Saved Campaigns for easy access anytime.</p></div></div>
             <div className="flex gap-3"><span className="text-violet-600">✈</span><div><b>Apply to this campaign</b><p className="mt-0.5 text-xs text-[#6775a0]">We&apos;ll add this to your Applications &amp; Collaborations and share your info with the brand.</p></div></div>

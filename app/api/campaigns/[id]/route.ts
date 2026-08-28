@@ -307,13 +307,17 @@ export async function DELETE(
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }
 
-    // Soft delete by setting status to CANCELLED
-    await prisma.campaign.update({
-      where: { id: id },
-      data: { status: 'CANCELLED' },
-    })
+    // ?mode=cancel → soft cancel (keeps history); default → hard delete (relations cascade)
+    if (req.nextUrl.searchParams.get('mode') === 'cancel') {
+      await prisma.campaign.update({
+        where: { id: id },
+        data: { status: 'CANCELLED' },
+      })
+      return NextResponse.json({ message: 'Campaign cancelled successfully' })
+    }
 
-    return NextResponse.json({ message: 'Campaign cancelled successfully' })
+    await prisma.campaign.delete({ where: { id } })
+    return NextResponse.json({ message: 'Campaign deleted successfully' })
   } catch (error) {
     console.error('Error deleting campaign:', error)
     return NextResponse.json(

@@ -37,6 +37,7 @@
     "pusher-js": "^8.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-easy-crop": "^6.2.3",
     "react-hook-form": "^7.48.2",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",

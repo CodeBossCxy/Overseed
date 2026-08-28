@@ -13,11 +13,17 @@ export default async function BrandCenterPage() {
     redirect('/auth/signup?type=brand')
   }
 
-  // Persist BRAND role choice to DB
-  await prisma.user.update({
+  // Persist BRAND role choice to DB — but never demote an ADMIN account
+  const current = await prisma.user.findUnique({
     where: { id: userId },
-    data: { userType: 'BRAND' },
+    select: { userType: true },
   })
+  if (current?.userType !== 'ADMIN') {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { userType: 'BRAND' },
+    })
+  }
 
   // Auto-create BrandProfile if it doesn't exist
   const existing = await prisma.brandProfile.findUnique({
