@@ -9,7 +9,7 @@ function getResend() {
   return resend
 }
 
-const VERIFICATION_NOTIFY_EMAIL = 'xinyi@overseed.net'
+const VERIFICATION_NOTIFY_EMAIL = process.env.VERIFICATION_NOTIFY_EMAIL || 'xinyi@overseed.net'
 
 export interface VerificationEmailInput {
   companyName: string
@@ -121,7 +121,7 @@ export async function sendVerificationSubmittedEmail(input: VerificationEmailInp
     input.submission.fullName ||
     input.companyName
 
-  await getResend().emails.send({
+  const { error } = await getResend().emails.send({
     from: `Overseed <${process.env.EMAIL_FROM}>`,
     to: VERIFICATION_NOTIFY_EMAIL,
     subject: `[Verification] ${typeLabel}: ${subjectName}`,
@@ -150,6 +150,7 @@ export async function sendVerificationSubmittedEmail(input: VerificationEmailInp
       </div>
     `,
   })
+  if (error) throw new Error(`Resend error: ${error.name} — ${error.message}`)
 }
 
 export async function sendOTPEmail(to: string, otp: string, locale: string = 'en') {
@@ -167,7 +168,7 @@ export async function sendOTPEmail(to: string, otp: string, locale: string = 'en
     ? '此验证码将在10分钟后过期。如果您没有请求此验证码，请忽略此邮件。'
     : 'This code expires in 10 minutes. If you didn\'t request this, you can safely ignore this email.'
 
-  await getResend().emails.send({
+  const { error } = await getResend().emails.send({
     from: `Overseed <${process.env.EMAIL_FROM}>`,
     to,
     subject,
@@ -186,4 +187,5 @@ export async function sendOTPEmail(to: string, otp: string, locale: string = 'en
       </div>
     `,
   })
+  if (error) throw new Error(`Resend error: ${error.name} — ${error.message}`)
 }

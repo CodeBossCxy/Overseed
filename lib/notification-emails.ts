@@ -40,6 +40,11 @@ function escapeHtml(value: string) {
     .replace(/"/g, '&quot;')
 }
 
+// Email clients can't load localhost assets, so images always come from the
+// public site even when sending from a dev environment.
+const LOGO_BASE_URL =
+  process.env.NEXTAUTH_URL?.startsWith('https://') ? process.env.NEXTAUTH_URL : 'https://www.overseed.net'
+
 const FOOTER: Localized = {
   en: "You're receiving this because you have email notifications enabled. Manage preferences in Settings.",
   zh: '您收到此邮件是因为您已开启邮件通知。可在设置中管理通知偏好。',
@@ -80,13 +85,13 @@ export async function sendStatusEmail(opts: StatusEmailOptions) {
         </div>`
       : ''
 
-    await getResend().emails.send({
+    const { error } = await getResend().emails.send({
       from: `Overseed <${process.env.EMAIL_FROM}>`,
       to: opts.recipient.email,
       subject: t(opts.subject),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
-          <img src="${baseUrl}/email-logo-overseed.png" alt="Overseed" style="height:32px">
+          <img src="${LOGO_BASE_URL}/email-logo-overseed.png" alt="Overseed" style="height:32px">
           <h1 style="color: #111827; font-size: 20px; margin: 24px 0 8px;">${escapeHtml(t(opts.title))}</h1>
           <p style="color: #6B7280; font-size: 14px; margin-bottom: 20px;">${escapeHtml(t(opts.intro))}</p>
           ${detailRows ? `
@@ -105,6 +110,7 @@ export async function sendStatusEmail(opts: StatusEmailOptions) {
         </div>
       `,
     })
+    if (error) console.error('Resend rejected status notification email:', error)
   } catch (error) {
     console.error('Failed to send status notification email:', error)
   }
