@@ -165,8 +165,15 @@ export default function DiscoverPanel() {
     const next = [...contactFiles]
     for (const f of Array.from(list)) {
       if (next.length >= 3) break
-      if (f.size > 5 * 1024 * 1024) {
-        setContactError(`"${f.name}" exceeds the 5MB limit`)
+      if (f.size > 4 * 1024 * 1024) {
+        setContactError(`"${f.name}" exceeds the 4MB limit`)
+        continue
+      }
+      // Attachments are sent to the server in a single request, so the combined
+      // size must also stay under the platform's ~4.5MB request-body limit.
+      const total = next.reduce((sum, file) => sum + file.size, 0) + f.size
+      if (total > 4 * 1024 * 1024) {
+        setContactError('Attachments exceed 4MB combined — remove a file or use smaller ones')
         continue
       }
       next.push(f)
@@ -914,7 +921,7 @@ export default function DiscoverPanel() {
                     />
                   </label>
                   <span className="ml-2 text-[11px] text-gray-400">
-                    Images or PDF · up to 3 files · 5MB each
+                    Images or PDF · up to 3 files · 4MB combined
                   </span>
                 </div>
 

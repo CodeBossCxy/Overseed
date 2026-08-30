@@ -43,6 +43,15 @@ export default function LocaleDateInput({
         required={required}
         className="absolute inset-0 opacity-0 cursor-pointer z-10"
         tabIndex={-1}
+        // This invisible input covers the whole field and swallows every click,
+        // so the calendar must be opened from here — not from the div below.
+        onClick={() => {
+          try {
+            hiddenRef.current?.showPicker?.()
+          } catch {
+            // Older browsers without showPicker fall back to native behavior
+          }
+        }}
       />
       {/* Visible formatted display */}
       <div

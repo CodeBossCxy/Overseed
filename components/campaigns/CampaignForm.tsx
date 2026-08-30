@@ -167,7 +167,7 @@ export default function CampaignForm({
 
     // Client-side validation
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-    const maxSize = 5 * 1024 * 1024
+    const maxSize = 4 * 1024 * 1024
     const maxTotal = 8
 
     const remaining = maxTotal - formData.images.length
@@ -193,18 +193,20 @@ export default function CampaignForm({
     setIsUploading(true)
 
     try {
-      const body = new FormData()
-      filesToUpload.forEach((f) => body.append('files', f))
+      // Upload one file per request to stay under the platform's request-body limit
+      for (const f of filesToUpload) {
+        const body = new FormData()
+        body.append('files', f)
 
-      const res = await fetch('/api/upload', { method: 'POST', body })
+        const res = await fetch('/api/upload', { method: 'POST', body })
+        const data = await res.json().catch(() => null)
 
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Upload failed')
+        if (!res.ok || !data?.urls) {
+          throw new Error(data?.error || `"${f.name}" ${cf.fileTooLarge}`)
+        }
+
+        setFormData((prev) => ({ ...prev, images: [...prev.images, ...data.urls] }))
       }
-
-      const { urls } = await res.json()
-      setFormData((prev) => ({ ...prev, images: [...prev.images, ...urls] }))
     } catch (err: any) {
       setUploadError(err.message)
     } finally {
@@ -687,7 +689,6 @@ export default function CampaignForm({
           <label className="block text-sm font-medium mb-1">{cf.requiredHashtags}</label>
           <input
             type="text"
-            required
             value={formData.hashtagsRequired}
             onChange={(e) => setFormData({ ...formData, hashtagsRequired: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
@@ -698,7 +699,6 @@ export default function CampaignForm({
           <label className="block text-sm font-medium mb-1">{cf.requiredMentions}</label>
           <input
             type="text"
-            required
             value={formData.mentionsRequired}
             onChange={(e) => setFormData({ ...formData, mentionsRequired: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"

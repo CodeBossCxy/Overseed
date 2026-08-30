@@ -14,7 +14,7 @@ import { getCreatorContactEmail, type ClubPlatform } from '@/lib/influencers-clu
 // (recommended for local dev). Remove with the other TEMP club pieces.
 
 const MAX_FILES = 3
-const MAX_FILE_BYTES = 5 * 1024 * 1024
+const MAX_FILE_BYTES = 4 * 1024 * 1024
 const ALLOWED_TYPES = [
   'image/jpeg',
   'image/png',
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
   for (const f of files) {
     if (f.size > MAX_FILE_BYTES) {
       return NextResponse.json(
-        { message: `"${f.name}" exceeds the 5MB attachment limit` },
+        { message: `"${f.name}" exceeds the 4MB attachment limit` },
         { status: 400 }
       )
     }

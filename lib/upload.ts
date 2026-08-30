@@ -61,4 +61,5 @@ export async function uploadFile(
 }
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-export const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
+// Vercel rejects request bodies over 4.5 MB, so cap uploads safely below that.
+export const MAX_FILE_SIZE = 4 * 1024 * 1024 // 4 MB

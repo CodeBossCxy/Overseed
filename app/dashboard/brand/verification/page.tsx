@@ -62,29 +62,51 @@ function ChoicePill({
   )
 }
 
-function useDocUpload(setError: (e: string | null) => void, errUpload: string) {
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024 // keep below the platform's ~4.5MB request-body limit
+
+interface UploadResult {
+  urls: string[]
+  error: string | null
+}
+
+function useDocUpload(errUpload: string, errTooLarge: string) {
   const [isUploading, setIsUploading] = useState(false)
   const upload = useCallback(
-    async (files: FileList, current: string[], max: number): Promise<string[]> => {
-      setError(null)
+    async (files: FileList, current: string[], max: number): Promise<UploadResult> => {
       const selected = Array.from(files).slice(0, max - current.length)
-      if (selected.length === 0) return current
+      if (selected.length === 0) return { urls: current, error: null }
+
+      // Reject oversized files up front with a clear message
+      const oversized = selected.find((f) => f.size > MAX_UPLOAD_BYTES)
+      if (oversized) {
+        return { urls: current, error: errTooLarge.replace('{name}', oversized.name) }
+      }
+
       setIsUploading(true)
+      const uploaded: string[] = [...current]
       try {
-        const fd = new FormData()
-        selected.forEach((f) => fd.append('files', f))
-        const res = await fetch('/api/brand-verification/upload', { method: 'POST', body: fd })
-        const data = await res.json()
-        if (!res.ok || !data.urls) throw new Error(data.error || errUpload)
-        return [...current, ...data.urls].slice(0, max)
+        // One request per file so the combined size never exceeds the body limit
+        for (const f of selected) {
+          const fd = new FormData()
+          fd.append('files', f)
+          const res = await fetch('/api/brand-verification/upload', { method: 'POST', body: fd })
+          const data = await res.json().catch(() => null) // 413 responses aren't JSON
+          if (!res.ok || !data?.urls) {
+            throw new Error(
+              res.status === 413 ? errTooLarge.replace('{name}', f.name) : data?.error || errUpload
+            )
+          }
+          uploaded.push(...data.urls)
+        }
+        return { urls: uploaded.slice(0, max), error: null }
       } catch (err: any) {
-        setError(err.message || errUpload)
-        return current
+        // Keep any files that made it up before the failure
+        return { urls: uploaded.slice(0, max), error: err.message || errUpload }
       } finally {
         setIsUploading(false)
       }
     },
-    [setError, errUpload]
+    [errUpload, errTooLarge]
   )
   return { isUploading, upload }
 }
@@ -104,7 +126,7 @@ function FileField({
   label: string
   urls: string[]
   onChange: (urls: string[]) => void
-  upload: (files: FileList, current: string[], max: number) => Promise<string[]>
+  upload: (files: FileList, current: string[], max: number) => Promise<UploadResult>
   isUploading: boolean
   max?: number
   hint: string
@@ -113,6 +135,7 @@ function FileField({
   removeLabel: string
 }) {
   const ref = useRef<HTMLInputElement>(null)
+  const [fieldError, setFieldError] = useState<string | null>(null)
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -140,8 +163,10 @@ function FileField({
         className="hidden"
         onChange={async (e) => {
           if (e.target.files) {
-            const next = await upload(e.target.files, urls, max)
-            onChange(next)
+            setFieldError(null)
+            const result = await upload(e.target.files, urls, max)
+            onChange(result.urls)
+            setFieldError(result.error)
           }
           if (ref.current) ref.current.value = ''
         }}
@@ -155,6 +180,11 @@ function FileField({
         >
           {isUploading ? uploadingLabel : `+ ${addLabel}`}
         </button>
+      )}
+      {fieldError && (
+        <p className="mt-1.5 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          ⚠ {fieldError}
+        </p>
       )}
       <p className="mt-1 text-[11px] text-gray-400">{hint}</p>
     </div>
@@ -250,7 +280,7 @@ export default function BrandVerificationPage() {
   const [contactEmail, setContactEmail] = useState('')
   const [contactPhone, setContactPhone] = useState('')
 
-  const { isUploading, upload } = useDocUpload(setError, v.errUpload)
+  const { isUploading, upload } = useDocUpload(v.errUpload, v.errTooLarge)
 
   useEffect(() => {
     const fetchProfile = async () => {

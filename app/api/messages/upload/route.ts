@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   const file = (await req.formData()).get('file')
   if (!(file instanceof File) || !file.size) return NextResponse.json({ message: 'File required' }, { status: 400 })
   if (!TYPES.includes(file.type)) return NextResponse.json({ message: 'Only images and PDF files are supported' }, { status: 400 })
-  if (file.size > MAX_FILE_SIZE) return NextResponse.json({ message: 'Files must be 5 MB or smaller' }, { status: 400 })
+  if (file.size > MAX_FILE_SIZE) return NextResponse.json({ message: 'Files must be 4 MB or smaller' }, { status: 400 })
   const url = await uploadFile(Buffer.from(await file.arrayBuffer()), file.name, file.type, 'message_attachment/')
   return NextResponse.json({ url, name: file.name, mime: file.type })
 }
