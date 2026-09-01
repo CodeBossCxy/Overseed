@@ -54,11 +54,33 @@ function avatar(creator: { avatar_url?: string | null; avatarUrl?: string | null
 type CampaignStats = { total: number; pending: number; approved: number; rejected: number; underReview: number }
 
 export default function BrandCampaignDetailClient({ campaign: initialCampaign, stats }: { campaign: Campaign; stats: CampaignStats }) {
-  const { locale } = useLanguage()
+  const { t, locale } = useLanguage()
   const router = useRouter()
   const [campaign, setCampaign] = useState(initialCampaign)
   const [showDelete, setShowDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const submitForReview = async () => {
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACTIVE' }), // server converts to PENDING_REVIEW
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || t.brand.campaigns.submitFailed)
+      setCampaign((cp) => ({ ...cp, status: 'PENDING_REVIEW' }))
+      router.refresh()
+    } catch (err: any) {
+      setSubmitError(err.message || t.brand.campaigns.submitFailed)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const removeCampaign = async (mode: 'delete' | 'cancel') => {
     setDeleting(true)
@@ -212,6 +234,23 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     return <div className="campaign-manage max-w-[1500px] mx-auto workspace-page-tight pb-8 text-[#17255f]">
       <div className="flex items-center gap-2 text-sm text-[#6272a4] mb-5"><Link href="/dashboard/brand/campaigns">Campaign Pipeline</Link><span>›</span><b className="text-[#17255f]">{campaign.title}</b></div>
       {campaignTabs}
+      {campaign.status === 'DRAFT' && (
+        <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <p className="font-semibold text-amber-800 text-sm">📝 {t.brand.campaigns.draftBannerTitle}</p>
+            <p className="text-sm text-amber-700 mt-0.5">{t.brand.campaigns.draftBannerDesc}</p>
+            {submitError && <p className="text-sm text-red-600 mt-1">{submitError}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={submitForReview}
+            disabled={submitting}
+            className="flex-shrink-0 px-5 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-50"
+          >
+            {submitting ? '…' : t.brand.campaigns.submitForReview}
+          </button>
+        </div>
+      )}
       <div className="grid xl:grid-cols-[minmax(0,1fr)_390px] gap-5 items-start">
         <div className="min-w-0 space-y-4">
           <header>
@@ -221,7 +260,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               <span className="px-4 py-2 rounded-full bg-violet-50 text-violet-700 font-semibold">✦ &nbsp;{category}</span>
               <span>▣ &nbsp; Posted {new Date(campaign.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               <span>▣ &nbsp; Deadline {campaign.deadline ? new Date(campaign.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Flexible'}</span>
-              <span className="px-4 py-2 rounded-full bg-violet-100 text-violet-700 font-semibold capitalize">● &nbsp;{statusLabel}</span>
+              <span className={`px-4 py-2 rounded-full font-semibold capitalize ${campaign.status === 'DRAFT' ? 'bg-gray-100 text-gray-600 border border-dashed border-gray-400' : 'bg-violet-100 text-violet-700'}`}>● &nbsp;{statusLabel}</span>
             </div>
           </header>
 
@@ -247,7 +286,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         </div>
 
         <aside className="workspace-glass-card rounded-3xl p-7 xl:sticky xl:top-5">
-          <div className="flex justify-between"><b>Status</b><span className="px-3 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold capitalize">● &nbsp;{statusLabel}</span></div>
+          <div className="flex justify-between"><b>Status</b><span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${campaign.status === 'DRAFT' ? 'bg-gray-100 text-gray-600 border border-dashed border-gray-400' : 'bg-violet-100 text-violet-700'}`}>● &nbsp;{statusLabel}</span></div>
           <div className="mt-7"><p className="text-sm text-[#7180ad]">Compensation</p><div className="flex justify-between items-end mt-2"><b className="text-2xl capitalize">{campaign.compensationType.toLowerCase().replaceAll('_',' ')}</b>{campaign.giftValue && <div className="text-right"><p className="text-xs text-[#7180ad]">Gift value</p><b className="text-xl">${Number(campaign.giftValue).toLocaleString()}</b></div>}</div></div>
           <div className="border-t border-white/70 mt-6 pt-6 space-y-5"><div className="flex justify-between"><span>Applications</span><b>{stats.total}</b></div><div><div className="flex justify-between"><span>Spots Filled</span><b>{campaign.filledSlots} / {campaign.totalSlots}</b></div><div className="h-2 bg-slate-200/70 rounded-full mt-3"><div className="h-full bg-blue-500 rounded-full" style={{width:`${progress}%`}}/></div><p className="text-xs text-[#7884a8] mt-2">{remaining} spots remaining</p></div><div className="flex justify-between border-t border-white/70 pt-5"><span>Views</span><b>{campaign.viewCount}</b></div></div>
           <div className="space-y-3 mt-7"><Link href={`/dashboard/brand/campaigns/${campaign.id}/applications`} className="block text-center py-4 rounded-xl bg-blue-600 text-white font-semibold">View Applications</Link><Link href={`/dashboard/brand/campaigns/${campaign.id}/edit`} className="block text-center py-4 rounded-xl border border-white bg-white/25 font-semibold">Edit Campaign</Link><button type="button" onClick={() => setShowDelete(true)} className="block w-full text-center py-4 rounded-xl border border-red-200 bg-red-50/60 text-red-600 font-semibold hover:bg-red-100 transition">Delete Campaign</button></div>

@@ -31,7 +31,7 @@ interface Campaign {
 const PAGE_SIZE = 10
 const STATUS_OPTIONS = ['DRAFT', 'PENDING_REVIEW', 'ACTIVE', 'COMPLETED', 'CANCELLED']
 
-export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaign[] }) {
+export default function BrandCampaignsClient({ campaigns, isVerified }: { campaigns: Campaign[]; isVerified: boolean }) {
   const { t, locale } = useLanguage()
   const c = t.brand.campaigns
 
@@ -42,6 +42,29 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
   const [page, setPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [submittingId, setSubmittingId] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const submitForReview = async (cp: Campaign) => {
+    setSubmittingId(cp.id)
+    setSubmitError(null)
+    try {
+      const res = await fetch(`/api/campaigns/${cp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACTIVE' }), // server converts to PENDING_REVIEW
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.message || c.submitFailed)
+      }
+      router.refresh()
+    } catch (err: any) {
+      setSubmitError(err.message || c.submitFailed)
+    } finally {
+      setSubmittingId(null)
+    }
+  }
 
   const removeCampaign = async (mode: 'delete' | 'cancel') => {
     if (!deleteTarget) return
@@ -101,6 +124,12 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
   }
 
   const statusCaption = (cp: Campaign) => {
+    if (cp.status === 'DRAFT') {
+      return c.draftNotVisible
+    }
+    if (cp.status === 'PENDING_REVIEW') {
+      return c.awaitingReviewNote
+    }
     if (cp.status === 'ACTIVE' && cp.publishedAt) {
       return `${c.liveSince} ${formatDate(cp.publishedAt, locale)}`
     }
@@ -117,7 +146,8 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
     status === 'ACTIVE' ? 'bg-emerald-400'
       : status === 'COMPLETED' ? 'bg-blue-500'
         : status === 'CANCELLED' ? 'bg-red-500'
-          : 'bg-gray-300'
+          : status === 'PENDING_REVIEW' ? 'bg-violet-400'
+            : 'bg-gray-300'
 
   return (
     <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
@@ -174,6 +204,10 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
         </div>
       </div>
 
+      {submitError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{submitError}</div>
+      )}
+
       {/* Campaign cards */}
       {campaigns.length === 0 ? (
         <div className="workspace-glass-card rounded-2xl p-12 text-center">
@@ -193,12 +227,15 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
           {paged.map((cp) => {
             const dl = deadlineInfo(cp)
             const caption = statusCaption(cp)
+            const isDraft = cp.status === 'DRAFT'
             return (
               <Link
                 key={cp.id}
                 href={`/dashboard/brand/campaigns/${cp.id}`}
                 aria-label={`${c.manageCampaign}: ${cp.title}`}
-                className="group workspace-glass-card workspace-glass-option rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8 min-h-[108px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+                className={`group workspace-glass-card workspace-glass-option rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8 min-h-[108px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
+                  isDraft ? 'border-2 border-dashed border-gray-300 bg-gray-50/50 saturate-[.85]' : ''
+                }`}
               >
                 {/* Thumb + title */}
                 <div className="flex items-center gap-5 flex-1 min-w-0 lg:max-w-[440px]">
@@ -273,6 +310,26 @@ export default function BrandCampaignsClient({ campaigns }: { campaigns: Campaig
 
                 {/* Action */}
                 <div className="flex-shrink-0 lg:ml-auto flex items-center gap-4">
+                  {isDraft && (
+                    isVerified ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); submitForReview(cp) }}
+                        disabled={submittingId === cp.id}
+                        className="px-4 py-2 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-50"
+                      >
+                        {submittingId === cp.id ? '…' : c.submitForReview}
+                      </button>
+                    ) : (
+                      <span
+                        role="link"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push('/dashboard/brand/verification') }}
+                        className="px-4 py-2 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold hover:bg-amber-200 transition"
+                      >
+                        {c.verifyToPublish}
+                      </span>
+                    )
+                  )}
                   <span className="inline-flex items-center justify-center gap-3 text-sm font-semibold text-gray-700 group-hover:text-primary-700 transition">
                     {c.manageCampaign}
                     <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>

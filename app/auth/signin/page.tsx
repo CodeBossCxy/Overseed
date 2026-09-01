@@ -59,7 +59,7 @@ export default function SignInPage() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/home/landing-logo-overseed.png" alt="Overseed" className="h-14 w-auto overseed-logo-ink" />
+          <img src="/logo-horizontal.png" alt="Overseed" className="h-14 w-auto overseed-logo-ink" />
         </Link>
         <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
           {t.auth.signin.title}

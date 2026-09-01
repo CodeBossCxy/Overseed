@@ -40,7 +40,10 @@ export default async function BrandCampaignsPage() {
 
   return (
     <BrandWorkspaceLayout>
-      <BrandCampaignsClient campaigns={JSON.parse(JSON.stringify(campaigns))} />
+      <BrandCampaignsClient
+        campaigns={JSON.parse(JSON.stringify(campaigns))}
+        isVerified={brandProfile.brandVerificationStatus === 'APPROVED'}
+      />
     </BrandWorkspaceLayout>
   )
 }

@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
         <p style="font-size:16px;margin:28px 0 8px;"><a href="${SITE}" style="color:#1a73e8;font-weight:600;text-decoration:none;">View &amp; respond on Overseed &rarr;</a></p>
         <p style="font-size:14px;color:#757575;margin:0 0 4px;">Prefer email? Simply reply to this message &mdash; it goes straight to ${esc(brandName)}.</p>
         <hr style="border:none;border-top:1px solid #e0e0e0;margin:32px 0 20px;"/>
-        <img src="${SITE}/email-logo-overseed.png" alt="Overseed" width="121" height="39" style="display:block;border:0;margin:0 0 10px;" />
+        <img src="${SITE}/email-logo-overseed.png" alt="Overseed" width="161" height="32" style="display:block;border:0;margin:0 0 10px;" />
         <p style="font-size:14px;line-height:1.6;color:#424242;margin:0 0 2px;"><strong>The Overseed Team</strong></p>
         <p style="font-size:13px;line-height:1.6;color:#757575;margin:0 0 2px;">Overseed is a collaboration platform where brands discover creators, then manage briefs, content and payments in one place.</p>
         <p style="font-size:13px;line-height:1.6;margin:0 0 14px;"><a href="${SITE}" style="color:#1a73e8;text-decoration:none;">overseed.net</a></p>

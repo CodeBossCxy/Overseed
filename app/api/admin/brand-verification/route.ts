@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { grantVerifiedTrial } from '@/lib/subscription'
+import { sendVerificationApprovedEmail, sendVerificationRejectedEmail } from '@/lib/notification-emails'
 
 // GET: List brand profiles by verification status
 export async function GET(req: NextRequest) {
@@ -61,13 +62,38 @@ export async function PATCH(req: NextRequest) {
         verificationReviewedBy: adminUserId,
         rejectionReason: action === 'REJECT' ? rejectionReason : null,
       },
-      select: { brandVerificationStatus: true, userId: true },
+      select: {
+        brandVerificationStatus: true,
+        userId: true,
+        companyName: true,
+        user: {
+          select: {
+            email: true,
+            name: true,
+            preferredLanguage: true,
+            emailNotifications: true,
+            emailCampaignUpdates: true,
+            emailCollaborationUpdates: true,
+          },
+        },
+      },
     })
 
     // Early-stage promo: newly verified users get a free PRO trial
     let trialGranted = false
     if (action === 'APPROVE') {
       trialGranted = await grantVerifiedTrial(updated.userId)
+    }
+
+    // Notify the brand by email (fire-and-forget; never blocks the response)
+    const recipient = { ...updated.user }
+    if (action === 'APPROVE') {
+      void sendVerificationApprovedEmail(recipient, { companyName: updated.companyName })
+    } else {
+      void sendVerificationRejectedEmail(recipient, {
+        companyName: updated.companyName,
+        rejectionReason,
+      })
     }
 
     return NextResponse.json({ success: true, status: updated.brandVerificationStatus, trialGranted })

@@ -23,7 +23,8 @@ export interface NotificationRecipient {
 
 export interface StatusEmailOptions {
   recipient: NotificationRecipient
-  category: 'campaign' | 'collaboration'
+  // 'account' only checks the master emailNotifications preference
+  category: 'campaign' | 'collaboration' | 'account'
   subject: Localized
   title: Localized
   intro: Localized
@@ -405,6 +406,59 @@ export function sendCollaborationCancelledEmail(
         info.recipientRole === 'brand'
           ? `/dashboard/brand/collaborations/${info.collaborationId}`
           : `/dashboard/influencer/collaborations/${info.collaborationId}`,
+    },
+  })
+}
+
+// ---- Account events (category: account — only the master pref applies) ----
+
+export function sendVerificationApprovedEmail(
+  recipient: NotificationRecipient,
+  info: { companyName?: string | null }
+) {
+  return sendStatusEmail({
+    recipient,
+    category: 'account',
+    subject: {
+      en: 'Your brand is now verified on Overseed',
+      zh: '您的品牌已通过 Overseed 认证',
+    },
+    title: { en: 'Brand verification approved 🎉', zh: '品牌认证已通过 🎉' },
+    intro: {
+      en: 'Congratulations — the Overseed team has verified your brand. You can now publish campaigns and start collaborating with creators. Any drafts you saved earlier can be submitted for review.',
+      zh: '恭喜 — Overseed 团队已通过您的品牌认证。现在您可以发布活动并与达人开展合作了，此前保存的草稿也可以提交审核。',
+    },
+    details: [{ label: { en: 'Brand', zh: '品牌' }, value: info.companyName }],
+    cta: {
+      label: { en: 'Go to Campaign Pipeline', zh: '前往活动管线' },
+      path: '/dashboard/brand/campaigns',
+    },
+  })
+}
+
+export function sendVerificationRejectedEmail(
+  recipient: NotificationRecipient,
+  info: { companyName?: string | null; rejectionReason?: string | null }
+) {
+  return sendStatusEmail({
+    recipient,
+    category: 'account',
+    subject: {
+      en: 'Update on your Overseed brand verification',
+      zh: 'Overseed 品牌认证状态更新',
+    },
+    title: { en: 'Verification not approved', zh: '认证未通过' },
+    intro: {
+      en: 'Unfortunately, we could not verify your brand with the materials provided. Please review the reason below, update your submission, and try again.',
+      zh: '很遗憾，根据您提交的材料我们暂时无法完成品牌认证。请查看以下原因，补充材料后重新提交。',
+    },
+    details: [{ label: { en: 'Brand', zh: '品牌' }, value: info.companyName }],
+    note: info.rejectionReason
+      ? { label: { en: 'Reason', zh: '原因' }, value: info.rejectionReason }
+      : undefined,
+    cta: {
+      label: { en: 'Update verification', zh: '重新提交认证' },
+      path: '/dashboard/brand/verification',
     },
   })
 }

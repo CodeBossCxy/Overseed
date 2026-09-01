@@ -24,8 +24,8 @@ import fs from 'fs'
 import path from 'path'
 
 const COLORS = {
-  creator: { brand: 'E6296B', headerBg: 'FFF1F4', logo: 'home/landing-logo-overseed.png' },
-  brand: { brand: '2563EB', headerBg: 'EFF6FF', logo: 'home/landing-logo-overseed.png' },
+  creator: { brand: 'E6296B', headerBg: 'FFF1F4', logo: 'logo-horizontal.png' },
+  brand: { brand: '2563EB', headerBg: 'EFF6FF', logo: 'logo-horizontal.png' },
 }
 
 // Will be set per-request
@@ -33,7 +33,7 @@ let BRAND_COLOR = 'E6296B'
 let HEADER_BG = 'FFF1F4'
 const ALT_ROW_BG = 'FAFAFA'
 const BORDER_COLOR = 'E5E7EB'
-const OVERSEED_WORDMARK_LOGO = 'home/landing-logo-overseed.png'
+const OVERSEED_WORDMARK_LOGO = 'logo-horizontal.png'
 
 type DocElement = Paragraph | Table
 
@@ -549,7 +549,7 @@ function generateWord(content: string, title: string, theme: string = 'creator')
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new ImageRun({ data: headerLogoBuffer, transformation: { width: 150, height: 39 }, type: 'png' }),
+          new ImageRun({ data: headerLogoBuffer, transformation: { width: 161, height: 32 }, type: 'png' }),
         ],
         spacing: { after: 100 },
       })

@@ -26,7 +26,7 @@ function LandingLogo() {
   return (
     <span className="flex items-center" aria-label="Overseed">
       <Image
-        src="/home/landing-logo-overseed.png"
+        src="/logo-horizontal.png"
         alt="Overseed"
         width={381}
         height={98}
