@@ -571,7 +571,7 @@ export default function MessagesPage() {
             {selectedConvId && convDetails ? (
               <>
                 {/* Thread header */}
-                <div className="px-6 py-5 flex items-center gap-4">
+                <div className="px-4 sm:px-6 py-4 sm:py-5 flex items-center gap-2 sm:gap-4">
                   <button
                     onClick={() => setShowMobileThread(false)}
                     className="md:hidden p-1 hover:bg-gray-100 rounded"
@@ -590,11 +590,21 @@ export default function MessagesPage() {
                       />
                     </svg>
                   </button>
-                  <div className="w-14 h-14 rounded-full bg-white/65 ring-1 ring-white flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {convDetails.otherUser?.image ? <img src={convDetails.otherUser.image} alt="" className="w-full h-full object-cover" /> : <span className="text-xl font-bold text-primary-700">{convDetails.otherUser?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
+                  <Link
+                    href={
+                      !isBrand && selectedConv?.brandProfileId
+                        ? `/brand/${selectedConv.brandProfileId}`
+                        : isBrand && selectedConv?.influencerId
+                          ? `/influencer/${selectedConv.influencerId}`
+                          : `/campaign/${convDetails.campaignId}`
+                    }
+                    className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0"
+                  >
+                  <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-white/65 ring-1 ring-white flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {convDetails.otherUser?.image ? <img src={convDetails.otherUser.image} alt="" className="w-full h-full object-cover" /> : <span className="text-base sm:text-xl font-bold text-primary-700">{convDetails.otherUser?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-[#172760] truncate flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-bold text-[#172760] truncate flex items-center gap-2">
                       {convDetails.otherUser?.name || t.messages.unknownUser}
                       {selectedConv && isFavorited(selectedConv) && (
                         <>
@@ -607,13 +617,14 @@ export default function MessagesPage() {
                         </>
                       )}
                     </h3>
-                    <p className="text-sm text-[#6b7ba3] mt-1">{isBrand ? 'Creator collaboration' : 'Brand collaboration'}</p>
+                    <p className="text-xs sm:text-sm text-[#6b7ba3] mt-0.5 sm:mt-1 truncate">{isBrand ? 'Creator collaboration' : 'Brand collaboration'}</p>
                   </div>
+                  </Link>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {!isBrand && selectedConv?.brandProfileId && (
                       <Link
                         href={`/brand/${selectedConv.brandProfileId}`}
-                        className="px-5 py-2.5 bg-white/55 border border-white/80 shadow-sm rounded-xl text-sm font-semibold text-[#25386f] hover:text-primary-700 transition whitespace-nowrap"
+                        className="hidden sm:block px-5 py-2.5 bg-white/55 border border-white/80 shadow-sm rounded-xl text-sm font-semibold text-[#25386f] hover:text-primary-700 transition whitespace-nowrap"
                       >
                         {(t.messages as any)?.viewBrandProfile || 'View Brand Profile'}
                       </Link>
@@ -621,14 +632,14 @@ export default function MessagesPage() {
                     {isBrand && selectedConv?.influencerId ? (
                       <Link
                         href={`/influencer/${selectedConv.influencerId}`}
-                        className="px-4 py-2 text-sm text-gray-600 hover:text-primary-600"
+                        className="hidden sm:block px-4 py-2 text-sm text-gray-600 hover:text-primary-600 whitespace-nowrap"
                       >
                         {(t.messages as any)?.viewCreatorProfile || 'View Creator Profile'}
                       </Link>
                     ) : (
                       <Link
                         href={`/campaign/${convDetails.campaignId}`}
-                        className="px-4 py-2 text-sm text-gray-600 hover:text-primary-600"
+                        className="hidden sm:block px-4 py-2 text-sm text-gray-600 hover:text-primary-600 whitespace-nowrap"
                       >
                         {t.messages?.viewCampaign || 'View Campaign'}
                       </Link>
@@ -667,14 +678,14 @@ export default function MessagesPage() {
                   </div>
                 </div>
 
-                <div className="mx-6 border-y border-white/60 px-1 py-3 text-sm text-[#6075a8]">
-                  <Link href={`/campaign/${convDetails.campaignId}`} className="font-semibold hover:text-primary-700">
-                    <span className="text-[#25386f]">{(t.messages as any)?.messageContext || 'Message context:'}</span> {convDetails.campaignTitle} <span className="ml-2">⌄</span>
+                <div className="mx-4 sm:mx-6 border-y border-white/60 px-1 py-3 text-sm text-[#6075a8]">
+                  <Link href={`/campaign/${convDetails.campaignId}`} className="font-semibold hover:text-primary-700 flex items-center min-w-0">
+                    <span className="truncate"><span className="text-[#25386f]">{(t.messages as any)?.messageContext || 'Message context:'}</span> {convDetails.campaignTitle}</span> <span className="ml-2 flex-shrink-0">⌄</span>
                   </Link>
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-7 py-5 space-y-3">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-7 py-5 space-y-3">
                   {messages.length > 0 && <div className="flex items-center gap-4 py-1 text-xs text-[#8290b1]"><span className="h-px flex-1 bg-white/70" /><span>{new Date(messages[0].createdAt).toLocaleDateString(localeTag, { month: 'long', day: 'numeric', year: 'numeric' })}</span><span className="h-px flex-1 bg-white/70" /></div>}
                   {messages.map((msg) =>
                     msg.isSystemMessage ? (
@@ -759,7 +770,7 @@ export default function MessagesPage() {
                 </div>
 
                 {/* Input */}
-                <div className="px-6 pb-4 pt-2">
+                <div className="px-4 sm:px-6 pb-4 pt-2">
                   {sendError && (
                     <div className="mb-3 flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-sm text-red-700">
                       <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

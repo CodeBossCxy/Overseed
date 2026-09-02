@@ -323,9 +323,9 @@ export default function Header() {
     <header
       className={`z-50 pt-[env(safe-area-inset-top)] ${
         isLandingPage
-          ? 'absolute left-0 right-0 top-0 bg-transparent'
+          ? `absolute left-0 right-0 top-0 ${mobileMenuOpen ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-transparent'}`
           : isGlobal
-            ? 'sticky top-0 bg-[#0a1527]/20 backdrop-blur-md'
+            ? `sticky top-0 backdrop-blur-md ${mobileMenuOpen ? 'bg-[#0a1527]/95' : 'bg-[#0a1527]/20'}`
             : 'sticky top-0 bg-white shadow-sm'
       }`}
     >
