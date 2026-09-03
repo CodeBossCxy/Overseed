@@ -1,9 +1,18 @@
 import { prisma } from '@/lib/prisma'
 import { EARLY_STAGE_PROMO, VERIFIED_TRIAL_DAYS } from '@/lib/config'
 
+export type SubscriptionTier = 'FREE' | 'CAMPAIGN_PLUS' | 'OUTREACH_PLUS' | 'PRO'
+
+export const PAID_TIERS: SubscriptionTier[] = ['CAMPAIGN_PLUS', 'OUTREACH_PLUS', 'PRO']
+
+export function isPaidTier(tier: string): boolean {
+  return PAID_TIERS.includes(tier as SubscriptionTier)
+}
+
 /**
- * Early-stage promo: grant a verified user a free PRO trial.
- * No-op when the promo is off or the user already has PRO.
+ * Early-stage promo: grant a verified user a free Campaign Plus trial
+ * (pricing v3 — the old PRO trial maps to Campaign Plus).
+ * No-op when the promo is off or the user is already on a paid tier.
  * Returns true when a trial was granted.
  */
 export async function grantVerifiedTrial(userId: string): Promise<boolean> {
@@ -12,11 +21,11 @@ export async function grantVerifiedTrial(userId: string): Promise<boolean> {
     where: { id: userId },
     select: { subscriptionTier: true },
   })
-  if (!user || user.subscriptionTier === 'PRO') return false
+  if (!user || isPaidTier(user.subscriptionTier)) return false
   await prisma.user.update({
     where: { id: userId },
     data: {
-      subscriptionTier: 'PRO',
+      subscriptionTier: 'CAMPAIGN_PLUS',
       proTrialEndsAt: new Date(Date.now() + VERIFIED_TRIAL_DAYS * 24 * 60 * 60 * 1000),
     },
   })
@@ -24,17 +33,17 @@ export async function grantVerifiedTrial(userId: string): Promise<boolean> {
 }
 
 /**
- * The user's effective tier right now. Trial PRO that has expired is lazily
- * downgraded back to FREE on read.
+ * The user's effective tier right now. An expired trial (any paid tier with
+ * proTrialEndsAt set) is lazily downgraded back to FREE on read.
  */
-export async function getEffectiveTier(userId: string): Promise<'FREE' | 'PRO'> {
+export async function getEffectiveTier(userId: string): Promise<SubscriptionTier> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { subscriptionTier: true, proTrialEndsAt: true },
   })
   if (!user) return 'FREE'
   if (
-    user.subscriptionTier === 'PRO' &&
+    isPaidTier(user.subscriptionTier) &&
     user.proTrialEndsAt &&
     user.proTrialEndsAt < new Date()
   ) {
@@ -44,7 +53,7 @@ export async function getEffectiveTier(userId: string): Promise<'FREE' | 'PRO'> 
     })
     return 'FREE'
   }
-  return user.subscriptionTier as 'FREE' | 'PRO'
+  return user.subscriptionTier as SubscriptionTier
 }
 
 /**

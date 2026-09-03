@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import Stripe from 'stripe'
+import { grantPackCredits } from '@/lib/credits'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,14 +78,41 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed': {
         const checkoutSession = event.data.object as Stripe.Checkout.Session
 
-        // Subscription upgrade — update user to PRO
+        // Subscription purchase — set the tier from checkout metadata
+        // (pricing v3: CAMPAIGN_PLUS | OUTREACH_PLUS | PRO). Sessions created
+        // before v3 carry no tier and map to CAMPAIGN_PLUS (old ¥69.99 Pro).
         if (checkoutSession.mode === 'subscription' && checkoutSession.metadata?.userId) {
+          const tier = (['CAMPAIGN_PLUS', 'OUTREACH_PLUS', 'PRO'] as const).includes(
+            checkoutSession.metadata?.tier as any,
+          )
+            ? (checkoutSession.metadata!.tier as 'CAMPAIGN_PLUS' | 'OUTREACH_PLUS' | 'PRO')
+            : 'CAMPAIGN_PLUS'
           await prisma.user.update({
             where: { id: checkoutSession.metadata.userId },
-            data: { subscriptionTier: 'PRO' },
+            // Paid subscription — clear any trial marker
+            data: { subscriptionTier: tier, proTrialEndsAt: null },
           })
 
-          console.log(`[Stripe Webhook] User ${checkoutSession.metadata.userId} upgraded to PRO`)
+          console.log(`[Stripe Webhook] User ${checkoutSession.metadata.userId} upgraded to ${tier}`)
+        }
+
+        // Credit pack purchase — grant credits (idempotent per session id)
+        if (
+          checkoutSession.mode === 'payment' &&
+          checkoutSession.metadata?.userId &&
+          checkoutSession.metadata?.packCredits
+        ) {
+          const credits = parseInt(checkoutSession.metadata.packCredits, 10)
+          if (Number.isFinite(credits) && credits > 0) {
+            const granted = await grantPackCredits(
+              checkoutSession.metadata.userId,
+              credits,
+              checkoutSession.id,
+            )
+            console.log(
+              `[Stripe Webhook] ${granted ? 'Granted' : 'Skipped duplicate'} ${credits} credits to user ${checkoutSession.metadata.userId}`,
+            )
+          }
         }
         break
       }

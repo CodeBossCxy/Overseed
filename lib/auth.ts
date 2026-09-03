@@ -227,11 +227,11 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async createUser({ user }) {
-      // New OAuth users get PRO tier (beta invite code was validated client-side before OAuth)
+      // New OAuth users get Campaign Plus during beta (invite code was validated client-side before OAuth)
       if (user.id) {
         await prisma.user.update({
           where: { id: user.id },
-          data: { subscriptionTier: 'PRO' },
+          data: { subscriptionTier: 'CAMPAIGN_PLUS' },
         })
       }
     },

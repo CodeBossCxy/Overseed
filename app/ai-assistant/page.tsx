@@ -42,11 +42,12 @@ interface ChatSummary {
 export default function AIAssistantPage() {
   const { data: session } = useSession()
   const { t } = useLanguage()
-  const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
-  const isProUser = subscriptionTier === 'PRO'
   const isLoggedIn = !!session
   const userType = (session?.user as any)?.userType
   const isCreator = userType === 'INFLUENCER'
+  // Pricing v3: every tier gets monthly AI credits, so any signed-in
+  // brand-side user can use the assistant (credits are the server-side gate).
+  const isProUser = isLoggedIn && !isCreator
   const { themeMode } = useTheme()
   const themeIcon = themeMode === 'brand' ? '/icon-blue.png' : '/icon-pink.png'
 

@@ -715,7 +715,13 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
               <>
                 {joinDate}
                 <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[11px] font-semibold">
-                  {user.subscriptionTier === 'PRO' ? 'Pro' : st.freePlan}
+                  {user.subscriptionTier === 'PRO'
+                    ? 'Pro'
+                    : user.subscriptionTier === 'CAMPAIGN_PLUS'
+                      ? 'Campaign Plus'
+                      : user.subscriptionTier === 'OUTREACH_PLUS'
+                        ? 'Outreach Plus'
+                        : st.freePlan}
                 </span>
               </>
             }

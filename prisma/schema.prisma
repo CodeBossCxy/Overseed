@@ -94,7 +94,21 @@ enum CollaborationStatus {
 
 enum SubscriptionTier {
   FREE
+  CAMPAIGN_PLUS
+  OUTREACH_PLUS
   PRO
+}
+
+// Credit ledger transaction kinds. Balances are derived from the ledger:
+// - purchased pool = sum of amounts on PACK_PURCHASE/PURCHASED_DEDUCTION/REFUND/ADMIN_ADJUSTMENT
+// - monthly allowance is virtual (per-tier constant per calendar month) and
+//   consumed via MONTHLY_DEDUCTION rows; it resets implicitly at month start.
+enum CreditTxType {
+  PACK_PURCHASE
+  MONTHLY_DEDUCTION
+  PURCHASED_DEDUCTION
+  REFUND
+  ADMIN_ADJUSTMENT
 }
 
 // ===========================================
@@ -170,6 +184,8 @@ model User {
   aiTokenUsage      AiTokenUsage[]
   betaFeedback      BetaFeedback[]
   aiChats           AiChat[]
+  creditTransactions CreditTransaction[]
+  quotaUsage         QuotaUsage[]
 
   @@map("users")
 }
@@ -655,6 +671,47 @@ model AiTokenUsage {
 
   @@index([userId, createdAt])
   @@map("ai_token_usage")
+}
+
+// ===========================================
+// AI CREDITS LEDGER
+// ===========================================
+
+// Monthly-quota consumption events for non-credit metered features
+// (kind: 'discovery_search' | 'analytics' | 'outreach'). Usage for a month =
+// row count for that kind since month start.
+model QuotaUsage {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, createdAt])
+  @@map("quota_usage")
+}
+
+model CreditTransaction {
+  id        String       @id @default(cuid())
+  userId    String
+  // Positive for grants (pack purchase, refund, admin top-up), negative for
+  // deductions. Always whole credits.
+  amount    Int
+  type      CreditTxType
+  // What the deduction paid for: 'chat_standard' | 'chat_advanced' | 'image'
+  // | 'profile_view' | 'analytics' (future rows may add more).
+  feature   String?
+  // External reference: Stripe checkout session id for purchases, chat id /
+  // image request id for deductions.
+  reference String?
+  createdAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, type, createdAt])
+  @@map("credit_transactions")
 }
 
 // ===========================================

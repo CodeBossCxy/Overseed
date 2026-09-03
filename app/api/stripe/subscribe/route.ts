@@ -5,6 +5,44 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
+import { SUBSCRIPTION_PLANS, CURRENCY, type PaidTier, type BillingInterval } from '@/lib/pricing'
+
+/** Find or create the Stripe price for a plan/interval (idempotent by product name). */
+async function resolvePriceId(tier: PaidTier, interval: BillingInterval): Promise<string> {
+  const plan = SUBSCRIPTION_PLANS[tier]
+  const unitAmount = interval === 'year' ? plan.annual : plan.monthly
+
+  const products = await stripe.products.search({
+    query: `name:'${plan.productName}'`,
+  })
+  let productId = products.data[0]?.id
+  if (!productId) {
+    const product = await stripe.products.create({
+      name: plan.productName,
+      description: `Overseed subscription — ${plan.productName}`,
+      metadata: { tier },
+    })
+    productId = product.id
+  }
+
+  const prices = await stripe.prices.list({ product: productId, active: true, limit: 100 })
+  const existing = prices.data.find(
+    (p) =>
+      p.recurring?.interval === interval &&
+      p.unit_amount === unitAmount &&
+      p.currency === CURRENCY,
+  )
+  if (existing) return existing.id
+
+  const price = await stripe.prices.create({
+    product: productId,
+    unit_amount: unitAmount,
+    currency: CURRENCY,
+    recurring: { interval },
+    metadata: { tier },
+  })
+  return price.id
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,16 +53,22 @@ export async function POST(req: NextRequest) {
 
     const userId = (session.user as any).id
     const userType = (session.user as any).userType
-    const subscriptionTier = (session.user as any).subscriptionTier || 'FREE'
 
-    if (subscriptionTier === 'PRO') {
-      return NextResponse.json({ error: 'Already on Pro plan' }, { status: 400 })
+    const body = await req.json().catch(() => ({}))
+    const tier = (body?.tier || 'CAMPAIGN_PLUS') as PaidTier
+    const interval: BillingInterval = body?.interval === 'year' ? 'year' : 'month'
+    if (!SUBSCRIPTION_PLANS[tier]) {
+      return NextResponse.json({ error: 'Unknown plan' }, { status: 400 })
     }
 
-    const user = await prisma.user.findUnique({
+    const currentTier = await prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true },
+      select: { subscriptionTier: true, proTrialEndsAt: true, email: true },
     })
+    // Paying users can't re-subscribe to the same tier (trials may convert).
+    if (currentTier?.subscriptionTier === tier && !currentTier?.proTrialEndsAt) {
+      return NextResponse.json({ error: 'Already on this plan' }, { status: 400 })
+    }
 
     // Get or create Stripe customer
     let stripeCustomerId: string | null = null
@@ -34,7 +78,7 @@ export async function POST(req: NextRequest) {
       stripeCustomerId = brand?.stripeCustomerId || null
       if (!stripeCustomerId) {
         const customer = await stripe.customers.create({
-          email: user?.email || undefined,
+          email: currentTier?.email || undefined,
           metadata: { userId, userType },
         })
         stripeCustomerId = customer.id
@@ -48,40 +92,13 @@ export async function POST(req: NextRequest) {
     } else {
       // For influencers, create a one-off customer (separate from Connect account)
       const customer = await stripe.customers.create({
-        email: user?.email || undefined,
+        email: currentTier?.email || undefined,
         metadata: { userId, userType },
       })
       stripeCustomerId = customer.id
     }
 
-    // Look up or create the Pro price
-    // Search for existing product named "Overseed Pro"
-    const products = await stripe.products.search({
-      query: "name:'Overseed Pro'",
-    })
-
-    let priceId: string
-
-    if (products.data.length > 0 && products.data[0].default_price) {
-      priceId = typeof products.data[0].default_price === 'string'
-        ? products.data[0].default_price
-        : products.data[0].default_price.id
-    } else {
-      // Create the product and price
-      const product = await stripe.products.create({
-        name: 'Overseed Pro',
-        description: 'Pro subscription for Overseed platform',
-      })
-
-      const price = await stripe.prices.create({
-        product: product.id,
-        unit_amount: 999, // $9.99
-        currency: 'usd',
-        recurring: { interval: 'month' },
-      })
-
-      priceId = price.id
-    }
+    const priceId = await resolvePriceId(tier, interval)
 
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
     const dashboardPath = userType === 'BRAND' || userType === 'ADMIN' ? '/dashboard/brand' : '/dashboard/influencer'
@@ -94,7 +111,7 @@ export async function POST(req: NextRequest) {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${baseUrl}${dashboardPath}?upgraded=true`,
       cancel_url: `${baseUrl}/dashboard/upgrade?cancelled=true`,
-      metadata: { userId, userType },
+      metadata: { userId, userType, tier },
     })
 
     return NextResponse.json({ url: checkoutSession.url })

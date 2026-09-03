@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { getEffectiveTier } from '@/lib/subscription'
+import { getCreditSummary } from '@/lib/credits'
 
-const MONTHLY_TOKEN_LIMIT = 150_000
-
+// Pricing v3: usage is credit-based. `used`/`limit`/`percentage` keep the old
+// response shape (now in credits) so existing UI meters keep working;
+// `purchased`/`total` are additive.
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
@@ -12,17 +14,19 @@ export async function GET() {
   }
 
   const userId = (session.user as any).id
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const tier = await getEffectiveTier(userId)
+  const summary = await getCreditSummary(userId, tier)
 
-  const monthlyUsage = await prisma.aiTokenUsage.aggregate({
-    where: { userId, createdAt: { gte: startOfMonth } },
-    _sum: { totalTokens: true },
+  const used = Math.min(summary.monthlyUsed, summary.monthlyAllowance)
+  const limit = summary.monthlyAllowance
+  const percentage = limit > 0 ? Math.min(Math.round((used / limit) * 100), 100) : 100
+
+  return NextResponse.json({
+    used,
+    limit,
+    percentage,
+    purchased: summary.purchased,
+    total: summary.total,
+    unit: 'credits',
   })
-
-  const used = monthlyUsage._sum.totalTokens || 0
-  const limit = MONTHLY_TOKEN_LIMIT
-  const percentage = Math.min(Math.round((used / limit) * 100), 100)
-
-  return NextResponse.json({ used, limit, percentage })
 }

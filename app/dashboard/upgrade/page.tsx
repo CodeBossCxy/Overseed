@@ -14,7 +14,7 @@ export default function UpgradePage() {
   const searchParams = useSearchParams()
   const cancelled = searchParams.get('cancelled')
   const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
-  const isPro = subscriptionTier === 'PRO'
+  const isPaid = subscriptionTier === 'CAMPAIGN_PLUS' || subscriptionTier === 'OUTREACH_PLUS' || subscriptionTier === 'PRO'
   const [isLoading, setIsLoading] = useState(false)
 
   const features = [
@@ -79,7 +79,11 @@ export default function UpgradePage() {
   const handleUpgrade = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch('/api/stripe/subscribe', { method: 'POST' })
+      const res = await fetch('/api/stripe/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: 'CAMPAIGN_PLUS', interval: 'month' }),
+      })
       if (res.ok) {
         const data = await res.json()
         window.location.href = data.url
@@ -94,7 +98,13 @@ export default function UpgradePage() {
     }
   }
 
-  if (isPro) {
+  const tierNames: Record<string, string> = {
+    CAMPAIGN_PLUS: 'Campaign Plus',
+    OUTREACH_PLUS: 'Outreach Plus',
+    PRO: 'Pro',
+  }
+
+  if (isPaid) {
     return (
       <RoleShell>
       <div className="max-w-lg mx-auto px-4 workspace-page-tight pb-10 text-center">
@@ -104,11 +114,19 @@ export default function UpgradePage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {locale === 'zh' ? '您已是 Pro 用户' : "You're on Pro"}
+            {locale === 'zh'
+              ? `您已订阅 ${tierNames[subscriptionTier] || subscriptionTier}`
+              : `You're on ${tierNames[subscriptionTier] || subscriptionTier}`}
           </h1>
           <p className="text-gray-500">
-            {locale === 'zh' ? '您已拥有所有 Pro 功能。' : 'You have access to all Pro features.'}
+            {locale === 'zh' ? '如需更多额度，可以升级套餐或购买 Credits。' : 'Need more? Compare plans or buy extra credits.'}
           </p>
+          <a
+            href="/pricing/brand"
+            className="inline-block mt-5 px-5 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 transition"
+          >
+            {locale === 'zh' ? '查看所有套餐' : 'View all plans'}
+          </a>
         </div>
       </RoleShell>
     )
@@ -126,12 +144,12 @@ export default function UpgradePage() {
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-br from-primary-600 to-primary-700 px-8 py-8 text-white text-center">
-            <div className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-bold mb-4">PRO</div>
+            <div className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-bold mb-4">CAMPAIGN PLUS</div>
             <h1 className="text-2xl font-bold mb-2">
-              {locale === 'zh' ? '升级到 Pro' : 'Upgrade to Pro'}
+              {locale === 'zh' ? '升级到 Campaign Plus' : 'Upgrade to Campaign Plus'}
             </h1>
             <div className="flex items-baseline justify-center gap-1">
-              <span className="text-4xl font-bold">{locale === 'zh' ? '¥69.99' : '$9.99'}</span>
+              <span className="text-4xl font-bold">¥69</span>
               <span className="text-white/70">/{locale === 'zh' ? '月' : 'mo'}</span>
             </div>
           </div>
@@ -176,6 +194,11 @@ export default function UpgradePage() {
             </button>
             <p className="text-xs text-gray-400 text-center mt-3">
               {locale === 'zh' ? '安全支付由 Stripe 提供。可随时取消。' : 'Secure payment via Stripe. Cancel anytime.'}
+            </p>
+            <p className="text-xs text-center mt-2">
+              <a href="/pricing/brand" className="text-primary-600 hover:underline">
+                {locale === 'zh' ? '对比全部套餐（Outreach Plus / Pro）' : 'Compare all plans (Outreach Plus / Pro)'}
+              </a>
             </p>
           </div>
         </div>

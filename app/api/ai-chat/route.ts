@@ -4,13 +4,19 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
-import { resolveModel, providerConfig } from '@/lib/ai-models'
-import { getEffectiveTier, isUserVerified } from '@/lib/subscription'
+import { resolveModel, providerConfig, type AiModelDef } from '@/lib/ai-models'
+import { isUserVerified, getEffectiveTier } from '@/lib/subscription'
+import { deductCredits, refundDeduction } from '@/lib/credits'
 
 // Allow streaming responses to run longer on Vercel
 export const maxDuration = 60
 
-const MONTHLY_TOKEN_LIMIT = 150_000
+/** Advanced models (OpenAI/Anthropic) bill 3 credits; standard (DeepSeek/Kimi) bill 1. */
+function chatCreditFeature(modelDef: AiModelDef): 'chat_standard' | 'chat_advanced' {
+  return modelDef.provider === 'openai' || modelDef.provider === 'anthropic'
+    ? 'chat_advanced'
+    : 'chat_standard'
+}
 
 const SYSTEM_PROMPT = `You are a helpful AI assistant for Overseed, a platform connecting brands with global creators and influencers. Help users with global expansion strategies, market insights, creator collaboration advice, and platform-related questions. Be concise, friendly, and professional.
 
@@ -72,26 +78,9 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Effective tier (handles expired verified-user trials)
+  // Effective tier (handles expired verified-user trials). All tiers may use
+  // the assistant now (pricing v3) — the credit balance is the gate.
   const subscriptionTier = await getEffectiveTier(userId)
-  if (subscriptionTier !== 'PRO') {
-    return NextResponse.json({ error: 'Pro subscription required' }, { status: 403 })
-  }
-
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthlyUsage = await prisma.aiTokenUsage.aggregate({
-    where: { userId, createdAt: { gte: startOfMonth } },
-    _sum: { totalTokens: true },
-  })
-
-  const usedTokens = monthlyUsage._sum.totalTokens || 0
-  if (usedTokens >= MONTHLY_TOKEN_LIMIT) {
-    return NextResponse.json(
-      { error: 'Monthly AI usage limit reached. Your allowance resets next month.' },
-      { status: 429 }
-    )
-  }
 
   const { messages, provider, chatId } = await req.json()
   if (!messages || !Array.isArray(messages)) {
@@ -108,6 +97,23 @@ export async function POST(req: NextRequest) {
     )
   }
   const useProvider = modelDef.id
+
+  // Bill credits up front (refunded if the provider call fails before any
+  // output). Monthly allowance is consumed first, then purchased credits.
+  const creditFeature = chatCreditFeature(modelDef)
+  const creditRef = `chat:${userId}:${Date.now()}`
+  const deduction = await deductCredits(userId, subscriptionTier, creditFeature, creditRef)
+  if (!deduction.ok) {
+    return NextResponse.json(
+      {
+        error: 'Not enough AI credits. Buy a credit pack or wait for your monthly allowance to reset.',
+        code: 'INSUFFICIENT_CREDITS',
+        required: deduction.cost,
+        available: deduction.available,
+      },
+      { status: 402 }
+    )
+  }
 
   try {
     // Get or create chat for history
@@ -294,6 +300,14 @@ export async function POST(req: NextRequest) {
           controller.close()
         } catch (error: any) {
           console.error('AI stream error:', error?.message || error)
+          // Provider failed — don't charge for a reply the user never got.
+          if (!fullContent) {
+            try {
+              await refundDeduction(userId, creditRef)
+            } catch (refundErr) {
+              console.error('Credit refund failed:', refundErr)
+            }
+          }
           const isAuthError = error?.message?.includes('authentication') || error?.message?.includes('apiKey') || error?.message?.includes('API key')
           const userMessage = isAuthError
             ? 'AI service is temporarily unavailable. Please try a different model or try again later.'
@@ -315,6 +329,11 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('AI Chat error:', error?.message || error)
+    try {
+      await refundDeduction(userId, creditRef)
+    } catch (refundErr) {
+      console.error('Credit refund failed:', refundErr)
+    }
     return NextResponse.json({ error: error?.message || 'Failed to generate response' }, { status: 500 })
   }
 }

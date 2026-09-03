@@ -47,11 +47,11 @@ export default async function BrowsePage({
 }) {
   const session = await getServerSession(authOptions)
   const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
-  const isPro = subscriptionTier === 'PRO'
+  const isPaid = subscriptionTier === 'CAMPAIGN_PLUS' || subscriptionTier === 'OUTREACH_PLUS' || subscriptionTier === 'PRO'
   const { Shell, savedIds, canSave, niche } = await resolveViewer((session?.user as any)?.id)
 
-  // If user is not logged in or not PRO, show upgrade prompt
-  if (!session?.user || !isPro) {
+  // If user is not logged in or not on a paid tier, show upgrade prompt
+  if (!session?.user || !isPaid) {
     return (
       <Shell>
         <BrowseProGate isLoggedIn={!!session?.user} />

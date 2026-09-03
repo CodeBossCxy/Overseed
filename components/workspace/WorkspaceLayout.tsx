@@ -65,7 +65,8 @@ export default function WorkspaceLayout({
   const [unread, setUnread] = useState(0)
 
   const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
-  const isPro = subscriptionTier === 'PRO'
+  const isPaid = subscriptionTier === 'CAMPAIGN_PLUS' || subscriptionTier === 'OUTREACH_PLUS' || subscriptionTier === 'PRO'
+  const tierBadgeLabel = subscriptionTier === 'PRO' ? 'PRO' : subscriptionTier === 'CAMPAIGN_PLUS' ? 'CAMPAIGN+' : subscriptionTier === 'OUTREACH_PLUS' ? 'OUTREACH+' : t.brand.dashboard.plan.free
 
   // Unread messages dot (sidebar Messages item + top-bar bell)
   useEffect(() => {
@@ -330,13 +331,13 @@ export default function WorkspaceLayout({
               <Link
                 href={role === 'creator' ? '/dashboard/upgrade' : '/pricing/brand'}
                 className={`h-10 px-5 rounded-full text-sm font-bold flex items-center transition workspace-top-pill ${
-                  isPro
+                  isPaid
                     ? 'selected-option-glass text-gray-900 hover:bg-white/70'
                     : 'bg-white shadow-sm text-gray-600 hover:text-gray-900'
                 }`}
                 title={w.myPlan}
               >
-                {isPro ? 'PRO' : t.brand.dashboard.plan.free}
+                {tierBadgeLabel}
               </Link>
               {/* Language */}
               <button

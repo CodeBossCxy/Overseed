@@ -84,7 +84,7 @@ export async function POST(request: Request) {
         email: email.toLowerCase(),
         password: hashedPassword,
         userType: userType === 'brand' ? 'BRAND' : 'INFLUENCER',
-        subscriptionTier: 'PRO',
+        subscriptionTier: 'CAMPAIGN_PLUS',
         emailVerified: null,
       },
     })
