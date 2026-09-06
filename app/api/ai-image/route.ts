@@ -5,6 +5,9 @@ import { authOptions } from '@/lib/auth'
 import { getEffectiveTier, isUserVerified } from '@/lib/subscription'
 import { deductCredits, refundDeduction } from '@/lib/credits'
 import { uploadFile } from '@/lib/upload'
+import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
+import { chargeCredits } from '@/lib/metering'
+import { walletRefund } from '@/lib/wallet'
 
 export const maxDuration = 60
 
@@ -24,19 +27,24 @@ export async function POST(req: Request) {
   const apiKey = process.env.CHAT_API
   if (!apiKey) return NextResponse.json({ message: 'Image generation is not configured' }, { status: 503 })
 
-  // Bill 4 credits up front; refunded if generation fails.
+  // Bill image credits up front; refunded if generation fails.
   const creditRef = `image:${userId}:${Date.now()}`
-  const deduction = await deductCredits(userId, tier, 'image', creditRef)
-  if (!deduction.ok) {
-    return NextResponse.json(
-      {
-        message: 'Not enough AI credits. Buy a credit pack or wait for your monthly allowance to reset.',
-        code: 'INSUFFICIENT_CREDITS',
-        required: deduction.cost,
-        available: deduction.available,
-      },
-      { status: 402 }
-    )
+  if (CREDIT_SYSTEM_ENABLED) {
+    const charge = await chargeCredits(userId, 'image', creditRef)
+    if (!charge.ok) return NextResponse.json(charge.body, { status: charge.status })
+  } else {
+    const deduction = await deductCredits(userId, tier, 'image', creditRef)
+    if (!deduction.ok) {
+      return NextResponse.json(
+        {
+          message: 'Not enough AI credits. Buy a credit pack or wait for your monthly allowance to reset.',
+          code: 'INSUFFICIENT_CREDITS',
+          required: deduction.cost,
+          available: deduction.available,
+        },
+        { status: 402 }
+      )
+    }
   }
 
   try {
@@ -53,7 +61,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ url })
   } catch (error: any) {
     try {
-      await refundDeduction(userId, creditRef)
+      if (CREDIT_SYSTEM_ENABLED) await walletRefund(userId, creditRef)
+      else await refundDeduction(userId, creditRef)
     } catch (refundErr) {
       console.error('Credit refund failed:', refundErr)
     }

@@ -7,3 +7,8 @@ export const EARLY_STAGE_PROMO: boolean = process.env.EARLY_STAGE_PROMO !== 'fal
 
 // Length of the free PRO trial granted on verification, in days.
 export const VERIFIED_TRIAL_DAYS: number = parseInt(process.env.VERIFIED_TRIAL_DAYS || '30', 10)
+
+// Pricing v4 unified credit wallet. While false, the legacy v3 behavior
+// (quota counters + virtual monthly allowance) stays active. Enable per
+// environment via CREDIT_SYSTEM_ENABLED=true.
+export const CREDIT_SYSTEM_ENABLED: boolean = process.env.CREDIT_SYSTEM_ENABLED === 'true'

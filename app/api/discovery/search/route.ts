@@ -6,6 +6,11 @@ import { KOL_API_URL, kolAuthHeaders, safeLocalCreatorDiscovery, sanitizeResults
 import { consumeQuota } from '@/lib/plan'
 import { getEffectiveTier } from '@/lib/subscription'
 import { deductCredits } from '@/lib/credits'
+import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
+import { chargeCredits } from '@/lib/metering'
+import { walletRefund, getCreditPrice } from '@/lib/wallet'
+
+const DISCOVERY_PAGE_SIZE = 10
 
 // GET /api/discovery/search
 // Brand-only proxy to the KOL discovery service (cache-first creator search).
@@ -43,7 +48,20 @@ export async function GET(req: NextRequest) {
   // once the quota is exhausted, extra searches bill 6 credits each.
   // Plain browsing (no q/topics) stays unmetered.
   const isKeywordSearch = Boolean(incoming.get('q') || incoming.get('topics'))
-  if (isKeywordSearch) {
+  let searchCharge: { referenceId: string; refund: () => Promise<void> } | null = null
+  if (CREDIT_SYSTEM_ENABLED) {
+    // Pricing v4: each keyword search page (10 results) costs credits;
+    // plain browsing stays unmetered.
+    if (isKeywordSearch) {
+      const referenceId = `discovery:${userId}:${Date.now()}`
+      const charge = await chargeCredits(userId, 'discovery_search', referenceId)
+      if (!charge.ok) {
+        return NextResponse.json(charge.body, { status: charge.status })
+      }
+      if (charge.cost > 0) searchCharge = { referenceId, refund: charge.refund }
+      incoming.set('limit', String(DISCOVERY_PAGE_SIZE))
+    }
+  } else if (isKeywordSearch) {
     const tier = await getEffectiveTier(userId)
     const quota = await consumeQuota(userId, tier, 'discovery_search')
     if (!quota.ok) {
@@ -70,6 +88,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // v4: zero results → full refund; short page → refund the unfilled share
+  // (charge kept = max(1, ceil(price·n/10))). Single atomic, idempotent op.
+  const settleCharge = async (resultCount: number) => {
+    if (!searchCharge || resultCount >= DISCOVERY_PAGE_SIZE) return
+    const price = await getCreditPrice('discovery_search')
+    const keep =
+      resultCount > 0 ? Math.max(1, Math.ceil((price * resultCount) / DISCOVERY_PAGE_SIZE)) : 0
+    if (keep >= price) return
+    await walletRefund(userId, searchCharge.referenceId, { amount: price - keep })
+  }
+
   try {
     const target = new URL('/search', KOL_API_URL)
     for (const key of FORWARDED_PARAMS) {
@@ -82,9 +111,17 @@ export async function GET(req: NextRequest) {
       signal: AbortSignal.timeout(30000),
     })
     const data = await res.json().catch(() => null)
-    if (!res.ok) return NextResponse.json(await safeLocalCreatorDiscovery(incoming, true))
-    return NextResponse.json(sanitizeResults(data))
+    if (!res.ok) {
+      const local = await safeLocalCreatorDiscovery(incoming, true)
+      await settleCharge(local?.results?.length ?? 0)
+      return NextResponse.json(local)
+    }
+    const sanitized = sanitizeResults(data)
+    await settleCharge(sanitized?.results?.length ?? 0)
+    return NextResponse.json(sanitized)
   } catch {
-    return NextResponse.json(await safeLocalCreatorDiscovery(incoming, true))
+    const local = await safeLocalCreatorDiscovery(incoming, true)
+    await settleCharge(local?.results?.length ?? 0)
+    return NextResponse.json(local)
   }
 }

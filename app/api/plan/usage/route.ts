@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { PLAN_LIMITS, getQuotaUsed } from '@/lib/plan'
 import { getEffectiveTier } from '@/lib/subscription'
 import { getCreditSummary } from '@/lib/credits'
+import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
+import { getWalletBalance, getPlanConfig } from '@/lib/wallet'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -88,32 +90,71 @@ export async function GET() {
         used: 1,
         limit: limits.teamSeats,
       },
-      {
-        // Unified AI credits (chat/image/profile views/analytics-on-demand).
-        // `used`/`limit` cover the monthly allowance; `extra` = purchased pool.
-        key: 'aiCredits',
-        used: Math.min(credits.monthlyUsed, credits.monthlyAllowance),
-        limit: credits.monthlyAllowance,
-        extra: credits.purchased,
-        enabled: true,
-      },
-      {
-        key: 'discoverySearches',
-        used: discoveryUsed,
-        limit: limits.discoverySearchesPerMonth,
-      },
-      {
-        key: 'advancedAnalytics',
-        used: analyticsUsed,
-        limit: limits.analyticsPerMonth,
-        enabled: limits.analyticsPerMonth > 0,
-      },
-      {
-        key: 'managedOutreach',
-        used: outreachUsed,
-        limit: limits.outreachPerMonth,
-        enabled: limits.outreachPerMonth > 0,
-      },
+      ...(await creditItems(userId, tier, credits, {
+        discoveryUsed,
+        analyticsUsed,
+        outreachUsed,
+        limits,
+      })),
     ],
   })
+}
+
+/**
+ * Pricing v4: everything metered is one credit wallet, so the old per-feature
+ * quota rows (discovery/analytics/outreach) disappear and aiCredits reflects
+ * the wallet. With the flag off, the legacy v3 rows are returned unchanged.
+ */
+async function creditItems(
+  userId: string,
+  tier: Awaited<ReturnType<typeof getEffectiveTier>>,
+  credits: Awaited<ReturnType<typeof getCreditSummary>>,
+  legacy: {
+    discoveryUsed: number
+    analyticsUsed: number
+    outreachUsed: number
+    limits: (typeof PLAN_LIMITS)[keyof typeof PLAN_LIMITS]
+  },
+) {
+  if (CREDIT_SYSTEM_ENABLED) {
+    const [balance, plan] = await Promise.all([getWalletBalance(userId), getPlanConfig(tier)])
+    const cycleCredits = plan.baseCredits + plan.bonusCredits
+    return [
+      {
+        key: 'aiCredits',
+        used: Math.max(0, cycleCredits - balance.subscription),
+        limit: cycleCredits,
+        extra: balance.purchased,
+        enabled: true,
+      },
+    ]
+  }
+  return [
+    {
+      // Unified AI credits (chat/image/profile views/analytics-on-demand).
+      // `used`/`limit` cover the monthly allowance; `extra` = purchased pool.
+      key: 'aiCredits',
+      used: Math.min(credits.monthlyUsed, credits.monthlyAllowance),
+      limit: credits.monthlyAllowance,
+      extra: credits.purchased,
+      enabled: true,
+    },
+    {
+      key: 'discoverySearches',
+      used: legacy.discoveryUsed,
+      limit: legacy.limits.discoverySearchesPerMonth,
+    },
+    {
+      key: 'advancedAnalytics',
+      used: legacy.analyticsUsed,
+      limit: legacy.limits.analyticsPerMonth,
+      enabled: legacy.limits.analyticsPerMonth > 0,
+    },
+    {
+      key: 'managedOutreach',
+      used: legacy.outreachUsed,
+      limit: legacy.limits.outreachPerMonth,
+      enabled: legacy.limits.outreachPerMonth > 0,
+    },
+  ]
 }

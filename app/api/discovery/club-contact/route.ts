@@ -5,6 +5,10 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { containsBannedContent } from '@/lib/message-filter'
 import { getCreatorContactEmail, type ClubPlatform } from '@/lib/influencers-club'
+import { consumeQuota, releaseQuota } from '@/lib/plan'
+import { getEffectiveTier } from '@/lib/subscription'
+import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
+import { chargeCredits } from '@/lib/metering'
 
 // TEMP: POST /api/discovery/club-contact — brand outreach to an influencers.club
 // creator. The creator's email lives only in the server-side cache populated by
@@ -88,12 +92,44 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const creatorEmail = getCreatorContactEmail(platform, handle)
+  const creatorEmail = await getCreatorContactEmail(platform, handle)
   if (!creatorEmail) {
     return NextResponse.json(
       { message: 'This creator cannot be reached yet', code: 'NOT_REACHABLE' },
       { status: 404 }
     )
+  }
+
+  // Charged/consumed after all validation so invalid requests never burn
+  // quota or credits.
+  let outreachCharge: { refund: () => Promise<void> } | null = null
+  let quota: { ok: boolean; used: number; limit: number; usageId?: string } | null = null
+  if (CREDIT_SYSTEM_ENABLED) {
+    // Pricing v4: outreach costs credits and is gated to Outreach Plus / Pro.
+    const outreachRef = `outreach:${userId}:${platform}:${handle.toLowerCase()}:${Date.now()}`
+    const charge = await chargeCredits(userId, 'outreach', outreachRef)
+    if (!charge.ok) {
+      return NextResponse.json(charge.body, { status: charge.status })
+    }
+    outreachCharge = charge
+  } else {
+    // Pricing v3 (legacy): managed outreach is a monthly quota (—/5/15/30).
+    const tier = await getEffectiveTier(userId)
+    quota = await consumeQuota(userId, tier, 'outreach')
+    if (!quota.ok) {
+      return NextResponse.json(
+        {
+          message:
+            quota.limit === 0
+              ? 'Managed outreach is not included in your plan. Upgrade to contact creators directly.'
+              : 'Monthly outreach limit reached. Upgrade your plan for more outreach.',
+          code: 'OUTREACH_QUOTA_EXCEEDED',
+          used: quota.used,
+          limit: quota.limit,
+        },
+        { status: 402 }
+      )
+    }
   }
 
   const to = process.env.CLUB_OUTREACH_TEST_RECIPIENT || creatorEmail
@@ -245,6 +281,21 @@ export async function POST(req: NextRequest) {
     })
     if (error) throw new Error(error.message)
   } catch (err: any) {
+    // Send failed — give the credits / quota unit back
+    if (outreachCharge) {
+      try {
+        await outreachCharge.refund()
+      } catch (refundErr) {
+        console.error('Outreach credit refund failed:', refundErr)
+      }
+    }
+    if (quota?.usageId) {
+      try {
+        await releaseQuota(quota.usageId)
+      } catch (releaseErr) {
+        console.error('Quota release failed:', releaseErr)
+      }
+    }
     return NextResponse.json(
       { message: err?.message || 'Failed to send message' },
       { status: 502 }

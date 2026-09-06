@@ -604,6 +604,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Doc export is free (0 credits, pricing v4) but rate-limited: 30/hour/user.
+  const { checkRateLimit } = await import('@/lib/rate-limit')
+  const rate = checkRateLimit(`doc_export:${(session.user as any).id}`, 30, 60 * 60 * 1000)
+  if (!rate.ok) {
+    return NextResponse.json(
+      { error: 'Too many export requests. Try again later.', code: 'RATE_LIMITED' },
+      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec) } }
+    )
+  }
+
   try {
     const { content, title, format = 'docx', theme = 'creator' } = await req.json()
     if (!content) {

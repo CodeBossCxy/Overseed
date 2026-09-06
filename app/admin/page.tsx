@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import MainLayout from '@/components/MainLayout'
+import CreditsAdminPanel from '@/components/admin/CreditsAdminPanel'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate, formatDateTime } from '@/lib/i18n/formatDate'
 
@@ -75,7 +76,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<UserData[]>([])
   const [recentAiLogs, setRecentAiLogs] = useState<AiLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'ai-usage' | 'beta-codes' | 'beta-feedback' | 'brand-verification' | 'campaign-review'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'ai-usage' | 'credits' | 'beta-codes' | 'beta-feedback' | 'brand-verification' | 'campaign-review'>('overview')
 
   // Brand verification state
   const [pendingBrands, setPendingBrands] = useState<any[]>([])
@@ -263,7 +264,7 @@ export default function AdminDashboard() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
-          {(['overview', 'users', 'ai-usage', 'brand-verification', 'campaign-review', 'beta-codes', 'beta-feedback'] as const).map((tab) => (
+          {(['overview', 'users', 'ai-usage', 'credits', 'brand-verification', 'campaign-review', 'beta-codes', 'beta-feedback'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => {
@@ -277,7 +278,7 @@ export default function AdminDashboard() {
                   : 'text-gray-600 font-medium hover:text-gray-900'
               }`}
             >
-              {tab === 'overview' ? 'Overview' : tab === 'users' ? 'Users' : tab === 'ai-usage' ? 'AI Usage' : tab === 'brand-verification' ? 'Brand Verification' : tab === 'campaign-review' ? `Campaign Review${reviewCampaigns.length ? ` (${reviewCampaigns.length})` : ''}` : tab === 'beta-codes' ? 'Beta Codes' : 'Beta Feedback'}
+              {tab === 'overview' ? 'Overview' : tab === 'users' ? 'Users' : tab === 'ai-usage' ? 'AI Usage' : tab === 'credits' ? 'Credits' : tab === 'brand-verification' ? 'Brand Verification' : tab === 'campaign-review' ? `Campaign Review${reviewCampaigns.length ? ` (${reviewCampaigns.length})` : ''}` : tab === 'beta-codes' ? 'Beta Codes' : 'Beta Feedback'}
             </button>
           ))}
         </div>
@@ -304,6 +305,9 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* Credits Tab */}
+        {activeTab === 'credits' && <CreditsAdminPanel />}
 
         {/* Users Tab */}
         {activeTab === 'users' && (

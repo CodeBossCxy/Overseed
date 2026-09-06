@@ -85,10 +85,15 @@ export async function consumeQuota(
   userId: string,
   tier: SubscriptionTier,
   kind: QuotaKind,
-): Promise<{ ok: boolean; used: number; limit: number }> {
+): Promise<{ ok: boolean; used: number; limit: number; usageId?: string }> {
   const limit = PLAN_LIMITS[tier][QUOTA_LIMIT_KEY[kind]]
   const used = await getQuotaUsed(userId, kind)
   if (used >= limit) return { ok: false, used, limit }
-  await prisma.quotaUsage.create({ data: { userId, kind } })
-  return { ok: true, used: used + 1, limit }
+  const row = await prisma.quotaUsage.create({ data: { userId, kind } })
+  return { ok: true, used: used + 1, limit, usageId: row.id }
+}
+
+/** Undo a quota consumption (e.g. the metered action failed downstream). */
+export async function releaseQuota(usageId: string): Promise<void> {
+  await prisma.quotaUsage.deleteMany({ where: { id: usageId } })
 }

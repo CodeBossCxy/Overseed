@@ -3,6 +3,25 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import Stripe from 'stripe'
 import { grantPackCredits } from '@/lib/credits'
+import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
+import {
+  walletGrant,
+  grantSubscriptionCycleCredits,
+  addMonths,
+  PACK_VALIDITY_MONTHS,
+} from '@/lib/wallet'
+
+const V4_TIERS = ['CAMPAIGN_PLUS', 'OUTREACH_PLUS', 'PRO'] as const
+type V4Tier = (typeof V4_TIERS)[number]
+
+/**
+ * Subscription lots never outlive the paid period, and monthly-granted
+ * credits on annual plans still reset monthly (no rollover).
+ */
+function subscriptionLotExpiry(periodEnd: Date): Date {
+  const monthly = addMonths(new Date(), 1)
+  return monthly < periodEnd ? monthly : periodEnd
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -87,12 +106,23 @@ export async function POST(req: NextRequest) {
           )
             ? (checkoutSession.metadata!.tier as 'CAMPAIGN_PLUS' | 'OUTREACH_PLUS' | 'PRO')
             : 'CAMPAIGN_PLUS'
+          const subscriptionId =
+            typeof checkoutSession.subscription === 'string'
+              ? checkoutSession.subscription
+              : checkoutSession.subscription?.id || null
           await prisma.user.update({
             where: { id: checkoutSession.metadata.userId },
             // Paid subscription — clear any trial marker
-            data: { subscriptionTier: tier, proTrialEndsAt: null },
+            data: {
+              subscriptionTier: tier,
+              proTrialEndsAt: null,
+              ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
+            },
           })
 
+          // Pricing v4: the first cycle's credits are granted by the
+          // invoice.paid event that accompanies this checkout (idempotent
+          // per invoice id), so nothing else to do here.
           console.log(`[Stripe Webhook] User ${checkoutSession.metadata.userId} upgraded to ${tier}`)
         }
 
@@ -104,16 +134,124 @@ export async function POST(req: NextRequest) {
         ) {
           const credits = parseInt(checkoutSession.metadata.packCredits, 10)
           if (Number.isFinite(credits) && credits > 0) {
-            const granted = await grantPackCredits(
-              checkoutSession.metadata.userId,
-              credits,
-              checkoutSession.id,
-            )
+            const buyerId = checkoutSession.metadata.userId
+            let granted: boolean
+            if (CREDIT_SYSTEM_ENABLED) {
+              // v4: purchased lot, valid 12 months, FIFO after subscription credits
+              granted = await walletGrant(buyerId, {
+                bucket: 'PURCHASED',
+                source: 'PACK',
+                credits,
+                expiresAt: addMonths(new Date(), PACK_VALIDITY_MONTHS),
+                reference: `checkout:${checkoutSession.id}`,
+                note: checkoutSession.metadata.packConfigId,
+              })
+              // Free users may buy the small pack exactly once. Atomic stamp
+              // (only when unset) closes the multi-open-checkout race; if the
+              // stamp already exists we still grant — the money was taken —
+              // but log it for support visibility.
+              if (granted && checkoutSession.metadata.freePack === 'true') {
+                const stamped = await prisma.user.updateMany({
+                  where: { id: buyerId, freePackPurchasedAt: null },
+                  data: { freePackPurchasedAt: new Date() },
+                })
+                if (stamped.count === 0) {
+                  console.warn(
+                    `[Stripe Webhook] Free user ${buyerId} fulfilled a second free-pack checkout (${checkoutSession.id})`,
+                  )
+                }
+              }
+            } else {
+              granted = await grantPackCredits(buyerId, credits, checkoutSession.id)
+            }
             console.log(
-              `[Stripe Webhook] ${granted ? 'Granted' : 'Skipped duplicate'} ${credits} credits to user ${checkoutSession.metadata.userId}`,
+              `[Stripe Webhook] ${granted ? 'Granted' : 'Skipped duplicate'} ${credits} credits to user ${buyerId}`,
             )
           }
         }
+        break
+      }
+
+      case 'invoice.paid': {
+        // Pricing v4: each paid subscription invoice opens a billing cycle —
+        // mirror period end and grant the cycle's subscription credits.
+        if (!CREDIT_SYSTEM_ENABLED) break
+        const invoice = event.data.object as Stripe.Invoice
+        const subscriptionId =
+          typeof (invoice as any).subscription === 'string'
+            ? ((invoice as any).subscription as string)
+            : ((invoice as any).subscription?.id as string | undefined)
+        if (!subscriptionId) break
+
+        // Only new cycles grant credits — prorations / plan-change invoices
+        // (billing_reason subscription_update etc.) must not re-grant.
+        const billingReason = (invoice as any).billing_reason as string | undefined
+        if (
+          billingReason &&
+          billingReason !== 'subscription_create' &&
+          billingReason !== 'subscription_cycle'
+        ) {
+          break
+        }
+
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+        const subMeta = (subscription.metadata || {}) as { userId?: string; tier?: string }
+
+        // Resolve the user: subscription metadata first (works even when this
+        // event beats checkout.session.completed), then mirrored id, then
+        // customer metadata.
+        let user =
+          (subMeta.userId
+            ? await prisma.user.findUnique({
+                where: { id: subMeta.userId },
+                select: { id: true, subscriptionTier: true },
+              })
+            : null) ||
+          (await prisma.user.findFirst({
+            where: { stripeSubscriptionId: subscriptionId },
+            select: { id: true, subscriptionTier: true },
+          }))
+        if (!user && invoice.customer) {
+          const customer = await stripe.customers.retrieve(invoice.customer as string)
+          const metaUserId = (customer as Stripe.Customer).metadata?.userId
+          if (metaUserId) {
+            user = await prisma.user.findUnique({
+              where: { id: metaUserId },
+              select: { id: true, subscriptionTier: true },
+            })
+          }
+        }
+        if (!user) {
+          console.warn(`[Stripe Webhook] invoice.paid: no user for subscription ${subscriptionId}`)
+          break
+        }
+
+        const periodEndSec =
+          (subscription as any).current_period_end ??
+          (subscription as any).items?.data?.[0]?.current_period_end
+        const periodEnd = periodEndSec ? new Date(periodEndSec * 1000) : addMonths(new Date(), 1)
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { stripeSubscriptionId: subscriptionId, currentPeriodEnd: periodEnd },
+        })
+
+        // Plan resolution: subscription metadata (authoritative, set at
+        // checkout) → DB tier → CAMPAIGN_PLUS.
+        const tier = V4_TIERS.includes(subMeta.tier as V4Tier)
+          ? (subMeta.tier as V4Tier)
+          : V4_TIERS.includes(user.subscriptionTier as V4Tier)
+            ? (user.subscriptionTier as V4Tier)
+            : 'CAMPAIGN_PLUS'
+        const granted = await grantSubscriptionCycleCredits(
+          user.id,
+          tier,
+          subscriptionLotExpiry(periodEnd),
+          `invoice:${invoice.id}`,
+        )
+        console.log(
+          `[Stripe Webhook] ${granted ? 'Granted' : 'Skipped duplicate'} cycle credits (${tier}) for user ${user.id}`,
+        )
         break
       }
 
@@ -126,7 +264,11 @@ export async function POST(req: NextRequest) {
         if (userId) {
           await prisma.user.update({
             where: { id: userId },
-            data: { subscriptionTier: 'FREE' },
+            data: {
+              subscriptionTier: 'FREE',
+              stripeSubscriptionId: null,
+              currentPeriodEnd: null,
+            },
           })
 
           console.log(`[Stripe Webhook] User ${userId} downgraded to FREE`)

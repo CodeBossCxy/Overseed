@@ -6,11 +6,19 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { SUBSCRIPTION_PLANS, CURRENCY, type PaidTier, type BillingInterval } from '@/lib/pricing'
+import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
+import { getPlanConfig } from '@/lib/wallet'
 
 /** Find or create the Stripe price for a plan/interval (idempotent by product name). */
 async function resolvePriceId(tier: PaidTier, interval: BillingInterval): Promise<string> {
   const plan = SUBSCRIPTION_PLANS[tier]
-  const unitAmount = interval === 'year' ? plan.annual : plan.monthly
+  // Pricing v4: charge the admin-editable plan_config amounts (the pricing
+  // page displays these), not the hardcoded catalog.
+  let unitAmount = interval === 'year' ? plan.annual : plan.monthly
+  if (CREDIT_SYSTEM_ENABLED) {
+    const cfg = await getPlanConfig(tier)
+    unitAmount = interval === 'year' ? cfg.priceAnnual : cfg.priceMonthly
+  }
 
   const products = await stripe.products.search({
     query: `name:'${plan.productName}'`,
@@ -112,6 +120,9 @@ export async function POST(req: NextRequest) {
       success_url: `${baseUrl}${dashboardPath}?upgraded=true`,
       cancel_url: `${baseUrl}/dashboard/upgrade?cancelled=true`,
       metadata: { userId, userType, tier },
+      // Copied onto the Subscription so invoice.paid can resolve the plan
+      // even when it arrives before checkout.session.completed.
+      subscription_data: { metadata: { userId, tier } },
     })
 
     return NextResponse.json({ url: checkoutSession.url })

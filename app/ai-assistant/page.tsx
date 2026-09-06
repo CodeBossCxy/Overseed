@@ -63,6 +63,7 @@ export default function AIAssistantPage() {
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [usagePercent, setUsagePercent] = useState<number | null>(null)
+  const [creditsUsage, setCreditsUsage] = useState<{ used: number; limit: number; purchased: number } | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [toolBusy, setToolBusy] = useState(false)
   const [activeTab, setActiveTab] = useState<'chat' | 'image'>('chat')
@@ -127,6 +128,7 @@ export default function AIAssistantPage() {
       if (res.ok) {
         const data = await res.json()
         setUsagePercent(data.percentage)
+        setCreditsUsage({ used: data.used, limit: data.limit, purchased: data.purchased || 0 })
       }
     } catch {}
   }, [])
@@ -233,10 +235,15 @@ export default function AIAssistantPage() {
 
       if (!res.ok) {
         const data = await res.json()
+        const content =
+          data.code === 'INSUFFICIENT_CREDITS'
+            ? `${t.aiAssistant.insufficientCredits} [${t.aiAssistant.buyCreditsCta}](/pricing/brand)`
+            : data.error || t.aiAssistant.errorGeneric
         setMessages((prev) => [
           ...prev,
-          { id: assistantId, role: 'assistant', content: data.error || t.aiAssistant.errorGeneric, timestamp: new Date() },
+          { id: assistantId, role: 'assistant', content, timestamp: new Date() },
         ])
+        if (data.code === 'INSUFFICIENT_CREDITS') loadUsage()
         setIsLoading(false)
         stopProgress()
         return
@@ -713,8 +720,10 @@ export default function AIAssistantPage() {
             {usagePercent !== null && (
               <div className="p-4 border-t border-gray-200">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-medium text-gray-500">{t.aiAssistant.usage}</span>
-                  <span className="text-xs font-semibold text-gray-700">{usagePercent}%</span>
+                  <span className="text-xs font-medium text-gray-500">{t.aiAssistant.usageCredits}</span>
+                  <span className="text-xs font-semibold text-gray-700">
+                    {creditsUsage ? `${creditsUsage.used} / ${creditsUsage.limit}` : `${usagePercent}%`}
+                  </span>
                 </div>
                 <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
@@ -739,6 +748,19 @@ export default function AIAssistantPage() {
                     ? t.aiAssistant.usageMedium
                     : t.aiAssistant.usageLow}
                 </p>
+                {creditsUsage && creditsUsage.purchased > 0 && (
+                  <p className="text-[10px] text-primary-500 font-semibold mt-0.5">
+                    +{creditsUsage.purchased} {t.aiAssistant.purchasedCredits}
+                  </p>
+                )}
+                {usagePercent >= 80 && (
+                  <a
+                    href="/pricing/brand"
+                    className="inline-block text-[10px] font-semibold text-primary-600 hover:underline mt-1"
+                  >
+                    {t.aiAssistant.buyCreditsCta}
+                  </a>
+                )}
               </div>
             )}
           </div>

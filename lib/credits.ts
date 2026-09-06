@@ -161,6 +161,23 @@ export async function refundDeduction(userId: string, reference: string): Promis
   })
 }
 
+/**
+ * Whether a (non-refunded) deduction with this reference exists — e.g. repeat
+ * profile views are free. Refunds are written under `refund:{reference}`, so
+ * we net the two: still charged only when deductions outweigh refunds.
+ */
+export async function hasPriorDeduction(userId: string, reference: string): Promise<boolean> {
+  const agg = await prisma.creditTransaction.aggregate({
+    where: {
+      userId,
+      reference: { in: [reference, `refund:${reference}`] },
+      type: { in: ['MONTHLY_DEDUCTION', 'PURCHASED_DEDUCTION'] },
+    },
+    _sum: { amount: true },
+  })
+  return (agg._sum.amount || 0) < 0
+}
+
 /** Credit a purchased pack (called from the Stripe webhook). Idempotent per reference. */
 export async function grantPackCredits(
   userId: string,

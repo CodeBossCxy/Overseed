@@ -85,6 +85,16 @@ export default function DiscoverPanel() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [unavailable, setUnavailable] = useState(false)
+  // Pricing v3: quota/credit exhaustion codes → show a plans/credits CTA
+  const QUOTA_CODES = ['DISCOVERY_QUOTA_EXCEEDED', 'OUTREACH_QUOTA_EXCEEDED', 'INSUFFICIENT_CREDITS']
+  const [searchBlocked, setSearchBlocked] = useState(false)
+  const [detailBlocked, setDetailBlocked] = useState(false)
+  const [contactBlocked, setContactBlocked] = useState(false)
+  const PlansCta = () => (
+    <a href="/pricing/brand" className="font-semibold underline whitespace-nowrap">
+      {t.aiAssistant.buyCreditsCta}
+    </a>
+  )
 
   // YouTube API source: only YouTube is searchable (phase 1).
   // TEMP: club source takes exactly one platform per request (and each
@@ -126,6 +136,7 @@ export default function DiscoverPanel() {
     setDetailFor(creator)
     setDetail(null)
     setDetailError(null)
+    setDetailBlocked(false)
     setDetailLoading(true)
     try {
       const qs = new URLSearchParams({
@@ -134,7 +145,10 @@ export default function DiscoverPanel() {
       })
       const res = await fetch(`/api/discovery/club-enrich?${qs}`)
       const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.message || 'Failed to load creator details')
+      if (!res.ok) {
+        setDetailBlocked(QUOTA_CODES.includes(data?.code))
+        throw new Error(data?.message || 'Failed to load creator details')
+      }
       setDetail(data)
     } catch (err: any) {
       setDetailError(err.message || 'Failed to load creator details')
@@ -185,6 +199,7 @@ export default function DiscoverPanel() {
     if (!detailFor?.handle || contactMsg.trim().length < 10) return
     setContactSending(true)
     setContactError(null)
+    setContactBlocked(false)
     try {
       const fd = new FormData()
       fd.set('platform', detailFor.platform)
@@ -193,7 +208,10 @@ export default function DiscoverPanel() {
       contactFiles.forEach((f) => fd.append('files', f))
       const res = await fetch('/api/discovery/club-contact', { method: 'POST', body: fd })
       const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.message || 'Failed to send message')
+      if (!res.ok) {
+        setContactBlocked(QUOTA_CODES.includes(data?.code))
+        throw new Error(data?.message || 'Failed to send message')
+      }
       setContactSent(true)
     } catch (err: any) {
       setContactError(err.message || 'Failed to send message')
@@ -302,6 +320,7 @@ export default function DiscoverPanel() {
     if (platforms.length === 0) return
     setIsLoading(true)
     setError(null)
+    setSearchBlocked(false)
     setUnavailable(false)
     try {
       /* TEMP: influencers.club search path — small pages, one platform */
@@ -332,7 +351,10 @@ export default function DiscoverPanel() {
         return
       }
       const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.message || d.searchFailed)
+      if (!res.ok) {
+        setSearchBlocked(QUOTA_CODES.includes(data?.code))
+        throw new Error(data?.message || d.searchFailed)
+      }
       setSearchResult(data)
     } catch (err: any) {
       setError(err.message || d.searchFailed)
@@ -479,7 +501,10 @@ export default function DiscoverPanel() {
         </div>
       )}
       {error && !unavailable && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">{error}</div>
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+          {error}
+          {searchBlocked && <> <PlansCta /></>}
+        </div>
       )}
 
       {/* Search-only notices */}
@@ -683,6 +708,7 @@ export default function DiscoverPanel() {
               {detailError && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
                   {detailError}
+                  {detailBlocked && <> <PlansCta /></>}
                 </div>
               )}
 
@@ -928,6 +954,7 @@ export default function DiscoverPanel() {
                 {contactError && (
                   <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
                     {contactError}
+                    {contactBlocked && <> <PlansCta /></>}
                   </div>
                 )}
 

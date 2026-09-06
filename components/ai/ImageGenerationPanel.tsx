@@ -18,12 +18,14 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [insufficientCredits, setInsufficientCredits] = useState(false)
   const [images, setImages] = useState<GeneratedImage[]>([])
 
   const generate = async () => {
     if (!prompt.trim() || busy) return
     setBusy(true)
     setError(null)
+    setInsufficientCredits(false)
     try {
       const res = await fetch('/api/ai-image', {
         method: 'POST',
@@ -31,7 +33,13 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
         body: JSON.stringify({ prompt: prompt.trim() }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message || ai.imageFailed)
+      if (!res.ok) {
+        if (data.code === 'INSUFFICIENT_CREDITS') {
+          setInsufficientCredits(true)
+          throw new Error(ai.insufficientCredits)
+        }
+        throw new Error(data.message || ai.imageFailed)
+      }
       setImages(prev => [
         { id: `img-${Date.now()}`, url: data.url, prompt: prompt.trim(), createdAt: new Date() },
         ...prev,
@@ -123,7 +131,19 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
       {/* Prompt input */}
       <div className="border-t border-gray-100 bg-white px-4 py-3 flex-shrink-0">
         <div className="max-w-3xl mx-auto">
-          {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+          {error && (
+            <p className="text-sm text-red-600 mb-2">
+              {error}
+              {insufficientCredits && (
+                <>
+                  {' '}
+                  <Link href="/pricing/brand" className="font-semibold text-primary-600 hover:underline">
+                    {ai.buyCreditsCta}
+                  </Link>
+                </>
+              )}
+            </p>
+          )}
           <form
             onSubmit={(e) => { e.preventDefault(); generate() }}
             className="flex items-stretch gap-2"

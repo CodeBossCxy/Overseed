@@ -64,6 +64,15 @@ export default function WorkspaceLayout({
   const [pendingHref, setPendingHref] = useState<string | null>(null)
   const [unread, setUnread] = useState(0)
 
+  // Credits chip state
+  const [credits, setCredits] = useState<{
+    total: number
+    subscription: number
+    purchased: number
+    cycleCredits: number
+    nextExpiry: { at: string; credits: number } | null
+  } | null>(null)
+
   const subscriptionTier = (session?.user as any)?.subscriptionTier || 'FREE'
   const isPaid = subscriptionTier === 'CAMPAIGN_PLUS' || subscriptionTier === 'OUTREACH_PLUS' || subscriptionTier === 'PRO'
   const tierBadgeLabel = subscriptionTier === 'PRO' ? 'PRO' : subscriptionTier === 'CAMPAIGN_PLUS' ? 'CAMPAIGN+' : subscriptionTier === 'OUTREACH_PLUS' ? 'OUTREACH+' : t.brand.dashboard.plan.free
@@ -82,6 +91,22 @@ export default function WorkspaceLayout({
     }
     fetchUnread()
     const interval = setInterval(fetchUnread, 30000)
+    return () => clearInterval(interval)
+  }, [session?.user])
+
+  useEffect(() => {
+    if (!session?.user) return
+    const fetchCredits = async () => {
+      try {
+        const res = await fetch('/api/credits/balance')
+        if (res.ok) {
+          const data = await res.json()
+          setCredits(data)
+        }
+      } catch {}
+    }
+    fetchCredits()
+    const interval = setInterval(fetchCredits, 60000)
     return () => clearInterval(interval)
   }, [session?.user])
 
@@ -327,6 +352,17 @@ export default function WorkspaceLayout({
                   {t.nav?.createCampaign || 'Create Campaign'}
                 </Link>
               )}
+              {/* Credits chip */}
+              {session?.user && credits != null && (
+                <CreditsChip
+                  total={credits.total}
+                  subscription={credits.subscription}
+                  purchased={credits.purchased}
+                  cycleCredits={credits.cycleCredits}
+                  nextExpiry={credits.nextExpiry}
+                  wt={w as Record<string, string>}
+                />
+              )}
               {/* Subscription status */}
               <Link
                 href={role === 'creator' ? '/dashboard/upgrade' : '/pricing/brand'}
@@ -376,5 +412,64 @@ export default function WorkspaceLayout({
       {/* Mandatory first-login Language & Region setup */}
       <LanguageSetupModal />
     </div>
+  )
+}
+
+function CreditsChip({
+  total,
+  subscription,
+  purchased,
+  cycleCredits,
+  nextExpiry,
+  wt,
+}: {
+  total: number
+  subscription: number
+  purchased: number
+  cycleCredits: number
+  nextExpiry: { at: string; credits: number } | null
+  wt: Record<string, string>
+}) {
+  const isWarning = cycleCredits > 0 && total <= Math.floor(cycleCredits * 0.2)
+  const isZero = total === 0
+
+  const tooltipLines = [
+    wt.creditsChipTooltipSub?.replace('{n}', String(subscription)) || `Subscription: ${subscription}`,
+    wt.creditsChipTooltipPurchased?.replace('{n}', String(purchased)) || `Purchased: ${purchased}`,
+    nextExpiry
+      ? wt.creditsChipTooltipExpiry?.replace('{date}', new Date(nextExpiry.at).toLocaleDateString()) ||
+        `Expires ${new Date(nextExpiry.at).toLocaleDateString()}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  if (isZero) {
+    return (
+      <Link
+        href="/pricing/brand"
+        className="h-10 px-3 rounded-full bg-red-50 border border-red-200 text-red-600 text-sm font-bold flex items-center gap-1.5 hover:bg-red-100 transition"
+        title={tooltipLines}
+      >
+        <span aria-hidden>⚡</span>
+        0
+        <span className="text-[11px] font-semibold">{wt.creditsChipTopUp || 'Top up'}</span>
+      </Link>
+    )
+  }
+
+  return (
+    <Link
+      href="/pricing/brand"
+      className={`h-10 px-3 rounded-full text-sm font-bold flex items-center gap-1.5 transition ${
+        isWarning
+          ? 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'
+          : 'bg-white shadow-sm text-gray-700 hover:text-gray-900'
+      }`}
+      title={tooltipLines}
+    >
+      <span aria-hidden>⚡</span>
+      {total.toLocaleString()}
+    </Link>
   )
 }

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import RoleShell from '@/components/workspace/RoleShell'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { perCreditYuan, formatPackName } from '@/lib/pricing-display'
 
 interface UsageItem {
   key: string
@@ -13,33 +14,78 @@ interface UsageItem {
   enabled?: boolean
 }
 
-interface TierColumn {
-  id: 'FREE' | 'CAMPAIGN_PLUS' | 'OUTREACH_PLUS' | 'PRO'
-  name: string
-  price: string
-  yearlyPrice: string
-  bestFor: string
-  serviceFee: string
-  campaignsPerDay: string
-  activeCampaigns: string
-  conversationsPerDay: string
-  discoverySearches: string
-  advancedAnalytics: string
-  managedOutreach: string
-  aiCredits: string
-  accent: string
-  ring: boolean
+interface PlanRow {
+  tier: string
+  priceMonthly: number
+  priceAnnual: number
+  baseCredits: number
+  bonusCredits: number
+}
+
+interface PackRow {
+  id: string
+  priceCents: number
+  baseCredits: number
+  bonusCredits: number
+  freeUserEligible: boolean
+}
+
+interface PricingConfig {
+  plans: PlanRow[]
+  packs: PackRow[]
+  prices: Record<string, number>
+}
+
+const TIER_ORDER = ['FREE', 'CAMPAIGN_PLUS', 'OUTREACH_PLUS', 'PRO']
+
+const TIER_META: Record<string, { ring: boolean }> = {
+  FREE: { ring: false },
+  CAMPAIGN_PLUS: { ring: false },
+  OUTREACH_PLUS: { ring: false },
+  PRO: { ring: true },
+}
+
+// Discovery quotas per tier (unchanged from before)
+// Metered features shown on plan cards, in display order. Gated features
+// render "—" on tiers that can't use them (mirrors lib/metering.ts).
+const METERED_FEATURES = [
+  'chat_standard',
+  'chat_advanced',
+  'image',
+  'discovery_search',
+  'profile_view',
+  'outreach',
+  'analytics',
+] as const
+
+const FEATURE_TIER_GATES: Record<string, string[]> = {
+  outreach: ['OUTREACH_PLUS', 'PRO'],
+  analytics: ['PRO'],
+}
+
+// Feature key → i18n key for computeEquivalents equivalents display
+const EQUIV_LABEL_KEY: Record<string, string> = {
+  chat_standard: 'creditFeatureChatStandard',
+  chat_advanced: 'creditFeatureChatAdvanced',
+  image: 'creditFeatureImage',
+  discovery_search: 'creditFeatureDiscoverySearch',
+  profile_view: 'creditFeatureProfileView',
+  outreach: 'creditFeatureOutreach',
+  analytics: 'creditFeatureAnalytics',
 }
 
 export default function MyPlanPage() {
   const { data: session } = useSession()
-  const { t } = useLanguage()
+  const { locale, t } = useLanguage()
   const m = t.myPlan
 
   const tier = (session?.user as any)?.subscriptionTier || 'FREE'
   const [usage, setUsage] = useState<UsageItem[] | null>(null)
   const [annual, setAnnual] = useState(false)
   const [loadingTier, setLoadingTier] = useState<string | null>(null)
+  const [config, setConfig] = useState<PricingConfig | null>(null)
+  const [upgradeError, setUpgradeError] = useState<string | null>(null)
+  const plansRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!session?.user) return
@@ -48,6 +94,13 @@ export default function MyPlanPage() {
       .then((data) => data?.items && setUsage(data.items))
       .catch(() => {})
   }, [session?.user])
+
+  useEffect(() => {
+    fetch('/api/pricing/config')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setConfig(data))
+      .catch(() => {})
+  }, [])
 
   const usageLabels: Record<string, string> = {
     translation: m.translation,
@@ -65,8 +118,7 @@ export default function MyPlanPage() {
 
   const usageDisplay = (item: UsageItem) => {
     if (item.key === 'aiCredits') {
-      const base = item.used != null && item.limit != null ? `${item.used} / ${item.limit}` : '—'
-      return base
+      return item.used != null && item.limit != null ? `${item.used} / ${item.limit}` : '—'
     }
     if (item.used == null || item.limit == null) return '—'
     return `${item.used} / ${item.limit}`
@@ -77,76 +129,46 @@ export default function MyPlanPage() {
     return Math.min(100, Math.round((item.used / item.limit) * 100))
   }
 
-  const tiers: TierColumn[] = [
-    {
-      id: 'FREE',
-      name: m.free,
-      price: '¥0',
-      yearlyPrice: '¥0',
-      bestFor: m.bestForFree,
-      serviceFee: '8%',
-      campaignsPerDay: `1 (${m.notAccumulated})`,
-      activeCampaigns: '1',
-      conversationsPerDay: '10',
-      discoverySearches: '5',
-      advancedAnalytics: '—',
-      managedOutreach: '—',
-      aiCredits: '20',
-      accent: 'sky',
-      ring: false,
-    },
-    {
-      id: 'CAMPAIGN_PLUS',
-      name: m.campaignPlus,
-      price: '¥69',
-      yearlyPrice: '¥690',
-      bestFor: m.bestForCampaignPlus,
-      serviceFee: '5%',
-      campaignsPerDay: `5 (${m.accumulated})`,
-      activeCampaigns: '50',
-      conversationsPerDay: '50',
-      discoverySearches: '50',
-      advancedAnalytics: '1',
-      managedOutreach: '5',
-      aiCredits: '100',
-      accent: 'violet',
-      ring: false,
-    },
-    {
-      id: 'OUTREACH_PLUS',
-      name: m.outreachPlus,
-      price: '¥109',
-      yearlyPrice: '¥1,090',
-      bestFor: m.bestForOutreachPlus,
-      serviceFee: '5%',
-      campaignsPerDay: `5 (${m.accumulated})`,
-      activeCampaigns: '10',
-      conversationsPerDay: '20',
-      discoverySearches: '80',
-      advancedAnalytics: '3',
-      managedOutreach: '15',
-      aiCredits: '100',
-      accent: 'indigo',
-      ring: false,
-    },
-    {
-      id: 'PRO',
-      name: m.pro,
-      price: '¥199',
-      yearlyPrice: '¥1,990',
-      bestFor: m.bestForPro,
-      serviceFee: '5%',
-      campaignsPerDay: `10 (${m.accumulated})`,
-      activeCampaigns: '80',
-      conversationsPerDay: '50',
-      discoverySearches: '150',
-      advancedAnalytics: '6',
-      managedOutreach: '30',
-      aiCredits: '250',
-      accent: 'pink',
-      ring: true,
-    },
-  ]
+  // Sorted plans in display order
+  const sortedPlans = config
+    ? (TIER_ORDER.map((id) => config.plans.find((p) => p.tier === id)).filter(Boolean) as PlanRow[])
+    : []
+
+  const prices = config?.prices || {}
+
+  // Tier name from i18n
+  const tierName = (tierId: string) => {
+    const names: Record<string, string> = {
+      FREE: m.free,
+      CAMPAIGN_PLUS: m.campaignPlus,
+      OUTREACH_PLUS: m.outreachPlus,
+      PRO: m.pro,
+    }
+    return names[tierId] || tierId
+  }
+
+  const tierBestFor = (tierId: string) => {
+    const map: Record<string, string> = {
+      FREE: m.bestForFree,
+      CAMPAIGN_PLUS: m.bestForCampaignPlus,
+      OUTREACH_PLUS: m.bestForOutreachPlus,
+      PRO: m.bestForPro,
+    }
+    return map[tierId] || ''
+  }
+
+  // Price display helpers
+  const centsToYuan = (cents: number) => {
+    const y = cents / 100
+    if (y % 1 === 0) return `¥${y}`
+    // Strip trailing zeros
+    return `¥${y.toFixed(2).replace(/\.?0+$/, '')}`
+  }
+
+  const annualMonthlyEquiv = (plan: PlanRow) => {
+    const y = plan.priceAnnual / 100 / 12
+    return `¥${Math.round(y)}`
+  }
 
   const handleSubscribe = async (tierId: string) => {
     setLoadingTier(tierId)
@@ -170,17 +192,20 @@ export default function MyPlanPage() {
     }
   }
 
-  const handleBuyPack = async (pack: string) => {
-    setLoadingTier(`pack-${pack}`)
+  const handleBuyPack = async (packId: string) => {
+    setLoadingTier(`pack-${packId}`)
+    setUpgradeError(null)
     try {
       const res = await fetch('/api/stripe/credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pack }),
+        body: JSON.stringify({ pack: packId }),
       })
       if (res.ok) {
         const data = await res.json()
         window.location.href = data.url
+      } else if (res.status === 409) {
+        setUpgradeError(packId)
       } else {
         const data = await res.json()
         alert(data.error || t.errors.somethingWrong)
@@ -192,33 +217,28 @@ export default function MyPlanPage() {
     }
   }
 
+  // Credit cost table — built from config prices; null cost = free
   const creditCostGroups = [
     {
       title: m.creditGroupAi,
       rows: [
-        { label: m.creditCostChatStandard, cost: '1' },
-        { label: m.creditCostChatAdvanced, cost: '3' },
-        { label: m.creditCostImage, cost: '4' },
-        { label: m.creditCostTranslation, cost: m.creditCostFree },
-        { label: m.creditCostDocExport, cost: m.creditCostFree },
+        { label: m.creditCostChatStandard, cost: prices['chat_standard'] ?? null },
+        { label: m.creditCostChatAdvanced, cost: prices['chat_advanced'] ?? null },
+        { label: m.creditCostImage, cost: prices['image'] ?? null },
+        { label: m.creditCostTranslation, cost: null as number | null },
+        { label: m.creditCostDocExport, cost: null as number | null },
       ],
     },
     {
       title: m.creditGroupCreatorData,
       rows: [
-        { label: m.creditCostSearchExtra, cost: '6' },
-        { label: m.creditCostProfileView, cost: '12' },
-        { label: m.creditCostAnalytics, cost: '45' },
+        { label: m.creditCostSearchExtra, cost: prices['discovery_search'] ?? null },
+        { label: m.creditCostProfileView, cost: prices['profile_view'] ?? null },
+        { label: m.creditCostAnalytics, cost: prices['analytics'] ?? null },
       ],
     },
   ]
 
-  const creditPacks = [
-    { id: 'mini', name: m.packMini, price: '¥9.9', credits: '60', anchor: m.packMiniAnchor },
-    { id: 'starter', name: m.packStarter, price: '¥29', credits: '240', anchor: m.packStarterAnchor },
-    { id: 'standard', name: m.packStandard, price: '¥99', credits: '880', anchor: m.packStandardAnchor },
-    { id: 'pro', name: m.packPro, price: '¥199', credits: '1,800', anchor: m.packProAnchor },
-  ]
 
   return (
     <RoleShell>
@@ -267,59 +287,105 @@ export default function MyPlanPage() {
         </div>
 
         {/* 4-column plan grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-          {tiers.map((tc) => {
-            const isCurrent = tier === tc.id
-            const isLoading = loadingTier === tc.id
-            const displayPrice = annual && tc.id !== 'FREE' ? tc.yearlyPrice : tc.price
-            const priceLabel = annual && tc.id !== 'FREE' ? m.perYear : m.perMonth
+        <div ref={plansRef} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+          {sortedPlans.map((plan) => {
+            const meta = TIER_META[plan.tier] || { ring: false }
+            const isCurrent = tier === plan.tier
+            const isLoading = loadingTier === plan.tier
+            const total = plan.baseCredits + plan.bonusCredits
+
+            // Price line
+            let displayPrice: string
+            let monthlyNote: string | null = null
+            if (plan.tier === 'FREE') {
+              displayPrice = '¥0'
+            } else if (annual) {
+              displayPrice = annualMonthlyEquiv(plan)
+              monthlyNote = `${centsToYuan(plan.priceAnnual)}${m.perYear} · ${m.billedAnnually}`
+            } else {
+              displayPrice = centsToYuan(plan.priceMonthly)
+            }
+
             return (
               <div
-                key={tc.id}
-                className={`workspace-glass-card rounded-3xl p-5 flex flex-col ${tc.ring ? 'ring-2 ring-primary-200' : ''}`}
+                key={plan.tier}
+                className={`workspace-glass-card rounded-3xl p-5 flex flex-col ${meta.ring ? 'ring-2 ring-primary-200' : ''}`}
               >
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-base font-bold text-gray-900">{tc.name}</p>
+                  <p className="text-base font-bold text-gray-900">{tierName(plan.tier)}</p>
                   {isCurrent && (
                     <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-semibold">
                       {m.currentPlan}
                     </span>
                   )}
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {displayPrice} <span className="text-xs font-normal text-gray-400">{priceLabel}</span>
-                </p>
-                {annual && tc.id !== 'FREE' && (
-                  <p className="text-[11px] text-gray-400 mt-0.5">{tc.price}{m.perMonth} {m.billedAnnually}</p>
-                )}
-                <p className="text-[11px] text-gray-500 mt-2 mb-4 flex-shrink-0">{tc.bestFor}</p>
 
-                <div className="flex-1 space-y-2 text-sm border-t border-gray-100 pt-3">
-                  <Row label={m.serviceFee} value={tc.serviceFee} />
-                  <Row label={m.campaignsPerDay} value={tc.campaignsPerDay} />
-                  <Row label={m.liveCampaigns} value={tc.activeCampaigns} />
-                  <Row label={m.conversationsPerDay} value={tc.conversationsPerDay} />
-                  <Row label={m.translation} value={m.unlimited} />
-                  <Row label={m.teamSeats} value="1" />
-                  <Row
-                    label={m.discoverySearches}
-                    value={`${tc.discoverySearches}${m.perMonth} · ${m.searchOverflow.replace('{n}', '6')}`}
-                  />
-                  <Row label={m.advancedAnalytics} value={tc.advancedAnalytics === '—' ? '—' : `${tc.advancedAnalytics}${m.perMonth}`} />
-                  <Row label={m.managedOutreach} value={tc.managedOutreach === '—' ? '—' : `${tc.managedOutreach}${m.perMonth}`} />
-                  <Row label={m.aiCreditsLabel} value={`${tc.aiCredits}${m.perMonth}`} highlight />
+                {/* Price */}
+                <p className="text-2xl font-bold text-gray-900">
+                  {displayPrice} <span className="text-xs font-normal text-gray-400">{m.perMonth}</span>
+                </p>
+                {annual && plan.tier !== 'FREE' && (
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <p className="text-[11px] text-gray-400">{monthlyNote}</p>
+                    <span className="px-1.5 py-0.5 bg-pink-50 text-pink-600 rounded-full text-[10px] font-semibold">{m.annualSaveBadge}</span>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-gray-500 mt-2 mb-3 flex-shrink-0">{tierBestFor(plan.tier)}</p>
+
+                {/* Credits block */}
+                <div className="bg-primary-50 rounded-2xl px-3 py-2 mb-3">
+                  {plan.tier === 'FREE' ? (
+                    <p className="text-sm font-bold text-primary-700">
+                      {plan.baseCredits} credits{locale === 'zh' ? '/月' : '/mo'}
+                    </p>
+                  ) : (
+                    <p className="text-sm font-bold text-primary-700">
+                      {total} credits{locale === 'zh' ? '/月' : '/mo'}{' '}
+                      <span className="font-normal text-[11px] text-primary-500">
+                        ({plan.baseCredits} +{' '}
+                        <span className="font-semibold text-pink-500">{plan.bonusCredits} {locale === 'zh' ? '加赠' : 'bonus'}</span>)
+                      </span>
+                    </p>
+                  )}
                 </div>
 
-                {tc.id !== 'FREE' && !isCurrent && (
+                {/* Max uses per feature (whole allowance spent on one feature) */}
+                <div className="flex-1 border-t border-gray-100 pt-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                    {m.maxUsesPerMonth}
+                  </p>
+                  <div className="space-y-2 text-sm">
+                    {METERED_FEATURES.map((key) => {
+                      const price = config?.prices?.[key]
+                      if (!price || price <= 0) return null
+                      const gate = FEATURE_TIER_GATES[key]
+                      const allowed = !gate || gate.includes(plan.tier)
+                      const count = Math.floor(total / price)
+                      const labelKey = EQUIV_LABEL_KEY[key]
+                      const label = labelKey ? (m as Record<string, string>)[labelKey] ?? key : key
+                      return (
+                        <Row
+                          key={key}
+                          label={label}
+                          value={allowed && count > 0 ? `×${count}${m.perMonth}` : '—'}
+                        />
+                      )
+                    })}
+                    <Row label={m.translation} value={m.unlimited} />
+                  </div>
+                </div>
+
+                {plan.tier !== 'FREE' && !isCurrent && (
                   <button
-                    onClick={() => handleSubscribe(tc.id)}
+                    onClick={() => handleSubscribe(plan.tier)}
                     disabled={!!isLoading}
                     className="mt-5 w-full py-2.5 rounded-2xl text-white text-sm font-bold bg-gradient-to-r from-pink-500 to-fuchsia-500 shadow hover:opacity-95 transition disabled:opacity-50"
                   >
-                    {isLoading ? m.redirecting : m.upgradeTo.replace('{tier}', tc.name)}
+                    {isLoading ? m.redirecting : m.upgradeTo.replace('{tier}', tierName(plan.tier))}
                   </button>
                 )}
-                {tc.id !== 'FREE' && isCurrent && (
+                {plan.tier !== 'FREE' && isCurrent && (
                   <div className="mt-5 w-full py-2.5 rounded-2xl bg-gray-50 text-center text-sm font-semibold text-gray-400">
                     {m.currentPlan}
                   </div>
@@ -344,10 +410,11 @@ export default function MyPlanPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="font-bold text-gray-900">{m.creditCostsTitle}</p>
                 <p className="text-[11px] text-gray-400">{m.creditCostsNote}</p>
               </div>
+              <HowCreditsWorkPopover m={m as Record<string, string>} />
             </div>
             <div className="space-y-4">
               {creditCostGroups.map((group) => (
@@ -358,7 +425,7 @@ export default function MyPlanPage() {
                       <div key={row.label} className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5 gap-4">
                         <p className="text-sm text-gray-700">{row.label}</p>
                         <span className="text-sm font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
-                          {row.cost === m.creditCostFree ? (
+                          {row.cost == null || row.cost === 0 ? (
                             <span className="text-emerald-600">{m.creditCostFree}</span>
                           ) : (
                             <>{row.cost} {m.creditsUnit}</>
@@ -374,7 +441,7 @@ export default function MyPlanPage() {
 
           {/* Credit packs */}
           <div className="workspace-glass-card rounded-3xl p-6">
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0">
                 <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -385,25 +452,57 @@ export default function MyPlanPage() {
                 <p className="text-[11px] text-gray-400">{m.buyCreditsNote}</p>
               </div>
             </div>
+
+            {/* Nudge line */}
+            <p className="text-[11px] text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2 mb-4">{m.packNudge}</p>
+
             <div className="space-y-3">
-              {creditPacks.map((pack) => {
+              {(config?.packs || []).map((pack) => {
+                const totalCredits = pack.baseCredits + pack.bonusCredits
                 const isPackLoading = loadingTier === `pack-${pack.id}`
+                const perCredit = perCreditYuan(pack.priceCents, totalCredits)
+                const packLabel = formatPackName(pack.priceCents, totalCredits)
+                const priceStr = packLabel.split(' /')[0]
                 return (
-                  <div key={pack.id} className="flex items-center gap-3 bg-white rounded-2xl shadow-sm px-4 py-3">
-                    <div className="flex-shrink-0 text-center min-w-[48px]">
-                      <p className="text-base font-bold text-gray-900">{pack.price}</p>
+                  <div key={pack.id}>
+                    <div className="flex items-center gap-3 bg-white rounded-2xl shadow-sm px-4 py-3">
+                      <div className="flex-shrink-0 min-w-[52px]">
+                        <p className="text-base font-bold text-gray-900">{priceStr}</p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-900">
+                          {pack.bonusCredits > 0
+                            ? m.packBonus
+                                .replace('{base}', String(pack.baseCredits))
+                                .replace('{bonus}', String(pack.bonusCredits))
+                            : `${pack.baseCredits} credits`}
+                        </p>
+                        <p className="text-[11px] text-gray-400 truncate">
+                          {m.packPerCredit.replace('{v}', perCredit)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleBuyPack(pack.id)}
+                        disabled={!!isPackLoading}
+                        className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-primary-50 text-primary-600 text-xs font-bold hover:bg-primary-100 transition disabled:opacity-50"
+                      >
+                        {isPackLoading ? '...' : m.buy}
+                      </button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900">{pack.credits} {m.credits}</p>
-                      <p className="text-[11px] text-gray-400 truncate">{pack.anchor}</p>
-                    </div>
-                    <button
-                      onClick={() => handleBuyPack(pack.id)}
-                      disabled={!!isPackLoading}
-                      className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-primary-50 text-primary-600 text-xs font-bold hover:bg-primary-100 transition disabled:opacity-50"
-                    >
-                      {isPackLoading ? '...' : m.buy}
-                    </button>
+                    {upgradeError === pack.id && (
+                      <div className="mt-1.5 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] text-amber-800">
+                        <span className="flex-1">{m.upgradeRequired}</span>
+                        <button
+                          onClick={() => {
+                            setUpgradeError(null)
+                            plansRef.current?.scrollIntoView({ behavior: 'smooth' })
+                          }}
+                          className="font-bold underline whitespace-nowrap"
+                        >
+                          {m.upgradeRequiredCta}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -416,6 +515,34 @@ export default function MyPlanPage() {
   )
 }
 
+// "How credits work" info popover
+function HowCreditsWorkPopover({ m }: { m: Record<string, string> }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative flex-shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-7 h-7 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition flex items-center justify-center text-xs font-bold"
+        aria-label={m.howCreditsWorkTitle}
+        title={m.howCreditsWorkTitle}
+      >
+        ?
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-9 z-20 w-64 bg-white rounded-2xl shadow-lg border border-gray-100 p-4 text-[12px] text-gray-700 space-y-2">
+            <p className="font-bold text-gray-900 mb-1">{m.howCreditsWorkTitle}</p>
+            <p>• {m.howCreditsWork1}</p>
+            <p>• {m.howCreditsWork2}</p>
+            <p>• {m.howCreditsWork3}</p>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-2 py-1 border-b border-gray-50 last:border-b-0">
@@ -424,3 +551,4 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
     </div>
   )
 }
+

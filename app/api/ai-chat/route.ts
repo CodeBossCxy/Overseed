@@ -7,6 +7,15 @@ import Anthropic from '@anthropic-ai/sdk'
 import { resolveModel, providerConfig, type AiModelDef } from '@/lib/ai-models'
 import { isUserVerified, getEffectiveTier } from '@/lib/subscription'
 import { deductCredits, refundDeduction } from '@/lib/credits'
+import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
+import { chargeCredits } from '@/lib/metering'
+import { walletRefund } from '@/lib/wallet'
+
+// Pricing v4 cost bounds for advanced (GPT/Claude-class) chat: cap output
+// tokens and trim input context so the per-message cost stays bounded.
+const ADVANCED_MAX_TOKENS = 8192
+const MAX_CONTEXT_MESSAGES = 30
+const MAX_MESSAGE_CHARS = 24_000
 
 // Allow streaming responses to run longer on Vercel
 export const maxDuration = 60
@@ -82,10 +91,18 @@ export async function POST(req: NextRequest) {
   // the assistant now (pricing v3) — the credit balance is the gate.
   const subscriptionTier = await getEffectiveTier(userId)
 
-  const { messages, provider, chatId } = await req.json()
-  if (!messages || !Array.isArray(messages)) {
+  const { messages: rawMessages, provider, chatId } = await req.json()
+  if (!rawMessages || !Array.isArray(rawMessages)) {
     return NextResponse.json({ error: 'Messages are required' }, { status: 400 })
   }
+  // Bound input context: keep the most recent turns, clamp oversized bodies.
+  const messages = rawMessages.slice(-MAX_CONTEXT_MESSAGES).map((m: any) => ({
+    ...m,
+    content:
+      typeof m?.content === 'string' && m.content.length > MAX_MESSAGE_CHARS
+        ? m.content.slice(0, MAX_MESSAGE_CHARS)
+        : m?.content,
+  }))
 
   // `provider` carries the model id from the picker (old values still work)
   const modelDef = resolveModel(provider)
@@ -102,17 +119,24 @@ export async function POST(req: NextRequest) {
   // output). Monthly allowance is consumed first, then purchased credits.
   const creditFeature = chatCreditFeature(modelDef)
   const creditRef = `chat:${userId}:${Date.now()}`
-  const deduction = await deductCredits(userId, subscriptionTier, creditFeature, creditRef)
-  if (!deduction.ok) {
-    return NextResponse.json(
-      {
-        error: 'Not enough AI credits. Buy a credit pack or wait for your monthly allowance to reset.',
-        code: 'INSUFFICIENT_CREDITS',
-        required: deduction.cost,
-        available: deduction.available,
-      },
-      { status: 402 }
-    )
+  if (CREDIT_SYSTEM_ENABLED) {
+    const charge = await chargeCredits(userId, creditFeature, creditRef)
+    if (!charge.ok) {
+      return NextResponse.json(charge.body, { status: charge.status })
+    }
+  } else {
+    const deduction = await deductCredits(userId, subscriptionTier, creditFeature, creditRef)
+    if (!deduction.ok) {
+      return NextResponse.json(
+        {
+          error: 'Not enough AI credits. Buy a credit pack or wait for your monthly allowance to reset.',
+          code: 'INSUFFICIENT_CREDITS',
+          required: deduction.cost,
+          available: deduction.available,
+        },
+        { status: 402 }
+      )
+    }
   }
 
   try {
@@ -174,7 +198,7 @@ export async function POST(req: NextRequest) {
             const client = new Anthropic({ apiKey: conn.apiKey })
             const response = await client.messages.create({
               model: modelDef.model,
-              max_tokens: 16384,
+              max_tokens: ADVANCED_MAX_TOKENS,
               system: SYSTEM_PROMPT,
               stream: true,
               messages: messages.map((m: any) => ({
@@ -303,7 +327,8 @@ export async function POST(req: NextRequest) {
           // Provider failed — don't charge for a reply the user never got.
           if (!fullContent) {
             try {
-              await refundDeduction(userId, creditRef)
+              if (CREDIT_SYSTEM_ENABLED) await walletRefund(userId, creditRef)
+              else await refundDeduction(userId, creditRef)
             } catch (refundErr) {
               console.error('Credit refund failed:', refundErr)
             }
@@ -330,7 +355,8 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('AI Chat error:', error?.message || error)
     try {
-      await refundDeduction(userId, creditRef)
+      if (CREDIT_SYSTEM_ENABLED) await walletRefund(userId, creditRef)
+      else await refundDeduction(userId, creditRef)
     } catch (refundErr) {
       console.error('Credit refund failed:', refundErr)
     }

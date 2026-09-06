@@ -112,6 +112,35 @@ enum CreditTxType {
 }
 
 // ===========================================
+// CREDIT WALLET (pricing v4 — unified credits)
+// ===========================================
+
+// Which pool a lot/ledger row belongs to. Deduction order: SUBSCRIPTION
+// first, then PURCHASED (oldest lot first, FIFO).
+enum CreditBucket {
+  SUBSCRIPTION
+  PURCHASED
+}
+
+// Where a lot came from. MIGRATION_BONUS lots live in the SUBSCRIPTION
+// bucket (consumed before purchased credits); ordering uses bucket, not
+// source.
+enum CreditLotSource {
+  SUBSCRIPTION
+  PACK
+  MIGRATION_BONUS
+  ADMIN
+}
+
+enum CreditLedgerType {
+  GRANT
+  DEDUCTION
+  REFUND
+  EXPIRY
+  ADMIN_ADJUSTMENT
+}
+
+// ===========================================
 // MULTILINGUAL SUPPORT
 // ===========================================
 
@@ -151,6 +180,17 @@ model User {
   // Set when PRO was granted as a limited verified-user trial (early-stage
   // promo); null for paid PRO. Lazily downgraded once expired.
   proTrialEndsAt   DateTime?
+  // Credit wallet (pricing v4): Stripe subscription state mirrored from
+  // invoice.paid webhooks. currentPeriodEnd bounds the active subscription
+  // lot's expiry and the annual-plan monthly grant cron.
+  stripeSubscriptionId String?
+  currentPeriodEnd     DateTime?
+  // Free users may buy the smallest credit pack exactly once (anti-farming);
+  // stamped on first purchase.
+  freePackPurchasedAt  DateTime?
+  // Existing paid users at v4 cutover get a 25% migration bonus for their
+  // first 2 renewal cycles; set by the cutover data migration.
+  migrationBonusEligible Boolean @default(false)
   preferredLanguage  String   @default("en")
   autoTranslateUGC   Boolean  @default(true)
   // Stamped once the mandatory first-login Language & Region setup is done
@@ -186,6 +226,8 @@ model User {
   aiChats           AiChat[]
   creditTransactions CreditTransaction[]
   quotaUsage         QuotaUsage[]
+  creditLots         CreditLot[]
+  creditLedger       CreditLedgerEntry[]
 
   @@map("users")
 }
@@ -712,6 +754,126 @@ model CreditTransaction {
   @@index([userId, createdAt])
   @@index([userId, type, createdAt])
   @@map("credit_transactions")
+}
+
+// ===========================================
+// CREDIT WALLET (pricing v4)
+// ===========================================
+
+// A grant of credits with an expiry. Subscription lots expire at billing
+// cycle end (no rollover); pack lots 12 months after purchase. `remaining`
+// is decremented as credits are consumed; the ledger is the audit trail.
+// All wallet mutations for a user are serialized via SELECT ... FOR UPDATE
+// on the user row, so remaining/balanceAfter are race-free.
+model CreditLot {
+  id        String          @id @default(cuid())
+  userId    String
+  bucket    CreditBucket
+  source    CreditLotSource
+  credits   Int // originally granted
+  remaining Int
+  expiresAt DateTime
+  // Idempotency key: 'invoice:{id}' | 'checkout:{sessionId}' |
+  // 'monthly:{userId}:{YYYY-MM}' | 'admin:{cuid}' | 'migrate:{userId}:...'
+  reference String          @unique
+  note      String?
+  createdAt DateTime        @default(now())
+
+  user   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledger CreditLedgerEntry[]
+
+  @@index([userId, bucket, expiresAt, createdAt])
+  @@map("credit_lots")
+}
+
+// Append-only wallet history. Every grant, deduction, refund and expiry is
+// a row; a single deduction spanning multiple lots produces one row per lot.
+model CreditLedgerEntry {
+  id           String           @id @default(cuid())
+  userId       String
+  // Signed credits: positive for grants/refunds, negative for deductions/expiry.
+  delta        Int
+  type         CreditLedgerType
+  bucket       CreditBucket
+  lotId        String?
+  // Feature key from credit_price_config for deductions (e.g. 'profile_view').
+  featureKey   String?
+  // Correlates deduction ↔ refund and carries external ids (chat id, search
+  // ref, Stripe ids). Refund rows use 'refund:{referenceId}'.
+  referenceId  String?
+  // Total wallet balance (all live lots) after this row; safe because
+  // per-user mutations are serialized.
+  balanceAfter Int
+  note         String?
+  createdAt    DateTime         @default(now())
+
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lot  CreditLot? @relation(fields: [lotId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, referenceId])
+  @@map("credit_ledger")
+}
+
+// ===========================================
+// PRICING CONFIG (admin-editable, seeded)
+// ===========================================
+
+// Per-tier subscription economics. The user receives base + bonus credits
+// each cycle; bonus is displayed separately ("+N 加赠") and adjustable
+// without code changes. Prices in CNY cents.
+model PlanConfig {
+  tier              SubscriptionTier @id
+  priceMonthly      Int
+  priceAnnual       Int // 0 for FREE
+  baseCredits       Int
+  bonusCredits      Int
+  // Migration promo: % extra credits for grandfathered paid users' first
+  // N cycles (see User.migrationBonusEligible).
+  migrationBonusPct    Int @default(25)
+  migrationBonusCycles Int @default(2)
+  updatedAt         DateTime @updatedAt
+
+  @@map("plan_config")
+}
+
+// Add-on credit packs (one-time purchase, 12-month validity). Display name
+// is derived: "¥{price} / {base+bonus} credits" — no pack names.
+model CreditPackConfig {
+  id               String  @id // stable key used in Stripe metadata, e.g. 'p990'
+  priceCents       Int
+  baseCredits      Int
+  bonusCredits     Int     @default(0)
+  active           Boolean @default(true)
+  // Whether a FREE-tier user may buy this pack (once).
+  freeUserEligible Boolean @default(false)
+  sortOrder        Int     @default(0)
+  updatedAt        DateTime @updatedAt
+
+  @@map("credit_pack_config")
+}
+
+// Credit price per metered action. Feature code reads from here (cached),
+// never hardcodes prices. credits = 0 means free (rate-limited only).
+model CreditPriceConfig {
+  featureKey String   @id
+  credits    Int
+  updatedAt  DateTime @updatedAt
+
+  @@map("credit_price_config")
+}
+
+// 30-day cache of creator enrichment results so Profile View → Outreach on
+// the same creator does not hit the upstream provider twice.
+model CreatorEnrichmentCache {
+  id        String   @id @default(cuid())
+  platform  String
+  handle    String
+  data      Json
+  fetchedAt DateTime @default(now())
+
+  @@unique([platform, handle])
+  @@map("creator_enrichment_cache")
 }
 
 // ===========================================

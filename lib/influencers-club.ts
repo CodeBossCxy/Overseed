@@ -193,11 +193,54 @@ const enrichCache = new Map<string, any>()
 // outreach route to deliver messages without ever revealing the address.
 const contactEmailCache = new Map<string, string | null>()
 
-export function getCreatorContactEmail(
+// Persistent 30-day cache (creator_enrichment_cache) so Profile View →
+// Outreach on the same creator never enriches twice upstream, across
+// deploys/restarts. data = { detail, email }; email never reaches clients.
+const ENRICH_CACHE_DAYS = 30
+
+async function readDbEnrichCache(
   platform: ClubPlatform,
   handle: string
-): string | null | undefined {
-  return contactEmailCache.get(`${platform}:${handle.toLowerCase()}`)
+): Promise<{ detail: any; email: string | null } | null> {
+  const { prisma } = await import('@/lib/prisma')
+  const row = await prisma.creatorEnrichmentCache
+    .findUnique({ where: { platform_handle: { platform, handle: handle.toLowerCase() } } })
+    .catch(() => null)
+  if (!row) return null
+  const ageMs = Date.now() - row.fetchedAt.getTime()
+  if (ageMs > ENRICH_CACHE_DAYS * 24 * 60 * 60 * 1000) return null
+  return row.data as { detail: any; email: string | null }
+}
+
+async function writeDbEnrichCache(
+  platform: ClubPlatform,
+  handle: string,
+  detail: any,
+  email: string | null
+): Promise<void> {
+  const { prisma } = await import('@/lib/prisma')
+  await prisma.creatorEnrichmentCache
+    .upsert({
+      where: { platform_handle: { platform, handle: handle.toLowerCase() } },
+      create: { platform, handle: handle.toLowerCase(), data: { detail, email } },
+      update: { data: { detail, email }, fetchedAt: new Date() },
+    })
+    .catch((e) => console.error('enrich cache write failed:', e))
+}
+
+export async function getCreatorContactEmail(
+  platform: ClubPlatform,
+  handle: string
+): Promise<string | null | undefined> {
+  const cacheKey = `${platform}:${handle.toLowerCase()}`
+  const inMemory = contactEmailCache.get(cacheKey)
+  if (inMemory !== undefined) return inMemory
+  const db = await readDbEnrichCache(platform, handle)
+  if (db) {
+    contactEmailCache.set(cacheKey, db.email)
+    return db.email
+  }
+  return undefined
 }
 
 function redact(text: unknown): string | null {
@@ -208,6 +251,14 @@ export async function clubEnrich(platform: ClubPlatform, handle: string) {
   const cacheKey = `${platform}:${handle.toLowerCase()}`
   const cached = enrichCache.get(cacheKey)
   if (cached) return cached
+
+  // Persistent cache (30 days) before any upstream (billed) call.
+  const dbCached = await readDbEnrichCache(platform, handle)
+  if (dbCached) {
+    enrichCache.set(cacheKey, dbCached.detail)
+    contactEmailCache.set(cacheKey, dbCached.email)
+    return dbCached.detail
+  }
 
   const res = await fetch(`${BASE}/public/v1/creators/enrich/handle/full/`, {
     method: 'POST',
@@ -288,5 +339,6 @@ export async function clubEnrich(platform: ClubPlatform, handle: string) {
   }
 
   enrichCache.set(cacheKey, detail)
+  await writeDbEnrichCache(platform, handle, detail, contactEmailCache.get(cacheKey) ?? null)
   return detail
 }
