@@ -39,7 +39,7 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
   },
   OUTREACH_PLUS: {
     campaignsPerDay: 5,
-    activeCampaigns: 10,
+    activeCampaigns: 50,
     conversationsPerDay: 20,
     teamSeats: 1,
     aiCreditsPerMonth: MONTHLY_CREDITS.OUTREACH_PLUS,

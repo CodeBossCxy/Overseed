@@ -8,7 +8,7 @@ import { getCreatorContactEmail, type ClubPlatform } from '@/lib/influencers-clu
 import { consumeQuota, releaseQuota } from '@/lib/plan'
 import { getEffectiveTier } from '@/lib/subscription'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
-import { chargeCredits } from '@/lib/metering'
+import { chargeCredits, hasPriorCharge, gateFeature } from '@/lib/metering'
 
 // TEMP: POST /api/discovery/club-contact — brand outreach to an influencers.club
 // creator. The creator's email lives only in the server-side cache populated by
@@ -105,13 +105,24 @@ export async function POST(req: NextRequest) {
   let outreachCharge: { refund: () => Promise<void> } | null = null
   let quota: { ok: boolean; used: number; limit: number; usageId?: string } | null = null
   if (CREDIT_SYSTEM_ENABLED) {
-    // Pricing v4: outreach costs credits and is gated to Outreach Plus / Pro.
-    const outreachRef = `outreach:${userId}:${platform}:${handle.toLowerCase()}:${Date.now()}`
-    const charge = await chargeCredits(userId, 'outreach', outreachRef)
-    if (!charge.ok) {
-      return NextResponse.json(charge.body, { status: charge.status })
+    // Pricing v4.1: profile view and outreach share ONE 12-credit "creator
+    // unlock" per creator — same reference as club-enrich, so whichever
+    // happens first charges and the other is free ("charged only once").
+    const unlockRef = `profile_view:${platform}:${handle.toLowerCase()}`
+    const alreadyUnlocked = await hasPriorCharge(userId, unlockRef)
+    if (alreadyUnlocked) {
+      // Still enforce tier/verification gates even when no charge is due.
+      const gate = await gateFeature(userId, 'outreach')
+      if (!gate.ok) {
+        return NextResponse.json(gate.body, { status: gate.status })
+      }
+    } else {
+      const charge = await chargeCredits(userId, 'outreach', unlockRef)
+      if (!charge.ok) {
+        return NextResponse.json(charge.body, { status: charge.status })
+      }
+      outreachCharge = charge
     }
-    outreachCharge = charge
   } else {
     // Pricing v3 (legacy): managed outreach is a monthly quota (—/5/15/30).
     const tier = await getEffectiveTier(userId)

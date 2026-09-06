@@ -54,6 +54,7 @@ export interface PlanConfigRow {
   tier: SubscriptionTier
   priceMonthly: number
   priceAnnual: number
+  compareAtMonthly: number
   baseCredits: number
   bonusCredits: number
   migrationBonusPct: number

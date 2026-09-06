@@ -15,6 +15,7 @@ export async function GET() {
     tier: p.tier,
     priceMonthly: p.priceMonthly,
     priceAnnual: p.priceAnnual,
+    compareAtMonthly: p.compareAtMonthly,
     baseCredits: p.baseCredits,
     bonusCredits: p.bonusCredits,
   }))

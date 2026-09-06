@@ -16,8 +16,9 @@ import {
 
 /** Features only available on specific tiers (beyond credit volume). */
 const TIER_GATES: Record<string, SubscriptionTier[]> = {
-  outreach: ['OUTREACH_PLUS', 'PRO'],
-  analytics: ['PRO'],
+  // 2026-09-06: opened to all paid tiers (was OUTREACH_PLUS/PRO and PRO-only).
+  outreach: ['CAMPAIGN_PLUS', 'OUTREACH_PLUS', 'PRO'],
+  analytics: ['CAMPAIGN_PLUS', 'OUTREACH_PLUS', 'PRO'],
 }
 
 /**
@@ -62,8 +63,8 @@ export async function gateFeature(
       body: {
         message:
           featureKey === 'analytics'
-            ? 'Advanced Analytics is available on the Pro plan.'
-            : 'Managed Outreach is available on Outreach Plus and Pro plans.',
+            ? 'Advanced Analytics is available on paid plans.'
+            : 'Managed Outreach is available on paid plans.',
         code: 'PLAN_REQUIRED',
         requiredTiers: allowedTiers,
         tier,

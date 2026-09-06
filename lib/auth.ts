@@ -190,6 +190,7 @@ export const authOptions: NextAuthOptions = {
         token.userType = (user as any).userType
         token.activeView = (user as any).activeView || null
         token.subscriptionTier = (user as any).subscriptionTier || 'FREE'
+        token.tierRefreshedAt = Date.now()
         // Load brand verification status for brand users (ADMIN acts as brand)
         if ((user as any).userType === 'BRAND' || (user as any).userType === 'ADMIN') {
           const bp = await prisma.brandProfile.findUnique({
@@ -199,8 +200,16 @@ export const authOptions: NextAuthOptions = {
           token.brandVerificationStatus = bp?.brandVerificationStatus || 'PENDING'
         }
       }
-      // Re-read userType from DB when session.update() is called client-side
-      if (trigger === 'update' && token.sub) {
+      // Keep JWT claims in sync with the DB: refresh on explicit
+      // session.update() AND at most once per minute otherwise. Without this,
+      // tier/verification changes (Stripe webhooks, migrations, admin edits)
+      // never reach already-issued 30-day JWTs until re-login.
+      const REFRESH_MS = 60_000
+      const stale =
+        !user &&
+        (typeof token.tierRefreshedAt !== 'number' ||
+          Date.now() - (token.tierRefreshedAt as number) > REFRESH_MS)
+      if ((trigger === 'update' || stale) && token.sub) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
           select: { userType: true, activeView: true, subscriptionTier: true, brandProfile: { select: { brandVerificationStatus: true } } },
@@ -211,6 +220,7 @@ export const authOptions: NextAuthOptions = {
           token.subscriptionTier = dbUser.subscriptionTier
           token.brandVerificationStatus = dbUser.brandProfile?.brandVerificationStatus || null
         }
+        token.tierRefreshedAt = Date.now()
       }
       return token
     },

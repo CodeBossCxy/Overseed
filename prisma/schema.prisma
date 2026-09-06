@@ -826,6 +826,9 @@ model PlanConfig {
   tier              SubscriptionTier @id
   priceMonthly      Int
   priceAnnual       Int // 0 for FREE
+  // Limited-time discount display: original (strikethrough) monthly price in
+  // CNY cents; 0 = no discount shown. Charged price stays priceMonthly.
+  compareAtMonthly  Int @default(0)
   baseCredits       Int
   bonusCredits      Int
   // Migration promo: % extra credits for grandfathered paid users' first

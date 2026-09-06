@@ -603,29 +603,29 @@ describe('gateFeature', () => {
     }
   })
 
-  it('CAMPAIGN_PLUS gets PLAN_REQUIRED for outreach', async () => {
+  // Pricing v4.1 (2026-09-06): outreach + analytics open to ALL paid tiers.
+  it('CAMPAIGN_PLUS passes gateFeature for outreach and analytics', async () => {
     const uid = await makeUser('gate-cp@example.invalid', 'CAMPAIGN_PLUS')
     try {
-      const result = await gateFeature(uid, 'outreach')
-      expect(result.ok).toBe(false)
-      if (!result.ok) {
-        expect(result.body.code).toBe('PLAN_REQUIRED')
-      }
+      expect((await gateFeature(uid, 'outreach')).ok).toBe(true)
+      expect((await gateFeature(uid, 'analytics')).ok).toBe(true)
     } finally {
       await cleanup('gate-cp@example.invalid')
     }
   })
 
-  it('OUTREACH_PLUS gets PLAN_REQUIRED for analytics', async () => {
-    const uid = await makeUser('gate-op@example.invalid', 'OUTREACH_PLUS')
+  it('FREE gets PLAN_REQUIRED for outreach and analytics', async () => {
+    const uid = await makeUser('gate-free2@example.invalid', 'FREE')
     try {
-      const result = await gateFeature(uid, 'analytics')
-      expect(result.ok).toBe(false)
-      if (!result.ok) {
-        expect(result.body.code).toBe('PLAN_REQUIRED')
+      for (const feature of ['outreach', 'analytics']) {
+        const result = await gateFeature(uid, feature)
+        expect(result.ok).toBe(false)
+        if (!result.ok) {
+          expect(result.body.code).toBe('PLAN_REQUIRED')
+        }
       }
     } finally {
-      await cleanup('gate-op@example.invalid')
+      await cleanup('gate-free2@example.invalid')
     }
   })
 
