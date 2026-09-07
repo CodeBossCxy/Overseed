@@ -359,7 +359,7 @@ export default function MyPlanPage() {
                     </div>
                     {annual && plan.tier !== 'FREE' && (
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <p className="text-[11px] text-gray-400">{monthlyNote}</p>
+                        <p className="text-sm text-gray-400">{monthlyNote}</p>
                         <span className="px-1.5 py-0.5 bg-pink-50 text-pink-600 rounded-full text-[10px] font-semibold">{m.annualSaveBadge}</span>
                       </div>
                     )}
@@ -505,9 +505,9 @@ export default function MyPlanPage() {
 
           {/* Matrix footer: how-far caption + footnotes */}
           <div className="px-6 py-4 border-t border-gray-100 space-y-1">
-            <p className="text-xs text-gray-500">{mm.howFarSubtitle} — {mm.maxUsesCaption}</p>
-            <p className="text-xs text-amber-600">{mm.limitedTimeNote}</p>
-            <p className="text-xs text-gray-400 italic">{mm.maxUsesFootnote}</p>
+            <p className="text-sm text-gray-500">{mm.howFarSubtitle} — {mm.maxUsesCaption}</p>
+            <p className="text-sm text-amber-600">{mm.limitedTimeNote}</p>
+            <p className="text-sm text-gray-400 italic">{mm.maxUsesFootnote}</p>
           </div>
         </div>
 
@@ -521,15 +521,15 @@ export default function MyPlanPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 11l-4 4v2h2l4-4m0 0L9 11m2 2l4.768-4.768a2 2 0 00-2.828-2.828L9 11" />
                 </svg>
               </div>
-              <p className="font-bold text-gray-900">{mm.aiFeaturesTitle}</p>
+              <p className="text-lg font-bold text-gray-900">{mm.aiFeaturesTitle}</p>
             </div>
             <div className="space-y-2">
               <HoverNoteRow note={mm.chatCostNote} className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5 gap-4">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <p className="text-sm text-gray-700">{mm.creditCostChat}</p>
+                  <p className="text-base text-gray-700">{mm.creditCostChat}</p>
                   <InfoIcon />
                 </div>
-                <span className="text-sm font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
+                <span className="text-base font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
                   {mm.costApprox
                     .replace('{a}', String(prices['chat_standard'] ?? 1))
                     .replace('{b}', String(prices['chat_advanced'] ?? 3))}
@@ -537,23 +537,23 @@ export default function MyPlanPage() {
               </HoverNoteRow>
               <HoverNoteRow note={mm.imageCostNote} className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5 gap-4">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <p className="text-sm text-gray-700">{m.creditCostImage}</p>
+                  <p className="text-base text-gray-700">{m.creditCostImage}</p>
                   <InfoIcon />
                 </div>
-                <span className="text-sm font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
+                <span className="text-base font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
                   {prices['image'] ?? 4} {m.creditsUnit}
                 </span>
               </HoverNoteRow>
               <div className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5 gap-4">
-                <p className="text-sm text-gray-700">{m.creditCostTranslation}</p>
-                <span className="text-sm font-bold text-emerald-600">{m.creditCostFree}</span>
+                <p className="text-base text-gray-700">{m.creditCostTranslation}</p>
+                <span className="text-base font-bold text-emerald-600">{m.creditCostFree}</span>
               </div>
               <div className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5 gap-4">
-                <p className="text-sm text-gray-700">{m.creditCostDocExport}</p>
-                <span className="text-sm font-bold text-emerald-600">{m.creditCostFree}</span>
+                <p className="text-base text-gray-700">{m.creditCostDocExport}</p>
+                <span className="text-base font-bold text-emerald-600">{m.creditCostFree}</span>
               </div>
             </div>
-            <p className="text-[11px] font-semibold text-gray-500 mt-3 px-1">{mm.moreAiSoon}</p>
+            <p className="text-sm font-semibold text-gray-500 mt-3 px-1">{mm.moreAiSoon}</p>
           </div>
 
           {/* Right: Overseed Creator Database */}
@@ -566,7 +566,7 @@ export default function MyPlanPage() {
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900">{mm.creatorDbTitle}</p>
+                <p className="text-lg font-bold text-gray-900">{mm.creatorDbTitle}</p>
               </div>
               <HowCreditsWorkPopover m={mm} />
             </div>
@@ -574,36 +574,36 @@ export default function MyPlanPage() {
               <HoverNoteRow note={mm.discoveryCostNote} className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5 gap-4">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <div className="min-w-0">
-                    <p className="text-sm text-gray-700">{m.creditCostSearchExtra.split(' — ')[0]}</p>
-                    <p className="text-[11px] text-gray-400">{mm.perSearchUnit}</p>
+                    <p className="text-base text-gray-700">{m.creditCostSearchExtra.split(' — ')[0]}</p>
+                    <p className="text-sm text-gray-400">{mm.perSearchUnit}</p>
                   </div>
                   <InfoIcon />
                 </div>
-                <span className="text-sm font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
+                <span className="text-base font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
                   {prices['discovery_search'] ?? '—'} {m.creditsUnit}
                 </span>
               </HoverNoteRow>
               <HoverNoteRow note={mm.profileOutreachCostNote} className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5 gap-4">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <div className="min-w-0">
-                    <p className="text-sm text-gray-700">{mm.creditCostProfileOutreach.split(' — ')[0]}</p>
-                    <p className="text-[11px] text-gray-400">{mm.perCreatorUnit}</p>
+                    <p className="text-base text-gray-700">{mm.creditCostProfileOutreach.split(' — ')[0]}</p>
+                    <p className="text-sm text-gray-400">{mm.perCreatorUnit}</p>
                   </div>
                   <InfoIcon />
                 </div>
-                <span className="text-sm font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
+                <span className="text-base font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
                   {prices['profile_view'] ?? '—'} {m.creditsUnit}
                 </span>
               </HoverNoteRow>
               <HoverNoteRow note={mm.analyticsCostNote} className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5 gap-4">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <div className="min-w-0">
-                    <p className="text-sm text-gray-700">{m.creditCostAnalytics.split(' — ')[0]}</p>
-                    <p className="text-[11px] text-gray-400">{mm.perCreatorUnit}</p>
+                    <p className="text-base text-gray-700">{m.creditCostAnalytics.split(' — ')[0]}</p>
+                    <p className="text-sm text-gray-400">{mm.perCreatorUnit}</p>
                   </div>
                   <InfoIcon />
                 </div>
-                <span className="text-sm font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
+                <span className="text-base font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
                   {prices['analytics'] ?? '—'} {m.creditsUnit}
                 </span>
               </HoverNoteRow>
@@ -620,12 +620,12 @@ export default function MyPlanPage() {
               </svg>
             </div>
             <div>
-              <p className="font-bold text-gray-900">{mm.needMoreCredits}</p>
-              <p className="text-[11px] text-gray-400">{mm.needMoreCreditsCaption}</p>
+              <p className="text-lg font-bold text-gray-900">{mm.needMoreCredits}</p>
+              <p className="text-sm text-gray-400">{mm.needMoreCreditsCaption}</p>
             </div>
           </div>
 
-          <p className="text-[11px] text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2 mb-4 mt-3">{m.packNudge}</p>
+          <p className="text-sm text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2 mb-4 mt-3">{m.packNudge}</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {(config?.packs || []).map((pack) => {
@@ -637,22 +637,28 @@ export default function MyPlanPage() {
                 <div key={pack.id}>
                   <div className="bg-white rounded-2xl shadow-sm px-4 py-4 flex flex-col gap-1">
                     <p className="text-xl font-bold text-gray-900">{priceStr}</p>
+                    {/* Same pill styling as the plan-card credit pills */}
                     {pack.bonusCredits > 0 ? (
-                      <p className="text-sm font-semibold text-amber-600">
-                        {mm.bonusEquals
-                          .replace('{base}', String(pack.baseCredits))
-                          .replace('{bonus}', String(pack.bonusCredits))
-                          .replace('{total}', String(totalCredits))}
-                      </p>
+                      <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-amber-50 self-start">
+                        <span className="text-sm font-bold text-amber-700">
+                          {pack.baseCredits}{' '}
+                          <span className="font-semibold text-amber-500">
+                            + {pack.bonusCredits} {locale === 'zh' ? '加赠' : 'bonus'}
+                          </span>
+                          {' '}= {totalCredits} credits
+                        </span>
+                      </div>
                     ) : (
-                      <p className="text-sm font-semibold text-gray-700">{pack.baseCredits} credits</p>
+                      <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 self-start">
+                        <span className="text-sm font-bold text-blue-700">{pack.baseCredits} credits</span>
+                      </div>
                     )}
                     <button
                       onClick={() => handleBuyPack(pack.id)}
                       disabled={!!isPackLoading}
-                      className="mt-2 w-full py-1.5 rounded-xl bg-primary-50 text-primary-600 text-xs font-bold hover:bg-primary-100 transition disabled:opacity-50"
+                      className="mt-2 w-full py-2.5 rounded-2xl text-white text-sm font-bold bg-gradient-to-r from-pink-500 to-fuchsia-500 shadow hover:opacity-95 transition disabled:opacity-50"
                     >
-                      {isPackLoading ? '...' : m.buy}
+                      {isPackLoading ? m.redirecting : m.buy}
                     </button>
                   </div>
                   {upgradeError === pack.id && (
@@ -673,7 +679,7 @@ export default function MyPlanPage() {
               )
             })}
           </div>
-          <p className="text-[11px] text-gray-400 mt-3">{m.purchasedCreditsNote}</p>
+          <p className="text-sm text-gray-400 mt-3">{m.purchasedCreditsNote}</p>
         </div>
       </div>
     </RoleShell>
@@ -694,7 +700,7 @@ function MatrixSectionDivider({
     <div
       className="col-span-full flex items-center gap-2 px-5 py-3 bg-gray-50 border-t border-b border-gray-100"
     >
-      <span className="text-xs font-bold tracking-widest text-gray-400 uppercase">{label}</span>
+      <span className="text-sm font-extrabold tracking-widest text-gray-600 uppercase">{label}</span>
       {tooltip && <CreditsInfoTooltip note={tooltip} />}
     </div>
   )
@@ -836,7 +842,7 @@ function CreditsInfoTooltip({ note }: { note: string }) {
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div
             data-solid
-            className="absolute left-0 top-6 z-20 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-[11px] text-gray-700 whitespace-pre-line"
+            className="absolute left-0 top-6 z-20 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-xs text-gray-700 whitespace-pre-line"
           >
             {note}
           </div>
@@ -880,7 +886,7 @@ function HoverNoteRow({
       {open && (
         <div
           data-solid
-          className="absolute left-3 right-3 top-full mt-1 z-20 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-[11px] text-gray-700 whitespace-pre-line"
+          className="absolute left-3 right-3 top-full mt-1 z-20 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-xs text-gray-700 whitespace-pre-line"
         >
           {note}
         </div>
