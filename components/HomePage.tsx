@@ -754,7 +754,7 @@ export default function HomePage() {
                 <Link href="/privacy" className="hover:text-white">{t.footer.privacy}</Link>
                 <Link href="/contact" className="hover:text-white">{t.footer.contact}</Link>
               </div>
-              <a href="https://overseed.net" className="hover:text-white">overseed.net</a>
+              <a href="https://www.overseed.net" className="hover:text-white">overseed.net</a>
             </div>
           </div>
         </div>

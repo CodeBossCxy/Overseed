@@ -9,7 +9,7 @@ import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const userId = (session.user as any).id
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     select: { id: true },
   })
   if (!influencerProfile) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
 
   const { searchParams } = new URL(req.url)

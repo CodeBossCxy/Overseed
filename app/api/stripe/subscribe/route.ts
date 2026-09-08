@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     const tier = (body?.tier || 'CAMPAIGN_PLUS') as PaidTier
     const interval: BillingInterval = body?.interval === 'year' ? 'year' : 'month'
     if (!SUBSCRIPTION_PLANS[tier]) {
-      return NextResponse.json({ error: 'Unknown plan' }, { status: 400 })
+      return NextResponse.json({ error: 'Unknown plan', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     const currentTier = await prisma.user.findUnique({
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     })
     // Paying users can't re-subscribe to the same tier (trials may convert).
     if (currentTier?.subscriptionTier === tier && !currentTier?.proTrialEndsAt) {
-      return NextResponse.json({ error: 'Already on this plan' }, { status: 400 })
+      return NextResponse.json({ error: 'Already on this plan', code: 'ALREADY_ON_PLAN' }, { status: 400 })
     }
 
     // Get or create Stripe customer
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[Stripe Subscribe]', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error.message || 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 },
     )
   }

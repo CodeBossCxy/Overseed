@@ -53,7 +53,7 @@ export async function GET(
     })
 
     if (!brand) {
-      return NextResponse.json({ message: 'Brand not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Brand not found', code: 'NOT_FOUND' }, { status: 404 })
     }
 
     // Get total completed collaborations
@@ -80,7 +80,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching brand profile:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

@@ -7,9 +7,9 @@ interface UGCTranslateToggleProps {
 }
 
 export default function UGCTranslateToggle({ isLoading }: UGCTranslateToggleProps) {
-  const { isUGCTranslated, setIsUGCTranslated, locale, t } = useLanguage()
+  const { isUGCTranslated, setIsUGCTranslated, t } = useLanguage()
 
-  const langName = locale === 'zh' ? '中文' : 'English'
+  const langName = t.ugcToggle?.currentLanguageName || 'English'
 
   return (
     <button

@@ -14,7 +14,7 @@ export async function POST(
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -23,7 +23,7 @@ export async function POST(
     // Free users cannot apply to campaigns
     if (subscriptionTier === 'FREE') {
       return NextResponse.json(
-        { message: 'Upgrade to Pro to apply to campaigns' },
+        { message: 'Upgrade to Pro to apply to campaigns', code: 'UPGRADE_REQUIRED' },
         { status: 403 }
       )
     }
@@ -36,7 +36,7 @@ export async function POST(
 
     if (!influencerProfile) {
       return NextResponse.json(
-        { message: 'Influencer profile required to apply' },
+        { message: 'Influencer profile required to apply', code: 'FORBIDDEN' },
         { status: 403 }
       )
     }
@@ -76,12 +76,12 @@ export async function POST(
     })
 
     if (!campaign) {
-      return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
     }
 
     if (campaign.status !== 'ACTIVE') {
       return NextResponse.json(
-        { message: 'Campaign is not accepting applications' },
+        { message: 'Campaign is not accepting applications', code: 'CAMPAIGN_CLOSED' },
         { status: 400 }
       )
     }
@@ -89,7 +89,7 @@ export async function POST(
     // Check if deadline has passed
     if (campaign.deadline && new Date(campaign.deadline) < new Date()) {
       return NextResponse.json(
-        { message: 'Application deadline has passed' },
+        { message: 'Application deadline has passed', code: 'CAMPAIGN_DEADLINE_PASSED' },
         { status: 400 }
       )
     }
@@ -97,7 +97,7 @@ export async function POST(
     // Check if slots are full
     if (campaign.filledSlots >= campaign.totalSlots) {
       return NextResponse.json(
-        { message: 'All slots have been filled' },
+        { message: 'All slots have been filled', code: 'CAMPAIGN_FULL' },
         { status: 400 }
       )
     }
@@ -114,7 +114,7 @@ export async function POST(
 
     if (existingApplication) {
       return NextResponse.json(
-        { message: 'You have already applied to this campaign' },
+        { message: 'You have already applied to this campaign', code: 'ALREADY_APPLIED' },
         { status: 400 }
       )
     }
@@ -161,7 +161,7 @@ export async function POST(
   } catch (error) {
     console.error('Error creating application:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

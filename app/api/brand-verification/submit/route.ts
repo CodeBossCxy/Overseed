@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || !['BRAND', 'ADMIN'].includes((session.user as any).userType)) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
     const userId = (session.user as any).id
 
@@ -29,16 +29,16 @@ export async function POST(req: NextRequest) {
       include: { user: { select: { email: true } } },
     })
     if (!brandProfile) {
-      return NextResponse.json({ message: 'Brand profile not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Brand profile not found', code: 'NOT_FOUND' }, { status: 404 })
     }
     if (brandProfile.brandVerificationStatus === 'APPROVED') {
-      return NextResponse.json({ message: 'Business is already verified' }, { status: 400 })
+      return NextResponse.json({ message: 'Business is already verified', code: 'ALREADY_VERIFIED' }, { status: 400 })
     }
 
     const data = await req.json()
     const type = data.type as string
     if (!ACCOUNT_TYPES.includes(type)) {
-      return NextResponse.json({ message: 'Invalid account type' }, { status: 400 })
+      return NextResponse.json({ message: 'Invalid account type', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     const contact = {
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       phone: str(data.contact?.phone),
     }
 
-    const invalid = (message: string) => NextResponse.json({ message }, { status: 400 })
+    const invalid = (message: string) => NextResponse.json({ message, code: 'VALIDATION_ERROR' }, { status: 400 })
 
     // Per-type validation + normalized verificationData
     let verificationData: any
@@ -228,6 +228,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Verification submit error:', error)
-    return NextResponse.json({ message: 'Failed to submit verification' }, { status: 500 })
+    return NextResponse.json({ message: 'Failed to submit verification', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }

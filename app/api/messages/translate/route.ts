@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const rate = checkRateLimit(
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     if (!text || !targetLanguage) {
       return NextResponse.json(
-        { message: 'text and targetLanguage are required' },
+        { message: 'text and targetLanguage are required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Translation error:', error)
     return NextResponse.json(
-      { message: 'Translation failed' },
+      { message: 'Translation failed', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

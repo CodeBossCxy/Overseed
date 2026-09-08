@@ -13,19 +13,19 @@ export const maxDuration = 60
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  if (!session?.user) return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   const userId = (session.user as any).id
   if (!(await isUserVerified(userId))) {
-    return NextResponse.json({ message: 'Verification required' }, { status: 403 })
+    return NextResponse.json({ message: 'Verification required', code: 'VERIFICATION_REQUIRED' }, { status: 403 })
   }
   // All tiers may generate images (pricing v3) — credits are the gate.
   const tier = await getEffectiveTier(userId)
   const { prompt } = await req.json().catch(() => ({ prompt: '' }))
   if (typeof prompt !== 'string' || prompt.trim().length < 3 || prompt.length > 1500) {
-    return NextResponse.json({ message: 'Describe the image in 3-1500 characters' }, { status: 400 })
+    return NextResponse.json({ message: 'Describe the image in 3-1500 characters', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
   const apiKey = process.env.CHAT_API
-  if (!apiKey) return NextResponse.json({ message: 'Image generation is not configured' }, { status: 503 })
+  if (!apiKey) return NextResponse.json({ message: 'Image generation is not configured', code: 'UPSTREAM_ERROR' }, { status: 503 })
 
   // Bill image credits up front; refunded if generation fails.
   const creditRef = `image:${userId}:${Date.now()}`
@@ -66,6 +66,6 @@ export async function POST(req: Request) {
     } catch (refundErr) {
       console.error('Credit refund failed:', refundErr)
     }
-    return NextResponse.json({ message: error?.message || 'Image generation failed' }, { status: 502 })
+    return NextResponse.json({ message: error?.message || 'Image generation failed', code: 'UPSTREAM_ERROR' }, { status: 502 })
   }
 }

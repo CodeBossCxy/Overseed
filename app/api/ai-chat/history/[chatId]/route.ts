@@ -10,7 +10,7 @@ export async function GET(
 ) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const { chatId } = await params
@@ -25,7 +25,7 @@ export async function GET(
   })
 
   if (!chat) {
-    return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Chat not found', code: 'NOT_FOUND' }, { status: 404 })
   }
 
   return NextResponse.json(chat)

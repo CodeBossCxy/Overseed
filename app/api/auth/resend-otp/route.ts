@@ -8,7 +8,7 @@ export async function POST(request: Request) {
 
     if (!email) {
       return NextResponse.json(
-        { error: 'Email is required' },
+        { error: 'Email is required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -20,14 +20,14 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { error: 'No account found with this email' },
+        { error: 'No account found with this email', code: 'NOT_FOUND' },
         { status: 404 }
       )
     }
 
     if (user.emailVerified) {
       return NextResponse.json(
-        { error: 'Email is already verified' },
+        { error: 'Email is already verified', code: 'ALREADY_VERIFIED' },
         { status: 400 }
       )
     }
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       if (secondsSinceCreation < 60) {
         const waitSeconds = Math.ceil(60 - secondsSinceCreation)
         return NextResponse.json(
-          { error: `Please wait ${waitSeconds} seconds before requesting a new code` },
+          { error: `Please wait ${waitSeconds} seconds before requesting a new code`, code: 'RATE_LIMITED' },
           { status: 429 }
         )
       }
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Resend OTP error:', error)
     return NextResponse.json(
-      { error: 'Something went wrong. Please try again.' },
+      { error: 'Something went wrong. Please try again.', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

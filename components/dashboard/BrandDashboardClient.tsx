@@ -91,9 +91,7 @@ export default function BrandDashboardClient({
   const verifState = deriveVerificationStatus(brandProfile.brandVerificationStatus as any, true)
   const verifLabel = (t.status as any)?.verification?.[VERIFICATION_META[verifState].key] ?? verifState
   const brandDisplayName = brandProfile.companyName || userName
-  const welcomeLine = locale === 'zh'
-    ? `${d.welcomeBack}${brandDisplayName} 👋`
-    : `${d.welcomeBack} ${brandDisplayName} 👋`
+  const welcomeLine = d.welcomeBack + d.welcomeNameFormat.replace('{name}', brandDisplayName)
 
   const steps = [
     { done: setup.profile, title: d.stepProfile, caption: setup.profile ? d.stepCompleted : d.stepNotStarted, href: '/dashboard/brand/profile' },

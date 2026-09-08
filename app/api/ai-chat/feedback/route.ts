@@ -6,12 +6,12 @@ import { prisma } from '@/lib/prisma'
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const { messageId, feedback } = await req.json()
   if (!messageId || !['like', 'dislike', null].includes(feedback)) {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
 
   // Verify the message belongs to a chat owned by this user
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   })
 
   if (!message || message.chat.userId !== userId) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
   }
 
   await prisma.aiChatMessage.update({

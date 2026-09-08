@@ -25,7 +25,7 @@ const CLUB_PLATFORMS: ClubPlatform[] = ['instagram', 'youtube', 'tiktok']
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const userId = (session.user as any).id
   const brand = await prisma.brandProfile.findUnique({
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     select: { id: true },
   })
   if (!brand) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
 
   const params = req.nextUrl.searchParams
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   // Validate everything cheap BEFORE any charge.
   const platform = (params.get('platform') || 'instagram') as ClubPlatform
   if (!CLUB_PLATFORMS.includes(platform)) {
-    return NextResponse.json({ message: 'Unsupported platform' }, { status: 400 })
+    return NextResponse.json({ message: 'Unsupported platform', code: 'UNSUPPORTED_PLATFORM' }, { status: 400 })
   }
 
   // Pricing v4: every search page costs credits (config: discovery_search per

@@ -601,7 +601,7 @@ function generateWord(content: string, title: string, theme: string = 'creator')
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   // Doc export is free (0 credits, pricing v4) but rate-limited: 30/hour/user.
@@ -617,7 +617,7 @@ export async function POST(req: NextRequest) {
   try {
     const { content, title, format = 'docx', theme = 'creator' } = await req.json()
     if (!content) {
-      return NextResponse.json({ error: 'Content is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Content is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     // Set colors based on theme
@@ -658,6 +658,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('Document export error:', error)
-    return NextResponse.json({ error: 'Failed to generate document' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to generate document', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }

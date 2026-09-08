@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     if (userType !== 'BRAND' && userType !== 'ADMIN') {
       return NextResponse.json(
-        { error: 'Only brands can create payments' },
+        { error: 'Only brands can create payments', code: 'FORBIDDEN' },
         { status: 403 },
       )
     }
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const { applicationId } = await req.json()
     if (!applicationId) {
       return NextResponse.json(
-        { error: 'applicationId is required' },
+        { error: 'applicationId is required', code: 'VALIDATION_ERROR' },
         { status: 400 },
       )
     }
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     if (!application) {
       return NextResponse.json(
-        { error: 'Application not found' },
+        { error: 'Application not found', code: 'NOT_FOUND' },
         { status: 404 },
       )
     }
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // Verify the brand owns this campaign
     if (application.campaign.brand.userId !== userId) {
       return NextResponse.json(
-        { error: 'You do not own this campaign' },
+        { error: 'You do not own this campaign', code: 'FORBIDDEN' },
         { status: 403 },
       )
     }
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     // Application must be APPROVED
     if (application.status !== 'APPROVED') {
       return NextResponse.json(
-        { error: 'Application must be in APPROVED status' },
+        { error: 'Application must be in APPROVED status', code: 'VALIDATION_ERROR' },
         { status: 400 },
       )
     }
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     // Must not already have a payment
     if (application.payment) {
       return NextResponse.json(
-        { error: 'Payment already exists for this application' },
+        { error: 'Payment already exists for this application', code: 'CONFLICT' },
         { status: 400 },
       )
     }
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     const amount = proposedRate || fallbackRate
     if (!amount || amount <= 0) {
       return NextResponse.json(
-        { error: 'No valid payment amount found' },
+        { error: 'No valid payment amount found', code: 'VALIDATION_ERROR' },
         { status: 400 },
       )
     }
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[Stripe Checkout]', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error.message || 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 },
     )
   }

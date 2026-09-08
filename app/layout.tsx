@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   description: 'A global platform connecting brands with creators for cross-border marketing collaborations.',
   keywords: 'creator marketing, brand collaborations, content creators, influencer marketing, cross-border marketing, KOL',
-  metadataBase: new URL('https://overseed.net'),
+  metadataBase: new URL('https://www.overseed.net'),
   alternates: {
     canonical: '/',
   },
@@ -77,8 +77,8 @@ export default async function RootLayout({
               '@context': 'https://schema.org',
               '@type': 'Organization',
               name: 'Overseed',
-              url: 'https://overseed.net',
-              logo: 'https://overseed.net/icon-pink.png',
+              url: 'https://www.overseed.net',
+              logo: 'https://www.overseed.net/icon-pink.png',
               description:
                 'AI-powered cross-border creator collaboration platform connecting brands with creators.',
             }),

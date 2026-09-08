@@ -40,15 +40,15 @@ async function loadCollaboration(id: string) {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = await getServerSession(authOptions)
-  if (!session?.user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  if (!session?.user) return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   const userId = (session.user as any).id
 
   const collaboration = await loadCollaboration(id)
-  if (!collaboration) return NextResponse.json({ message: 'Not found' }, { status: 404 })
+  if (!collaboration) return NextResponse.json({ message: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
 
   const isBrand = collaboration.brand.userId === userId
   const isCreator = collaboration.influencer.userId === userId
-  if (!isBrand && !isCreator) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+  if (!isBrand && !isCreator) return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
   const lang = searchParams.get('lang')
@@ -72,15 +72,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params
     const session = await getServerSession(authOptions)
-    if (!session?.user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    if (!session?.user) return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     const userId = (session.user as any).id
 
     const collaboration = await loadCollaboration(id)
-    if (!collaboration) return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    if (!collaboration) return NextResponse.json({ message: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
 
     const isBrand = collaboration.brand.userId === userId
     const isCreator = collaboration.influencer.userId === userId
-    if (!isBrand && !isCreator) return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    if (!isBrand && !isCreator) return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
     const body = await req.json()
     const { action } = body
@@ -89,10 +89,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const creatorActions = ['accept', 'decline', 'submit', 'upload_draft']
     const brandActions = ['approve', 'request_revision']
     if (creatorActions.includes(action) && !isCreator) {
-      return NextResponse.json({ message: 'Only the creator can perform this action' }, { status: 403 })
+      return NextResponse.json({ message: 'Only the creator can perform this action', code: 'FORBIDDEN' }, { status: 403 })
     }
     if (brandActions.includes(action) && !isBrand) {
-      return NextResponse.json({ message: 'Only the brand can perform this action' }, { status: 403 })
+      return NextResponse.json({ message: 'Only the brand can perform this action', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     let next: CollaborationStatus | null = null
@@ -112,12 +112,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         // Creator uploads a draft for brand feedback; status stays Active
         if (current !== 'ACTIVE') {
           return NextResponse.json(
-            { message: 'Drafts can only be uploaded while the collaboration is Active' },
+            { message: 'Drafts can only be uploaded while the collaboration is Active', code: 'VALIDATION_ERROR' },
             { status: 400 },
           )
         }
         if (!body.fileUrl) {
-          return NextResponse.json({ message: 'fileUrl is required' }, { status: 400 })
+          return NextResponse.json({ message: 'fileUrl is required', code: 'VALIDATION_ERROR' }, { status: 400 })
         }
         const deliverable = await prisma.collaborationDeliverable.create({
           data: {
@@ -147,7 +147,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       case 'request_revision': // brand requests changes → back to Active
         if (collaboration.revisionsUsed >= collaboration.revisionRounds) {
           return NextResponse.json(
-            { message: 'No revision rounds remaining' },
+            { message: 'No revision rounds remaining', code: 'VALIDATION_ERROR' },
             { status: 400 },
           )
         }
@@ -164,7 +164,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         data.disputedAt = new Date()
         break
       default:
-        return NextResponse.json({ message: 'Unknown action' }, { status: 400 })
+        return NextResponse.json({ message: 'Unknown action', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     if (next) {
@@ -172,7 +172,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         assertTransition(CollaborationSM, 'Collaboration', current, next)
       } catch {
         return NextResponse.json(
-          { message: `Cannot ${action} a collaboration that is ${current}` },
+          { message: `Cannot ${action} a collaboration that is ${current}`, code: 'INVALID_STATUS_TRANSITION' },
           { status: 400 },
         )
       }
@@ -258,6 +258,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ collaboration: updated })
   } catch (error) {
     console.error('Error updating collaboration:', error)
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ message: 'Internal server error', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }

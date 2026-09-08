@@ -11,7 +11,7 @@ import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const userId = (session.user as any).id
   if (!CREDIT_SYSTEM_ENABLED) {

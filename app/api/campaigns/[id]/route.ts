@@ -71,7 +71,7 @@ export async function GET(
     })
 
     if (!campaign) {
-      return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
     }
 
     // Internal workspace translation fetches should not inflate public views.
@@ -111,7 +111,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching campaign:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
@@ -126,7 +126,7 @@ export async function PATCH(
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -140,11 +140,11 @@ export async function PATCH(
     })
 
     if (!existingCampaign) {
-      return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
     }
 
     if (existingCampaign.brand.userId !== userId) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     const data = await req.json()
@@ -162,7 +162,7 @@ export async function PATCH(
       existingCampaign.brand.brandVerificationStatus !== 'APPROVED'
     ) {
       return NextResponse.json(
-        { message: 'Your brand must be verified before you can publish campaigns. You can keep this campaign as a draft.' },
+        { message: 'Your brand must be verified before you can publish campaigns. You can keep this campaign as a draft.', code: 'VERIFICATION_REQUIRED' },
         { status: 403 }
       )
     }
@@ -171,7 +171,7 @@ export async function PATCH(
         assertTransition(Campaign, 'campaign', existingCampaign.status as CampaignStatus, requestedStatus)
       } catch {
         return NextResponse.json(
-          { message: `Cannot move campaign from ${existingCampaign.status} to ${requestedStatus}` },
+          { message: `Cannot move campaign from ${existingCampaign.status} to ${requestedStatus}`, code: 'INVALID_STATUS_TRANSITION' },
           { status: 422 }
         )
       }
@@ -272,7 +272,7 @@ export async function PATCH(
   } catch (error) {
     console.error('Error updating campaign:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
@@ -287,7 +287,7 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -301,11 +301,11 @@ export async function DELETE(
     })
 
     if (!campaign) {
-      return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
     }
 
     if (campaign.brand.userId !== userId) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     // ?mode=cancel → soft cancel (keeps history); default → hard delete (relations cascade)
@@ -355,7 +355,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting campaign:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
     if (!applicationId) {
       return NextResponse.json(
-        { message: 'applicationId is required' },
+        { message: 'applicationId is required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     if (!application) {
       return NextResponse.json(
-        { message: 'Application not found' },
+        { message: 'Application not found', code: 'NOT_FOUND' },
         { status: 404 }
       )
     }
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     // Verify the current user is either the brand or the influencer
     if (userId !== brandUserId && userId !== influencerUserId) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     // Check brand verification if current user is the brand
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       })
       if (brandProfile?.brandVerificationStatus !== 'APPROVED') {
         return NextResponse.json(
-          { message: 'Your brand must be verified before you can start conversations.' },
+          { message: 'Your brand must be verified before you can start conversations.', code: 'VERIFICATION_REQUIRED' },
           { status: 403 }
         )
       }
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Error starting conversation:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
 
     if (!name || !email || !message) {
       return NextResponse.json(
-        { message: 'Name, email, and message are required' },
+        { message: 'Name, email, and message are required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Contact form error:', error)
     return NextResponse.json(
-      { message: 'Failed to send message' },
+      { message: 'Failed to send message', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

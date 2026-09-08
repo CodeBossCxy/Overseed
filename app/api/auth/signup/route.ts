@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     // Validate inputs
     if (!email || !password || !name) {
       return NextResponse.json(
-        { error: 'Name, email, and password are required' },
+        { error: 'Name, email, and password are required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     // Beta invite code validation
     if (!inviteCode) {
       return NextResponse.json(
-        { error: 'An invite code is required to join the beta' },
+        { error: 'An invite code is required to join the beta', code: 'INVITE_CODE_REQUIRED' },
         { status: 400 }
       )
     }
@@ -29,21 +29,21 @@ export async function POST(request: Request) {
 
     if (!betaCode || !betaCode.isActive) {
       return NextResponse.json(
-        { error: 'Invalid invite code' },
+        { error: 'Invalid invite code', code: 'INVALID_INVITE_CODE' },
         { status: 400 }
       )
     }
 
     if (betaCode.expiresAt && betaCode.expiresAt < new Date()) {
       return NextResponse.json(
-        { error: 'This invite code has expired' },
+        { error: 'This invite code has expired', code: 'INVITE_CODE_EXPIRED' },
         { status: 400 }
       )
     }
 
     if (betaCode.usedCount >= betaCode.maxUses) {
       return NextResponse.json(
-        { error: 'This invite code has reached its usage limit' },
+        { error: 'This invite code has reached its usage limit', code: 'INVITE_CODE_EXHAUSTED' },
         { status: 400 }
       )
     }
@@ -51,14 +51,14 @@ export async function POST(request: Request) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json(
-        { error: 'Invalid email format' },
+        { error: 'Invalid email format', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
 
     if (password.length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters' },
+        { error: 'Password must be at least 8 characters', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'An account with this email already exists' },
+        { error: 'An account with this email already exists', code: 'CONFLICT' },
         { status: 409 }
       )
     }
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Signup error:', error)
     return NextResponse.json(
-      { error: 'Something went wrong. Please try again.' },
+      { error: 'Something went wrong. Please try again.', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

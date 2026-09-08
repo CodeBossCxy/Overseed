@@ -45,7 +45,7 @@ function accountVerifState(acc: any): string {
 }
 
 export default function CreatorProfilePage() {
-  const { t, locale } = useLanguage()
+  const { t } = useLanguage()
   const p = t.creatorProfile
   const [tab, setTab] = useState<'public' | 'social'>('public')
   const [loading, setLoading] = useState(true)
@@ -307,7 +307,7 @@ export default function CreatorProfilePage() {
                   </div>
 
                   {/* Cover photo */}
-                  <p className="text-sm font-medium text-gray-700 mt-4 mb-2">{locale === 'zh' ? '封面图' : 'Cover photo'}</p>
+                  <p className="text-sm font-medium text-gray-700 mt-4 mb-2">{p.coverPhoto}</p>
                   <div className="relative w-40 h-16 rounded-xl overflow-hidden bg-gray-100 group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={form.coverImageUrl || '/creator-cover-default.jpg'} alt="" className="w-full h-full object-cover" />
@@ -323,7 +323,7 @@ export default function CreatorProfilePage() {
                       disabled={uploadingCover}
                       className="absolute inset-0 flex items-center justify-center bg-black/35 text-white text-xs font-semibold opacity-0 group-hover:opacity-100 transition disabled:opacity-70"
                     >
-                      {uploadingCover ? '…' : locale === 'zh' ? '更换' : 'Change'}
+                      {uploadingCover ? '…' : p.change}
                     </button>
                   </div>
                   {form.coverImageUrl && (
@@ -331,7 +331,7 @@ export default function CreatorProfilePage() {
                       onClick={() => setForm((f) => ({ ...f, coverImageUrl: '' }))}
                       className="mt-1.5 text-xs text-gray-400 hover:text-red-500 transition"
                     >
-                      {locale === 'zh' ? '恢复默认' : 'Reset to default'}
+                      {p.resetToDefault}
                     </button>
                   )}
                 </div>

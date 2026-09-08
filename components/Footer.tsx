@@ -51,7 +51,7 @@ export default function Footer() {
         <div className="border-t border-white/10 mt-8 pt-8 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 text-sm text-center text-white/40">
           <p>{t.footer.copyright}</p>
           <span className="hidden sm:inline">·</span>
-          <a href="https://overseed.net" className="hover:text-white transition">overseed.net</a>
+          <a href="https://www.overseed.net" className="hover:text-white transition">overseed.net</a>
         </div>
       </div>
     </footer>

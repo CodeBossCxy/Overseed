@@ -16,6 +16,17 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
+/**
+ * Keep the environment in sync with the active locale:
+ * - <html lang> for accessibility/SEO (client-side; pages stay statically
+ *   renderable, unlike reading a cookie in the server root layout)
+ * - a `locale` cookie so any future server-side rendering can pick it up
+ */
+function syncLocaleEnvironment(locale: Locale) {
+  document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en'
+  document.cookie = `locale=${locale};path=/;max-age=31536000;samesite=lax`
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('en')
   const [autoTranslateUGC, setAutoTranslateUGCState] = useState(true)
@@ -29,6 +40,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     if (savedLocale && (savedLocale === 'en' || savedLocale === 'zh')) {
       setLocaleState(savedLocale)
     }
+    syncLocaleEnvironment(savedLocale === 'zh' ? 'zh' : 'en')
     const savedAutoTranslate = localStorage.getItem('autoTranslateUGC')
     if (savedAutoTranslate !== null) {
       const val = savedAutoTranslate === 'true'
@@ -48,6 +60,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         if (data.language && (data.language === 'en' || data.language === 'zh')) {
           setLocaleState(data.language)
           localStorage.setItem('locale', data.language)
+          syncLocaleEnvironment(data.language)
         }
         if (data.autoTranslateUGC !== undefined) {
           const val = Boolean(data.autoTranslateUGC)
@@ -64,6 +77,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale)
     localStorage.setItem('locale', newLocale)
+    syncLocaleEnvironment(newLocale)
 
     // Reset UGC toggle to the user's default preference when switching language
     setIsUGCTranslated(autoTranslateUGC)

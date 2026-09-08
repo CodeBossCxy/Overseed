@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     if (userType !== 'BRAND' && userType !== 'ADMIN') {
       return NextResponse.json(
-        { error: 'Only brands can release payments' },
+        { error: 'Only brands can release payments', code: 'FORBIDDEN' },
         { status: 403 },
       )
     }
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const { applicationId } = await req.json()
     if (!applicationId) {
       return NextResponse.json(
-        { error: 'applicationId is required' },
+        { error: 'applicationId is required', code: 'VALIDATION_ERROR' },
         { status: 400 },
       )
     }
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     if (!application) {
       return NextResponse.json(
-        { error: 'Application not found' },
+        { error: 'Application not found', code: 'NOT_FOUND' },
         { status: 404 },
       )
     }
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // Brand must own the campaign
     if (application.campaign.brand.userId !== userId) {
       return NextResponse.json(
-        { error: 'You do not own this campaign' },
+        { error: 'You do not own this campaign', code: 'FORBIDDEN' },
         { status: 403 },
       )
     }
@@ -59,14 +59,14 @@ export async function POST(req: NextRequest) {
     // Payment must exist with status HELD
     if (!application.payment) {
       return NextResponse.json(
-        { error: 'No payment found for this application' },
+        { error: 'No payment found for this application', code: 'NOT_FOUND' },
         { status: 400 },
       )
     }
 
     if (application.payment.status !== 'HELD') {
       return NextResponse.json(
-        { error: 'Payment must be in HELD status to release' },
+        { error: 'Payment must be in HELD status to release', code: 'VALIDATION_ERROR' },
         { status: 400 },
       )
     }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const creator = application.influencer
     if (!creator.stripeConnectId || !creator.stripeOnboardingComplete) {
       return NextResponse.json(
-        { error: 'Creator has not completed Stripe onboarding' },
+        { error: 'Creator has not completed Stripe onboarding', code: 'VALIDATION_ERROR' },
         { status: 400 },
       )
     }
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[Stripe Release]', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error.message || 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 },
     )
   }

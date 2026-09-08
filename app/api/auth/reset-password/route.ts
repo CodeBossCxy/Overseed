@@ -8,14 +8,14 @@ export async function POST(request: Request) {
 
     if (!email || !code || !password) {
       return NextResponse.json(
-        { error: 'Email, code, and new password are required' },
+        { error: 'Email, code, and new password are required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
 
     if (String(password).length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters' },
+        { error: 'Password must be at least 8 characters', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     if (!token || token.expires < new Date()) {
       return NextResponse.json(
-        { error: 'Invalid or expired code' },
+        { error: 'Invalid or expired code', code: 'INVALID_OR_EXPIRED_CODE' },
         { status: 400 }
       )
     }
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       where: { email: normalizedEmail },
     })
     if (!user) {
-      return NextResponse.json({ error: 'Invalid or expired code' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid or expired code', code: 'INVALID_OR_EXPIRED_CODE' }, { status: 400 })
     }
 
     const hashedPassword = await hash(String(password), 12)
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Reset password error:', error)
     return NextResponse.json(
-      { error: 'Something went wrong. Please try again.' },
+      { error: 'Something went wrong. Please try again.', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

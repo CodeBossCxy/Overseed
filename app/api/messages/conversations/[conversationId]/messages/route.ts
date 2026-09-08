@@ -14,7 +14,7 @@ export async function POST(
     const { conversationId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -27,20 +27,20 @@ export async function POST(
     })
 
     if (!participant) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     const { content, attachmentUrl, attachmentName, attachmentMime } = await req.json()
 
     if ((!content || typeof content !== 'string' || !content.trim()) && !attachmentUrl) {
       return NextResponse.json(
-        { message: 'Message content is required' },
+        { message: 'Message content is required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
 
     if (attachmentUrl && (typeof attachmentUrl !== 'string' || (!attachmentUrl.startsWith('/uploads/message_attachment/') && !attachmentUrl.startsWith('/api/s3-image/message_attachment/')))) {
-      return NextResponse.json({ message: 'Invalid attachment URL' }, { status: 400 })
+      return NextResponse.json({ message: 'Invalid attachment URL', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     if (content && containsBannedContent(content)) {
@@ -101,7 +101,7 @@ export async function POST(
   } catch (error) {
     console.error('Error sending message:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

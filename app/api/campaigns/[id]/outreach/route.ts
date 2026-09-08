@@ -12,10 +12,10 @@ async function ownedCampaign(id: string, userId: string) {
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  if (!session?.user) return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   const { id } = await params
   if (!(await ownedCampaign(id, (session.user as any).id))) {
-    return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+    return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
   }
   const queue = await prisma.campaignOutreach.findMany({
     where: { campaignId: id },
@@ -26,10 +26,10 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  if (!session?.user) return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   const { id } = await params
   if (!(await ownedCampaign(id, (session.user as any).id))) {
-    return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+    return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
   }
   const body = await req.json()
   if (body.action === 'request') {
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
   } else {
     if (!body.creator?.id || !body.creator?.platform) {
-      return NextResponse.json({ message: 'Creator is required' }, { status: 400 })
+      return NextResponse.json({ message: 'Creator is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
     const c = body.creator
     await prisma.campaignOutreach.upsert({
@@ -60,13 +60,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  if (!session?.user) return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   const { id } = await params
   if (!(await ownedCampaign(id, (session.user as any).id))) {
-    return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+    return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
   }
   const outreachId = req.nextUrl.searchParams.get('outreachId')
-  if (!outreachId) return NextResponse.json({ message: 'outreachId is required' }, { status: 400 })
+  if (!outreachId) return NextResponse.json({ message: 'outreachId is required', code: 'VALIDATION_ERROR' }, { status: 400 })
   await prisma.campaignOutreach.deleteMany({ where: { id: outreachId, campaignId: id, status: 'SHORTLISTED' } })
   const queue = await prisma.campaignOutreach.findMany({ where: { campaignId: id }, orderBy: { createdAt: 'asc' } })
   return NextResponse.json({ queue })

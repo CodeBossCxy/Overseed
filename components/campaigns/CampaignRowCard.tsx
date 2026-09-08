@@ -67,26 +67,26 @@ export default function CampaignRowCard({ campaign: c, saved = false, onToggleSa
     </div>
 
     <div className="lg:w-40 flex-shrink-0">
-      <p className="text-xs font-semibold text-gray-600 mb-2">{locale === 'zh' ? '品牌' : 'Brand'}</p>
+      <p className="text-xs font-semibold text-gray-600 mb-2">{s.brand}</p>
       <p className="text-sm font-semibold text-gray-900 truncate">{c.brand?.companyName || t.campaign.anonymousBrand}{c.brand?.isVerified ? ' ✓' : ''}</p>
       <div className="flex gap-1 mt-2">{platforms.map((p:any) => <PlatformIcon key={p.platform.name} name={p.platform.name}/>)}</div>
     </div>
 
     <div className="lg:w-40 flex-shrink-0">
-      <p className="text-xs font-semibold text-gray-600 mb-2">{locale === 'zh' ? '报酬' : 'Compensation'}</p>
+      <p className="text-xs font-semibold text-gray-600 mb-2">{s.compensation}</p>
       <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${paid ? 'bg-emerald-50 text-emerald-600' : 'bg-violet-50 text-violet-600'}`}>{compensation}</span>
       <p className="text-sm font-semibold text-gray-900 mt-1.5">{price}</p>
     </div>
 
     <div className="lg:w-44 flex-shrink-0">
-      <p className="text-xs font-semibold text-gray-600 mb-2">{locale === 'zh' ? '截止日期' : 'Deadline'}</p>
-      <p className="text-sm text-gray-900">{c.deadline ? `▣ ${formatDate(c.deadline, locale)}` : (locale === 'zh' ? '无截止日期' : 'No deadline')}</p>
+      <p className="text-xs font-semibold text-gray-600 mb-2">{s.deadline}</p>
+      <p className="text-sm text-gray-900">{c.deadline ? `▣ ${formatDate(c.deadline, locale)}` : s.noDeadline}</p>
       <p className="text-[11px] text-gray-500 mt-2">{Math.max(0, (c.totalSlots || 0) - (c.filledSlots || 0))} {s.spotsLeft}</p>
     </div>
 
     <div className="flex-shrink-0 lg:ml-auto flex items-center gap-4">
       {onRemove && <button type="button" disabled={busy} onClick={event => control(event, () => onRemove(c.id))} className="text-xs text-gray-400 hover:text-red-500 transition">{busy ? s.removing : s.remove}</button>}
-      <span className="inline-flex items-center gap-3 text-sm font-semibold text-gray-700 group-hover:text-primary-700 transition">{locale === 'zh' ? '查看活动' : 'View Campaign'} <span className="transition-transform group-hover:translate-x-1">→</span></span>
+      <span className="inline-flex items-center gap-3 text-sm font-semibold text-gray-700 group-hover:text-primary-700 transition">{s.viewCampaign} <span className="transition-transform group-hover:translate-x-1">→</span></span>
     </div>
   </div>
 }

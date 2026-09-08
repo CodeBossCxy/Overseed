@@ -18,11 +18,11 @@ async function getBrandId(userId: string) {
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const brandId = await getBrandId((session.user as any).id)
   if (!brandId) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
 
   if (req.nextUrl.searchParams.get('idsOnly')) {
@@ -67,23 +67,23 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const brandId = await getBrandId((session.user as any).id)
   if (!brandId) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
 
   const { influencerId } = await req.json()
   if (!influencerId) {
-    return NextResponse.json({ message: 'influencerId is required' }, { status: 400 })
+    return NextResponse.json({ message: 'influencerId is required', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
   const influencer = await prisma.influencerProfile.findUnique({
     where: { id: influencerId },
     select: { id: true },
   })
   if (!influencer) {
-    return NextResponse.json({ message: 'Creator not found' }, { status: 404 })
+    return NextResponse.json({ message: 'Creator not found', code: 'NOT_FOUND' }, { status: 404 })
   }
 
   await prisma.savedCreator.upsert({
@@ -98,16 +98,16 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const brandId = await getBrandId((session.user as any).id)
   if (!brandId) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
 
   const influencerId = req.nextUrl.searchParams.get('influencerId')
   if (!influencerId) {
-    return NextResponse.json({ message: 'influencerId is required' }, { status: 400 })
+    return NextResponse.json({ message: 'influencerId is required', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
 
   await prisma.savedCreator.deleteMany({ where: { brandId, influencerId } })

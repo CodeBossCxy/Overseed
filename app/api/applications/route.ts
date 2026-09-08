@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     if (!influencerProfile) {
       return NextResponse.json(
-        { message: 'Influencer profile not found' },
+        { message: 'Influencer profile not found', code: 'NOT_FOUND' },
         { status: 404 }
       )
     }
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Error fetching applications:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

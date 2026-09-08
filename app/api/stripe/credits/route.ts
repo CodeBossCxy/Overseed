@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
     const userId = (session.user as any).id
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     // legacy pool grant and the v4 lot grant based on the flag).
     const pack = await prisma.creditPackConfig.findUnique({ where: { id: requested } })
     if (!pack || !pack.active) {
-      return NextResponse.json({ error: 'Unknown credit pack' }, { status: 400 })
+      return NextResponse.json({ error: 'Unknown credit pack', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     const tier = await getEffectiveTier(userId)
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[Stripe Credits]', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error.message || 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 },
     )
   }

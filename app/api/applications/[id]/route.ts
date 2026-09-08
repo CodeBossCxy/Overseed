@@ -19,7 +19,7 @@ export async function GET(
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -61,7 +61,7 @@ export async function GET(
     })
 
     if (!application) {
-      return NextResponse.json({ message: 'Application not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Application not found', code: 'APPLICATION_NOT_FOUND' }, { status: 404 })
     }
 
     // Check if user is either the applicant or the campaign owner
@@ -69,7 +69,7 @@ export async function GET(
     const isCampaignOwner = application.campaign.brand.userId === userId
 
     if (!isApplicant && !isCampaignOwner) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     // Translate only when a language is explicitly requested, so omitting
@@ -104,7 +104,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching application:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
@@ -120,7 +120,7 @@ export async function PATCH(
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -138,14 +138,14 @@ export async function PATCH(
     })
 
     if (!application) {
-      return NextResponse.json({ message: 'Application not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Application not found', code: 'APPLICATION_NOT_FOUND' }, { status: 404 })
     }
 
     const isApplicant = application.influencer.userId === userId
     const isCampaignOwner = application.campaign.brand.userId === userId
 
     if (!isApplicant && !isCampaignOwner) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     const data = await req.json()
@@ -157,7 +157,7 @@ export async function PATCH(
 
       if (data.status && !allowedStatuses.includes(data.status)) {
         return NextResponse.json(
-          { message: 'Invalid status for brand action' },
+          { message: 'Invalid status for brand action', code: 'VALIDATION_ERROR' },
           { status: 400 }
         )
       }
@@ -264,7 +264,7 @@ export async function PATCH(
       // Influencer can only update pitch message or proposed rate (if status is PENDING)
       if (application.status !== 'PENDING') {
         return NextResponse.json(
-          { message: 'Can only update pending applications' },
+          { message: 'Can only update pending applications', code: 'VALIDATION_ERROR' },
           { status: 400 }
         )
       }
@@ -308,11 +308,11 @@ export async function PATCH(
       return NextResponse.json(updated)
     }
 
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   } catch (error) {
     console.error('Error updating application:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
@@ -328,7 +328,7 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -341,17 +341,17 @@ export async function DELETE(
     })
 
     if (!application) {
-      return NextResponse.json({ message: 'Application not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Application not found', code: 'APPLICATION_NOT_FOUND' }, { status: 404 })
     }
 
     if (application.influencer.userId !== userId) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     // Only allow withdrawal if status is PENDING or UNDER_REVIEW
     if (!['PENDING', 'UNDER_REVIEW'].includes(application.status)) {
       return NextResponse.json(
-        { message: 'Cannot withdraw application in current status' },
+        { message: 'Cannot withdraw application in current status', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -366,7 +366,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error withdrawing application:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

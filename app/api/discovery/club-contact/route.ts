@@ -33,7 +33,7 @@ const esc = (s: string) =>
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const userId = (session.user as any).id
   const [brand, user] = await Promise.all([
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } }),
   ])
   if (!brand || !user) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
 
   const form = await req.formData()
@@ -53,11 +53,11 @@ export async function POST(req: NextRequest) {
   const message = String(form.get('message') || '').trim()
 
   if (!platform || !handle) {
-    return NextResponse.json({ message: 'platform and handle required' }, { status: 400 })
+    return NextResponse.json({ message: 'platform and handle required', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
   if (message.length < 10 || message.length > 2000) {
     return NextResponse.json(
-      { message: 'Message must be between 10 and 2000 characters' },
+      { message: 'Message must be between 10 and 2000 characters', code: 'MESSAGE_LENGTH' },
       { status: 400 }
     )
   }
@@ -75,18 +75,18 @@ export async function POST(req: NextRequest) {
 
   const files = form.getAll('files').filter((f): f is File => f instanceof File && f.size > 0)
   if (files.length > MAX_FILES) {
-    return NextResponse.json({ message: `At most ${MAX_FILES} attachments` }, { status: 400 })
+    return NextResponse.json({ message: `At most ${MAX_FILES} attachments`, code: 'ATTACHMENT_TOO_MANY' }, { status: 400 })
   }
   for (const f of files) {
     if (f.size > MAX_FILE_BYTES) {
       return NextResponse.json(
-        { message: `"${f.name}" exceeds the 4MB attachment limit` },
+        { message: `"${f.name}" exceeds the 4MB attachment limit`, code: 'ATTACHMENT_TOO_LARGE' },
         { status: 400 }
       )
     }
     if (!ALLOWED_TYPES.includes(f.type)) {
       return NextResponse.json(
-        { message: `"${f.name}": only images and PDF are supported` },
+        { message: `"${f.name}": only images and PDF are supported`, code: 'ATTACHMENT_TYPE' },
         { status: 400 }
       )
     }
@@ -308,7 +308,7 @@ export async function POST(req: NextRequest) {
       }
     }
     return NextResponse.json(
-      { message: err?.message || 'Failed to send message' },
+      { message: err?.message || 'Failed to send message', code: 'UPSTREAM_ERROR' },
       { status: 502 }
     )
   }

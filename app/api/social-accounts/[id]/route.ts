@@ -13,7 +13,7 @@ export async function PATCH(
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -27,11 +27,11 @@ export async function PATCH(
     })
 
     if (!socialAccount) {
-      return NextResponse.json({ message: 'Social account not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Social account not found', code: 'NOT_FOUND' }, { status: 404 })
     }
 
     if (socialAccount.influencer.userId !== userId) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     const data = await req.json()
@@ -73,7 +73,7 @@ export async function PATCH(
   } catch (error) {
     console.error('Error updating social account:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
@@ -89,7 +89,7 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -103,11 +103,11 @@ export async function DELETE(
     })
 
     if (!socialAccount) {
-      return NextResponse.json({ message: 'Social account not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Social account not found', code: 'NOT_FOUND' }, { status: 404 })
     }
 
     if (socialAccount.influencer.userId !== userId) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     await prisma.influencerSocialAccount.delete({
@@ -118,7 +118,7 @@ export async function DELETE(
   } catch (error) {
     console.error('Error unlinking social account:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

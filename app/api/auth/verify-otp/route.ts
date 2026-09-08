@@ -7,7 +7,7 @@ export async function POST(request: Request) {
 
     if (!email || !otp) {
       return NextResponse.json(
-        { error: 'Email and OTP are required' },
+        { error: 'Email and OTP are required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     if (!token) {
       return NextResponse.json(
-        { error: 'Invalid verification code' },
+        { error: 'Invalid verification code', code: 'INVALID_OR_EXPIRED_CODE' },
         { status: 400 }
       )
     }
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         },
       })
       return NextResponse.json(
-        { error: 'Verification code has expired. Please request a new one.' },
+        { error: 'Verification code has expired. Please request a new one.', code: 'INVALID_OR_EXPIRED_CODE' },
         { status: 400 }
       )
     }
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Verify OTP error:', error)
     return NextResponse.json(
-      { error: 'Something went wrong. Please try again.' },
+      { error: 'Something went wrong. Please try again.', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

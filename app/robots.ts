@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/dashboard/', '/admin/', '/settings/', '/api/', '/auth/'],
       },
     ],
-    sitemap: 'https://overseed.net/sitemap.xml',
+    sitemap: 'https://www.overseed.net/sitemap.xml',
   }
 }

@@ -36,7 +36,7 @@ export async function GET(
     })
 
     if (!influencer) {
-      return NextResponse.json({ message: 'Influencer not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Influencer not found', code: 'NOT_FOUND' }, { status: 404 })
     }
 
     // Get completed campaigns count
@@ -58,7 +58,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching influencer profile:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

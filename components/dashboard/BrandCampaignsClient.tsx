@@ -198,8 +198,8 @@ export default function BrandCampaignsClient({ campaigns, isVerified }: { campai
             onChange={(e) => { setSort(e.target.value as any); setPage(1) }}
             className="h-11 min-w-[230px] px-5 workspace-glass-control text-sm font-medium text-gray-700 focus:outline-none"
           >
-            <option value="deadline">{locale === 'zh' ? '排序：' : 'Sort by: '}{c.sortDeadlineSoonest}</option>
-            <option value="newest">{locale === 'zh' ? '排序：' : 'Sort by: '}{c.sortNewest}</option>
+            <option value="deadline">{c.sortPrefix}{c.sortDeadlineSoonest}</option>
+            <option value="newest">{c.sortPrefix}{c.sortNewest}</option>
           </select>
         </div>
       </div>

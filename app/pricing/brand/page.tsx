@@ -69,7 +69,7 @@ const AI_FEATURES = ['chat_standard', 'chat_advanced', 'image'] as const
 
 export default function MyPlanPage() {
   const { data: session } = useSession()
-  const { locale, t } = useLanguage()
+  const { t } = useLanguage()
   const m = t.myPlan
 
   const tier = (session?.user as any)?.subscriptionTier || 'FREE'
@@ -372,7 +372,7 @@ export default function MyPlanPage() {
                     {plan.tier === 'FREE' ? (
                       <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 mb-4 self-start">
                         <span className="text-sm font-bold text-blue-700">
-                          {plan.baseCredits} credits{locale === 'zh' ? '/月' : '/mo'}
+                          {plan.baseCredits} credits{m.perMonthShort}
                         </span>
                       </div>
                     ) : (
@@ -380,9 +380,9 @@ export default function MyPlanPage() {
                         <span className="text-sm font-bold text-amber-700">
                           {plan.baseCredits}{' '}
                           <span className="font-semibold text-amber-500">
-                            + {plan.bonusCredits} {locale === 'zh' ? '加赠' : 'bonus'}
+                            + {plan.bonusCredits} {m.bonusWord}
                           </span>
-                          {' '}= {total} credits{locale === 'zh' ? '/月' : '/mo'}
+                          {' '}= {total} credits{m.perMonthShort}
                         </span>
                       </div>
                     )}
@@ -644,7 +644,7 @@ export default function MyPlanPage() {
                         <span className="text-sm font-bold text-amber-700">
                           {pack.baseCredits}{' '}
                           <span className="font-semibold text-amber-500">
-                            + {pack.bonusCredits} {locale === 'zh' ? '加赠' : 'bonus'}
+                            + {pack.bonusCredits} {m.bonusWord}
                           </span>
                           {' '}= {totalCredits} credits
                         </span>

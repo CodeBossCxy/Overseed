@@ -15,7 +15,7 @@ export async function GET(
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -29,11 +29,11 @@ export async function GET(
     })
 
     if (!campaign) {
-      return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
     }
 
     if (campaign.brand.userId !== userId) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     const { searchParams } = new URL(req.url)
@@ -92,7 +92,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching applications:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

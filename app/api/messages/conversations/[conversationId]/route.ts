@@ -12,7 +12,7 @@ export async function GET(
     const { conversationId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -25,7 +25,7 @@ export async function GET(
     })
 
     if (!participant) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     // Pagination
@@ -97,7 +97,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching messages:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

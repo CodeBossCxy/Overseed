@@ -9,7 +9,7 @@ import { Application as ApplicationSM, assertTransition, type ApplicationStatus 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const userId = (session.user as any).id
   const { searchParams } = new URL(req.url)
@@ -52,13 +52,13 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
     const userId = (session.user as any).id
     const body = await req.json()
     const { applicationId } = body
     if (!applicationId) {
-      return NextResponse.json({ message: 'applicationId is required' }, { status: 400 })
+      return NextResponse.json({ message: 'applicationId is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     const application = await prisma.application.findUnique({
@@ -70,14 +70,14 @@ export async function POST(req: NextRequest) {
       },
     })
     if (!application) {
-      return NextResponse.json({ message: 'Application not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Application not found', code: 'APPLICATION_NOT_FOUND' }, { status: 404 })
     }
     // Only the campaign owner (brand) may select.
     if (application.campaign.brand.userId !== userId) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
     if (application.collaboration) {
-      return NextResponse.json({ message: 'Collaboration already exists for this application' }, { status: 409 })
+      return NextResponse.json({ message: 'Collaboration already exists for this application', code: 'CONFLICT' }, { status: 409 })
     }
 
     // Guard the Application transition (Applied/Under Review → Selected).
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       assertTransition(ApplicationSM, 'Application', application.status as ApplicationStatus, 'APPROVED')
     } catch {
       return NextResponse.json(
-        { message: `Cannot select a creator whose application is ${application.status}` },
+        { message: `Cannot select a creator whose application is ${application.status}`, code: 'INVALID_STATUS_TRANSITION' },
         { status: 400 },
       )
     }
@@ -139,6 +139,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ collaboration }, { status: 201 })
   } catch (error) {
     console.error('Error creating collaboration:', error)
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ message: 'Internal server error', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }

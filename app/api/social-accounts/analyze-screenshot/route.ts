@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     if (!influencerProfile) {
       return NextResponse.json(
-        { message: 'Influencer profile required' },
+        { message: 'Influencer profile required', code: 'FORBIDDEN' },
         { status: 403 }
       )
     }
@@ -31,24 +31,24 @@ export async function POST(req: NextRequest) {
     const platformSlug = formData.get('platformSlug') as string | null
 
     if (!file) {
-      return NextResponse.json({ message: 'File is required' }, { status: 400 })
+      return NextResponse.json({ message: 'File is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     if (!platformSlug) {
-      return NextResponse.json({ message: 'Platform is required' }, { status: 400 })
+      return NextResponse.json({ message: 'Platform is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     // Validate file
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       return NextResponse.json(
-        { message: `Invalid file type: ${file.type}. Allowed: JPEG, PNG, WebP, GIF` },
+        { message: `Invalid file type: ${file.type}. Allowed: JPEG, PNG, WebP, GIF`, code: 'ATTACHMENT_TYPE' },
         { status: 400 }
       )
     }
 
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { message: 'File exceeds 4 MB limit' },
+        { message: 'File exceeds 4 MB limit', code: 'ATTACHMENT_TOO_LARGE' },
         { status: 400 }
       )
     }
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Error analyzing screenshot:', error)
     return NextResponse.json(
-      { message: 'Failed to analyze screenshot' },
+      { message: 'Failed to analyze screenshot', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

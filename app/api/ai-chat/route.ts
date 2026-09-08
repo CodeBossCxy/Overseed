@@ -74,7 +74,7 @@ This summary is what the user sees in chat — the full document content is only
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const userId = (session.user as any).id
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   const { messages: rawMessages, provider, chatId } = await req.json()
   if (!rawMessages || !Array.isArray(rawMessages)) {
-    return NextResponse.json({ error: 'Messages are required' }, { status: 400 })
+    return NextResponse.json({ error: 'Messages are required', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
   // Bound input context: keep the most recent turns, clamp oversized bodies.
   const messages = rawMessages.slice(-MAX_CONTEXT_MESSAGES).map((m: any) => ({
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
   const conn = providerConfig(modelDef.provider)
   if (!conn.apiKey) {
     return NextResponse.json(
-      { error: `${modelDef.label} is not configured yet. Please pick another model.` },
+      { error: `${modelDef.label} is not configured yet. Please pick another model.`, code: 'UPSTREAM_ERROR' },
       { status: 503 }
     )
   }
@@ -360,6 +360,6 @@ export async function POST(req: NextRequest) {
     } catch (refundErr) {
       console.error('Credit refund failed:', refundErr)
     }
-    return NextResponse.json({ error: error?.message || 'Failed to generate response' }, { status: 500 })
+    return NextResponse.json({ error: error?.message || 'Failed to generate response', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }

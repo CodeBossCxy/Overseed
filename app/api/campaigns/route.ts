@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Error fetching campaigns:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
 
     if (!brandProfile) {
       return NextResponse.json(
-        { message: 'Brand profile required to create campaigns' },
+        { message: 'Brand profile required to create campaigns', code: 'FORBIDDEN' },
         { status: 403 }
       )
     }
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
     // Unverified brands may draft campaigns but not submit them for review
     if (brandProfile.brandVerificationStatus !== 'APPROVED' && data.status && data.status !== 'DRAFT') {
       return NextResponse.json(
-        { message: 'Your brand must be verified before you can publish campaigns. You can save this campaign as a draft.' },
+        { message: 'Your brand must be verified before you can publish campaigns. You can save this campaign as a draft.', code: 'VERIFICATION_REQUIRED' },
         { status: 403 }
       )
     }
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     // Validate required fields
     if (!data.title || !data.compensationType) {
       return NextResponse.json(
-        { message: 'Title and compensation type are required' },
+        { message: 'Title and compensation type are required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Error creating campaign:', error)
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

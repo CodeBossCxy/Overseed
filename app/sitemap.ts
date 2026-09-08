@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
 
-const BASE_URL = 'https://overseed.net'
+const BASE_URL = 'https://www.overseed.net'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [

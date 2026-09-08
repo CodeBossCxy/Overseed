@@ -19,7 +19,7 @@ const CLUB_PLATFORMS: ClubPlatform[] = ['instagram', 'youtube', 'tiktok']
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const userId = (session.user as any).id
   const brand = await prisma.brandProfile.findUnique({
@@ -27,12 +27,12 @@ export async function GET(req: NextRequest) {
     select: { id: true },
   })
   if (!brand) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
 
   if (!clubConfigured()) {
     return NextResponse.json(
-      { message: 'Influencers Club API not configured' },
+      { message: 'Influencers Club API not configured', code: 'UPSTREAM_ERROR' },
       { status: 503 }
     )
   }
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   const platform = req.nextUrl.searchParams.get('platform') as ClubPlatform
   const handle = req.nextUrl.searchParams.get('handle')?.trim()
   if (!CLUB_PLATFORMS.includes(platform) || !handle) {
-    return NextResponse.json({ message: 'platform and handle required' }, { status: 400 })
+    return NextResponse.json({ message: 'platform and handle required', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
 
   // Profile view is charged per creator; repeat views of the same creator by
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
       }
     }
     return NextResponse.json(
-      { message: err?.message || 'Enrichment failed' },
+      { message: err?.message || 'Enrichment failed', code: 'UPSTREAM_ERROR' },
       { status: 502 }
     )
   }

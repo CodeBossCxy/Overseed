@@ -7,11 +7,11 @@ const TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'applicatio
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  if (!session?.user) return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   const file = (await req.formData()).get('file')
-  if (!(file instanceof File) || !file.size) return NextResponse.json({ message: 'File required' }, { status: 400 })
-  if (!TYPES.includes(file.type)) return NextResponse.json({ message: 'Only images and PDF files are supported' }, { status: 400 })
-  if (file.size > MAX_FILE_SIZE) return NextResponse.json({ message: 'Files must be 4 MB or smaller' }, { status: 400 })
+  if (!(file instanceof File) || !file.size) return NextResponse.json({ message: 'File required', code: 'VALIDATION_ERROR' }, { status: 400 })
+  if (!TYPES.includes(file.type)) return NextResponse.json({ message: 'Only images and PDF files are supported', code: 'ATTACHMENT_TYPE' }, { status: 400 })
+  if (file.size > MAX_FILE_SIZE) return NextResponse.json({ message: 'Files must be 4 MB or smaller', code: 'ATTACHMENT_TOO_LARGE' }, { status: 400 })
   const url = await uploadFile(Buffer.from(await file.arrayBuffer()), file.name, file.type, 'message_attachment/')
   return NextResponse.json({ url, name: file.name, mime: file.type })
 }

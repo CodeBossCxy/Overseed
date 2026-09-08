@@ -18,11 +18,11 @@ export async function POST(
 ) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const influencerId = await getInfluencerId((session.user as any).id)
   if (!influencerId) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
   const { id: campaignId } = await params
 
@@ -31,7 +31,7 @@ export async function POST(
     select: { id: true },
   })
   if (!campaign) {
-    return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+    return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
   }
 
   await prisma.savedCampaign.upsert({
@@ -49,11 +49,11 @@ export async function DELETE(
 ) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const influencerId = await getInfluencerId((session.user as any).id)
   if (!influencerId) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
   const { id: campaignId } = await params
 

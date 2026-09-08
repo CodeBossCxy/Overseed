@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     const { email, locale } = await request.json()
 
     if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Email is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     const normalizedEmail = String(email).toLowerCase()
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
         if (secondsSinceCreation < 60) {
           const waitSeconds = Math.ceil(60 - secondsSinceCreation)
           return NextResponse.json(
-            { error: `Please wait ${waitSeconds} seconds before requesting a new code` },
+            { error: `Please wait ${waitSeconds} seconds before requesting a new code`, code: 'RATE_LIMITED' },
             { status: 429 }
           )
         }
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Forgot password error:', error)
     return NextResponse.json(
-      { error: 'Something went wrong. Please try again.' },
+      { error: 'Something went wrong. Please try again.', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

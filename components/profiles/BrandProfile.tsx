@@ -28,7 +28,8 @@ interface BrandProfileProps {
 }
 
 export default function BrandProfile({ brand }: BrandProfileProps) {
-  const { locale } = useLanguage()
+  const { locale, t } = useLanguage()
+  const p = t.brand.profile
   const companySizeLabels: Record<string, string> = {
     startup: 'Startup',
     small: 'Small Business',
@@ -81,7 +82,7 @@ export default function BrandProfile({ brand }: BrandProfileProps) {
               <span>{companySizeLabels[brand.companySize] || brand.companySize}</span>
             )}
             <span>
-              {locale === 'zh' ? '入驻于 ' : 'On platform since '}{formatMonthYear(brand.user.createdAt, locale)}
+              {p.onPlatformSince}{formatMonthYear(brand.user.createdAt, locale)}
             </span>
           </div>
 

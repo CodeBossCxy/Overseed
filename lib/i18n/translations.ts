@@ -96,6 +96,9 @@ export const translations = {
       confirmRemove: 'Remove this social account?',
       noAccounts: 'No social accounts connected yet.',
       errorSave: 'Failed to save profile',
+      coverPhoto: 'Cover photo',
+      change: 'Change',
+      resetToDefault: 'Reset to default',
     },
     myPlan: {
       title: 'My Plan',
@@ -231,6 +234,8 @@ export const translations = {
       needMoreCreditsCaption: 'Purchased credits can be used across both AI features and Creator Database tools.',
       perSearchUnit: '· 10 creators per search',
       perCreatorUnit: '· per creator',
+      perMonthShort: '/mo',
+      bonusWord: 'bonus',
     },
     workspace: {
       dashboard: 'Dashboard',
@@ -1102,6 +1107,29 @@ export const translations = {
         removing: 'Removing...',
         saveAction: 'Save',
         noMatches: 'No saved campaigns match your search or filters.',
+        brand: 'Brand',
+        compensation: 'Compensation',
+        deadline: 'Deadline',
+        noDeadline: 'No deadline',
+      },
+      publicView: {
+        totalFollowers: 'Total Followers',
+        platforms: 'Platforms',
+        campaigns: 'Campaigns',
+        verified: 'Verified',
+        yes: 'Yes',
+        no: 'No',
+        memberSince: 'Member since ',
+        languages: 'Languages:',
+        about: 'About',
+        connectedPlatforms: 'Connected Platforms',
+        lastUpdated: 'Last updated: ',
+        noAccountsLinked: 'No social accounts linked yet.',
+        followers: 'Followers',
+        engagement: 'Engagement',
+        viewAnalytics: 'View analytics',
+        showLess: 'Show less',
+        viewAllPlatforms: 'View all platforms',
       },
     },
     brand: {
@@ -1195,6 +1223,7 @@ export const translations = {
           used: 'used',
           of: 'of',
         },
+        welcomeNameFormat: ' {name} 👋',
       },
       profile: {
         title: 'Company Profile',
@@ -1257,6 +1286,7 @@ export const translations = {
         previewNote: 'This is how creators see your brand.',
         close: 'Close',
         logoPreviewAlt: 'Logo preview',
+        onPlatformSince: 'On platform since ',
       },
       verification: {
         title: 'Business Verification',
@@ -1408,6 +1438,7 @@ export const translations = {
         deletePermanently: 'Delete permanently',
         cancelCampaign: 'Cancel campaign',
         keepCampaign: 'Keep campaign',
+        sortPrefix: 'Sort by: ',
       },
       campaignNew: {
         title: 'Create Campaign',
@@ -1897,6 +1928,7 @@ export const translations = {
       showOriginal: 'Show Original',
       translateTo: 'Translate to {language}',
       translating: 'Translating...',
+      currentLanguageName: 'English',
     },
     campaignForm: {
       basicInfo: 'Basic Information',
@@ -2195,6 +2227,28 @@ export const translations = {
       linkAccountsDesc: 'Upgrade to a Pro account to link your social media accounts and showcase your reach to brands.',
       upgradeToPro: 'Upgrade to Pro',
       failedToStartCheckout: 'Failed to start checkout',
+      limitedTimeFree: 'Limited-time free',
+      creatorFreeTitle: 'Creator access is free for now',
+      creatorFreeDesc: 'During this launch period, creators can use the core workspace features at no cost.',
+      perMo: '/ mo',
+      creatorFeat1: 'Browse and save brand campaigns',
+      creatorFeat2: 'Apply to campaigns and manage collaborations',
+      creatorFeat3: 'In-app messaging and auto translation',
+      creatorFeat4: 'Creator profile and social account verification',
+      creatorFeat5: 'Payouts and collaboration tracking',
+      youAreOn: "You're on {name}",
+      needMoreCredits: 'Need more? Compare plans or buy extra credits.',
+      viewAllPlans: 'View all plans',
+      paymentCancelled: 'Payment cancelled. You can upgrade anytime.',
+      upgradeTitle: 'Upgrade to Campaign Plus',
+      upgradeNow: 'Upgrade Now',
+      securePayment: 'Secure payment via Stripe. Cancel anytime.',
+      compareAllPlans: 'Compare all plans (Outreach Plus / Pro)',
+      brandFeat1: '5 campaigns per day',
+      brandFeat2: 'Up to 30 active campaigns',
+      brandFeat3: '30 new conversations per day',
+      brandFeat4: 'AI Assistant with full access',
+      brandFeat5: 'Secure payments & creator payouts',
     },
     payments: {
       fundTitle: 'Fund Campaign Payment',
@@ -2453,6 +2507,9 @@ export const translations = {
       confirmRemove: '确定移除该社交账号？',
       noAccounts: '尚未绑定社交账号。',
       errorSave: '保存资料失败',
+      coverPhoto: '封面图',
+      change: '更换',
+      resetToDefault: '恢复默认',
     },
     myPlan: {
       title: '我的套餐',
@@ -2584,6 +2641,8 @@ export const translations = {
       needMoreCreditsCaption: '购买的 credits 可通用于 AI 功能与达人数据库。',
       perSearchUnit: '· 每次返回 10 位达人',
       perCreatorUnit: '· 按达人计',
+      perMonthShort: '/月',
+      bonusWord: '加赠',
     },
     workspace: {
       dashboard: '控制台',
@@ -3455,6 +3514,29 @@ export const translations = {
         removing: '移除中...',
         saveAction: '收藏',
         noMatches: '没有符合搜索或筛选条件的收藏活动。',
+        brand: '品牌',
+        compensation: '报酬',
+        deadline: '截止日期',
+        noDeadline: '无截止日期',
+      },
+      publicView: {
+        totalFollowers: '总粉丝数',
+        platforms: '平台数',
+        campaigns: '活动数',
+        verified: '已认证',
+        yes: '是',
+        no: '否',
+        memberSince: '加入于 ',
+        languages: '语言：',
+        about: '关于',
+        connectedPlatforms: '已连接平台',
+        lastUpdated: '最近更新：',
+        noAccountsLinked: '尚未关联社交账号。',
+        followers: '粉丝',
+        engagement: '互动率',
+        viewAnalytics: '查看数据',
+        showLess: '收起',
+        viewAllPlatforms: '查看全部平台',
       },
     },
     brand: {
@@ -3548,6 +3630,7 @@ export const translations = {
           used: '已用',
           of: '/',
         },
+        welcomeNameFormat: '{name} 👋',
       },
       profile: {
         title: '公司资料',
@@ -3610,6 +3693,7 @@ export const translations = {
         previewNote: '这是达人看到的品牌形象。',
         close: '关闭',
         logoPreviewAlt: '标志预览',
+        onPlatformSince: '入驻于 ',
       },
       verification: {
         title: '企业认证',
@@ -3752,6 +3836,7 @@ export const translations = {
         noDeadline: '无截止日期',
         edit: '编辑',
         spots: '名额',
+        sortPrefix: '排序：',
       },
       campaignNew: {
         title: '创建活动',
@@ -4241,6 +4326,7 @@ export const translations = {
       showOriginal: '显示原文',
       translateTo: '翻译为{language}',
       translating: '翻译中...',
+      currentLanguageName: '中文',
     },
     campaignForm: {
       basicInfo: '基本信息',
@@ -4539,6 +4625,28 @@ export const translations = {
       linkAccountsDesc: '升级到 Pro 账户即可关联社交媒体账号，向品牌展示您的影响力。',
       upgradeToPro: '升级到 Pro',
       failedToStartCheckout: '发起结账失败',
+      limitedTimeFree: '限时免费',
+      creatorFreeTitle: '达人端目前免费开放',
+      creatorFreeDesc: '在早期阶段，达人可以免费使用核心工作区功能。',
+      perMo: '/ 月',
+      creatorFeat1: '浏览并收藏品牌活动',
+      creatorFeat2: '提交活动申请并管理合作',
+      creatorFeat3: '站内消息与自动翻译',
+      creatorFeat4: '达人资料与社交账号认证',
+      creatorFeat5: '收款与合作进度管理',
+      youAreOn: '您已订阅 {name}',
+      needMoreCredits: '如需更多额度，可以升级套餐或购买 Credits。',
+      viewAllPlans: '查看所有套餐',
+      paymentCancelled: '支付已取消。您可以随时再次升级。',
+      upgradeTitle: '升级到 Campaign Plus',
+      upgradeNow: '立即升级',
+      securePayment: '安全支付由 Stripe 提供。可随时取消。',
+      compareAllPlans: '对比全部套餐（Outreach Plus / Pro）',
+      brandFeat1: '每日发布 5 个活动',
+      brandFeat2: '最多 30 个同时在线通告',
+      brandFeat3: '每日 30 次达人沟通',
+      brandFeat4: 'AI 助手无限对话',
+      brandFeat5: '安全支付与达人结算',
     },
     payments: {
       fundTitle: '活动付款',
@@ -4702,5 +4810,21 @@ export const translations = {
   },
 } as const
 
-export type Locale = 'en' | 'zh'
+export type Locale = keyof typeof translations
 export type TranslationKey = keyof typeof translations.en
+
+// ---------------------------------------------------------------------------
+// Compile-time exhaustiveness: every locale must mirror the FULL deep key
+// structure of `en` (leaf values may differ, but the shape may not). A key
+// added to `en` without its counterpart elsewhere fails `tsc`.
+// scripts/check-i18n-keys.ts is the runtime/CI twin of this check.
+// ---------------------------------------------------------------------------
+type DeepShape<T> = {
+  readonly [K in keyof T]: T[K] extends readonly (infer U)[]
+    ? readonly (U extends object ? DeepShape<U> : string)[]
+    : T[K] extends object
+      ? DeepShape<T[K]>
+      : string
+}
+const _assertLocaleShapes: Record<Locale, DeepShape<typeof translations.en>> = translations
+void _assertLocaleShapes
