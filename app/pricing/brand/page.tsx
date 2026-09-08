@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useSession } from 'next-auth/react'
 import RoleShell from '@/components/workspace/RoleShell'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -777,30 +778,46 @@ function MatrixRow({
   )
 }
 
-// "How credits work" info popover
+// "How credits work" info popover (portal-rendered — see NotePanel)
 function HowCreditsWorkPopover({ m }: { m: Record<string, string> }) {
-  const [open, setOpen] = useState(false)
+  const [anchor, setAnchor] = useState<DOMRect | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+  const toggle = () =>
+    setAnchor((v) => (v ? null : ref.current?.getBoundingClientRect() ?? null))
   return (
-    <div className="relative flex-shrink-0">
+    <div ref={ref} className="relative flex-shrink-0">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className="w-7 h-7 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition flex items-center justify-center text-xs font-bold"
         aria-label={m.howCreditsWorkTitle}
         title={m.howCreditsWorkTitle}
       >
         ?
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-9 z-20 w-64 bg-white rounded-2xl shadow-lg border border-gray-100 p-4 text-[12px] text-gray-700 space-y-2">
-            <p className="font-bold text-gray-900 mb-1">{m.howCreditsWorkTitle}</p>
-            <p>• {m.howCreditsWork1}</p>
-            <p>• {m.howCreditsWork2}</p>
-            <p>• {m.howCreditsWork3}</p>
-          </div>
-        </>
-      )}
+      {anchor &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            <div className="fixed inset-0" style={{ zIndex: 999 }} onClick={() => setAnchor(null)} />
+            <div
+              data-solid
+              style={{
+                position: 'fixed',
+                top: anchor.bottom + 6,
+                left: Math.max(8, anchor.right - 256),
+                width: 256,
+                zIndex: 1000,
+              }}
+              className="bg-white rounded-2xl shadow-xl border border-gray-200 p-4 text-[12px] text-gray-700 space-y-2"
+            >
+              <p className="font-bold text-gray-900 mb-1">{m.howCreditsWorkTitle}</p>
+              <p>• {m.howCreditsWork1}</p>
+              <p>• {m.howCreditsWork2}</p>
+              <p>• {m.howCreditsWork3}</p>
+            </div>
+          </>,
+          document.body,
+        )}
     </div>
   )
 }
@@ -818,36 +835,56 @@ function InfoIcon({ className = 'w-3.5 h-3.5 text-gray-400' }: { className?: str
 
 const HOVER_NOTE_DELAY_MS = 2000
 
-function CreditsInfoTooltip({ note }: { note: string }) {
-  const [open, setOpen] = useState(false)
+/**
+ * Note panel rendered in a document.body portal with fixed positioning —
+ * escapes every overflow-hidden / backdrop-blur stacking context (the glass
+ * cards create their own, which used to paint later siblings over the notes).
+ */
+function NotePanel({ anchor, note }: { anchor: DOMRect; note: string }) {
+  if (typeof document === 'undefined') return null
+  const width = Math.min(320, Math.max(256, anchor.width))
+  const left = Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8))
+  return createPortal(
+    <div
+      data-solid
+      style={{ position: 'fixed', top: anchor.bottom + 6, left, width, zIndex: 1000 }}
+      className="bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-xs text-gray-700 whitespace-pre-line"
+    >
+      {note}
+    </div>,
+    document.body,
+  )
+}
+
+/** Shared open/anchor logic for 2s-hover + click notes. */
+function useHoverNote() {
+  const [anchor, setAnchor] = useState<DOMRect | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const show = () => ref.current && setAnchor(ref.current.getBoundingClientRect())
   const enter = () => {
-    timer.current = setTimeout(() => setOpen(true), HOVER_NOTE_DELAY_MS)
+    timer.current = setTimeout(show, HOVER_NOTE_DELAY_MS)
   }
   const leave = () => {
     if (timer.current) clearTimeout(timer.current)
-    setOpen(false)
+    setAnchor(null)
   }
+  const toggle = () => (anchor ? setAnchor(null) : show())
+  return { anchor, ref, enter, leave, toggle }
+}
+
+function CreditsInfoTooltip({ note }: { note: string }) {
+  const { anchor, ref, enter, leave, toggle } = useHoverNote()
   return (
-    <div className="relative flex-shrink-0" onMouseEnter={enter} onMouseLeave={leave}>
+    <div ref={ref} className="relative flex-shrink-0" onMouseEnter={enter} onMouseLeave={leave}>
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className="text-gray-400 hover:text-gray-600 transition flex items-center justify-center"
         aria-label={note}
       >
         <InfoIcon />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div
-            data-solid
-            className="absolute left-0 top-6 z-20 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-xs text-gray-700 whitespace-pre-line"
-          >
-            {note}
-          </div>
-        </>
-      )}
+      {anchor && <NotePanel anchor={anchor} note={note} />}
     </div>
   )
 }
@@ -866,31 +903,17 @@ function HoverNoteRow({
   className?: string
   children: React.ReactNode
 }) {
-  const [open, setOpen] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const enter = () => {
-    timer.current = setTimeout(() => setOpen(true), HOVER_NOTE_DELAY_MS)
-  }
-  const leave = () => {
-    if (timer.current) clearTimeout(timer.current)
-    setOpen(false)
-  }
+  const { anchor, ref, enter, leave, toggle } = useHoverNote()
   return (
     <div
+      ref={ref}
       className={`relative cursor-default ${className}`}
       onMouseEnter={enter}
       onMouseLeave={leave}
-      onClick={() => setOpen((v) => !v)}
+      onClick={toggle}
     >
       {children}
-      {open && (
-        <div
-          data-solid
-          className="absolute left-3 right-3 top-full mt-1 z-20 bg-white rounded-2xl shadow-xl border border-gray-200 p-3 text-xs text-gray-700 whitespace-pre-line"
-        >
-          {note}
-        </div>
-      )}
+      {anchor && <NotePanel anchor={anchor} note={note} />}
     </div>
   )
 }
