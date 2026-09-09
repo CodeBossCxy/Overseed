@@ -20,6 +20,16 @@ interface Overview {
   clubTrialSearchesLeft: number | null
 }
 
+interface ClubUsageRow {
+  userId: string
+  email: string
+  name: string | null
+  profileViews: number
+  analytics: number
+  outreach: number
+  total: number
+}
+
 interface UserData {
   id: string
   name: string | null
@@ -77,6 +87,7 @@ export default function AdminDashboard() {
   const [overview, setOverview] = useState<Overview | null>(null)
   const [users, setUsers] = useState<UserData[]>([])
   const [recentAiLogs, setRecentAiLogs] = useState<AiLog[]>([])
+  const [clubUsage, setClubUsage] = useState<ClubUsageRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'ai-usage' | 'credits' | 'beta-codes' | 'beta-feedback' | 'brand-verification' | 'campaign-review'>('overview')
 
@@ -120,6 +131,7 @@ export default function AdminDashboard() {
           setOverview(data.overview)
           setUsers(data.users)
           setRecentAiLogs(data.recentAiLogs)
+          setClubUsage(data.clubUsage || [])
         }
       } catch (error) {
         console.error('Failed to fetch admin stats:', error)
@@ -318,6 +330,47 @@ export default function AdminDashboard() {
                 }
               />
             </div>
+
+            {/* Per-user Influencers Club usage (billed platform charges;
+                cache hits don't re-bill upstream, so this is an upper bound
+                on club credits actually consumed) */}
+            {clubUsage.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="font-semibold text-gray-900">Influencers Club Usage by User</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Charged calls per user. Profile views & analytics ≈ 1 club credit each (uncached); repeat views are cached and free.
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                        <th className="px-6 py-2.5 font-medium">User</th>
+                        <th className="px-6 py-2.5 font-medium text-right">Profile Views</th>
+                        <th className="px-6 py-2.5 font-medium text-right">Full Analytics</th>
+                        <th className="px-6 py-2.5 font-medium text-right">Outreach</th>
+                        <th className="px-6 py-2.5 font-medium text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clubUsage.map((row) => (
+                        <tr key={row.userId} className="border-b border-gray-50">
+                          <td className="px-6 py-2.5">
+                            <span className="font-medium text-gray-900">{row.name || '—'}</span>
+                            <span className="text-gray-400 ml-2">{row.email}</span>
+                          </td>
+                          <td className="px-6 py-2.5 text-right tabular-nums">{row.profileViews}</td>
+                          <td className="px-6 py-2.5 text-right tabular-nums">{row.analytics}</td>
+                          <td className="px-6 py-2.5 text-right tabular-nums">{row.outreach}</td>
+                          <td className="px-6 py-2.5 text-right tabular-nums font-semibold">{row.total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

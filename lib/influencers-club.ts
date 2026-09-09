@@ -7,6 +7,9 @@
 
 const BASE = 'https://api-dashboard.influencers.club'
 
+// Club search responses are cached for 30 minutes (see ClubSearchCache).
+const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000
+
 export type ClubPlatform = 'instagram' | 'youtube' | 'tiktok'
 
 export function clubConfigured(): boolean {
@@ -24,6 +27,14 @@ function authHeaders() {
 // dictionary. Cached per platform+code for the life of the server process.
 const locationCache = new Map<string, string | null>()
 
+// The club location dictionary uses plain English country names (verified
+// against the classifier endpoint), so for the codes offered in the UI we
+// can skip the resolver round-trip entirely.
+const TRUSTED_LOCATION_CODES = new Set([
+  'US', 'UK', 'CA', 'AU', 'CN', 'JP', 'KR', 'SG', 'DE', 'FR',
+  'NL', 'SE', 'BR', 'MX', 'IN', 'AE', 'NZ', 'IT', 'ES',
+])
+
 async function resolveLocation(
   platform: ClubPlatform,
   isoCountry: string
@@ -38,6 +49,11 @@ async function resolveLocation(
     name = new Intl.DisplayNames(['en'], { type: 'region' }).of(iso) || iso
   } catch {
     // fall through with the raw code
+  }
+
+  if (TRUSTED_LOCATION_CODES.has(iso) && name !== iso) {
+    locationCache.set(cacheKey, name)
+    return name
   }
 
   let resolved: string | null = null
@@ -120,6 +136,20 @@ export async function clubSearch(opts: ClubSearchOptions) {
     filters,
   }
 
+  // Short-TTL response cache — repeat searches (same query/filters/page)
+  // return instantly and cost no vendor credits.
+  const { createHash } = await import('crypto')
+  const cacheKey = createHash('sha1').update(JSON.stringify(body)).digest('hex')
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
+    if (hit && Date.now() - hit.fetchedAt.getTime() < SEARCH_CACHE_TTL_MS) {
+      return { ...(hit.data as any), warnings }
+    }
+  } catch {
+    // cache is best-effort; fall through to the live call
+  }
+
   // The vendor occasionally has slow spells; one retry on timeout avoids
   // needlessly falling back to the local index (normal responses are ~5s).
   const doFetch = () =>
@@ -161,7 +191,7 @@ export async function clubSearch(opts: ClubSearchOptions) {
     score: a.similarity_score ?? null,
   }))
 
-  return {
+  const shaped = {
     results,
     total: data?.total ?? results.length,
     credits_left: data?.credits_left ?? null,
@@ -170,6 +200,21 @@ export async function clubSearch(opts: ClubSearchOptions) {
     cache_hits: 0,
     live_calls: 1,
   }
+
+  if (results.length > 0) {
+    try {
+      const { prisma } = await import('@/lib/prisma')
+      await prisma.clubSearchCache.upsert({
+        where: { key: cacheKey },
+        create: { key: cacheKey, data: shaped },
+        update: { data: shaped, fetchedAt: new Date() },
+      })
+    } catch {
+      // best-effort
+    }
+  }
+
+  return shaped
 }
 
 // ---------------------------------------------------------------------------
@@ -399,4 +444,81 @@ export async function clubEnrich(platform: ClubPlatform, handle: string) {
   enrichCache.set(cacheKey, detail)
   await writeDbEnrichCache(platform, handle, detail, contactEmailCache.get(cacheKey) ?? null)
   return detail
+}
+
+// ---------------------------------------------------------------------------
+// Full analytics (audience demographics) — same 1-credit enrich call but with
+// include_audience_data: true. Cached under a "#analytics" pseudo-handle in
+// the same 30-day table so repeat views never re-bill upstream.
+// Notable-user and lookalike lists are dropped: large, and they leak other
+// creators' identities to brands for free.
+// ---------------------------------------------------------------------------
+
+const ANALYTICS_CACHE_SUFFIX = '#analytics'
+
+function parseAudienceSection(section: any) {
+  const data = section?.audience_followers?.data
+  if (!data || typeof data !== 'object') return null
+  const pick = (list: any, n: number) =>
+    Array.isArray(list) ? list.slice(0, n) : []
+  return {
+    genders: pick(data.audience_genders, 4),
+    ages: pick(data.audience_ages, 8),
+    genders_per_age: pick(data.audience_genders_per_age, 8),
+    languages: pick(data.audience_languages, 6),
+    countries: pick(data.audience_geo?.countries, 6),
+    notable_users_ratio: data.notable_users_ratio ?? null,
+  }
+}
+
+export async function clubAnalytics(platform: ClubPlatform, handle: string) {
+  const cacheHandle = `${handle.toLowerCase()}${ANALYTICS_CACHE_SUFFIX}`
+  const cacheKey = `${platform}:${cacheHandle}`
+  const inMemory = enrichCache.get(cacheKey)
+  if (inMemory) return inMemory
+
+  const dbCached = await readDbEnrichCache(platform, cacheHandle)
+  if (dbCached) {
+    enrichCache.set(cacheKey, dbCached.detail)
+    return dbCached.detail
+  }
+
+  const res = await fetch(`${BASE}/public/v1/creators/enrich/handle/full/`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      handle,
+      platform,
+      include_lookalikes: false,
+      include_audience_data: true,
+    }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(90000),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const detail =
+      data?.detail || data?.message || `Influencers Club analytics failed (${res.status})`
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+  }
+  const r = data?.result
+  if (!r) throw new Error('No analytics available for this creator')
+
+  const main = r[platform] || {}
+  const analytics = {
+    platform,
+    handle,
+    audience: parseAudienceSection(main.audience),
+    avg_views: main.avg_views ?? null,
+    avg_likes: main.avg_likes ?? null,
+    avg_comments: main.avg_comments ?? null,
+    has_brand_deals: r.has_brand_deals ?? null,
+    income: main.income ?? null,
+    follower_growth: main.creator_follower_growth ?? null,
+    posting_frequency_recent_months: main.posting_frequency_recent_months ?? null,
+  }
+
+  enrichCache.set(cacheKey, analytics)
+  await writeDbEnrichCache(platform, cacheHandle, analytics, null)
+  return analytics
 }

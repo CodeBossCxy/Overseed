@@ -1630,6 +1630,7 @@ export const translations = {
         contactMsgPlaceholder: 'Introduce your brand and describe the collaboration you have in mind…',
         allCountries: 'All countries',
         viewDetails: 'View details',
+        dataAttribution: 'Creator data provided by Influencers Club',
       },
     },
     help: {
@@ -4133,6 +4134,7 @@ export const translations = {
         contactMsgPlaceholder: '介绍您的品牌，并描述您期望的合作方式…',
         allCountries: '全部国家',
         viewDetails: '查看详情',
+        dataAttribution: '达人数据由 Influencers Club 提供',
       },
     },
     help: {

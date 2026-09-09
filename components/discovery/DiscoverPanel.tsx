@@ -159,12 +159,46 @@ export default function DiscoverPanel() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
+  // Full analytics (audience demographics) — separate paid fetch
+  const [analytics, setAnalytics] = useState<any | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null)
+  const [analyticsBlocked, setAnalyticsBlocked] = useState(false)
+
+  const loadAnalytics = async () => {
+    if (!detailFor?.handle || analyticsLoading) return
+    setAnalyticsError(null)
+    setAnalyticsBlocked(false)
+    setAnalyticsLoading(true)
+    try {
+      const qs = new URLSearchParams({
+        platform: detailFor.platform,
+        handle: detailFor.handle,
+      })
+      const res = await fetch(`/api/discovery/club-analytics?${qs}`)
+      window.dispatchEvent(new Event('credits:refresh'))
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setAnalyticsBlocked(QUOTA_CODES.includes(data?.code))
+        throw new Error(data?.message || 'Failed to load analytics')
+      }
+      setAnalytics(data)
+    } catch (err: any) {
+      setAnalyticsError(err.message || 'Failed to load analytics')
+    } finally {
+      setAnalyticsLoading(false)
+    }
+  }
+
   const openDetail = async (creator: DiscoveredCreator) => {
     if (!creator.handle) return
     setDetailFor(creator)
     setDetail(null)
     setDetailError(null)
     setDetailBlocked(false)
+    setAnalytics(null)
+    setAnalyticsError(null)
+    setAnalyticsBlocked(false)
     setDetailLoading(true)
     try {
       const qs = new URLSearchParams({
@@ -558,7 +592,11 @@ export default function DiscoverPanel() {
           {!isLoading && creators.length === 0 ? (
             <div className="workspace-glass-card rounded-2xl p-8 text-center text-gray-500">{d.noResults}</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity ${
+                isLoading ? 'opacity-40 pointer-events-none' : ''
+              }`}
+            >
               {creators.map((creator) => (
                 // TEMP: club results open the detail popup on click
                 <div
@@ -643,6 +681,10 @@ export default function DiscoverPanel() {
               </button>
             </div>
           )}
+
+          <p className="mt-8 text-center text-xs text-gray-400">
+            {d.dataAttribution}
+          </p>
         </>
       )}
 
@@ -669,15 +711,15 @@ export default function DiscoverPanel() {
                 ×
               </button>
             </div>
-            <div className="px-7 -mt-10 flex items-end gap-4 flex-shrink-0">
-              <div className="w-20 h-20 rounded-full ring-4 ring-white bg-gray-200 overflow-hidden shadow-md flex-shrink-0">
+            <div className="px-7 flex items-start gap-4 flex-shrink-0">
+              <div className="relative z-10 w-20 h-20 -mt-10 rounded-full ring-4 ring-white bg-gray-200 overflow-hidden shadow-md flex-shrink-0">
                 <CreatorAvatar
                   url={detail?.avatar_url || detailFor.avatar_url || null}
                   name={detailFor.display_name || detailFor.handle || '?'}
                   textSize="text-2xl"
                 />
               </div>
-              <div className="flex-1 min-w-0 pb-1">
+              <div className="flex-1 min-w-0 pt-2">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold text-gray-900 truncate">
                     {detail?.name || detailFor.display_name || detailFor.handle}
@@ -816,13 +858,124 @@ export default function DiscoverPanel() {
                       </div>
                     </div>
                   )}
+
+                  {/* Full audience analytics (separate paid fetch) */}
+                  <div className="mt-6">
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
+                      Audience analytics
+                    </p>
+                    {!analytics && (
+                      <>
+                        <button
+                          onClick={loadAnalytics}
+                          disabled={analyticsLoading}
+                          className="w-full px-4 py-2.5 border border-primary-200 bg-primary-50 text-primary-700 rounded-xl text-sm font-semibold hover:bg-primary-100 transition disabled:opacity-50"
+                        >
+                          {analyticsLoading ? 'Loading analytics…' : 'View full analytics'}
+                        </button>
+                        {analyticsError && (
+                          <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                            {analyticsError}
+                            {analyticsBlocked && <> <PlansCta /></>}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {analytics && (
+                      <div className="space-y-4">
+                        {/* Averages */}
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { label: 'Avg views', value: analytics.avg_views },
+                            { label: 'Avg likes', value: analytics.avg_likes },
+                            { label: 'Avg comments', value: analytics.avg_comments },
+                          ]
+                            .filter((s) => s.value != null)
+                            .map((s) => (
+                              <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2.5">
+                                <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
+                                <p className="text-base font-bold text-gray-900 mt-0.5">
+                                  {formatFollowers(Math.round(Number(s.value)), locale)}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                        {analytics.audience ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {[
+                              {
+                                title: 'Gender',
+                                rows: (analytics.audience.genders || []).map((g: any) => ({
+                                  label: g.code === 'MALE' ? 'Male' : g.code === 'FEMALE' ? 'Female' : g.code,
+                                  weight: g.weight,
+                                })),
+                              },
+                              {
+                                title: 'Age',
+                                rows: (analytics.audience.ages || []).map((a: any) => ({
+                                  label: a.code,
+                                  weight: a.weight,
+                                })),
+                              },
+                              {
+                                title: 'Top countries',
+                                rows: (analytics.audience.countries || []).map((c: any) => ({
+                                  label: c.name || c.code,
+                                  weight: c.weight,
+                                })),
+                              },
+                              {
+                                title: 'Languages',
+                                rows: (analytics.audience.languages || []).map((l: any) => ({
+                                  label: l.name || l.code,
+                                  weight: l.weight,
+                                })),
+                              },
+                            ]
+                              .filter((sec) => sec.rows.length > 0)
+                              .map((sec) => (
+                                <div key={sec.title} className="border border-gray-100 rounded-xl p-3">
+                                  <p className="text-xs font-semibold text-gray-500 mb-2">{sec.title}</p>
+                                  <div className="space-y-1.5">
+                                    {sec.rows.map((row: any) => (
+                                      <div key={row.label} className="flex items-center gap-2 text-xs">
+                                        <span className="w-20 truncate text-gray-600">{row.label}</span>
+                                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full bg-gradient-to-r from-primary-500 to-rose-400"
+                                            style={{ width: `${Math.min(100, Math.round((row.weight || 0) * 100))}%` }}
+                                          />
+                                        </div>
+                                        <span className="w-10 text-right tabular-nums text-gray-500">
+                                          {((row.weight || 0) * 100).toFixed(1)}%
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400">
+                            Audience demographics are not available for this creator.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
 
             {/* Footer actions */}
             {detail && (
-              <div className="flex items-center gap-3 px-7 py-4 border-t border-gray-100 flex-shrink-0">
+              <div className="px-7 py-4 border-t border-gray-100 flex-shrink-0">
+                {!detail.contactable && (
+                  <p className="mb-2 text-xs text-gray-400 text-center">
+                    No verified contact channel for this creator yet — reach out via their profile instead.
+                  </p>
+                )}
+                <div className="flex items-center gap-3">
                 <button
                   onClick={openContact}
                   disabled={!detail.contactable}
@@ -841,6 +994,7 @@ export default function DiscoverPanel() {
                     View profile ↗
                   </a>
                 )}
+                </div>
               </div>
             )}
           </div>

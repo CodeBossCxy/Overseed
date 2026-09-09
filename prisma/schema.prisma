@@ -879,6 +879,17 @@ model CreatorEnrichmentCache {
   @@map("creator_enrichment_cache")
 }
 
+// Short-TTL cache of club discovery search responses (key = hash of
+// platform+query+filters+page). Speeds up repeat searches and saves
+// vendor credits; rows past the TTL are ignored and replaced on write.
+model ClubSearchCache {
+  key       String   @id
+  data      Json
+  fetchedAt DateTime @default(now())
+
+  @@map("club_search_cache")
+}
+
 // ===========================================
 // BETA TEST
 // ===========================================

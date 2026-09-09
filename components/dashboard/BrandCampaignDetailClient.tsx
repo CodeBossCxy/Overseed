@@ -343,7 +343,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           </form>
           {error && <div className="mb-3 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>}
           <div className="flex items-center justify-between mb-3"><b>{loading ? 'Finding creators…' : `${creators.length} creators found`}</b><span className="text-sm text-[#7180ad]">Sort by: <b>Relevance</b></span></div>
-          <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-3">
+          <div className={`grid md:grid-cols-2 2xl:grid-cols-3 gap-3 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
             {creators.map(c => <article key={c.id} className="workspace-glass-card rounded-3xl p-5 min-h-64 flex flex-col">
               <div className="flex gap-3 items-center">{avatar(c)}<div className="min-w-0"><button onClick={() => openCreator(c)} className="font-bold truncate block max-w-full text-left hover:text-indigo-600">{c.display_name || c.handle || 'Creator'} <span className="text-indigo-500">●</span></button><p className="text-xs text-[#7581a5] truncate">@{c.handle?.replace(/^@/, '') || 'creator'}</p><span className="text-xs mt-1 inline-block px-2 py-0.5 rounded bg-white/50">{PLATFORM_LABEL[c.platform] || c.platform}</span></div></div>
               <div className="grid grid-cols-2 gap-4 mt-5"><div><b className="text-xl">{compact(c.follower_count)}</b><p className="text-xs text-[#7d88aa]">Followers</p></div><div><b className="text-xl">{c.engagement_rate == null ? '—' : `${Number(c.engagement_rate).toFixed(1)}%`}</b><p className="text-xs text-[#7d88aa]">Eng. rate</p></div></div>

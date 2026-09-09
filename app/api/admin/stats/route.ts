@@ -23,6 +23,7 @@ export async function GET() {
     aiUsageMonthly,
     recentAiLogs,
     clubCredits,
+    clubUsageRaw,
   ] = await Promise.all([
     // All users with their AI usage
     prisma.user.findMany({
@@ -67,6 +68,17 @@ export async function GET() {
     }),
     // Influencers Club remaining balance (null if unconfigured/unreachable)
     clubCreditsLeft(),
+    // Per-user usage of club-backed features (profile views, analytics,
+    // outreach). Counts platform charges — cache hits don't re-bill upstream,
+    // so this is an upper bound on actual club credits consumed per user.
+    prisma.creditLedgerEntry.groupBy({
+      by: ['userId', 'featureKey'],
+      where: {
+        type: 'DEDUCTION',
+        featureKey: { in: ['profile_view', 'analytics', 'outreach'] },
+      },
+      _count: true,
+    }),
   ])
 
   // Merge AI usage into user data
@@ -89,7 +101,36 @@ export async function GET() {
     },
   }))
 
+  // userId -> { profileViews, analytics, outreach }
+  const userById = new Map(users.map((u) => [u.id, u]))
+  const clubUsageByUser = new Map<
+    string,
+    { profileViews: number; analytics: number; outreach: number }
+  >()
+  for (const row of clubUsageRaw) {
+    const entry =
+      clubUsageByUser.get(row.userId) ||
+      { profileViews: 0, analytics: 0, outreach: 0 }
+    if (row.featureKey === 'profile_view') entry.profileViews += row._count
+    else if (row.featureKey === 'analytics') entry.analytics += row._count
+    else if (row.featureKey === 'outreach') entry.outreach += row._count
+    clubUsageByUser.set(row.userId, entry)
+  }
+  const clubUsage = Array.from(clubUsageByUser.entries())
+    .map(([id, counts]) => {
+      const u = userById.get(id)
+      return {
+        userId: id,
+        email: u?.email ?? id,
+        name: u?.name ?? null,
+        ...counts,
+        total: counts.profileViews + counts.analytics + counts.outreach,
+      }
+    })
+    .sort((a, b) => b.total - a.total)
+
   return NextResponse.json({
+    clubUsage,
     overview: {
       totalUsers,
       proUsers,
