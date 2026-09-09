@@ -3,14 +3,11 @@
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
-export function PlatformIcon({ name }: { name: string }) {
-  const key = name.toLowerCase()
-  if (key.includes('instagram')) return <span className="w-5 h-5 rounded-md bg-gradient-to-tr from-amber-400 via-pink-500 to-purple-600 flex items-center justify-center text-[9px] text-white font-bold">IG</span>
-  if (key.includes('tiktok')) return <span className="w-5 h-5 rounded-md bg-black flex items-center justify-center text-[9px] text-white font-bold">TT</span>
-  if (key.includes('youtube')) return <span className="w-5 h-5 rounded-md bg-red-600 flex items-center justify-center text-[9px] text-white font-bold">▶</span>
-  return <span className="w-5 h-5 rounded-md bg-gray-300 flex items-center justify-center text-[9px] text-white font-bold">{name.charAt(0).toUpperCase()}</span>
-}
+import PlatformIcon from '@/components/PlatformIcon'
+
+export { PlatformIcon }
 
 interface CampaignRowCardProps {
   campaign: any
@@ -27,7 +24,7 @@ export default function CampaignRowCard({ campaign: c, saved = false, onToggleSa
   const image = c.images?.[0] || c.media?.[0]?.mediaUrl || c.brand?.logoUrl
   const paid = c.compensationType === 'PAID' || c.compensationType === 'PAID_PLUS_GIFT'
   const price = paid && (c.paymentMin != null || c.paymentMax != null)
-    ? [c.paymentMin, c.paymentMax].filter((v: any) => v != null).map((v: any) => `$${Number(v).toLocaleString()}`).join(' - ')
+    ? [c.paymentMin, c.paymentMax].filter((v: any) => v != null).map((v: any) => `$${formatNumber(Number(v), locale)}`).join(' - ')
     : s.productOnly
   const compensation = ({ PAID: s.paid, GIFTED: s.gifted, PAID_PLUS_GIFT: s.paidPlusGift, AFFILIATE: s.affiliate, NEGOTIABLE: s.negotiable } as Record<string,string>)[c.compensationType] || c.compensationType
   const platforms = (c.platforms || []).slice(0, 3)

@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     const campaigns = await prisma.campaign.findMany({
@@ -25,7 +25,7 @@ export async function GET() {
     return NextResponse.json({ campaigns })
   } catch (error) {
     console.error('Error fetching campaigns for review:', error)
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ message: 'Internal server error', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }
 
@@ -34,20 +34,20 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     const { campaignId, action, reviewNote } = await req.json()
     if (!campaignId || !['approve', 'request_changes'].includes(action)) {
-      return NextResponse.json({ message: 'campaignId and a valid action are required' }, { status: 400 })
+      return NextResponse.json({ message: 'campaignId and a valid action are required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
     if (action === 'request_changes' && !reviewNote?.trim()) {
-      return NextResponse.json({ message: 'A review note is required when requesting changes' }, { status: 400 })
+      return NextResponse.json({ message: 'A review note is required when requesting changes', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } })
     if (!campaign) {
-      return NextResponse.json({ message: 'Campaign not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Campaign not found', code: 'NOT_FOUND' }, { status: 404 })
     }
 
     const to: CampaignStatus = action === 'approve' ? 'ACTIVE' : 'DRAFT'
@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest) {
       assertTransition(Campaign, 'campaign', campaign.status as CampaignStatus, to)
     } catch {
       return NextResponse.json(
-        { message: `Campaign is ${campaign.status}, not awaiting review` },
+        { message: `Campaign is ${campaign.status}, not awaiting review`, code: 'INVALID_STATUS_TRANSITION' },
         { status: 422 }
       )
     }
@@ -72,6 +72,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ campaign: updated })
   } catch (error) {
     console.error('Error reviewing campaign:', error)
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ message: 'Internal server error', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }

@@ -7,6 +7,7 @@ import ApplicationStatus from '@/components/applications/ApplicationStatus'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 
 interface ApplicationDetail {
@@ -117,9 +118,9 @@ export default function ApplicationDetailPage() {
     const max = app.campaign.paymentMax ? Number(app.campaign.paymentMax) : null
 
     if (type === 'PAID' || type === 'PAID_PLUS_GIFT') {
-      if (min && max) return `$${min.toLocaleString()} - $${max.toLocaleString()}`
-      if (max) return `${t.campaign.upTo} $${max.toLocaleString()}`
-      if (min) return `${t.campaign.from} $${min.toLocaleString()}`
+      if (min && max) return `$${formatNumber(min, locale)} - $${formatNumber(max, locale)}`
+      if (max) return `${t.campaign.upTo} $${formatNumber(max, locale)}`
+      if (min) return `${t.campaign.from} $${formatNumber(min, locale)}`
     }
 
     const labels: Record<string, string> = {
@@ -238,7 +239,7 @@ export default function ApplicationDetailPage() {
                 <p className="text-sm text-gray-800">
                   {application.socialAccount.platform.name} — @{application.socialAccount.username}
                   <span className="text-gray-500 ml-1">
-                    ({application.socialAccount.followerCount.toLocaleString()} followers)
+                    ({formatNumber(application.socialAccount.followerCount, locale)} followers)
                   </span>
                 </p>
               </div>
@@ -249,7 +250,7 @@ export default function ApplicationDetailPage() {
               <div className="mb-4">
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.applications.detail.yourProposedRate}</p>
                 <p className="text-lg font-semibold text-primary-600">
-                  ${Number(application.proposedRate).toLocaleString()}
+                  ${formatNumber(Number(application.proposedRate), locale)}
                 </p>
               </div>
             )}

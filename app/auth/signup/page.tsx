@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { localizeApiError } from '@/lib/i18n/api-error'
 
 type Step = 'form' | 'business-info' | 'otp'
 
@@ -85,7 +86,7 @@ export default function SignUpPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || t.errors?.somethingWrong)
+        setError(localizeApiError(t, data, t.errors?.somethingWrong))
         return
       }
 
@@ -168,7 +169,7 @@ export default function SignUpPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || t.auth.otp.errorVerification)
+        setError(localizeApiError(t, data, t.auth.otp.errorVerification))
         return
       }
 
@@ -207,7 +208,7 @@ export default function SignUpPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || t.errors?.failedToResend)
+        setError(localizeApiError(t, data, t.errors?.failedToResend))
         return
       }
 
@@ -233,7 +234,7 @@ export default function SignUpPage() {
       })
       const data = await res.json()
       if (!data.valid) {
-        setError(data.error || 'Invalid invite code')
+        setError(localizeApiError(t, data, 'Invalid invite code'))
         return false
       }
       return true
@@ -589,7 +590,7 @@ export default function SignUpPage() {
                     onChange={(e) => setName(e.target.value)}
                     required
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                    placeholder="John Doe"
+                    placeholder={t.auth.signup.fullNamePlaceholder}
                   />
                 </div>
 

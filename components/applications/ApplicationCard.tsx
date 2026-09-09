@@ -5,6 +5,7 @@ import Link from 'next/link'
 import ApplicationStatus from './ApplicationStatus'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 interface ApplicationCardProps {
   application: {
@@ -126,7 +127,7 @@ export default function ApplicationCard({
               )}
               {application.proposedRate && (
                 <span>
-                  Proposed rate: ${Number(application.proposedRate).toLocaleString()}
+                  Proposed rate: ${formatNumber(Number(application.proposedRate), locale)}
                 </span>
               )}
             </div>

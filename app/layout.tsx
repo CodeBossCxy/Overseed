@@ -47,11 +47,14 @@ export const metadata: Metadata = {
     description: 'AI-powered cross-border creator collaboration platform. Launch campaigns, discover creators, manage partnerships.',
     type: 'website',
     siteName: 'Overseed',
+    url: 'https://www.overseed.net',
+    images: [{ url: '/pink_logo_with_txt.png', alt: 'Overseed' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Overseed - Connect Brands with Creators',
     description: 'AI-powered cross-border creator collaboration platform.',
+    images: ['/pink_logo_with_txt.png'],
   },
   robots: {
     index: true,
@@ -73,15 +76,28 @@ export default async function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'Organization',
-              name: 'Overseed',
-              url: 'https://www.overseed.net',
-              logo: 'https://www.overseed.net/icon-pink.png',
-              description:
-                'AI-powered cross-border creator collaboration platform connecting brands with creators.',
-            }),
+            __html: JSON.stringify([
+              {
+                '@context': 'https://schema.org',
+                '@type': 'Organization',
+                '@id': 'https://www.overseed.net/#organization',
+                name: 'Overseed',
+                alternateName: ['Overseed.net', 'overseed'],
+                url: 'https://www.overseed.net',
+                logo: 'https://www.overseed.net/icon-pink.png',
+                description:
+                  'AI-powered cross-border creator collaboration platform connecting brands with creators.',
+              },
+              {
+                '@context': 'https://schema.org',
+                '@type': 'WebSite',
+                '@id': 'https://www.overseed.net/#website',
+                name: 'Overseed',
+                alternateName: 'Overseed.net',
+                url: 'https://www.overseed.net',
+                publisher: { '@id': 'https://www.overseed.net/#organization' },
+              },
+            ]),
           }}
         />
       </head>

@@ -891,7 +891,7 @@ export default function DiscoverPanel() {
                   onChange={(e) => setContactMsg(e.target.value)}
                   rows={6}
                   maxLength={2000}
-                  placeholder="Introduce your brand and describe the collaboration you have in mind…"
+                  placeholder={d.contactMsgPlaceholder}
                   className="mt-4 w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
                 />
                 <p className="text-right text-[11px] text-gray-400 mt-1">

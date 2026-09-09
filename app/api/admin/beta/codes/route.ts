@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const codes = await prisma.betaInviteCode.findMany({
@@ -31,7 +31,7 @@ export async function GET() {
   } catch (error) {
     console.error('Failed to fetch beta codes:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch codes' },
+      { error: 'Failed to fetch codes', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const { count = 1, maxUses = 1, note, expiresInDays } = await request.json()
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Failed to generate beta codes:', error)
     return NextResponse.json(
-      { error: 'Failed to generate codes' },
+      { error: 'Failed to generate codes', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
@@ -75,7 +75,7 @@ export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const { id, isActive } = await request.json()
@@ -89,7 +89,7 @@ export async function PATCH(request: Request) {
   } catch (error) {
     console.error('Failed to update beta code:', error)
     return NextResponse.json(
-      { error: 'Failed to update code' },
+      { error: 'Failed to update code', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

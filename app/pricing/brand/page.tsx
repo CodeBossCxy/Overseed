@@ -5,6 +5,9 @@ import { createPortal } from 'react-dom'
 import { useSession } from 'next-auth/react'
 import RoleShell from '@/components/workspace/RoleShell'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { formatNumber } from '@/lib/i18n/formatNumber'
+import { localizeApiError } from '@/lib/i18n/api-error'
+import CreditHistoryPanel from '@/components/credits/CreditHistoryPanel'
 import { perCreditYuan, formatPackName } from '@/lib/pricing-display'
 
 interface PlanRow {
@@ -69,7 +72,7 @@ const AI_FEATURES = ['chat_standard', 'chat_advanced', 'image'] as const
 
 export default function MyPlanPage() {
   const { data: session } = useSession()
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const m = t.myPlan
 
   const tier = (session?.user as any)?.subscriptionTier || 'FREE'
@@ -142,7 +145,7 @@ export default function MyPlanPage() {
         window.location.href = data.url
       } else {
         const data = await res.json()
-        alert(data.error || t.errors.somethingWrong)
+        alert(localizeApiError(t, data, t.errors.somethingWrong))
       }
     } catch {
       alert(t.errors.somethingWrong)
@@ -167,7 +170,7 @@ export default function MyPlanPage() {
         setUpgradeError(packId)
       } else {
         const data = await res.json()
-        alert(data.error || t.errors.somethingWrong)
+        alert(localizeApiError(t, data, t.errors.somethingWrong))
       }
     } catch {
       alert(t.errors.somethingWrong)
@@ -187,16 +190,16 @@ export default function MyPlanPage() {
       const pages = Math.floor(total / price)
       const creators = pages * 10
       if (creators <= 0) return '—'
-      return mm.upToNCreators.replace('{n}', creators.toLocaleString())
+      return mm.upToNCreators.replace('{n}', formatNumber(creators, locale))
     }
     if (key === 'profile_view' || key === 'analytics') {
       const n = Math.floor(total / price)
       if (n <= 0) return '—'
-      return mm.upToNCreators.replace('{n}', n.toLocaleString())
+      return mm.upToNCreators.replace('{n}', formatNumber(n, locale))
     }
     const n = Math.floor(total / price)
     if (n <= 0) return '—'
-    return mm.upToN.replace('{n}', n.toLocaleString())
+    return mm.upToN.replace('{n}', formatNumber(n, locale))
   }
 
   const campaignSignupRows = [
@@ -372,7 +375,7 @@ export default function MyPlanPage() {
                     {plan.tier === 'FREE' ? (
                       <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 mb-4 self-start">
                         <span className="text-sm font-bold text-blue-700">
-                          {plan.baseCredits} credits{m.perMonthShort}
+                          {plan.baseCredits} {m.creditsWord}{m.perMonthShort}
                         </span>
                       </div>
                     ) : (
@@ -382,7 +385,7 @@ export default function MyPlanPage() {
                           <span className="font-semibold text-amber-500">
                             + {plan.bonusCredits} {m.bonusWord}
                           </span>
-                          {' '}= {total} credits{m.perMonthShort}
+                          {' '}= {total} {m.creditsWord}{m.perMonthShort}
                         </span>
                       </div>
                     )}
@@ -646,12 +649,12 @@ export default function MyPlanPage() {
                           <span className="font-semibold text-amber-500">
                             + {pack.bonusCredits} {m.bonusWord}
                           </span>
-                          {' '}= {totalCredits} credits
+                          {' '}= {totalCredits} {m.creditsWord}
                         </span>
                       </div>
                     ) : (
                       <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 self-start">
-                        <span className="text-sm font-bold text-blue-700">{pack.baseCredits} credits</span>
+                        <span className="text-sm font-bold text-blue-700">{pack.baseCredits} {m.creditsWord}</span>
                       </div>
                     )}
                     <button
@@ -682,6 +685,9 @@ export default function MyPlanPage() {
           </div>
           <p className="text-sm text-gray-400 mt-3">{m.purchasedCreditsNote}</p>
         </div>
+
+        {/* ---- Credit history ---- */}
+        <CreditHistoryPanel />
       </div>
     </RoleShell>
   )

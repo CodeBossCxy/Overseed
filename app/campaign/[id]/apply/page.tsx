@@ -1,5 +1,7 @@
 import RoleShell from '@/components/workspace/RoleShell'
 import ApplicationForm from '@/components/applications/ApplicationForm'
+import { ApplyBackLink, ApplyHeading, CompleteProfileNotice } from './ApplyStrings'
+import { LocaleNumber } from '@/components/LocaleNumber'
 import CompensationBadge from '@/components/campaigns/CompensationBadge'
 import CategoryName from '@/components/campaigns/CategoryName'
 import { LocaleDate } from '@/components/LocaleDate'
@@ -8,7 +10,6 @@ import { prisma } from '@/lib/prisma'
 import { notFound, redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import Link from 'next/link'
 
 export default async function ApplyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -33,15 +34,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
     return (
       <RoleShell>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Link
-            href={`/campaign/${id}`}
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Campaign
-          </Link>
+          <ApplyBackLink campaignId={id} />
           <div className="bg-white rounded-lg shadow-md">
             <UpgradePrompt feature="apply" />
           </div>
@@ -125,43 +118,16 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
     <RoleShell>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back link */}
-        <Link
-          href={`/campaign/${id}`}
-          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to Campaign
-        </Link>
+        <ApplyBackLink campaignId={id} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Application Form */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h1 className="text-2xl font-bold mb-2">Apply to Campaign</h1>
-              <p className="text-gray-600 mb-6">
-                Submit your application for &ldquo;{campaign.title}&rdquo;
-              </p>
+              <ApplyHeading campaignTitle={campaign.title} />
 
               {!influencerProfile ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-lg font-semibold mb-2">Complete Your Profile First</h2>
-                  <p className="text-gray-600 mb-4">
-                    You need to set up your creator profile before applying to campaigns.
-                  </p>
-                  <Link
-                    href="/dashboard/influencer/profile"
-                    className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-medium"
-                  >
-                    Set Up Profile
-                  </Link>
-                </div>
+                <CompleteProfileNotice />
               ) : (
                 <ApplicationForm
                   campaignId={id}
@@ -250,8 +216,8 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
                   <div className="space-y-1">
                     {campaign.followerRequirements.map((req, i) => (
                       <p key={i} className="text-xs text-gray-700">
-                        {req.platform.name}: {req.minFollowers.toLocaleString()}
-                        {req.maxFollowers ? ` - ${req.maxFollowers.toLocaleString()}` : '+'} followers
+                        {req.platform.name}: <LocaleNumber value={req.minFollowers} />
+                        {req.maxFollowers ? <> - <LocaleNumber value={req.maxFollowers} /></> : '+'} followers
                       </p>
                     ))}
                   </div>

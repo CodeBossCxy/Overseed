@@ -8,6 +8,7 @@ import CompensationBadge from './CompensationBadge'
 import CampaignStats from './CampaignStats'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 interface CampaignDetailProps {
   campaign: {
@@ -158,7 +159,7 @@ export default function CampaignDetail({
                 </div>
                 <h1 className="text-2xl md:text-3xl font-bold mb-2">{campaign.title}</h1>
                 <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                  <span>{campaign.viewCount.toLocaleString()} {t.campaign.views_count}</span>
+                  <span>{formatNumber(campaign.viewCount, locale)} {t.campaign.views_count}</span>
                   <span>{t.campaign.posted} {formatDate(campaign.createdAt, locale)}</span>
                   {campaign.deadline && (
                     <span className={isDeadlinePassed ? 'text-red-600' : 'text-orange-600'}>
@@ -231,8 +232,8 @@ export default function CampaignDetail({
                     {campaign.followerRequirements.map((req, i) => (
                       <div key={i} className="text-sm">
                         <span className="font-medium">{req.platform.name}:</span>{' '}
-                        {req.minFollowers.toLocaleString()}
-                        {req.maxFollowers ? ` - ${req.maxFollowers.toLocaleString()}` : '+'} {t.campaign.followers}
+                        {formatNumber(req.minFollowers, locale)}
+                        {req.maxFollowers ? ` - ${formatNumber(req.maxFollowers, locale)}` : '+'} {t.campaign.followers}
                         {req.minEngagementRate && ` (min ${req.minEngagementRate}% ${t.campaign.engagement})`}
                       </div>
                     ))}
@@ -330,7 +331,7 @@ export default function CampaignDetail({
             />
             {campaign.giftValue && (
               <p className="text-sm text-gray-500 mt-2">
-                {t.campaign.giftValue} ${Number(campaign.giftValue).toLocaleString()}
+                {t.campaign.giftValue} ${formatNumber(Number(campaign.giftValue), locale)}
               </p>
             )}
             {campaign.requiresProductPurchase && (
@@ -338,7 +339,7 @@ export default function CampaignDetail({
                 <p className="font-medium text-yellow-800">{t.campaign.requiresProductPurchase}</p>
                 {campaign.productPurchaseAmount && (
                   <p className="text-yellow-700">
-                    ${Number(campaign.productPurchaseAmount).toLocaleString()}
+                    ${formatNumber(Number(campaign.productPurchaseAmount), locale)}
                     {campaign.isProductReimbursed && ` ${t.campaign.reimbursed}`}
                   </p>
                 )}

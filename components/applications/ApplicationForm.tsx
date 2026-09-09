@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 interface SocialAccount {
   id: string
@@ -27,7 +28,7 @@ export default function ApplicationForm({
   isNegotiable,
 }: ApplicationFormProps) {
   const router = useRouter()
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -119,7 +120,7 @@ export default function ApplicationForm({
                   <span className="font-medium">{account.platform.name}</span>
                   <span className="text-gray-500 ml-2">@{account.username}</span>
                   <span className="text-gray-400 ml-2">
-                    ({account.followerCount.toLocaleString()} followers)
+                    ({formatNumber(account.followerCount, locale)} followers)
                   </span>
                 </div>
               </label>

@@ -17,10 +17,40 @@ async function requireAdmin() {
   return session
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (!(await requireAdmin())) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
+
+  const { searchParams } = new URL(req.url)
+  if (searchParams.get('view') === 'ledger') {
+    const email = searchParams.get('email')?.trim().toLowerCase()
+    if (!email) {
+      return NextResponse.json({ error: 'email query param required', code: 'VALIDATION_ERROR' }, { status: 400 })
+    }
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { id: true, email: true, subscriptionTier: true },
+    })
+    if (!user) {
+      return NextResponse.json({ error: 'No user with that email', code: 'NOT_FOUND' }, { status: 404 })
+    }
+    const [lots, ledger] = await Promise.all([
+      prisma.creditLot.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, bucket: true, source: true, credits: true, remaining: true, expiresAt: true, reference: true, createdAt: true },
+      }),
+      prisma.creditLedgerEntry.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        select: { id: true, delta: true, type: true, bucket: true, featureKey: true, referenceId: true, balanceAfter: true, note: true, createdAt: true },
+      }),
+    ])
+    return NextResponse.json({ user, lots, ledger })
+  }
+
   const [plans, packs, prices] = await Promise.all([
     prisma.planConfig.findMany({ orderBy: { priceMonthly: 'asc' } }),
     prisma.creditPackConfig.findMany({ orderBy: { sortOrder: 'asc' } }),
@@ -31,7 +61,7 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   if (!(await requireAdmin())) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
   const { kind, data } = await req.json().catch(() => ({}))
   try {
@@ -62,17 +92,17 @@ export async function PATCH(req: NextRequest) {
     } else if (kind === 'price' && data?.featureKey) {
       const credits = Number(data.credits)
       if (!Number.isInteger(credits) || credits < 0) {
-        return NextResponse.json({ error: 'credits must be a non-negative integer' }, { status: 400 })
+        return NextResponse.json({ error: 'credits must be a non-negative integer', code: 'VALIDATION_ERROR' }, { status: 400 })
       }
       await prisma.creditPriceConfig.update({
         where: { featureKey: data.featureKey },
         data: { credits },
       })
     } else {
-      return NextResponse.json({ error: 'Invalid kind/data' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid kind/data', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Update failed' }, { status: 400 })
+    return NextResponse.json({ error: e?.message || 'Update failed', code: 'SERVER_ERROR' }, { status: 400 })
   }
   invalidateWalletConfigCache()
   return NextResponse.json({ ok: true })
@@ -81,19 +111,19 @@ export async function PATCH(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await requireAdmin()
   if (!session) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
   const { email, credits, note, validityMonths } = await req.json().catch(() => ({}))
   const amount = Number(credits)
   if (!email || !Number.isInteger(amount) || amount <= 0 || !note?.trim()) {
     return NextResponse.json(
-      { error: 'email, positive integer credits, and a note are required' },
+      { error: 'email, positive integer credits, and a note are required', code: 'VALIDATION_ERROR' },
       { status: 400 },
     )
   }
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } })
   if (!user) {
-    return NextResponse.json({ error: 'No user with that email' }, { status: 404 })
+    return NextResponse.json({ error: 'No user with that email', code: 'NOT_FOUND' }, { status: 404 })
   }
   const months = Number.isInteger(Number(validityMonths)) && Number(validityMonths) > 0
     ? Number(validityMonths)

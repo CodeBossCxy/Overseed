@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }
 
   const now = new Date()

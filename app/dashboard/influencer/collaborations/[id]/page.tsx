@@ -8,6 +8,7 @@ import StatusBadge from '@/components/StatusBadge'
 import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 // Creator Manage Collaboration per spec 4.4.4 — four areas: Overview (locked
 // terms + accept/decline), Deliverables & Submission (6-step progress, draft
@@ -215,7 +216,7 @@ export default function CreatorManageCollaborationPage() {
           >
             {term(c.deliverables, collab.deliverables)}
             {term(c.compensation, [
-              collab.fee != null ? `${collab.currency} ${Number(collab.fee).toLocaleString()}` : null,
+              collab.fee != null ? `${collab.currency} ${formatNumber(Number(collab.fee), locale)}` : null,
               collab.productCompensation,
             ].filter(Boolean).join(' + ') || null)}
             {term(c.deadline, collab.deadline ? formatDate(collab.deadline, locale) : null)}
@@ -397,8 +398,8 @@ export default function CreatorManageCollaborationPage() {
                 </div>
                 <div>
                   {term(c.amountLabel, pay
-                    ? `$${Number(pay.creatorPayout ?? pay.amount).toLocaleString()}`
-                    : collab.fee != null ? `${collab.currency} ${Number(collab.fee).toLocaleString()}` : null)}
+                    ? `$${formatNumber(Number(pay.creatorPayout ?? pay.amount), locale)}`
+                    : collab.fee != null ? `${collab.currency} ${formatNumber(Number(collab.fee), locale)}` : null)}
                   {pay?.paidAt && term(c.securedOn, formatDate(pay.paidAt, locale))}
                   {pay?.releasedAt && term(c.releasedOn, formatDate(pay.releasedAt, locale))}
                   {pay && (

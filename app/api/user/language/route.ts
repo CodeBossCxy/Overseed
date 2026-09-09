@@ -7,12 +7,12 @@ export async function GET() {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const userId = (session.user as any).id
   if (!userId) {
-    return NextResponse.json({ error: 'User ID not found' }, { status: 400 })
+    return NextResponse.json({ error: 'User ID not found', code: 'UNAUTHORIZED' }, { status: 400 })
   }
 
   const user = await prisma.user.findUnique({
@@ -30,12 +30,12 @@ export async function PUT(request: Request) {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const userId = (session.user as any).id
   if (!userId) {
-    return NextResponse.json({ error: 'User ID not found' }, { status: 400 })
+    return NextResponse.json({ error: 'User ID not found', code: 'UNAUTHORIZED' }, { status: 400 })
   }
 
   const body = await request.json()
@@ -46,7 +46,7 @@ export async function PUT(request: Request) {
   if (language !== undefined) {
     if (language !== 'en' && language !== 'zh') {
       return NextResponse.json(
-        { error: 'Invalid language. Must be "en" or "zh"' },
+        { error: 'Invalid language. Must be "en" or "zh"', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -58,7 +58,7 @@ export async function PUT(request: Request) {
   }
 
   if (Object.keys(updateData).length === 0) {
-    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    return NextResponse.json({ error: 'No valid fields to update', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
 
   await prisma.user.update({

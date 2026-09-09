@@ -1,0 +1,46 @@
+// Machine-readable error code manifest.
+// All codes that appear in app/api/**/route.ts are listed here, deduplicated
+// and sorted alphabetically. Import this in client-side i18n to map codes to
+// user-facing messages; do NOT import it in route files (keep literals there).
+
+export const API_ERROR_CODES = [
+  'ALREADY_APPLIED',
+  'ALREADY_ON_PLAN',
+  'ALREADY_VERIFIED',
+  'APPLICATION_NOT_FOUND',
+  'ATTACHMENT_TOO_LARGE',
+  'ATTACHMENT_TOO_MANY',
+  'ATTACHMENT_TYPE',
+  'BANNED_CONTENT',
+  'CAMPAIGN_CLOSED',
+  'CAMPAIGN_DEADLINE_PASSED',
+  'CAMPAIGN_FULL',
+  'CAMPAIGN_NOT_FOUND',
+  'CONFLICT',
+  'DISCOVERY_QUOTA_EXCEEDED',
+  'FORBIDDEN',
+  'INSUFFICIENT_CREDITS',
+  'INVALID_INVITE_CODE',
+  'INVALID_OR_EXPIRED_CODE',
+  'INVALID_STATUS_TRANSITION',
+  'INVITE_CODE_EXHAUSTED',
+  'INVITE_CODE_EXPIRED',
+  'INVITE_CODE_REQUIRED',
+  'MESSAGE_LENGTH',
+  'NOT_FOUND',
+  'NOT_REACHABLE',
+  'OUTREACH_QUOTA_EXCEEDED',
+  'PAYMENT_REQUIRED',
+  'PLAN_REQUIRED',
+  'RATE_LIMITED',
+  'SERVER_ERROR',
+  'SOCIAL_VERIFICATION_REQUIRED',
+  'UNAUTHORIZED',
+  'UNSUPPORTED_PLATFORM',
+  'UPGRADE_REQUIRED',
+  'UPSTREAM_ERROR',
+  'VALIDATION_ERROR',
+  'VERIFICATION_REQUIRED',
+] as const
+
+export type ApiErrorCode = (typeof API_ERROR_CODES)[number]

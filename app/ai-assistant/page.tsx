@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import RoleShell from '@/components/workspace/RoleShell'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { localizeApiError } from '@/lib/i18n/api-error'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -238,7 +239,7 @@ export default function AIAssistantPage() {
         const content =
           data.code === 'INSUFFICIENT_CREDITS'
             ? `${t.aiAssistant.insufficientCredits} [${t.aiAssistant.buyCreditsCta}](/pricing/brand)`
-            : data.error || t.aiAssistant.errorGeneric
+            : localizeApiError(t, data, t.aiAssistant.errorGeneric)
         setMessages((prev) => [
           ...prev,
           { id: assistantId, role: 'assistant', content, timestamp: new Date() },

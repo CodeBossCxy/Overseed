@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { formatCompactNumber } from '@/lib/i18n/formatNumber'
 import { formatMonthYear } from '@/lib/i18n/formatDate'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 // Default scenic cover shown when the creator hasn't set their own.
 const DEFAULT_COVER_IMAGE = '/creator-cover-default.jpg'
@@ -51,12 +53,6 @@ interface InfluencerProfileProps {
     }>
     completedCampaigns?: number
   }
-}
-
-function compactCount(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
 }
 
 function platformTile(name: string) {
@@ -133,7 +129,7 @@ export default function InfluencerProfile({ influencer }: InfluencerProfileProps
   const stats = [
     {
       label: pv.totalFollowers,
-      value: accounts.reduce((sum, acc) => sum + acc.followerCount, 0).toLocaleString(),
+      value: formatNumber(accounts.reduce((sum, acc) => sum + acc.followerCount, 0), locale),
       icon: 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a3 3 0 11-3-3M3 8a3 3 0 103 3',
       tint: 'bg-blue-50 text-blue-500',
     },
@@ -283,7 +279,7 @@ export default function InfluencerProfile({ influencer }: InfluencerProfileProps
                     <p className="text-xs text-gray-500 truncate">@{acc.username}</p>
                   </div>
                   <div className="w-24 flex-shrink-0 hidden sm:block">
-                    <p className="text-sm font-semibold text-gray-900">{compactCount(acc.followerCount)}</p>
+                    <p className="text-sm font-semibold text-gray-900">{formatCompactNumber(acc.followerCount, locale)}</p>
                     <p className="text-xs text-gray-500">{pv.followers}</p>
                   </div>
                   <div className="w-24 flex-shrink-0 hidden sm:block">

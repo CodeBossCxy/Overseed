@@ -7,12 +7,12 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const userId = (session.user as any).id
   if (!userId) {
-    return NextResponse.json({ error: 'User ID not found' }, { status: 400 })
+    return NextResponse.json({ error: 'User ID not found', code: 'UNAUTHORIZED' }, { status: 400 })
   }
 
   const body = await request.json()
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
   if (viewMode !== 'BRAND' && viewMode !== 'INFLUENCER') {
     return NextResponse.json(
-      { error: 'Invalid viewMode. Must be BRAND or INFLUENCER' },
+      { error: 'Invalid viewMode. Must be BRAND or INFLUENCER', code: 'VALIDATION_ERROR' },
       { status: 400 }
     )
   }

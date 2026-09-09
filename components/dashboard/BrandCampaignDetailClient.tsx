@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 type Creator = {
   id: string; platform: string; handle: string | null; display_name: string | null
@@ -55,6 +56,7 @@ type CampaignStats = { total: number; pending: number; approved: number; rejecte
 
 export default function BrandCampaignDetailClient({ campaign: initialCampaign, stats }: { campaign: Campaign; stats: CampaignStats }) {
   const { t, locale } = useLanguage()
+  const d = t.brand.discover
   const router = useRouter()
   const [campaign, setCampaign] = useState(initialCampaign)
   const [showDelete, setShowDelete] = useState(false)
@@ -212,7 +214,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   }
 
   const queuedIds = useMemo(() => new Set(queue.map(q => q.externalCreatorId)), [queue])
-  const budget = campaign.paymentMin ? `$${Number(campaign.paymentMin).toLocaleString()}${campaign.paymentMax ? ` – $${Number(campaign.paymentMax).toLocaleString()}` : '+'}` : campaign.giftDescription || 'Negotiable'
+  const budget = campaign.paymentMin ? `$${formatNumber(Number(campaign.paymentMin), locale)}${campaign.paymentMax ? ` – $${formatNumber(Number(campaign.paymentMax), locale)}` : '+'}` : campaign.giftDescription || 'Negotiable'
   const cover = campaign.images?.[0]
 
   const campaignTabs = <div className="flex gap-2 mb-5 p-1.5 w-fit rounded-2xl bg-white/35 border border-white/50">
@@ -287,7 +289,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
 
         <aside className="workspace-glass-card rounded-3xl p-7 xl:sticky xl:top-5">
           <div className="flex justify-between"><b>Status</b><span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${campaign.status === 'DRAFT' ? 'bg-gray-100 text-gray-600 border border-dashed border-gray-400' : 'bg-violet-100 text-violet-700'}`}>● &nbsp;{statusLabel}</span></div>
-          <div className="mt-7"><p className="text-sm text-[#7180ad]">Compensation</p><div className="flex justify-between items-end mt-2"><b className="text-2xl capitalize">{campaign.compensationType.toLowerCase().replaceAll('_',' ')}</b>{campaign.giftValue && <div className="text-right"><p className="text-xs text-[#7180ad]">Gift value</p><b className="text-xl">${Number(campaign.giftValue).toLocaleString()}</b></div>}</div></div>
+          <div className="mt-7"><p className="text-sm text-[#7180ad]">Compensation</p><div className="flex justify-between items-end mt-2"><b className="text-2xl capitalize">{campaign.compensationType.toLowerCase().replaceAll('_',' ')}</b>{campaign.giftValue && <div className="text-right"><p className="text-xs text-[#7180ad]">Gift value</p><b className="text-xl">${formatNumber(Number(campaign.giftValue), locale)}</b></div>}</div></div>
           <div className="border-t border-white/70 mt-6 pt-6 space-y-5"><div className="flex justify-between"><span>Applications</span><b>{stats.total}</b></div><div><div className="flex justify-between"><span>Spots Filled</span><b>{campaign.filledSlots} / {campaign.totalSlots}</b></div><div className="h-2 bg-slate-200/70 rounded-full mt-3"><div className="h-full bg-blue-500 rounded-full" style={{width:`${progress}%`}}/></div><p className="text-xs text-[#7884a8] mt-2">{remaining} spots remaining</p></div><div className="flex justify-between border-t border-white/70 pt-5"><span>Views</span><b>{campaign.viewCount}</b></div></div>
           <div className="space-y-3 mt-7"><Link href={`/dashboard/brand/campaigns/${campaign.id}/applications`} className="block text-center py-4 rounded-xl bg-blue-600 text-white font-semibold">View Applications</Link><Link href={`/dashboard/brand/campaigns/${campaign.id}/edit`} className="block text-center py-4 rounded-xl border border-white bg-white/25 font-semibold">Edit Campaign</Link><button type="button" onClick={() => setShowDelete(true)} className="block w-full text-center py-4 rounded-xl border border-red-200 bg-red-50/60 text-red-600 font-semibold hover:bg-red-100 transition">Delete Campaign</button></div>
           <div className="border-t border-white/70 mt-7 pt-6"><p className="text-xs text-[#7884a8]">Campaign owner</p><div className="flex gap-3 items-center mt-3"><span className="w-11 h-11 rounded-full bg-white/70 flex items-center justify-center font-bold overflow-hidden">{campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt="" className="w-full h-full object-cover"/> : (campaign.brand?.companyName || 'B').slice(0, 2).toUpperCase()}</span><div><b>{campaign.brand?.companyName || 'Brand'}</b><p className="text-xs text-[#7884a8]">Brand Account</p></div></div></div>
@@ -329,13 +331,13 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           </section>
 
           <form onSubmit={e => { e.preventDefault(); discover(query) }} className="mb-4">
-            <div className="flex gap-2"><div className="workspace-glass-control flex-1 flex items-center gap-3 px-4 py-3">{icon(searchIcon, 'w-4 h-4')}<input value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent outline-none w-full" placeholder="Search by name, handle, niche or keyword…"/></div><button className="px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold">Search</button></div>
+            <div className="flex gap-2"><div className="workspace-glass-control flex-1 flex items-center gap-3 px-4 py-3">{icon(searchIcon, 'w-4 h-4')}<input value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent outline-none w-full" placeholder={d.searchByNamePlaceholder}/></div><button className="px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold">{d.searchButton}</button></div>
             <div className="flex flex-wrap gap-2 mt-3">
-              <select value={source} onChange={e => setSource(e.target.value as any)} className="workspace-glass-control px-3 py-2 text-sm"><option value="kol">Creator database</option><option value="club">Extended network</option></select>
+              <select value={source} onChange={e => setSource(e.target.value as any)} className="workspace-glass-control px-3 py-2 text-sm"><option value="kol">{d.sourceDatabase}</option><option value="club">{d.sourceExtended}</option></select>
               <select value={platform} onChange={e => setPlatform(e.target.value)} className="workspace-glass-control px-3 py-2 text-sm"><option value="youtube">YouTube</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select>
-              <input value={country} onChange={e => setCountry(e.target.value)} maxLength={2} placeholder="Country" className="workspace-glass-control w-28 px-3 py-2 text-sm uppercase"/>
-              <input type="number" value={minFollowers} onChange={e => setMinFollowers(e.target.value)} placeholder="Min followers" className="workspace-glass-control w-36 px-3 py-2 text-sm"/>
-              <button type="button" onClick={() => { setQuery(''); setCountry(''); setMinFollowers(''); discover('') }} className="px-3 text-sm text-[#65739e]">Clear all</button>
+              <input value={country} onChange={e => setCountry(e.target.value)} maxLength={2} placeholder={d.countryLabel} className="workspace-glass-control w-28 px-3 py-2 text-sm uppercase"/>
+              <input type="number" value={minFollowers} onChange={e => setMinFollowers(e.target.value)} placeholder={d.minFollowers} className="workspace-glass-control w-36 px-3 py-2 text-sm"/>
+              <button type="button" onClick={() => { setQuery(''); setCountry(''); setMinFollowers(''); discover('') }} className="px-3 text-sm text-[#65739e]">{d.clearAll}</button>
             </div>
           </form>
           {error && <div className="mb-3 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>}

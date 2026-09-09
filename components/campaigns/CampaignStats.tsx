@@ -1,6 +1,7 @@
 'use client'
 
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 interface CampaignStatsProps {
   applications: number
@@ -15,7 +16,7 @@ export default function CampaignStats({
   totalSlots,
   viewCount,
 }: CampaignStatsProps) {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const filledPercentage = ((totalSlots - spotsLeft) / totalSlots) * 100
 
   const spotsRemainingText = (spotsLeft === 1 ? t.campaign.spotRemainingCount : t.campaign.spotsRemainingCount)
@@ -46,7 +47,7 @@ export default function CampaignStats({
 
       <div className="flex items-center justify-between text-sm">
         <span className="text-gray-600">{t.campaign.views}</span>
-        <span className="font-semibold">{viewCount.toLocaleString()}</span>
+        <span className="font-semibold">{formatNumber(viewCount, locale)}</span>
       </div>
     </div>
   )

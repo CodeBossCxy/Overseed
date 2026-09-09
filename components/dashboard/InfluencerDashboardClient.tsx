@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 import { formatDate } from '@/lib/i18n/formatDate'
 
 // Creator dashboard per the July 2026 workspace mockup: welcome header with
@@ -77,7 +78,7 @@ export default function InfluencerDashboardClient({
   }
 
   const money = (n: number) =>
-    `$${n.toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US', { maximumFractionDigits: 0 })}`
+    `$${formatNumber(n, locale)}`
 
   const price = (c: any) => {
     if (c.paymentMin != null || c.paymentMax != null) {

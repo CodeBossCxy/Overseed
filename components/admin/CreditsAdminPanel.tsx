@@ -31,6 +31,35 @@ interface PriceRow {
   credits: number
 }
 
+interface LedgerUser {
+  id: string
+  email: string
+  subscriptionTier: string
+}
+
+interface LotRow {
+  id: string
+  bucket: string
+  source: string
+  credits: number
+  remaining: number
+  expiresAt: string
+  reference: string
+  createdAt: string
+}
+
+interface LedgerRow {
+  id: string
+  delta: number
+  type: string
+  bucket: string
+  featureKey: string | null
+  referenceId: string | null
+  balanceAfter: number
+  note: string | null
+  createdAt: string
+}
+
 export default function CreditsAdminPanel() {
   const [plans, setPlans] = useState<PlanRow[]>([])
   const [packs, setPacks] = useState<PackRow[]>([])
@@ -42,6 +71,13 @@ export default function CreditsAdminPanel() {
   const [grantCredits, setGrantCredits] = useState('')
   const [grantNote, setGrantNote] = useState('')
   const [granting, setGranting] = useState(false)
+
+  const [ledgerEmail, setLedgerEmail] = useState('')
+  const [ledgerLoading, setLedgerLoading] = useState(false)
+  const [ledgerError, setLedgerError] = useState<string | null>(null)
+  const [ledgerUser, setLedgerUser] = useState<LedgerUser | null>(null)
+  const [lots, setLots] = useState<LotRow[]>([])
+  const [ledger, setLedger] = useState<LedgerRow[]>([])
 
   const load = async () => {
     setLoading(true)
@@ -79,6 +115,31 @@ export default function CreditsAdminPanel() {
     } else {
       const body = await res.json().catch(() => ({}))
       flash(body.error || 'Save failed')
+    }
+  }
+
+  const viewLedger = async () => {
+    setLedgerLoading(true)
+    setLedgerError(null)
+    setLedgerUser(null)
+    setLots([])
+    setLedger([])
+    try {
+      const res = await fetch(
+        `/api/admin/credits?view=ledger&email=${encodeURIComponent(ledgerEmail.trim())}`,
+      )
+      const body = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setLedgerUser(body.user)
+        setLots(body.lots || [])
+        setLedger(body.ledger || [])
+      } else {
+        setLedgerError(body.error || 'Failed to load ledger')
+      }
+    } catch {
+      setLedgerError('Network error')
+    } finally {
+      setLedgerLoading(false)
     }
   }
 
@@ -158,6 +219,120 @@ export default function CreditsAdminPanel() {
             {granting ? 'Granting…' : 'Grant'}
           </button>
         </div>
+      </section>
+
+      {/* Ledger viewer */}
+      <section className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="font-bold text-gray-900 mb-1">View user ledger</h2>
+        <p className="text-xs text-gray-500 mb-4">Look up credit lots and transaction history for any user by email.</p>
+        <div className="flex flex-wrap gap-2 items-center mb-4">
+          <input
+            className="px-3 py-1.5 border border-gray-300 rounded text-sm w-64"
+            placeholder="user email"
+            value={ledgerEmail}
+            onChange={(e) => setLedgerEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && ledgerEmail.trim() && viewLedger()}
+          />
+          <button
+            onClick={viewLedger}
+            disabled={ledgerLoading || !ledgerEmail.trim()}
+            className="px-4 py-1.5 bg-gray-900 text-white rounded text-sm font-medium disabled:opacity-40"
+          >
+            {ledgerLoading ? 'Loading…' : 'View ledger'}
+          </button>
+        </div>
+
+        {ledgerError && (
+          <p className="text-sm text-red-600 mb-3">{ledgerError}</p>
+        )}
+
+        {ledgerUser && (
+          <div className="space-y-6">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">{ledgerUser.email}</span>
+              <span className="text-gray-400 mx-1">·</span>
+              <span>{ledgerUser.subscriptionTier}</span>
+            </p>
+
+            {/* Lots table */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Lots ({lots.length})</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b">
+                      <th className="py-1.5 pr-3">Bucket</th>
+                      <th className="pr-3">Source</th>
+                      <th className="pr-3 text-right">Credits</th>
+                      <th className="pr-3 text-right">Remaining</th>
+                      <th className="pr-3">Expires</th>
+                      <th>Reference</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lots.map((lot) => {
+                      const expired = new Date(lot.expiresAt) < new Date()
+                      const dim = lot.remaining === 0 || expired
+                      return (
+                        <tr key={lot.id} className={`border-b last:border-0 ${dim ? 'opacity-40' : ''}`}>
+                          <td className="py-1.5 pr-3">{lot.bucket}</td>
+                          <td className="pr-3">{lot.source}</td>
+                          <td className="pr-3 text-right">{lot.credits}</td>
+                          <td className="pr-3 text-right">{lot.remaining}</td>
+                          <td className="pr-3 whitespace-nowrap">{new Date(lot.expiresAt).toLocaleDateString()}</td>
+                          <td className="font-mono text-gray-500 break-all">{lot.reference}</td>
+                        </tr>
+                      )
+                    })}
+                    {lots.length === 0 && (
+                      <tr><td colSpan={6} className="py-3 text-gray-400">No lots found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Ledger table */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Ledger (last 100)</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b">
+                      <th className="py-1.5 pr-3">Time</th>
+                      <th className="pr-3">Type</th>
+                      <th className="pr-3">Feature</th>
+                      <th className="pr-3 text-right">Delta</th>
+                      <th className="pr-3 text-right">Balance after</th>
+                      <th className="pr-3">Reference</th>
+                      <th>Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledger.map((row) => (
+                      <tr key={row.id} className="border-b last:border-0">
+                        <td className="py-1.5 pr-3 whitespace-nowrap">
+                          {new Date(row.createdAt).toLocaleString()}
+                        </td>
+                        <td className="pr-3">{row.type}</td>
+                        <td className="pr-3 font-mono">{row.featureKey ?? '—'}</td>
+                        <td className={`pr-3 text-right font-medium ${row.delta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {row.delta >= 0 ? '+' : ''}{row.delta}
+                        </td>
+                        <td className="pr-3 text-right">{row.balanceAfter}</td>
+                        <td className="pr-3 font-mono text-gray-500">{row.referenceId ?? '—'}</td>
+                        <td className="text-gray-500">{row.note ?? '—'}</td>
+                      </tr>
+                    ))}
+                    {ledger.length === 0 && (
+                      <tr><td colSpan={7} className="py-3 text-gray-400">No ledger entries found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Plan credits */}

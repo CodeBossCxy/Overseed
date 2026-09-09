@@ -9,7 +9,9 @@ import PaymentStatusBadge from '@/components/payments/PaymentStatus'
 import PaymentModal from '@/components/payments/PaymentModal'
 import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { localizeApiError } from '@/lib/i18n/api-error'
 import { formatDate } from '@/lib/i18n/formatDate'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 const STAGES = ['AWAITING_CONFIRMATION', 'ACTIVE', 'SUBMITTED', 'COMPLETED'] as const
 
@@ -45,7 +47,7 @@ export default function BrandManageCollaborationPage() {
         body: JSON.stringify({ applicationId: collabData.applicationId }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to create payment')
+      if (!res.ok) throw new Error(localizeApiError(t, data, 'Failed to create payment'))
       const amount = Number(collabData.fee || 0)
       const platformFee = Math.round(amount * 10) / 100
       setPaymentModal({
@@ -71,7 +73,7 @@ export default function BrandManageCollaborationPage() {
         body: JSON.stringify({ applicationId: collabData.applicationId }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Failed to release payment')
+      if (!res.ok) throw new Error(localizeApiError(t, data, 'Failed to release payment'))
       await load()
     } catch (err: any) {
       setError(err.message)
@@ -208,7 +210,7 @@ export default function BrandManageCollaborationPage() {
             <section className="workspace-glass-card rounded-2xl p-5">
               <h2 className="text-lg font-semibold mb-3">{c.overview}</h2>
               {term(c.deliverables, collab.deliverables)}
-              {term(c.fee, collab.fee != null ? `${collab.currency} ${Number(collab.fee).toLocaleString()}` : null)}
+              {term(c.fee, collab.fee != null ? `${collab.currency} ${formatNumber(Number(collab.fee), locale)}` : null)}
               {term(c.compensation, collab.productCompensation)}
               {term(c.deadline, collab.deadline ? formatDate(collab.deadline, locale) : null)}
               {term(c.revisionRounds, `${collab.revisionsUsed} / ${collab.revisionRounds}`)}

@@ -7,11 +7,11 @@ const TRACKED_PATHS = new Set(['/dashboard/brand/discover'])
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  if (!session?.user) return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
 
   const { path } = await req.json().catch(() => ({ path: '' }))
   if (!TRACKED_PATHS.has(path)) {
-    return NextResponse.json({ message: 'Unsupported analytics path' }, { status: 400 })
+    return NextResponse.json({ message: 'Unsupported analytics path', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
 
   await prisma.pageViewEvent.create({

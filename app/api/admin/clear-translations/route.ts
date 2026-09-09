@@ -8,7 +8,7 @@ export async function POST() {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || !['BRAND', 'ADMIN'].includes((session.user as any).userType)) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const result = await prisma.translation.deleteMany({
@@ -21,6 +21,6 @@ export async function POST() {
     })
   } catch (error) {
     console.error('Error clearing translations:', error)
-    return NextResponse.json({ message: 'Failed to clear translations' }, { status: 500 })
+    return NextResponse.json({ message: 'Failed to clear translations', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }

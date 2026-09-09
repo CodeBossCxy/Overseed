@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     const { searchParams } = new URL(req.url)
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ brands })
   } catch (error) {
     console.error('Error fetching brand verifications:', error)
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ message: 'Internal server error', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }
 
@@ -38,18 +38,18 @@ export async function PATCH(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
     }
 
     const adminUserId = (session.user as any).id
     const { brandProfileId, action, rejectionReason } = await req.json()
 
     if (!brandProfileId || !['APPROVE', 'REJECT'].includes(action)) {
-      return NextResponse.json({ message: 'brandProfileId and action (APPROVE/REJECT) are required' }, { status: 400 })
+      return NextResponse.json({ message: 'brandProfileId and action (APPROVE/REJECT) are required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     if (action === 'REJECT' && !rejectionReason) {
-      return NextResponse.json({ message: 'A rejection reason is required' }, { status: 400 })
+      return NextResponse.json({ message: 'A rejection reason is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     const updated = await prisma.brandProfile.update({
@@ -99,6 +99,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true, status: updated.brandVerificationStatus, trialGranted })
   } catch (error) {
     console.error('Error updating brand verification:', error)
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ message: 'Internal server error', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }

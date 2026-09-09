@@ -58,7 +58,7 @@ export async function GET() {
       })
     }
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Internal server error', code: 'SERVER_ERROR' }, { status: 500 })
   }
 }
 
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     if (userType !== 'INFLUENCER') {
       return NextResponse.json(
-        { error: 'Only influencers can connect Stripe accounts' },
+        { error: 'Only influencers can connect Stripe accounts', code: 'FORBIDDEN' },
         { status: 403 },
       )
     }
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     if (!influencer) {
       return NextResponse.json(
-        { error: 'Influencer profile not found' },
+        { error: 'Influencer profile not found', code: 'NOT_FOUND' },
         { status: 404 },
       )
     }
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[Stripe Connect]', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error.message || 'Internal server error', code: 'SERVER_ERROR' },
       { status: 500 },
     )
   }

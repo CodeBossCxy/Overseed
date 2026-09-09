@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import RoleShell from '@/components/workspace/RoleShell'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { localizeApiError } from '@/lib/i18n/api-error'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 
 export default function UpgradePage() {
@@ -82,7 +83,7 @@ export default function UpgradePage() {
         window.location.href = data.url
       } else {
         const data = await res.json()
-        alert(data.error || t.upgrade.failedToStartCheckout)
+        alert(localizeApiError(t, data, t.upgrade.failedToStartCheckout))
       }
     } catch {
       alert(t.errors.somethingWrong)

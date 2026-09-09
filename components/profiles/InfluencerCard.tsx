@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { formatCompactNumber } from '@/lib/i18n/formatNumber'
 
 interface InfluencerCardProps {
   influencer: {
@@ -30,7 +31,7 @@ interface InfluencerCardProps {
 }
 
 export default function InfluencerCard({ influencer }: InfluencerCardProps) {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const displayName = influencer.displayName || influencer.user.name || t.profileCards.influencer.unknownName
   const avatar = influencer.avatarUrl || influencer.user.image
 
@@ -107,11 +108,7 @@ export default function InfluencerCard({ influencer }: InfluencerCardProps) {
                   <span className="text-gray-400 truncate">@{acc.username}</span>
                 </div>
                 <span className="font-medium text-gray-700 flex-shrink-0 ml-2">
-                  {acc.followerCount >= 1000000
-                    ? `${(acc.followerCount / 1000000).toFixed(1)}M`
-                    : acc.followerCount >= 1000
-                      ? `${(acc.followerCount / 1000).toFixed(1)}K`
-                      : acc.followerCount}
+                  {formatCompactNumber(acc.followerCount, locale)}
                 </span>
               </div>
             ))}

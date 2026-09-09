@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import LanguageSetupModal from '@/components/workspace/LanguageSetupModal'
 
@@ -430,6 +431,7 @@ function CreditsChip({
   nextExpiry: { at: string; credits: number } | null
   wt: Record<string, string>
 }) {
+  const { locale } = useLanguage()
   const isWarning = cycleCredits > 0 && total <= Math.floor(cycleCredits * 0.2)
   const isZero = total === 0
 
@@ -469,7 +471,7 @@ function CreditsChip({
       title={tooltipLines}
     >
       <span aria-hidden>⚡</span>
-      {total.toLocaleString()}
+      {formatNumber(total, locale)}
     </Link>
   )
 }

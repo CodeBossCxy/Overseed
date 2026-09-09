@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { localizeApiError } from '@/lib/i18n/api-error'
 
 export default function ForgotPasswordPage() {
   const { t, locale } = useLanguage()
@@ -31,7 +32,7 @@ export default function ForgotPasswordPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || s.errorGeneric)
+        setError(localizeApiError(t, data, s.errorGeneric))
       } else {
         setStep('reset')
       }
@@ -62,7 +63,7 @@ export default function ForgotPasswordPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || s.errorGeneric)
+        setError(localizeApiError(t, data, s.errorGeneric))
       } else {
         setStep('done')
       }

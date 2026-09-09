@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const userId = (session.user as any).id
@@ -15,14 +15,14 @@ export async function POST(request: Request) {
 
     if (!type || !content) {
       return NextResponse.json(
-        { error: 'Type and content are required' },
+        { error: 'Type and content are required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
 
     if (!['bug', 'feature', 'general'].includes(type)) {
       return NextResponse.json(
-        { error: 'Invalid feedback type' },
+        { error: 'Invalid feedback type', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Beta feedback error:', error)
     return NextResponse.json(
-      { error: 'Failed to submit feedback' },
+      { error: 'Failed to submit feedback', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }

@@ -84,8 +84,8 @@ export default function CampaignDetailWrapper({
           </Link>
           <UGCTranslateToggle isLoading={isLoading} />
         </div>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Campaign Details</h1>
-        <p className="mt-2 text-[#6876a1]">{isOwner ? 'Preview how creators see your campaign.' : 'Recommended opportunity for you'}</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">{t.campaign.campaignDetails}</h1>
+        <p className="mt-2 text-[#6876a1]">{isOwner ? t.campaign.previewCreators : t.campaign.recommendedOpportunity}</p>
       </header>
       <CreatorCampaignDetail
         campaign={campaign}

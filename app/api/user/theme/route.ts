@@ -9,12 +9,12 @@ export async function GET() {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const userId = (session.user as any).id
   if (!userId) {
-    return NextResponse.json({ error: 'User ID not found' }, { status: 400 })
+    return NextResponse.json({ error: 'User ID not found', code: 'UNAUTHORIZED' }, { status: 400 })
   }
 
   const user = await prisma.user.findUnique({
@@ -29,12 +29,12 @@ export async function PUT(request: Request) {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const userId = (session.user as any).id
   if (!userId) {
-    return NextResponse.json({ error: 'User ID not found' }, { status: 400 })
+    return NextResponse.json({ error: 'User ID not found', code: 'UNAUTHORIZED' }, { status: 400 })
   }
 
   const body = await request.json()
@@ -42,7 +42,7 @@ export async function PUT(request: Request) {
 
   if (!VALID_COLOR_THEMES.includes(colorTheme)) {
     return NextResponse.json(
-      { error: `Invalid theme. Must be one of: ${VALID_COLOR_THEMES.join(', ')}` },
+      { error: `Invalid theme. Must be one of: ${VALID_COLOR_THEMES.join(', ')}`, code: 'VALIDATION_ERROR' },
       { status: 400 }
     )
   }

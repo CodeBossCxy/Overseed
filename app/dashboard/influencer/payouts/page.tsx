@@ -6,6 +6,7 @@ import CreatorWorkspaceLayout from '@/components/workspace/CreatorWorkspaceLayou
 import StatusBadge from '@/components/StatusBadge'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 // "Earnings & Payments" per spec: summary cards (Pending Release /
 // Available Soon / Paid to Date), a setup banner until Stripe is connected,
@@ -87,7 +88,7 @@ export default function CreatorPayoutsPage() {
       .reduce((sum, c) => sum + payout(c), 0)
 
   const money = (n: number) =>
-    `$${n.toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US', { maximumFractionDigits: 2 })}`
+    `$${formatNumber(n, locale)}`
 
   const activeList = collabs.filter((c) => !c.payment || !HISTORY_STATUSES.includes(c.payment.status))
 

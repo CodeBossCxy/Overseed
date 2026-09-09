@@ -8,7 +8,7 @@ import { hash, compare } from 'bcryptjs'
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
   const user = await prisma.user.findUnique({
     where: { id: (session.user as any).id },
@@ -22,7 +22,7 @@ export async function GET() {
       defaultCampaignCurrency: true,
     },
   })
-  if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!user) return NextResponse.json({ error: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
   return NextResponse.json({ ...user, needsLanguageSetup: !user.languageSetupAt })
 }
 
@@ -30,12 +30,12 @@ export async function PATCH(request: Request) {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   const userId = (session.user as any).id
   if (!userId) {
-    return NextResponse.json({ error: 'User ID not found' }, { status: 400 })
+    return NextResponse.json({ error: 'User ID not found', code: 'UNAUTHORIZED' }, { status: 400 })
   }
 
   const body = await request.json()
@@ -45,7 +45,7 @@ export async function PATCH(request: Request) {
   if (action === 'updateName') {
     const { name } = body
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Name is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     await prisma.user.update({
@@ -62,7 +62,7 @@ export async function PATCH(request: Request) {
 
     if (!newPassword || newPassword.length < 8) {
       return NextResponse.json(
-        { error: 'New password must be at least 8 characters' },
+        { error: 'New password must be at least 8 characters', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -85,7 +85,7 @@ export async function PATCH(request: Request) {
     // User has an existing password — verify current password
     if (!currentPassword) {
       return NextResponse.json(
-        { error: 'Current password is required' },
+        { error: 'Current password is required', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -93,7 +93,7 @@ export async function PATCH(request: Request) {
     const isValid = await compare(currentPassword, user.password)
     if (!isValid) {
       return NextResponse.json(
-        { error: 'Current password is incorrect' },
+        { error: 'Current password is incorrect', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -141,7 +141,7 @@ export async function PATCH(request: Request) {
     }
 
     if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+      return NextResponse.json({ error: 'No valid fields to update', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
     await prisma.user.update({
@@ -170,5 +170,5 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true })
   }
 
-  return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+  return NextResponse.json({ error: 'Invalid action', code: 'VALIDATION_ERROR' }, { status: 400 })
 }

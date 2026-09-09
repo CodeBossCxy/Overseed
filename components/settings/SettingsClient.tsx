@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { localizeApiError } from '@/lib/i18n/api-error'
 import { formatDate } from '@/lib/i18n/formatDate'
 import { signOut } from 'next-auth/react'
 import { useTheme, COLOR_THEMES, type ColorTheme } from '@/components/ThemeProvider'
@@ -194,7 +195,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
         body: JSON.stringify({ action: 'updateName', name }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) throw new Error(localizeApiError(t, data))
       setNameMsg({ type: 'success', text: st.saved })
       setTimeout(() => setNameMsg(null), 3000)
     } catch (err: any) {
@@ -225,7 +226,7 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
         body: JSON.stringify({ action: 'changePassword', currentPassword, newPassword }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) throw new Error(localizeApiError(t, data))
       setPasswordMsg({ type: 'success', text: st.passwordChanged })
       setCurrentPassword('')
       setNewPassword('')

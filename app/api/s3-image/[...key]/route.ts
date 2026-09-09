@@ -26,7 +26,7 @@ export async function GET(
 
     const body = response.Body
     if (!body) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
     }
 
     // Stream the S3 object to the client
@@ -40,9 +40,9 @@ export async function GET(
     })
   } catch (error: any) {
     if (error.name === 'NoSuchKey') {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
     }
     console.error('S3 image proxy error:', error)
-    return NextResponse.json({ error: 'Failed to load image' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to load image', code: 'UPSTREAM_ERROR' }, { status: 500 })
   }
 }

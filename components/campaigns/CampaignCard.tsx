@@ -5,6 +5,7 @@ import Image from 'next/image'
 import CompensationBadge from './CompensationBadge'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
+import { formatNumber } from '@/lib/i18n/formatNumber'
 
 interface CampaignCardProps {
   campaign: {
@@ -144,7 +145,7 @@ export default function CampaignCard({ campaign }: CampaignCardProps) {
             )}
             {campaign.followerRequirements && campaign.followerRequirements.length > 0 && (
               <span>
-                {campaign.followerRequirements[0].minFollowers.toLocaleString()}+ {t.campaignCard.followers}
+                {formatNumber(campaign.followerRequirements[0].minFollowers, locale)}+ {t.campaignCard.followers}
               </span>
             )}
             {campaign._count && (

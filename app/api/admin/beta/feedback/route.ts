@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const feedback = await prisma.betaFeedback.findMany({
@@ -26,7 +26,7 @@ export async function GET() {
   } catch (error) {
     console.error('Failed to fetch beta feedback:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch feedback' },
+      { error: 'Failed to fetch feedback', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
@@ -36,14 +36,14 @@ export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user || (session.user as any).userType !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
     const { id, status } = await request.json()
 
     if (!['new', 'reviewed', 'resolved'].includes(status)) {
       return NextResponse.json(
-        { error: 'Invalid status' },
+        { error: 'Invalid status', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -57,7 +57,7 @@ export async function PATCH(request: Request) {
   } catch (error) {
     console.error('Failed to update feedback:', error)
     return NextResponse.json(
-      { error: 'Failed to update feedback' },
+      { error: 'Failed to update feedback', code: 'SERVER_ERROR' },
       { status: 500 }
     )
   }
