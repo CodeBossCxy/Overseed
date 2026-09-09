@@ -16,6 +16,8 @@ interface Overview {
   totalApplications: number
   aiMonthlyTokens: number
   aiMonthlyRequests: number
+  clubCreditsLeft: number | null
+  clubTrialSearchesLeft: number | null
 }
 
 interface UserData {
@@ -301,6 +303,19 @@ export default function AdminDashboard() {
                 label="Est. AI Cost (This Month)"
                 value={`$${estimateCost(overview.aiMonthlyTokens)}`}
                 accent="text-orange-600"
+              />
+              <StatCard
+                label="Influencers Club Credits"
+                value={
+                  overview.clubCreditsLeft != null
+                    ? `${overview.clubCreditsLeft}${overview.clubTrialSearchesLeft != null ? ` (${overview.clubTrialSearchesLeft} trial searches)` : ''}`
+                    : 'N/A'
+                }
+                accent={
+                  overview.clubCreditsLeft != null && overview.clubCreditsLeft < 10
+                    ? 'text-red-600'
+                    : 'text-purple-600'
+                }
               />
             </div>
           </div>

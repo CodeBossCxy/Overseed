@@ -135,7 +135,6 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [tab, setTab] = useState<'detail' | 'direct'>('detail')
   const [query, setQuery] = useState('')
   const [platform, setPlatform] = useState('youtube')
-  const [source, setSource] = useState<'kol' | 'club'>('kol')
   const [country, setCountry] = useState('')
   const [minFollowers, setMinFollowers] = useState('')
   const [creators, setCreators] = useState<Creator[]>([])
@@ -154,24 +153,26 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
 
   const discover = useCallback(async (search = '') => {
     setLoading(true); setError('')
-    const qs = new URLSearchParams({ limit: source === 'club' ? '10' : '50' })
-    if (search.trim()) {
-      qs.set('q', search.trim()); qs.set(source === 'club' ? 'platform' : 'platforms', platform)
-      if (source === 'kol') qs.set('topics', search.trim())
+    // KOL/YouTube API search is paused — keyword searches use the club API,
+    // empty-query browsing stays on the local creator index (unmetered).
+    const searching = Boolean(search.trim())
+    const qs = new URLSearchParams({ limit: searching ? '10' : '50' })
+    if (searching) {
+      qs.set('q', search.trim()); qs.set('platform', platform)
     } else {
       qs.set('platform', platform); qs.set('sort', 'followers')
     }
     if (country) qs.set('country', country.toUpperCase())
     if (minFollowers) qs.set('min_followers', minFollowers)
     try {
-      const endpoint = source === 'club' ? 'club-search' : (search.trim() ? 'search' : 'creators')
+      const endpoint = searching ? 'club-search' : 'creators'
       const res = await fetch(`/api/discovery/${endpoint}?${qs}`)
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Creator discovery is temporarily unavailable.')
       setCreators(data?.results || [])
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
-  }, [country, minFollowers, platform, source])
+  }, [country, minFollowers, platform])
 
   useEffect(() => { discover(); loadQueue() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -333,7 +334,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           <form onSubmit={e => { e.preventDefault(); discover(query) }} className="mb-4">
             <div className="flex gap-2"><div className="workspace-glass-control flex-1 flex items-center gap-3 px-4 py-3">{icon(searchIcon, 'w-4 h-4')}<input value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent outline-none w-full" placeholder={d.searchByNamePlaceholder}/></div><button className="px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold">{d.searchButton}</button></div>
             <div className="flex flex-wrap gap-2 mt-3">
-              <select value={source} onChange={e => setSource(e.target.value as any)} className="workspace-glass-control px-3 py-2 text-sm"><option value="kol">{d.sourceDatabase}</option><option value="club">{d.sourceExtended}</option></select>
+              
               <select value={platform} onChange={e => setPlatform(e.target.value)} className="workspace-glass-control px-3 py-2 text-sm"><option value="youtube">YouTube</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select>
               <input value={country} onChange={e => setCountry(e.target.value)} maxLength={2} placeholder={d.countryLabel} className="workspace-glass-control w-28 px-3 py-2 text-sm uppercase"/>
               <input type="number" value={minFollowers} onChange={e => setMinFollowers(e.target.value)} placeholder={d.minFollowers} className="workspace-glass-control w-36 px-3 py-2 text-sm"/>

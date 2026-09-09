@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { clubCreditsLeft } from '@/lib/influencers-club'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -21,6 +22,7 @@ export async function GET() {
     aiUsageByUser,
     aiUsageMonthly,
     recentAiLogs,
+    clubCredits,
   ] = await Promise.all([
     // All users with their AI usage
     prisma.user.findMany({
@@ -63,6 +65,8 @@ export async function GET() {
         user: { select: { email: true, name: true } },
       },
     }),
+    // Influencers Club remaining balance (null if unconfigured/unreachable)
+    clubCreditsLeft(),
   ])
 
   // Merge AI usage into user data
@@ -94,6 +98,8 @@ export async function GET() {
       totalApplications,
       aiMonthlyTokens: aiUsageMonthly._sum.totalTokens || 0,
       aiMonthlyRequests: aiUsageMonthly._count || 0,
+      clubCreditsLeft: clubCredits?.creditsLeft ?? null,
+      clubTrialSearchesLeft: clubCredits?.trialSearchesLeft ?? null,
     },
     users: usersWithUsage,
     recentAiLogs,

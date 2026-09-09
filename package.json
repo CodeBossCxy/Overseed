@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -p 3333",
+    "dev:kol": "cd ../KOL/kol-platform && docker compose up -d && ./.venv/bin/uvicorn app.main:app --port 8000",
     "build": "prisma migrate deploy && next build",
     "start": "next start -p 3333",
     "lint": "next lint",

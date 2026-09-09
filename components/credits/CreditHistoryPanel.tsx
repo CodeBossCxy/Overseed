@@ -11,7 +11,7 @@ import { formatNumber } from '@/lib/i18n/formatNumber'
 interface LedgerEntry {
   id: string
   delta: number
-  type: 'GRANT' | 'DEDUCT' | 'REFUND' | 'EXPIRE'
+  type: 'GRANT' | 'DEDUCTION' | 'REFUND' | 'EXPIRY' | 'ADMIN_ADJUSTMENT'
   bucket: string
   featureKey: string | null
   referenceId: string | null
@@ -104,12 +104,20 @@ export default function CreditHistoryPanel() {
     }
   }
 
+  const featureLabel = (e: LedgerEntry): string | null => {
+    const labelKey = e.featureKey ? FEATURE_LABEL_KEYS[e.featureKey] : undefined
+    return (labelKey && myPlan[labelKey]) || null
+  }
+
   const describe = (e: LedgerEntry): string => {
-    if (e.type === 'REFUND') return ch.typeRefund
-    if (e.type === 'EXPIRE') return ch.typeExpire
-    if (e.type === 'DEDUCT') {
-      const labelKey = e.featureKey ? FEATURE_LABEL_KEYS[e.featureKey] : undefined
-      return (labelKey && myPlan[labelKey]) || ch.typeDeduct
+    // Refunds keep the feature context: "Refund · Discovery Search"
+    if (e.type === 'REFUND') {
+      const feature = featureLabel(e)
+      return feature ? `${ch.typeRefund} · ${feature}` : ch.typeRefund
+    }
+    if (e.type === 'EXPIRY') return ch.typeExpire
+    if (e.type === 'DEDUCTION') {
+      return featureLabel(e) || ch.typeDeduct
     }
     // GRANT — classify by reference
     const ref = e.referenceId || ''

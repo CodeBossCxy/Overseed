@@ -108,7 +108,13 @@ export default function WorkspaceLayout({
     }
     fetchCredits()
     const interval = setInterval(fetchCredits, 60000)
-    return () => clearInterval(interval)
+    // Metered features dispatch this after spending credits so the chip
+    // updates immediately instead of waiting for the next poll.
+    window.addEventListener('credits:refresh', fetchCredits)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('credits:refresh', fetchCredits)
+    }
   }, [session?.user])
 
   const navItems: NavItem[] =

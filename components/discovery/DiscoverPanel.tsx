@@ -31,10 +31,6 @@ interface SearchResult {
 /* TEMP: influencers.club data source — remove this block together with
    lib/influencers-club.ts and app/api/discovery/club-search/. */
 type DiscoverySource = 'kol' | 'club'
-const SOURCE_LABELS: Record<DiscoverySource, string> = {
-  kol: 'YouTube API',
-  club: 'Influencers Club API',
-}
 // Club bills 0.01 credits per returned creator — keep pages small.
 const CLUB_PAGE_SIZE = 10
 /* END TEMP */
@@ -46,6 +42,56 @@ const PLATFORM_LABELS: Record<string, string> = {
   tiktok: 'TikTok',
 }
 const PAGE_SIZE = 50
+
+// Country filter options — ISO codes sent to the discovery APIs, labels from
+// the shared t.signupBusiness.countries map.
+const COUNTRY_FILTER_OPTIONS: { code: string; key: string }[] = [
+  { code: 'US', key: 'us' },
+  { code: 'UK', key: 'uk' },
+  { code: 'CA', key: 'ca' },
+  { code: 'AU', key: 'au' },
+  { code: 'CN', key: 'cn' },
+  { code: 'JP', key: 'jp' },
+  { code: 'KR', key: 'kr' },
+  { code: 'SG', key: 'sg' },
+  { code: 'DE', key: 'de' },
+  { code: 'FR', key: 'fr' },
+  { code: 'NL', key: 'nl' },
+  { code: 'SE', key: 'se' },
+  { code: 'BR', key: 'br' },
+  { code: 'MX', key: 'mx' },
+  { code: 'IN', key: 'in' },
+  { code: 'AE', key: 'ae' },
+  { code: 'NZ', key: 'nz' },
+  { code: 'IT', key: 'it' },
+  { code: 'ES', key: 'es' },
+]
+
+// Coverage statuses that are normal operation, not warnings worth a banner.
+const COVERAGE_OK = new Set(['ok', 'cache', 'live'])
+
+// Avatar with referrerPolicy (Google's image CDN rejects some localhost/hotlink
+// referrers) and a fallback to the creator's initial if the URL has rotted.
+function CreatorAvatar({ url, name, textSize = '' }: { url: string | null; name: string; textSize?: string }) {
+  const [failed, setFailed] = useState(false)
+  if (!url || failed) {
+    return (
+      <div className={`w-full h-full flex items-center justify-center text-gray-400 font-bold ${textSize}`}>
+        {(name || '?').charAt(0)}
+      </div>
+    )
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+      className="w-full h-full object-cover"
+    />
+  )
+}
 
 function formatFollowers(count: number | null, locale: string): string {
   if (count == null) return '—'
@@ -65,7 +111,10 @@ export default function DiscoverPanel() {
 
   const [query, setQuery] = useState('')
   // TEMP: influencers.club source picker state — remove with the TEMP blocks below
-  const [source, setSource] = useState<DiscoverySource>('kol')
+  // KOL/YouTube API search is paused for now — all keyword searches go
+  // through the club API regardless of platform. Flip back to state when
+  // re-enabling the KOL path.
+  const [source] = useState<DiscoverySource>('club')
   // The KOL service's live search covers YouTube only (phase 1) — lock the
   // default source to YouTube so IG/TikTok searches don't dead-end.
   const [platforms, setPlatforms] = useState<string[]>(['youtube'])
@@ -96,33 +145,12 @@ export default function DiscoverPanel() {
     </a>
   )
 
-  // YouTube API source: only YouTube is searchable (phase 1).
-  // TEMP: club source takes exactly one platform per request (and each
-  // returned creator costs credits), so its pills act as radio buttons.
-  const platformDisabled = (p: string) => source === 'kol' && p !== 'youtube'
-
+  // One platform per search (club API constraint), so the pills act as
+  // radio buttons.
   const togglePlatform = (p: string) => {
-    if (platformDisabled(p)) return
-    if (source === 'club') {
-      setPlatforms([p])
-      return
-    }
-    setPlatforms((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
-    )
-  }
-
-  /* TEMP: switch data source — one platform for club, YouTube-only for kol */
-  const changeSource = (s: DiscoverySource) => {
-    setSource(s)
+    setPlatforms([p])
     setSearchResult(null)
-    if (s === 'club') {
-      setPlatforms((prev) => [prev[0] || 'instagram'])
-    } else {
-      setPlatforms(['youtube'])
-    }
   }
-  /* END TEMP */
 
   /* TEMP: influencers.club creator detail popup (contact info stripped
      server-side; brands contact creators inside Overseed only) */
@@ -144,6 +172,7 @@ export default function DiscoverPanel() {
         handle: creator.handle,
       })
       const res = await fetch(`/api/discovery/club-enrich?${qs}`)
+      window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
       if (!res.ok) {
         setDetailBlocked(QUOTA_CODES.includes(data?.code))
@@ -207,6 +236,7 @@ export default function DiscoverPanel() {
       fd.set('message', contactMsg.trim())
       contactFiles.forEach((f) => fd.append('files', f))
       const res = await fetch('/api/discovery/club-contact', { method: 'POST', body: fd })
+      window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
       if (!res.ok) {
         setContactBlocked(QUOTA_CODES.includes(data?.code))
@@ -345,6 +375,7 @@ export default function DiscoverPanel() {
       const res = await fetch(
         `/api/discovery/${isClub ? 'club-search' : 'search'}?${qs}`
       )
+      window.dispatchEvent(new Event('credits:refresh'))
       if (res.status === 503) {
         setUnavailable(true)
         setSearchResult(null)
@@ -404,23 +435,6 @@ export default function DiscoverPanel() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
-          {/* TEMP: influencers.club data source picker — remove with
-              lib/influencers-club.ts and app/api/discovery/club-search/ */}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">Data source</label>
-            <select
-              value={source}
-              onChange={(e) => changeSource(e.target.value as DiscoverySource)}
-              className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-            >
-              {(Object.keys(SOURCE_LABELS) as DiscoverySource[]).map((s) => (
-                <option key={s} value={s}>
-                  {SOURCE_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </div>
-          {/* END TEMP */}
           <div>
             <span className="block text-xs font-medium text-gray-500 mb-1.5">{d.platformsLabel}</span>
             <div className="flex gap-2">
@@ -429,14 +443,10 @@ export default function DiscoverPanel() {
                   key={p}
                   type="button"
                   onClick={() => togglePlatform(p)}
-                  disabled={platformDisabled(p)}
-                  title={platformDisabled(p) ? 'Coming soon for this data source' : undefined}
                   className={`px-3 py-1.5 rounded-full text-sm transition ${
-                    platformDisabled(p)
-                      ? 'bg-gray-100 text-gray-400 opacity-60 cursor-not-allowed'
-                      : platforms.includes(p)
-                        ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
-                        : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
+                    platforms.includes(p)
+                      ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
+                      : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
                   }`}
                 >
                   {PLATFORM_LABELS[p]}
@@ -446,14 +456,18 @@ export default function DiscoverPanel() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.countryLabel}</label>
-            <input
-              type="text"
+            <select
               value={country}
               onChange={(e) => setCountry(e.target.value)}
-              placeholder={d.countryPlaceholder}
-              maxLength={2}
-              className="w-24 px-3 py-1.5 workspace-glass-control text-sm uppercase focus:outline-none"
-            />
+              className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+            >
+              <option value="">{d.allCountries}</option>
+              {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
+                <option key={code} value={code}>
+                  {(t.signupBusiness.countries as Record<string, string>)[key] || code}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.minFollowers}</label>
@@ -510,10 +524,10 @@ export default function DiscoverPanel() {
       {/* Search-only notices */}
       {searchResult &&
         (searchResult.warnings.length > 0 ||
-          Object.values(searchResult.platform_coverage).some((v) => v !== 'ok')) && (
+          Object.values(searchResult.platform_coverage).some((v) => !COVERAGE_OK.has(v))) && (
           <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 space-y-1">
             {Object.entries(searchResult.platform_coverage)
-              .filter(([, status]) => status !== 'ok')
+              .filter(([, status]) => !COVERAGE_OK.has(status))
               .map(([platform, status]) => (
                 <p key={platform}>
                   <span className="font-medium">{PLATFORM_LABELS[platform] || platform}:</span>{' '}
@@ -534,12 +548,9 @@ export default function DiscoverPanel() {
             <h2 className="text-lg font-semibold">
               {isLoading ? d.loadingCreators : `${creators.length}${isBrowsing && hasMore ? '+' : ''} ${d.resultsCount}`}
             </h2>
-            {searchResult && (
+            {searchResult && searchResult.credits_left == null && (
               <p className="text-xs text-gray-400">
-                {/* TEMP: club responses report remaining credits instead of cache stats */}
-                {searchResult.credits_left != null
-                  ? `Influencers Club credits left: ${searchResult.credits_left}`
-                  : `${d.cacheHits}: ${searchResult.cache_hits} · ${d.liveCalls}: ${searchResult.live_calls}`}
+                {`${d.cacheHits}: ${searchResult.cache_hits} · ${d.liveCalls}: ${searchResult.live_calls}`}
               </p>
             )}
           </div>
@@ -562,14 +573,10 @@ export default function DiscoverPanel() {
                   }`}
                 >
                   <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                    {creator.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        {(creator.display_name || creator.handle || '?').charAt(0)}
-                      </div>
-                    )}
+                    <CreatorAvatar
+                      url={creator.avatar_url}
+                      name={creator.display_name || creator.handle || '?'}
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -601,10 +608,9 @@ export default function DiscoverPanel() {
                     )}
                     {(creator.profile_url || creator.id.startsWith('club:')) && (
                       <div className="mt-3 flex items-center gap-4">
-                        {/* TEMP: club cards advertise the detail popup */}
                         {creator.id.startsWith('club:') && (
                           <span className="text-sm text-primary-600 font-medium">
-                            View details · 1 credit
+                            {d.viewDetails}
                           </span>
                         )}
                         {creator.profile_url && (
@@ -665,18 +671,11 @@ export default function DiscoverPanel() {
             </div>
             <div className="px-7 -mt-10 flex items-end gap-4 flex-shrink-0">
               <div className="w-20 h-20 rounded-full ring-4 ring-white bg-gray-200 overflow-hidden shadow-md flex-shrink-0">
-                {(detail?.avatar_url || detailFor.avatar_url) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={detail?.avatar_url || detailFor.avatar_url || ''}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl font-bold">
-                    {(detailFor.display_name || detailFor.handle || '?').charAt(0)}
-                  </div>
-                )}
+                <CreatorAvatar
+                  url={detail?.avatar_url || detailFor.avatar_url || null}
+                  name={detailFor.display_name || detailFor.handle || '?'}
+                  textSize="text-2xl"
+                />
               </div>
               <div className="flex-1 min-w-0 pb-1">
                 <div className="flex items-center gap-2">

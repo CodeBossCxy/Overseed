@@ -1628,6 +1628,8 @@ export const translations = {
         sourceExtended: 'Extended network',
         clearAll: 'Clear all',
         contactMsgPlaceholder: 'Introduce your brand and describe the collaboration you have in mind…',
+        allCountries: 'All countries',
+        viewDetails: 'View details',
       },
     },
     help: {
@@ -2760,7 +2762,7 @@ export const translations = {
       myPlan: '我的套餐',
       creator: '达人',
       brand: '品牌',
-      myCampaigns: '活动管线',
+      myCampaigns: '活动管理',
       brandProfile: '公司主页',
       aiAssistant: 'AI 助手',
       creatorResources: '达人资源',
@@ -2924,7 +2926,7 @@ export const translations = {
       noCollaborations: '暂无合作',
       manage: '管理合作',
       manageSubtitle: '管理合作进度、交付内容、审批和付款。',
-      backToPipeline: '返回活动管线',
+      backToPipeline: '返回活动管理',
       overview: '概览',
       lockedTerms: '这些条款由品牌方锁定。',
       timeline: '时间线 / 阶段进度',
@@ -3927,7 +3929,7 @@ export const translations = {
         individualBadgeNote: '审核通过后，您的账号将显示"Verified Individual PR"（已认证个人公关）标识。',
       },
       campaigns: {
-        title: '活动管线',
+        title: '活动管理',
         subtitle: '在一个页面管理您的所有活动。',
         searchPlaceholder: '搜索活动...',
         allStatuses: '全部状态',
@@ -4017,7 +4019,7 @@ export const translations = {
       },
       applications: {
         backToCampaigns: '← 返回活动列表',
-        breadcrumbPipeline: '活动管线',
+        breadcrumbPipeline: '活动管理',
         breadcrumbManage: '管理活动',
         title: '申请管理',
         forCampaign: '活动：',
@@ -4129,6 +4131,8 @@ export const translations = {
         sourceExtended: '扩展网络',
         clearAll: '清除全部',
         contactMsgPlaceholder: '介绍您的品牌，并描述您期望的合作方式…',
+        allCountries: '全部国家',
+        viewDetails: '查看详情',
       },
     },
     help: {

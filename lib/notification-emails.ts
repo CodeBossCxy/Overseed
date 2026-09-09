@@ -430,7 +430,7 @@ export function sendVerificationApprovedEmail(
     },
     details: [{ label: { en: 'Brand', zh: '品牌' }, value: info.companyName }],
     cta: {
-      label: { en: 'Go to Campaign Pipeline', zh: '前往活动管线' },
+      label: { en: 'Go to Campaign Pipeline', zh: '前往活动管理' },
       path: '/dashboard/brand/campaigns',
     },
   })

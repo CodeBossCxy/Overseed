@@ -120,13 +120,23 @@ export async function clubSearch(opts: ClubSearchOptions) {
     filters,
   }
 
-  const res = await fetch(`${BASE}/public/v1/discovery/`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(body),
-    cache: 'no-store',
-    signal: AbortSignal.timeout(30000),
-  })
+  // The vendor occasionally has slow spells; one retry on timeout avoids
+  // needlessly falling back to the local index (normal responses are ~5s).
+  const doFetch = () =>
+    fetch(`${BASE}/public/v1/discovery/`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(20000),
+    })
+  let res: Response
+  try {
+    res = await doFetch()
+  } catch (err: any) {
+    if (err?.name !== 'TimeoutError' && err?.name !== 'AbortError') throw err
+    res = await doFetch()
+  }
   const data = await res.json().catch(() => null)
   if (!res.ok) {
     const detail =
@@ -160,6 +170,54 @@ export async function clubSearch(opts: ClubSearchOptions) {
     cache_hits: 0,
     live_calls: 1,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Remaining credit balance. The club API has no dedicated balance endpoint,
+// but every discovery response includes credits_left and a search returning
+// zero results costs 0 — so we probe with an impossible follower range.
+// Cached for 5 minutes to keep the admin page snappy.
+// ---------------------------------------------------------------------------
+
+let creditsCache: { at: number; value: ClubCredits | null } | null = null
+const CREDITS_CACHE_TTL_MS = 5 * 60 * 1000
+
+export interface ClubCredits {
+  creditsLeft: number
+  trialSearchesLeft: number | null
+}
+
+export async function clubCreditsLeft(): Promise<ClubCredits | null> {
+  if (!clubConfigured()) return null
+  if (creditsCache && Date.now() - creditsCache.at < CREDITS_CACHE_TTL_MS) {
+    return creditsCache.value
+  }
+  let value: ClubCredits | null = null
+  try {
+    const res = await fetch(new URL('/public/v1/discovery/', BASE), {
+      method: 'POST',
+      headers: authHeaders(),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(20000),
+      body: JSON.stringify({
+        platform: 'instagram',
+        paging: { limit: 1, page: 0 },
+        // 99,999,998–99,999,999 followers: guaranteed empty, costs 0 credits
+        filters: { number_of_followers: { min: 99999998, max: 99999999 } },
+      }),
+    })
+    const data = await res.json().catch(() => null)
+    if (res.ok && typeof data?.credits_left === 'number') {
+      value = {
+        creditsLeft: data.credits_left,
+        trialSearchesLeft: data.trial_searches_left ?? null,
+      }
+    }
+  } catch {
+    value = null
+  }
+  creditsCache = { at: Date.now(), value }
+  return value
 }
 
 // ---------------------------------------------------------------------------
