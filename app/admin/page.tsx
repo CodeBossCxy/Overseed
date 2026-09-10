@@ -38,6 +38,7 @@ interface UserData {
   subscriptionTier: string
   isActive: boolean
   createdAt: string
+  creditsRemaining: number
   _count: { aiTokenUsage: number }
   aiUsage: {
     monthlyTokens: number
@@ -389,6 +390,7 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 font-medium text-gray-600">Type</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Tier</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Active</th>
+                    <th className="px-4 py-3 font-medium text-gray-600 text-right">Credits Left</th>
                     <th className="px-4 py-3 font-medium text-gray-600">AI Requests (Month)</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Tokens (Month)</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Joined</th>
@@ -425,6 +427,9 @@ export default function AdminDashboard() {
                         ) : (
                           <span className="text-red-600">No</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold text-gray-900">
+                        {u.creditsRemaining.toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-center">{u.aiUsage.monthlyRequests}</td>
                       <td className="px-4 py-3 text-right">

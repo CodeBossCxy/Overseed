@@ -23,6 +23,7 @@ export async function GET() {
     aiUsageMonthly,
     recentAiLogs,
     clubCredits,
+    creditBalances,
     clubUsageRaw,
   ] = await Promise.all([
     // All users with their AI usage
@@ -68,6 +69,16 @@ export async function GET() {
     }),
     // Influencers Club remaining balance (null if unconfigured/unreachable)
     clubCreditsLeft(),
+    // Spendable balance per user. Expired and depleted lots are excluded so
+    // this matches the balance exposed by the credit wallet.
+    prisma.creditLot.groupBy({
+      by: ['userId'],
+      where: {
+        remaining: { gt: 0 },
+        expiresAt: { gt: now },
+      },
+      _sum: { remaining: true },
+    }),
     // Per-user usage of club-backed features (profile views, analytics,
     // outreach). Counts platform charges — cache hits don't re-bill upstream,
     // so this is an upper bound on actual club credits consumed per user.
@@ -90,9 +101,13 @@ export async function GET() {
       monthlyRequests: u._count,
     }])
   )
+  const creditBalanceMap = new Map(
+    creditBalances.map((row) => [row.userId, row._sum.remaining || 0])
+  )
 
   const usersWithUsage = users.map((u) => ({
     ...u,
+    creditsRemaining: creditBalanceMap.get(u.id) || 0,
     aiUsage: usageMap.get(u.id) || {
       monthlyTokens: 0,
       monthlyPromptTokens: 0,
