@@ -39,3 +39,6 @@ next-env.d.ts
 # uploaded files (keep the directory structure, ignore contents)
 /public/uploads/campaigns/*
 !/public/uploads/campaigns/.gitkeep
+
+# local data exports (may contain production-derived records)
+/exports/

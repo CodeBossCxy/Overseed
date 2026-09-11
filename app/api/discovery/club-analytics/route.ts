@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { clubConfigured, clubAnalytics, type ClubPlatform } from '@/lib/influencers-club'
+import { clubAnalytics, type ClubPlatform } from '@/lib/influencers-club'
 import { deductCredits, hasPriorDeduction, refundDeduction } from '@/lib/credits'
 import { getEffectiveTier } from '@/lib/subscription'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
@@ -29,13 +29,6 @@ export async function GET(req: NextRequest) {
   })
   if (!brand) {
     return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
-  }
-
-  if (!clubConfigured()) {
-    return NextResponse.json(
-      { message: 'Influencers Club API not configured', code: 'UPSTREAM_ERROR' },
-      { status: 503 }
-    )
   }
 
   const platform = req.nextUrl.searchParams.get('platform') as ClubPlatform

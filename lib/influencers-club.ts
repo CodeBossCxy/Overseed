@@ -7,8 +7,8 @@
 
 const BASE = 'https://api-dashboard.influencers.club'
 
-// Club search responses are cached for 30 minutes (see ClubSearchCache).
-const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000
+// Successful Club requests are cached indefinitely in PostgreSQL. This is
+// intentional: identical requests should never spend vendor credits twice.
 
 export type ClubPlatform = 'instagram' | 'youtube' | 'tiktok'
 
@@ -96,15 +96,99 @@ export interface ClubSearchOptions {
   country?: string
   minFollowers?: number
   maxFollowers?: number
+  // Engagement rate bounds in percent (filters.engagement_percent)
+  minEngagement?: number
+  maxEngagement?: number
+  // Creator gender. The club docs don't publish an enum; 'MALE'/'FEMALE'
+  // follows the convention of the underlying data provider.
+  gender?: 'MALE' | 'FEMALE'
+  // Language abbreviation as used by the club languages classifier (e.g. 'en')
+  language?: string
+  // keywords_in_bio (IG/TikTok) or keywords_in_description (YouTube)
+  bioKeywords?: string[]
+  // Days since last post: 90 or 365 (last_post; YouTube:
+  // last_upload_long_video). Omit for "any".
+  lastPost?: 90 | 365
+  // Audience age filter — Instagram only, creators with 10k+ followers
+  audienceAgeRange?: '13-17' | '18-24' | '25-34' | '35-44' | '45-64' | '65-'
+  audienceAgeMinPct?: number
+  // Only creators who also have accounts on these platforms
+  // (filters.creator_has: has_instagram / has_youtube / has_tiktok)
+  requirePlatforms?: ClubPlatform[]
   limit: number
   page?: number
 }
 
+function cachedSearchResult(data: any, extraWarnings: string[] = []) {
+  const results = Array.isArray(data?.results) ? data.results : []
+  const storedWarnings = Array.isArray(data?.warnings) ? data.warnings : []
+  return {
+    ...data,
+    results,
+    warnings: Array.from(new Set([...storedWarnings, ...extraWarnings])),
+    cache_hits: results.length,
+    live_calls: 0,
+    cached: true,
+  }
+}
+
 export async function clubSearch(opts: ClubSearchOptions) {
+  const query = opts.query?.trim().slice(0, 150) || null
+  const country = opts.country?.trim().toUpperCase() || null
+  const bioKeywords = (opts.bioKeywords ?? [])
+    .map((k) => k.trim().toLowerCase())
+    .filter(Boolean)
+    .slice(0, 10)
+    .sort()
+  // New filter keys are only added to the cache-key object when set, so
+  // pre-existing cache rows for filterless requests keep hitting.
+  const request: Record<string, any> = {
+    platform: opts.platform,
+    query,
+    country,
+    min_followers: opts.minFollowers ?? null,
+    max_followers: opts.maxFollowers ?? null,
+    limit: opts.limit,
+    page: opts.page ?? 0,
+  }
+  if (opts.minEngagement != null) request.min_engagement = opts.minEngagement
+  if (opts.maxEngagement != null) request.max_engagement = opts.maxEngagement
+  if (opts.gender) request.gender = opts.gender
+  if (opts.language) request.language = opts.language
+  if (bioKeywords.length) request.bio_keywords = bioKeywords
+  if (opts.lastPost) request.last_post = opts.lastPost
+  if (opts.platform === 'instagram' && opts.audienceAgeRange) {
+    request.audience_age = opts.audienceAgeRange
+    if (opts.audienceAgeMinPct != null) request.audience_age_min_pct = opts.audienceAgeMinPct
+  }
+  const requirePlatforms = (opts.requirePlatforms ?? [])
+    .filter((p) => p !== opts.platform)
+    .sort()
+  if (requirePlatforms.length) request.require_platforms = requirePlatforms
+  const { createHash } = await import('crypto')
+  const hash = (value: unknown) =>
+    createHash('sha1').update(JSON.stringify(value)).digest('hex')
+  const cacheKey = hash(request)
+
+  // Look up the request before resolving locations or contacting Club. A hit
+  // therefore makes zero Influencers Club API calls, including dictionary
+  // calls, and works even when the provider is temporarily unavailable.
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
+    if (hit) return cachedSearchResult(hit.data)
+  } catch {
+    // Cache is best-effort; a database issue may still fall through to live.
+  }
+
+  if (!clubConfigured()) {
+    throw new Error('Influencers Club API not configured')
+  }
+
   const warnings: string[] = []
   const filters: Record<string, any> = {}
 
-  if (opts.query) filters.ai_search = opts.query.slice(0, 150)
+  if (query) filters.ai_search = query
 
   if (opts.minFollowers != null || opts.maxFollowers != null) {
     const key =
@@ -115,13 +199,51 @@ export async function clubSearch(opts: ClubSearchOptions) {
     }
   }
 
-  if (opts.country?.trim()) {
-    const location = await resolveLocation(opts.platform, opts.country)
+  if (opts.minEngagement != null || opts.maxEngagement != null) {
+    filters.engagement_percent = {
+      ...(opts.minEngagement != null ? { min: opts.minEngagement } : {}),
+      ...(opts.maxEngagement != null ? { max: opts.maxEngagement } : {}),
+    }
+  }
+
+  if (opts.gender) filters.gender = opts.gender
+
+  if (opts.language) filters.profile_language = [opts.language]
+
+  if (bioKeywords.length) {
+    // YouTube profiles have a channel description instead of a bio
+    const key = opts.platform === 'youtube' ? 'keywords_in_description' : 'keywords_in_bio'
+    filters[key] = bioKeywords
+  }
+
+  if (opts.lastPost) {
+    const key = opts.platform === 'youtube' ? 'last_upload_long_video' : 'last_post'
+    filters[key] = opts.lastPost
+  }
+
+  // Audience demographics are Instagram-only (10k+ follower creators)
+  if (opts.platform === 'instagram' && opts.audienceAgeRange) {
+    filters.audience = {
+      age: [
+        {
+          range: opts.audienceAgeRange,
+          ...(opts.audienceAgeMinPct != null ? { min_pct: opts.audienceAgeMinPct } : {}),
+        },
+      ],
+    }
+  }
+
+  if (requirePlatforms.length) {
+    filters.creator_has = Object.fromEntries(requirePlatforms.map((p) => [`has_${p}`, true]))
+  }
+
+  if (country) {
+    const location = await resolveLocation(opts.platform, country)
     if (location) {
       filters.location = [location]
     } else {
       warnings.push(
-        `Country "${opts.country.toUpperCase()}" not recognized by Influencers Club — location filter skipped.`
+        `Country "${country}" not recognized by Influencers Club — location filter skipped.`
       )
     }
   }
@@ -130,24 +252,31 @@ export async function clubSearch(opts: ClubSearchOptions) {
     platform: opts.platform,
     paging: { limit: opts.limit, page: opts.page ?? 0 },
     sort: {
-      sort_by: opts.query ? 'relevancy' : 'number_of_followers',
+      sort_by: query ? 'relevancy' : 'number_of_followers',
       sort_order: 'desc',
     },
     filters,
   }
 
-  // Short-TTL response cache — repeat searches (same query/filters/page)
-  // return instantly and cost no vendor credits.
-  const { createHash } = await import('crypto')
-  const cacheKey = createHash('sha1').update(JSON.stringify(body)).digest('hex')
-  try {
-    const { prisma } = await import('@/lib/prisma')
-    const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
-    if (hit && Date.now() - hit.fetchedAt.getTime() < SEARCH_CACHE_TTL_MS) {
-      return { ...(hit.data as any), warnings }
+  // Compatibility with cache rows written before request-shaped keys were
+  // introduced. Promote an old body-hash hit to the new permanent key.
+  const legacyCacheKey = hash(body)
+  if (legacyCacheKey !== cacheKey) {
+    try {
+      const { prisma } = await import('@/lib/prisma')
+      const hit = await prisma.clubSearchCache.findUnique({ where: { key: legacyCacheKey } })
+      if (hit) {
+        const cachedData = hit.data as any
+        await prisma.clubSearchCache.upsert({
+          where: { key: cacheKey },
+          create: { key: cacheKey, request, data: cachedData, fetchedAt: hit.fetchedAt },
+          update: { request, data: cachedData },
+        })
+        return cachedSearchResult(cachedData, warnings)
+      }
+    } catch {
+      // Cache is best-effort; fall through to the live request.
     }
-  } catch {
-    // cache is best-effort; fall through to the live call
   }
 
   // The vendor occasionally has slow spells; one retry on timeout avoids
@@ -175,7 +304,8 @@ export async function clubSearch(opts: ClubSearchOptions) {
   }
 
   // Same shape as the KOL proxy so DiscoverPanel renders results unchanged.
-  const results = (data?.accounts || []).map((a: any) => ({
+  const accounts = Array.isArray(data?.accounts) ? data.accounts : []
+  const results = accounts.map((a: any) => ({
     id: `club:${opts.platform}:${a.user_id}`,
     platform: opts.platform,
     handle: a.profile?.username ?? null,
@@ -199,22 +329,92 @@ export async function clubSearch(opts: ClubSearchOptions) {
     warnings,
     cache_hits: 0,
     live_calls: 1,
+    cached: false,
   }
 
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    await prisma.clubSearchCache.upsert({
+      where: { key: cacheKey },
+      create: { key: cacheKey, request, data: shaped },
+      update: { request, data: shaped, fetchedAt: new Date() },
+    })
+  } catch (error) {
+    // Persistence is best-effort: a cache write must never hide valid live
+    // results from the user, but log failures so production can alert on them.
+    console.error('club search persistence failed:', error)
+  }
+
+  return shaped
+}
+
+// ---------------------------------------------------------------------------
+// Default discovery showcase: the top 10 Instagram creators (by followers)
+// who also have YouTube + TikTok accounts. Fetched from the club API exactly
+// once (~0.1 vendor credits), then served forever from clubSearchCache under
+// a dedicated key. Club avatar URLs expire after ~24h, so images are
+// re-hosted through lib/upload before the row is persisted.
+// ---------------------------------------------------------------------------
+
+const SHOWCASE_CACHE_KEY = 'showcase:instagram:v1'
+
+async function rehostAvatar(url: string | null): Promise<string | null> {
+  if (!url || url.startsWith('/')) return url // already local/proxied
+  try {
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10000) })
+    if (!res.ok) return null
+    const contentType = res.headers.get('content-type') || 'image/jpeg'
+    if (!contentType.startsWith('image/')) return null
+    const buffer = Buffer.from(await res.arrayBuffer())
+    if (buffer.length === 0 || buffer.length > 2 * 1024 * 1024) return null
+    const ext = contentType.includes('png') ? '.png' : contentType.includes('webp') ? '.webp' : '.jpg'
+    const { uploadFile } = await import('@/lib/upload')
+    return await uploadFile(buffer, `avatar${ext}`, contentType, 'discovery-avatars/')
+  } catch {
+    return null
+  }
+}
+
+export async function clubShowcase() {
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const hit = await prisma.clubSearchCache.findUnique({ where: { key: SHOWCASE_CACHE_KEY } })
+    if (hit) return cachedSearchResult(hit.data)
+  } catch {
+    // fall through to a fresh build
+  }
+
+  const shaped = await clubSearch({
+    platform: 'instagram',
+    requirePlatforms: ['youtube', 'tiktok'],
+    limit: 10,
+    page: 0,
+  })
+
+  const results = await Promise.all(
+    (shaped.results as any[]).map(async (r) => ({
+      ...r,
+      avatar_url: await rehostAvatar(r.avatar_url),
+    }))
+  )
+  const data = { ...shaped, results, cached: false }
+
+  // Persist only complete fetches: a transient empty/partial club response
+  // must not become the permanent default page.
   if (results.length > 0) {
     try {
       const { prisma } = await import('@/lib/prisma')
       await prisma.clubSearchCache.upsert({
-        where: { key: cacheKey },
-        create: { key: cacheKey, data: shaped },
-        update: { data: shaped, fetchedAt: new Date() },
+        where: { key: SHOWCASE_CACHE_KEY },
+        create: { key: SHOWCASE_CACHE_KEY, request: { showcase: 'instagram' }, data },
+        update: { request: { showcase: 'instagram' }, data, fetchedAt: new Date() },
       })
-    } catch {
-      // best-effort
+    } catch (error) {
+      console.error('showcase persistence failed:', error)
     }
   }
 
-  return shaped
+  return data
 }
 
 // ---------------------------------------------------------------------------
@@ -296,10 +496,9 @@ const enrichCache = new Map<string, any>()
 // outreach route to deliver messages without ever revealing the address.
 const contactEmailCache = new Map<string, string | null>()
 
-// Persistent 30-day cache (creator_enrichment_cache) so Profile View →
-// Outreach on the same creator never enriches twice upstream, across
-// deploys/restarts. data = { detail, email }; email never reaches clients.
-const ENRICH_CACHE_DAYS = 30
+// Permanent request cache (creator_enrichment_cache) shared by profiles,
+// analytics and outreach across deploys/restarts. data = { detail, email };
+// email never reaches clients.
 
 async function readDbEnrichCache(
   platform: ClubPlatform,
@@ -310,8 +509,6 @@ async function readDbEnrichCache(
     .findUnique({ where: { platform_handle: { platform, handle: handle.toLowerCase() } } })
     .catch(() => null)
   if (!row) return null
-  const ageMs = Date.now() - row.fetchedAt.getTime()
-  if (ageMs > ENRICH_CACHE_DAYS * 24 * 60 * 60 * 1000) return null
   return row.data as { detail: any; email: string | null }
 }
 
@@ -355,12 +552,16 @@ export async function clubEnrich(platform: ClubPlatform, handle: string) {
   const cached = enrichCache.get(cacheKey)
   if (cached) return cached
 
-  // Persistent cache (30 days) before any upstream (billed) call.
+  // Permanent cache before any upstream (billed) call.
   const dbCached = await readDbEnrichCache(platform, handle)
   if (dbCached) {
     enrichCache.set(cacheKey, dbCached.detail)
     contactEmailCache.set(cacheKey, dbCached.email)
     return dbCached.detail
+  }
+
+  if (!clubConfigured()) {
+    throw new Error('Influencers Club API not configured')
   }
 
   const res = await fetch(`${BASE}/public/v1/creators/enrich/handle/full/`, {
@@ -449,7 +650,7 @@ export async function clubEnrich(platform: ClubPlatform, handle: string) {
 // ---------------------------------------------------------------------------
 // Full analytics (audience demographics) — same 1-credit enrich call but with
 // include_audience_data: true. Cached under a "#analytics" pseudo-handle in
-// the same 30-day table so repeat views never re-bill upstream.
+// the same permanent table so repeat views never re-bill upstream.
 // Notable-user and lookalike lists are dropped: large, and they leak other
 // creators' identities to brands for free.
 // ---------------------------------------------------------------------------
@@ -481,6 +682,10 @@ export async function clubAnalytics(platform: ClubPlatform, handle: string) {
   if (dbCached) {
     enrichCache.set(cacheKey, dbCached.detail)
     return dbCached.detail
+  }
+
+  if (!clubConfigured()) {
+    throw new Error('Influencers Club API not configured')
   }
 
   const res = await fetch(`${BASE}/public/v1/creators/enrich/handle/full/`, {

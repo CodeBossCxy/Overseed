@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { getPlanConfigs, getActivePacks, getCreditPrices } from '@/lib/wallet'
+import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
 
 // GET /api/pricing/config — public, config-driven pricing for the pricing page.
 export async function GET() {
@@ -30,5 +31,6 @@ export async function GET() {
       freeUserEligible: p.freeUserEligible,
     })),
     prices,
+    creditSystemEnabled: CREDIT_SYSTEM_ENABLED,
   })
 }

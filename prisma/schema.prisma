@@ -866,8 +866,8 @@ model CreditPriceConfig {
   @@map("credit_price_config")
 }
 
-// 30-day cache of creator enrichment results so Profile View → Outreach on
-// the same creator does not hit the upstream provider twice.
+// Permanent cache of creator profile and analytics responses so the same
+// request never hits the upstream provider twice.
 model CreatorEnrichmentCache {
   id        String   @id @default(cuid())
   platform  String
@@ -879,11 +879,12 @@ model CreatorEnrichmentCache {
   @@map("creator_enrichment_cache")
 }
 
-// Short-TTL cache of club discovery search responses (key = hash of
-// platform+query+filters+page). Speeds up repeat searches and saves
-// vendor credits; rows past the TTL are ignored and replaced on write.
+// Permanent request cache of club discovery responses (key = hash of
+// platform+query+filters+page). Identical searches never call the vendor
+// twice; request stores the normalized parameters for inspection/export.
 model ClubSearchCache {
   key       String   @id
+  request   Json?
   data      Json
   fetchedAt DateTime @default(now())
 

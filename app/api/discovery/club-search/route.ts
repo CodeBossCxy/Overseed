@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { clubConfigured, clubSearch, type ClubPlatform } from '@/lib/influencers-club'
+import { clubSearch, type ClubPlatform } from '@/lib/influencers-club'
 import { safeLocalCreatorDiscovery } from '@/lib/discovery'
 import { consumeQuota } from '@/lib/plan'
 import { getEffectiveTier } from '@/lib/subscription'
@@ -43,6 +43,31 @@ export async function GET(req: NextRequest) {
   if (!CLUB_PLATFORMS.includes(platform)) {
     return NextResponse.json({ message: 'Unsupported platform', code: 'UNSUPPORTED_PLATFORM' }, { status: 400 })
   }
+
+  // Enum-valued advanced filters (all optional). Invalid values are a
+  // client bug/tampering — reject before any charge.
+  const gender = params.get('gender')?.trim().toUpperCase() || undefined
+  if (gender && gender !== 'MALE' && gender !== 'FEMALE') {
+    return NextResponse.json({ message: 'Invalid gender filter', code: 'INVALID_FILTER' }, { status: 400 })
+  }
+  const lastPostRaw = params.get('last_post')?.trim() || undefined
+  if (lastPostRaw && lastPostRaw !== '90' && lastPostRaw !== '365') {
+    return NextResponse.json({ message: 'Invalid last_post filter', code: 'INVALID_FILTER' }, { status: 400 })
+  }
+  const AUDIENCE_AGES = ['13-17', '18-24', '25-34', '35-44', '45-64', '65-'] as const
+  const audienceAge = params.get('audience_age')?.trim() || undefined
+  if (audienceAge && !(AUDIENCE_AGES as readonly string[]).includes(audienceAge)) {
+    return NextResponse.json({ message: 'Invalid audience_age filter', code: 'INVALID_FILTER' }, { status: 400 })
+  }
+  const language = params.get('language')?.trim().toLowerCase() || undefined
+  if (language && !/^[a-z]{2,3}$/.test(language)) {
+    return NextResponse.json({ message: 'Invalid language filter', code: 'INVALID_FILTER' }, { status: 400 })
+  }
+  const bioKeywords = (params.get('bio_keywords') || '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean)
+    .slice(0, 10)
 
   // Pricing v4: every search page costs credits (config: discovery_search per
   // page of 10). Charged up front; adjusted after results come back.
@@ -94,11 +119,6 @@ export async function GET(req: NextRequest) {
     await walletRefund(userId, searchCharge.referenceId, { amount: price - keep })
   }
 
-  if (!clubConfigured()) {
-    const local = await safeLocalCreatorDiscovery(req.nextUrl.searchParams, true)
-    await settleCharge(local?.results?.length ?? 0)
-    return NextResponse.json(local)
-  }
   const num = (key: string) => {
     const v = params.get(key)
     if (!v) return undefined
@@ -113,6 +133,16 @@ export async function GET(req: NextRequest) {
       country: params.get('country')?.trim() || undefined,
       minFollowers: num('min_followers'),
       maxFollowers: num('max_followers'),
+      minEngagement: num('min_engagement'),
+      maxEngagement: num('max_engagement'),
+      gender: gender as 'MALE' | 'FEMALE' | undefined,
+      language,
+      bioKeywords,
+      lastPost: lastPostRaw ? (Number(lastPostRaw) as 90 | 365) : undefined,
+      // Audience demographics are Instagram-only; ignore for other platforms
+      audienceAgeRange:
+        platform === 'instagram' ? (audienceAge as '13-17' | '18-24' | '25-34' | '35-44' | '45-64' | '65-' | undefined) : undefined,
+      audienceAgeMinPct: num('audience_age_min_pct'),
       // v4: fixed page size of 10 (one billed page); legacy allows up to 25.
       limit: CREDIT_SYSTEM_ENABLED ? DISCOVERY_PAGE_SIZE : Math.min(num('limit') ?? 10, 25),
       page: num('page') ?? 0,

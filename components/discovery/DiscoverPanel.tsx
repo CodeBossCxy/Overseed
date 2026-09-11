@@ -35,6 +35,12 @@ type DiscoverySource = 'kol' | 'club'
 const CLUB_PAGE_SIZE = 10
 /* END TEMP */
 
+interface DiscoverySearchRequest {
+  endpoint: 'club-search' | 'search'
+  params: string
+  pageSize: number
+}
+
 const PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: 'YouTube',
@@ -66,6 +72,32 @@ const COUNTRY_FILTER_OPTIONS: { code: string; key: string }[] = [
   { code: 'IT', key: 'it' },
   { code: 'ES', key: 'es' },
 ]
+
+// Language filter options — club classifier abbreviations with native-name
+// labels (self-describing, so no i18n entries needed).
+const LANGUAGE_FILTER_OPTIONS: { code: string; label: string }[] = [
+  { code: 'en', label: 'English' },
+  { code: 'zh', label: '中文' },
+  { code: 'es', label: 'Español' },
+  { code: 'pt', label: 'Português' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'nl', label: 'Nederlands' },
+  { code: 'sv', label: 'Svenska' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ko', label: '한국어' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'id', label: 'Bahasa Indonesia' },
+  { code: 'th', label: 'ไทย' },
+  { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'tr', label: 'Türkçe' },
+  { code: 'ru', label: 'Русский' },
+]
+
+// Audience age buckets supported by the club audience filter (IG only)
+const AUDIENCE_AGE_OPTIONS = ['13-17', '18-24', '25-34', '35-44', '45-64', '65-'] as const
 
 // Coverage statuses that are normal operation, not warnings worth a banner.
 const COVERAGE_OK = new Set(['ok', 'cache', 'live'])
@@ -115,13 +147,38 @@ export default function DiscoverPanel() {
   // through the club API regardless of platform. Flip back to state when
   // re-enabling the KOL path.
   const [source] = useState<DiscoverySource>('club')
-  // The KOL service's live search covers YouTube only (phase 1) — lock the
-  // default source to YouTube so IG/TikTok searches don't dead-end.
-  const [platforms, setPlatforms] = useState<string[]>(['youtube'])
+  // Instagram default: the browse showcase (top tri-platform creators) is
+  // Instagram-anchored, and IG is the only platform with audience filters.
+  const [platforms, setPlatforms] = useState<string[]>(['instagram'])
   const [country, setCountry] = useState('')
   const [minFollowers, setMinFollowers] = useState('')
   const [maxFollowers, setMaxFollowers] = useState('')
   const [sort, setSort] = useState<'followers' | 'recent'>('followers')
+
+  // Pricing v4 search price (credits per page of 10) for the live cost
+  // estimate under the search bar. null = credit system off / not loaded.
+  const [searchPrice, setSearchPrice] = useState<number | null>(null)
+  useEffect(() => {
+    fetch('/api/pricing/config')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.creditSystemEnabled && typeof data.prices?.discovery_search === 'number') {
+          setSearchPrice(data.prices.discovery_search)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Advanced filters (keyword search via the club API only — the local
+  // browse index doesn't support them)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [minEngagement, setMinEngagement] = useState('')
+  const [maxEngagement, setMaxEngagement] = useState('')
+  const [gender, setGender] = useState('')
+  const [language, setLanguage] = useState('')
+  const [bioKeywords, setBioKeywords] = useState('')
+  const [lastPost, setLastPost] = useState('')
+  const [audienceAge, setAudienceAge] = useState('')
 
   const [browseList, setBrowseList] = useState<DiscoveredCreator[] | null>(null)
   // Offset into the raw (un-narrowed) creator index for pagination — may
@@ -130,6 +187,9 @@ export default function DiscoverPanel() {
   const [rawOffset, setRawOffset] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null)
+  const [activeSearch, setActiveSearch] = useState<DiscoverySearchRequest | null>(null)
+  const [searchPage, setSearchPage] = useState(0)
+  const [searchHasMore, setSearchHasMore] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -150,6 +210,9 @@ export default function DiscoverPanel() {
   const togglePlatform = (p: string) => {
     setPlatforms([p])
     setSearchResult(null)
+    setActiveSearch(null)
+    setSearchPage(0)
+    setSearchHasMore(false)
   }
 
   /* TEMP: influencers.club creator detail popup (contact info stripped
@@ -374,45 +437,27 @@ export default function DiscoverPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort])
 
-  const submit = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    if (!query.trim()) {
-      setSearchResult(null)
-      fetchBrowse(0, false)
-      return
-    }
-    if (platforms.length === 0) return
+  const runSearchPage = async (
+    request: DiscoverySearchRequest,
+    page: number,
+    preserveCurrentOnEmpty = false
+  ) => {
     setIsLoading(true)
     setError(null)
     setSearchBlocked(false)
     setUnavailable(false)
     try {
-      /* TEMP: influencers.club search path — small pages, one platform */
-      const isClub = source === 'club'
-      const qs = isClub
-        ? new URLSearchParams({
-            q: query.trim(),
-            platform: platforms[0],
-            limit: String(CLUB_PAGE_SIZE),
-          })
-        : new URLSearchParams({
-            q: query.trim(),
-            topics: query.trim(),
-            platforms: platforms.join(','),
-            limit: String(PAGE_SIZE),
-          })
-      /* END TEMP */
-      if (country.trim()) qs.set('country', country.trim().toUpperCase())
-      if (minFollowers) qs.set('min_followers', minFollowers)
-      if (maxFollowers) qs.set('max_followers', maxFollowers)
+      const qs = new URLSearchParams(request.params)
+      if (request.endpoint === 'club-search') qs.set('page', String(page))
+      // The offset is ignored by Club, but lets Overseed's local fallback
+      // return the corresponding page if the provider is unavailable.
+      qs.set('offset', String(page * request.pageSize))
 
-      const res = await fetch(
-        `/api/discovery/${isClub ? 'club-search' : 'search'}?${qs}`
-      )
+      const res = await fetch(`/api/discovery/${request.endpoint}?${qs}`)
       window.dispatchEvent(new Event('credits:refresh'))
       if (res.status === 503) {
         setUnavailable(true)
-        setSearchResult(null)
+        if (!preserveCurrentOnEmpty) setSearchResult(null)
         return
       }
       const data = await res.json().catch(() => null)
@@ -420,18 +465,86 @@ export default function DiscoverPanel() {
         setSearchBlocked(QUOTA_CODES.includes(data?.code))
         throw new Error(data?.message || d.searchFailed)
       }
+      const results = Array.isArray(data?.results) ? data.results : []
+      // A full page is the only signal the provider gives us that another
+      // page may exist. If that probe is empty, keep the current page visible
+      // and simply disable the Next page button.
+      if (preserveCurrentOnEmpty && results.length === 0) {
+        setSearchHasMore(false)
+        return
+      }
       setSearchResult(data)
+      setActiveSearch(request)
+      setSearchPage(page)
+      setSearchHasMore(results.length === request.pageSize)
     } catch (err: any) {
       setError(err.message || d.searchFailed)
-      setSearchResult(null)
+      if (!preserveCurrentOnEmpty) {
+        setSearchResult(null)
+        setActiveSearch(null)
+        setSearchPage(0)
+        setSearchHasMore(false)
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (!query.trim()) {
+      setSearchResult(null)
+      setActiveSearch(null)
+      setSearchPage(0)
+      setSearchHasMore(false)
+      fetchBrowse(0, false)
+      return
+    }
+    if (platforms.length === 0) return
+
+    /* TEMP: influencers.club search path — small pages, one platform */
+    const isClub = source === 'club'
+    const qs = isClub
+      ? new URLSearchParams({
+          q: query.trim(),
+          platform: platforms[0],
+          limit: String(CLUB_PAGE_SIZE),
+        })
+      : new URLSearchParams({
+          q: query.trim(),
+          topics: query.trim(),
+          platforms: platforms.join(','),
+          limit: String(PAGE_SIZE),
+        })
+    /* END TEMP */
+    if (country.trim()) qs.set('country', country.trim().toUpperCase())
+    if (minFollowers) qs.set('min_followers', minFollowers)
+    if (maxFollowers) qs.set('max_followers', maxFollowers)
+    if (minEngagement) qs.set('min_engagement', minEngagement)
+    if (maxEngagement) qs.set('max_engagement', maxEngagement)
+    if (gender) qs.set('gender', gender)
+    if (language) qs.set('language', language)
+    if (bioKeywords.trim()) qs.set('bio_keywords', bioKeywords.trim())
+    if (lastPost) qs.set('last_post', lastPost)
+    // Audience demographics are an Instagram-only club filter
+    if (audienceAge && platforms[0] === 'instagram') qs.set('audience_age', audienceAge)
+
+    await runSearchPage(
+      {
+        endpoint: isClub ? 'club-search' : 'search',
+        params: qs.toString(),
+        pageSize: isClub ? CLUB_PAGE_SIZE : PAGE_SIZE,
+      },
+      0
+    )
+  }
+
   const clearSearch = () => {
     setQuery('')
     setSearchResult(null)
+    setActiveSearch(null)
+    setSearchPage(0)
+    setSearchHasMore(false)
     fetchBrowse(0, false)
   }
 
@@ -467,6 +580,15 @@ export default function DiscoverPanel() {
             </button>
           )}
         </div>
+
+        {/* Live credit-cost estimate: updates as the user types/filters */}
+        {searchPrice != null && (
+          <p className="mt-2 text-xs text-gray-400">
+            {query.trim()
+              ? d.searchCostEstimate.replace('{n}', String(searchPrice))
+              : d.browseFreeNote.replace('{n}', String(searchPrice))}
+          </p>
+        )}
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
           <div>
@@ -538,7 +660,114 @@ export default function DiscoverPanel() {
               </select>
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+          >
+            {showAdvanced ? d.advancedFiltersHide : d.advancedFilters}
+          </button>
         </div>
+
+        {showAdvanced && (
+          <div className="mt-4 pt-4 border-t border-gray-200/60">
+            <p className="text-xs text-gray-400 mb-3">{d.advancedHint}</p>
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.minEngagement}</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={minEngagement}
+                  onChange={(e) => setMinEngagement(e.target.value)}
+                  placeholder="1"
+                  className="w-24 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.maxEngagement}</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={maxEngagement}
+                  onChange={(e) => setMaxEngagement(e.target.value)}
+                  placeholder="10"
+                  className="w-24 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.genderLabel}</label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+                >
+                  <option value="">{d.anyOption}</option>
+                  <option value="FEMALE">{d.genderFemale}</option>
+                  <option value="MALE">{d.genderMale}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.languageLabel}</label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+                >
+                  <option value="">{d.allLanguages}</option>
+                  {LANGUAGE_FILTER_OPTIONS.map(({ code, label }) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.bioKeywordsLabel}</label>
+                <input
+                  type="text"
+                  value={bioKeywords}
+                  onChange={(e) => setBioKeywords(e.target.value)}
+                  placeholder={d.bioKeywordsPlaceholder}
+                  className="w-48 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.lastPostLabel}</label>
+                <select
+                  value={lastPost}
+                  onChange={(e) => setLastPost(e.target.value)}
+                  className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+                >
+                  <option value="">{d.anyOption}</option>
+                  <option value="90">{d.lastPost90}</option>
+                  <option value="365">{d.lastPost365}</option>
+                </select>
+              </div>
+              {platforms[0] === 'instagram' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.audienceAgeLabel}</label>
+                  <select
+                    value={audienceAge}
+                    onChange={(e) => setAudienceAge(e.target.value)}
+                    className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+                  >
+                    <option value="">{d.anyOption}</option>
+                    {AUDIENCE_AGE_OPTIONS.map((range) => (
+                      <option key={range} value={range}>
+                        {range === '65-' ? '65+' : range}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </form>
 
       {/* States */}
@@ -678,6 +907,30 @@ export default function DiscoverPanel() {
                 className="px-6 py-2.5 bg-white/55 text-gray-700 rounded-full font-semibold hover:bg-white/75 transition disabled:opacity-50"
               >
                 {isLoadingMore ? d.loadingCreators : d.loadMore}
+              </button>
+            </div>
+          )}
+
+          {searchResult && creators.length > 0 && (searchPage > 0 || searchHasMore) && (
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => activeSearch && runSearchPage(activeSearch, searchPage - 1, true)}
+                disabled={!activeSearch || searchPage === 0 || isLoading}
+                className="px-5 py-2.5 bg-white/55 text-gray-700 rounded-full font-semibold hover:bg-white/75 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ← {d.previousPage}
+              </button>
+              <span className="min-w-20 text-center text-sm font-medium text-gray-500">
+                {d.pageLabel} {searchPage + 1}
+              </span>
+              <button
+                type="button"
+                onClick={() => activeSearch && runSearchPage(activeSearch, searchPage + 1, true)}
+                disabled={!activeSearch || !searchHasMore || isLoading}
+                className="px-5 py-2.5 bg-primary-600 text-white rounded-full font-semibold hover:bg-primary-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {d.nextPage} →
               </button>
             </div>
           )}
