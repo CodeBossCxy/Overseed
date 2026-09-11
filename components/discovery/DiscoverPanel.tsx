@@ -147,9 +147,9 @@ export default function DiscoverPanel() {
   // through the club API regardless of platform. Flip back to state when
   // re-enabling the KOL path.
   const [source] = useState<DiscoverySource>('club')
-  // Instagram default: the browse showcase (top tri-platform creators) is
-  // Instagram-anchored, and IG is the only platform with audience filters.
-  const [platforms, setPlatforms] = useState<string[]>(['instagram'])
+  // YouTube default: the browse list comes from the YouTube Data API ranked
+  // by subscribers; the Instagram pill shows the cached club showcase.
+  const [platforms, setPlatforms] = useState<string[]>(['youtube'])
   const [country, setCountry] = useState('')
   const [minFollowers, setMinFollowers] = useState('')
   const [maxFollowers, setMaxFollowers] = useState('')
