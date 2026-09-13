@@ -132,7 +132,10 @@ function cachedSearchResult(data: any, extraWarnings: string[] = []) {
   }
 }
 
-export async function clubSearch(opts: ClubSearchOptions) {
+// Normalized request object used as the permanent cache key. New filter keys
+// are only added when set, so pre-existing cache rows for filterless
+// requests keep hitting.
+function buildCacheRequest(opts: ClubSearchOptions) {
   const query = opts.query?.trim().slice(0, 150) || null
   const country = opts.country?.trim().toUpperCase() || null
   const bioKeywords = (opts.bioKeywords ?? [])
@@ -140,8 +143,6 @@ export async function clubSearch(opts: ClubSearchOptions) {
     .filter(Boolean)
     .slice(0, 10)
     .sort()
-  // New filter keys are only added to the cache-key object when set, so
-  // pre-existing cache rows for filterless requests keep hitting.
   const request: Record<string, any> = {
     platform: opts.platform,
     query,
@@ -165,10 +166,30 @@ export async function clubSearch(opts: ClubSearchOptions) {
     .filter((p) => p !== opts.platform)
     .sort()
   if (requirePlatforms.length) request.require_platforms = requirePlatforms
+  return { request, query, country, bioKeywords, requirePlatforms }
+}
+
+async function hashRequest(value: unknown) {
   const { createHash } = await import('crypto')
-  const hash = (value: unknown) =>
-    createHash('sha1').update(JSON.stringify(value)).digest('hex')
-  const cacheKey = hash(request)
+  return createHash('sha1').update(JSON.stringify(value)).digest('hex')
+}
+
+// Cache-only probe: returns the cached search result or null, making zero
+// vendor calls. Lets the API route check the cache in parallel with billing.
+export async function clubSearchCacheProbe(opts: ClubSearchOptions) {
+  try {
+    const cacheKey = await hashRequest(buildCacheRequest(opts).request)
+    const { prisma } = await import('@/lib/prisma')
+    const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
+    return hit ? cachedSearchResult(hit.data) : null
+  } catch {
+    return null
+  }
+}
+
+export async function clubSearch(opts: ClubSearchOptions) {
+  const { request, query, country, bioKeywords, requirePlatforms } = buildCacheRequest(opts)
+  const cacheKey = await hashRequest(request)
 
   // Look up the request before resolving locations or contacting Club. A hit
   // therefore makes zero Influencers Club API calls, including dictionary
@@ -260,7 +281,7 @@ export async function clubSearch(opts: ClubSearchOptions) {
 
   // Compatibility with cache rows written before request-shaped keys were
   // introduced. Promote an old body-hash hit to the new permanent key.
-  const legacyCacheKey = hash(body)
+  const legacyCacheKey = await hashRequest(body)
   if (legacyCacheKey !== cacheKey) {
     try {
       const { prisma } = await import('@/lib/prisma')
@@ -472,8 +493,6 @@ export async function clubCreditsLeft(): Promise<ClubCredits | null> {
 // server-side before anything reaches the browser.
 // ---------------------------------------------------------------------------
 
-const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g
-
 const ENRICH_PLATFORM_KEYS = [
   'instagram',
   'youtube',
@@ -543,21 +562,37 @@ export async function getCreatorContactEmail(
   return undefined
 }
 
-function redact(text: unknown): string | null {
-  return typeof text === 'string' ? text.replace(EMAIL_RE, '•••') : null
+// Drop any bio line that contains an email address (or an already-redacted
+// '•••' placeholder from older cache rows) — partial redaction still hints
+// that contact info exists, so the whole line goes.
+function stripContactLines(text: unknown): string | null {
+  if (typeof text !== 'string') return null
+  const emailRe = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/
+  const kept = text
+    .split(/\r?\n/)
+    .filter((line) => !emailRe.test(line) && !line.includes('•••'))
+  return kept.join('\n').trim() || null
+}
+
+// Old cache rows may still carry '•••'-redacted bio lines — normalize on the
+// way out so the client never sees them.
+function cleanCachedDetail(detail: any) {
+  return detail && typeof detail === 'object'
+    ? { ...detail, bio: stripContactLines(detail.bio) }
+    : detail
 }
 
 export async function clubEnrich(platform: ClubPlatform, handle: string) {
   const cacheKey = `${platform}:${handle.toLowerCase()}`
   const cached = enrichCache.get(cacheKey)
-  if (cached) return cached
+  if (cached) return cleanCachedDetail(cached)
 
   // Permanent cache before any upstream (billed) call.
   const dbCached = await readDbEnrichCache(platform, handle)
   if (dbCached) {
     enrichCache.set(cacheKey, dbCached.detail)
     contactEmailCache.set(cacheKey, dbCached.email)
-    return dbCached.detail
+    return cleanCachedDetail(dbCached.detail)
   }
 
   if (!clubConfigured()) {
@@ -615,8 +650,10 @@ export async function clubEnrich(platform: ClubPlatform, handle: string) {
     platform,
     handle,
     name: main.full_name || main.title || r.first_name || handle,
-    avatar_url: main.profile_picture ?? null,
-    bio: redact(main.biography ?? main.description),
+    // Club picture URLs expire in ~24h but this detail is cached forever, so
+    // re-host the image; keep the short-lived URL only if re-hosting fails.
+    avatar_url: (await rehostAvatar(main.profile_picture ?? null)) ?? main.profile_picture ?? null,
+    bio: stripContactLines(main.biography ?? main.description),
     location: r.location ?? null,
     language: r.speaking_language ?? null,
     gender: r.gender ?? null,

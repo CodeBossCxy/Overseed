@@ -140,7 +140,12 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [minFollowers, setMinFollowers] = useState('')
   const [creators, setCreators] = useState<Creator[]>([])
   const [queue, setQueue] = useState<QueueItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  // No creators are shown until the brand runs the AI match (or a manual
+  // search) — discovery is metered, so nothing auto-loads.
+  const [matched, setMatched] = useState(false)
+  const [aiMatching, setAiMatching] = useState(false)
+  const [searchPrice, setSearchPrice] = useState<number | null>(null)
   const [queueBusy, setQueueBusy] = useState(false)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<Creator | null>(null)
@@ -172,10 +177,62 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       if (!res.ok) throw new Error(data?.message || 'Creator discovery is temporarily unavailable.')
       setCreators(data?.results || [])
     } catch (e: any) { setError(e.message) }
-    finally { setLoading(false) }
+    finally { setLoading(false); setMatched(true) }
   }, [country, minFollowers, platform])
 
-  useEffect(() => { discover(); loadQueue() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // AI match: turn the campaign brief into search filters (parse-query),
+  // then run one billed club search page with them.
+  const aiMatch = async () => {
+    if (aiMatching) return
+    setAiMatching(true); setError('')
+    try {
+      const catNames = campaign.categories.map(c => c.category.name).join(', ')
+      const platformNames = campaign.platforms.map(p => p.platform.name).join(', ')
+      const minReq = campaign.followerRequirements?.[0]?.minFollowers
+      const text =
+        `Find creators for this campaign. Title: ${campaign.title}. Categories: ${catNames}. ` +
+        `Platforms: ${platformNames}. ${minReq ? `Minimum ${minReq} followers. ` : ''}` +
+        (campaign.description || '').slice(0, 300)
+      let q = catNames || campaign.title
+      let plat = platform
+      const qs = new URLSearchParams({ limit: '10' })
+      try {
+        const parseRes = await fetch('/api/discovery/parse-query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        })
+        const parsed = parseRes.ok ? (await parseRes.json())?.parsed : null
+        if (parsed?.keywords) q = parsed.keywords
+        if (parsed?.platform) plat = parsed.platform
+        if (parsed?.country) qs.set('country', parsed.country)
+        if (parsed?.min_followers != null) qs.set('min_followers', String(parsed.min_followers))
+      } catch {
+        // Parsing is best-effort; fall back to category keywords
+      }
+      qs.set('q', q); qs.set('platform', plat)
+      const res = await fetch(`/api/discovery/club-search?${qs}`)
+      window.dispatchEvent(new Event('credits:refresh'))
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Creator matching is temporarily unavailable.')
+      setCreators(data?.results || [])
+      setQuery(q); setPlatform(plat)
+      setMatched(true)
+    } catch (e: any) { setError(e.message) }
+    finally { setAiMatching(false) }
+  }
+
+  useEffect(() => { loadQueue() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetch('/api/pricing/config')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (data?.creditSystemEnabled && typeof data.prices?.discovery_search === 'number') {
+          setSearchPrice(data.prices.discovery_search)
+        }
+      })
+      .catch(() => {})
+  }, [])
   useEffect(() => {
     const controller = new AbortController()
     fetch(`/api/campaigns/${initialCampaign.id}?lang=${locale}&track=0`, { signal: controller.signal })
@@ -337,6 +394,8 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <div className="mt-5 grid md:grid-cols-4 gap-2 bg-white/25 rounded-2xl p-3 text-sm">{[[m.stepShortlist,m.stepShortlistDesc],[m.stepOutreach,m.stepOutreachDesc],[m.stepResponse,m.stepResponseDesc],[m.stepCollab,m.stepCollabDesc]].map(([a,b], i) => <div key={a} className="flex items-center gap-2"><span className="w-8 h-8 rounded-full bg-white/75 flex items-center justify-center text-indigo-500">{i+1}</span><div><b>{a}</b><p className="text-xs text-[#7d88aa]">{b}</p></div>{i<3 && <span className="ml-auto hidden md:block">→</span>}</div>)}</div>
           </section>
 
+          {/* Search + filters only appear after the AI recommendation ran */}
+          {matched && (
           <form onSubmit={e => { e.preventDefault(); discover(query) }} className="mb-4">
             <div className="flex gap-2"><div className="workspace-glass-control flex-1 flex items-center gap-3 px-4 py-3">{icon(searchIcon, 'w-4 h-4')}<input value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent outline-none w-full" placeholder={d.searchByNamePlaceholder}/></div><button className="px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold">{d.searchButton}</button></div>
             <div className="flex flex-wrap gap-2 mt-3">
@@ -344,10 +403,42 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               <select value={platform} onChange={e => setPlatform(e.target.value)} className="workspace-glass-control px-3 py-2 text-sm"><option value="youtube">YouTube</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select>
               <input value={country} onChange={e => setCountry(e.target.value)} maxLength={2} placeholder={d.countryLabel} className="workspace-glass-control w-28 px-3 py-2 text-sm uppercase"/>
               <input type="number" value={minFollowers} onChange={e => setMinFollowers(e.target.value)} placeholder={d.minFollowers} className="workspace-glass-control w-36 px-3 py-2 text-sm"/>
-              <button type="button" onClick={() => { setQuery(''); setCountry(''); setMinFollowers(''); discover('') }} className="px-3 text-sm text-[#65739e]">{d.clearAll}</button>
+              <button type="button" onClick={() => { setQuery(''); setCountry(''); setMinFollowers(''); setCreators([]); setMatched(false) }} className="px-3 text-sm text-[#65739e]">{d.clearAll}</button>
             </div>
           </form>
+          )}
           {error && <div className="mb-3 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>}
+          {!matched && (
+            <section className="workspace-glass-card rounded-3xl px-6 py-12 text-center">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-white/70 text-indigo-600 flex items-center justify-center text-2xl">✨</div>
+              <h3 className="font-bold text-xl mt-4">{m.aiMatchTitle}</h3>
+              <p className="text-sm text-[#7180ad] mt-2 max-w-lg mx-auto">{m.aiMatchDesc}</p>
+              <div className="mt-5 mx-auto max-w-lg grid sm:grid-cols-3 gap-2 text-xs text-[#5f6c95]">
+                {[m.aiMatchStep1, m.aiMatchStep2, m.aiMatchStep3].map((s, i) => (
+                  <div key={s} className="bg-white/40 rounded-xl px-3 py-2.5">
+                    <span className="text-indigo-500 font-bold">{i + 1}.</span> {s}
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={aiMatch}
+                disabled={aiMatching}
+                className="mt-6 px-8 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50"
+              >
+                ✨ {aiMatching ? m.aiMatchLoading : m.aiMatchButton}
+                {!aiMatching && searchPrice != null && (
+                  <span className="font-normal"> · {d.creditsN.replace('{n}', String(searchPrice))}</span>
+                )}
+              </button>
+              {searchPrice != null && (
+                <p className="mt-3 text-xs text-[#7d88aa] max-w-md mx-auto">
+                  {m.aiMatchCostNote.replace('{n}', String(searchPrice))}
+                </p>
+              )}
+            </section>
+          )}
+          {matched && (<>
           <div className="flex items-center justify-between mb-3"><b>{loading ? m.findingCreators : m.creatorsFound.replace('{count}', String(creators.length))}</b><span className="text-sm text-[#7180ad]">{m.sortBy}<b>{m.relevance}</b></span></div>
           <div className={`grid md:grid-cols-2 2xl:grid-cols-3 gap-3 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
             {creators.map(c => <article key={c.id} className="workspace-glass-card rounded-3xl p-5 min-h-64 flex flex-col">
@@ -357,6 +448,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               <div className="flex gap-2 mt-auto pt-5"><button onClick={() => openCreator(c)} className="flex-1 py-2 rounded-xl border border-white bg-white/25 text-sm font-semibold">{m.viewProfile}</button><button disabled={queuedIds.has(c.id) || queueBusy} onClick={() => addCreator(c)} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-semibold disabled:opacity-50">{queuedIds.has(c.id) ? m.added : m.addToCampaign}</button></div>
             </article>)}
           </div>
+          </>)}
         </>
       </div>
 

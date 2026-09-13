@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { clubSearch, type ClubPlatform } from '@/lib/influencers-club'
+import { clubSearch, clubSearchCacheProbe, type ClubPlatform } from '@/lib/influencers-club'
 import { safeLocalCreatorDiscovery } from '@/lib/discovery'
 import { consumeQuota } from '@/lib/plan'
 import { getEffectiveTier } from '@/lib/subscription'
@@ -69,16 +69,51 @@ export async function GET(req: NextRequest) {
     .filter(Boolean)
     .slice(0, 10)
 
+  const num = (key: string) => {
+    const v = params.get(key)
+    if (!v) return undefined
+    const n = Number(v)
+    return Number.isFinite(n) ? n : undefined
+  }
+
+  const searchOpts = {
+    platform,
+    query: params.get('q')?.trim() || undefined,
+    country: params.get('country')?.trim() || undefined,
+    minFollowers: num('min_followers'),
+    maxFollowers: num('max_followers'),
+    minEngagement: num('min_engagement'),
+    maxEngagement: num('max_engagement'),
+    gender: gender as 'MALE' | 'FEMALE' | undefined,
+    language,
+    bioKeywords,
+    lastPost: lastPostRaw ? (Number(lastPostRaw) as 90 | 365) : undefined,
+    // Audience demographics are Instagram-only; ignore for other platforms
+    audienceAgeRange:
+      platform === 'instagram' ? (audienceAge as '13-17' | '18-24' | '25-34' | '35-44' | '45-64' | '65-' | undefined) : undefined,
+    audienceAgeMinPct: num('audience_age_min_pct'),
+    // v4: fixed page size of 10 (one billed page); legacy allows up to 25.
+    limit: CREDIT_SYSTEM_ENABLED ? DISCOVERY_PAGE_SIZE : Math.min(num('limit') ?? 10, 25),
+    page: num('page') ?? 0,
+  }
+
   // Pricing v4: every search page costs credits (config: discovery_search per
-  // page of 10). Charged up front; adjusted after results come back.
+  // page of 10). Charged up front; adjusted after results come back. The
+  // cache probe is free, so it runs in parallel with the wallet charge —
+  // repeat searches skip the vendor round-trip entirely.
   let searchCharge: { referenceId: string; refund: () => Promise<void> } | null = null
+  let cachedResult: Awaited<ReturnType<typeof clubSearchCacheProbe>> = null
   if (CREDIT_SYSTEM_ENABLED) {
     const referenceId = `discovery:${userId}:${Date.now()}`
-    const charge = await chargeCredits(userId, 'discovery_search', referenceId)
+    const [probe, charge] = await Promise.all([
+      clubSearchCacheProbe(searchOpts),
+      chargeCredits(userId, 'discovery_search', referenceId),
+    ])
     if (!charge.ok) {
       return NextResponse.json(charge.body, { status: charge.status })
     }
     if (charge.cost > 0) searchCharge = { referenceId, refund: charge.refund }
+    cachedResult = probe
   } else if (params.get('q')?.trim()) {
     // Pricing v3 (legacy): keyword searches consume the monthly discovery
     // quota; beyond it, extra searches bill 6 credits each.
@@ -119,40 +154,26 @@ export async function GET(req: NextRequest) {
     await walletRefund(userId, searchCharge.referenceId, { amount: price - keep })
   }
 
-  const num = (key: string) => {
-    const v = params.get(key)
-    if (!v) return undefined
-    const n = Number(v)
-    return Number.isFinite(n) ? n : undefined
+  // Refund settlement is pure bookkeeping — run it after the response is
+  // sent instead of blocking the search result on extra DB round-trips.
+  const settleAfterResponse = (resultCount: number) => {
+    after(async () => {
+      try {
+        await settleCharge(resultCount)
+      } catch (err: any) {
+        console.error('Discovery charge settlement failed:', err?.message)
+      }
+    })
   }
 
   try {
-    const result = await clubSearch({
-      platform,
-      query: params.get('q')?.trim() || undefined,
-      country: params.get('country')?.trim() || undefined,
-      minFollowers: num('min_followers'),
-      maxFollowers: num('max_followers'),
-      minEngagement: num('min_engagement'),
-      maxEngagement: num('max_engagement'),
-      gender: gender as 'MALE' | 'FEMALE' | undefined,
-      language,
-      bioKeywords,
-      lastPost: lastPostRaw ? (Number(lastPostRaw) as 90 | 365) : undefined,
-      // Audience demographics are Instagram-only; ignore for other platforms
-      audienceAgeRange:
-        platform === 'instagram' ? (audienceAge as '13-17' | '18-24' | '25-34' | '35-44' | '45-64' | '65-' | undefined) : undefined,
-      audienceAgeMinPct: num('audience_age_min_pct'),
-      // v4: fixed page size of 10 (one billed page); legacy allows up to 25.
-      limit: CREDIT_SYSTEM_ENABLED ? DISCOVERY_PAGE_SIZE : Math.min(num('limit') ?? 10, 25),
-      page: num('page') ?? 0,
-    })
-    await settleCharge(result?.results?.length ?? 0)
+    const result = cachedResult ?? (await clubSearch(searchOpts))
+    settleAfterResponse(result?.results?.length ?? 0)
     return NextResponse.json(result)
   } catch (err: any) {
     console.warn('Influencers Club search unavailable; using Overseed creator index:', err?.message)
     const local = await safeLocalCreatorDiscovery(params, true)
-    await settleCharge(local?.results?.length ?? 0)
+    settleAfterResponse(local?.results?.length ?? 0)
     return NextResponse.json(local)
   }
 }

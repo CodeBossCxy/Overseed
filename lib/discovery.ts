@@ -12,14 +12,20 @@ export function kolAuthHeaders(): Record<string, string> {
     : {}
 }
 
-const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g
+const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/
 
 // Brands must not see creator contact info: drop contact_email entirely and
-// redact addresses that appear inside free-text fields like the bio.
+// remove any bio line that contains an email address (partial redaction
+// still hints that contact info exists).
 export function sanitizeCreator(creator: Record<string, any>) {
   const { contact_email, ...rest } = creator
   if (typeof rest.bio === 'string') {
-    rest.bio = rest.bio.replace(EMAIL_RE, '•••')
+    rest.bio =
+      rest.bio
+        .split(/\r?\n/)
+        .filter((line: string) => !EMAIL_RE.test(line) && !line.includes('•••'))
+        .join('\n')
+        .trim() || null
   }
   return rest
 }

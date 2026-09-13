@@ -170,6 +170,15 @@ function formatFollowers(count: number | null, locale: string): string {
 // per-campaign "Find your influencer" tab. With no query it browses the
 // local creator index; a keyword search goes through the cache-first
 // discovery endpoint (which may trigger live provider lookups).
+function Spinner({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V1a11 11 0 0 0-11 11h3z" />
+    </svg>
+  )
+}
+
 export default function DiscoverPanel() {
   const { t, locale } = useLanguage()
   const d = t.brand.discover
@@ -819,14 +828,14 @@ export default function DiscoverPanel() {
             title={d.aiSearchHint}
             className="px-5 py-2.5 bg-gray-900 text-white rounded-full text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            ✨ {aiParsing ? d.aiParsing : d.aiSearchButton}
+            {aiParsing ? <span className="inline-flex items-center gap-2"><Spinner /> {d.aiParsing}</span> : <>✨ {d.aiSearchButton}</>}
           </button>
           <button
             type="submit"
             disabled={isLoading || platforms.length === 0}
             className="px-6 py-2.5 bg-primary-600 text-white rounded-full font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? d.searching : d.searchButton}
+            {isLoading ? <span className="inline-flex items-center gap-2"><Spinner /> {d.searching}</span> : d.searchButton}
           </button>
           {searchResult && (
             <button
@@ -1077,9 +1086,32 @@ export default function DiscoverPanel() {
             )}
           </div>
 
-          {!isLoading && creators.length === 0 ? (
+          {isLoading && creators.length === 0 ? (
+            /* Skeleton cards while the first page loads */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="workspace-glass-card rounded-2xl p-5 flex gap-4 animate-pulse">
+                  <div className="w-12 h-12 rounded-full bg-gray-200/70 flex-shrink-0" />
+                  <div className="flex-1 space-y-3 py-1">
+                    <div className="h-4 bg-gray-200/70 rounded w-1/3" />
+                    <div className="h-3 bg-gray-200/60 rounded w-1/2" />
+                    <div className="h-3 bg-gray-200/50 rounded w-2/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !isLoading && creators.length === 0 ? (
             <div className="workspace-glass-card rounded-2xl p-8 text-center text-gray-500">{d.noResults}</div>
           ) : (
+            <div className="relative">
+            {/* Floating indicator while refreshing on top of existing results */}
+            {isLoading && (
+              <div className="absolute inset-0 z-10 flex items-start justify-center pt-16 pointer-events-none">
+                <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/85 shadow-lg backdrop-blur-sm text-sm font-semibold text-gray-700">
+                  <Spinner className="w-4 h-4 text-primary-600" /> {d.loadingCreators}
+                </span>
+              </div>
+            )}
             <div
               className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity ${
                 isLoading ? 'opacity-40 pointer-events-none' : ''
@@ -1161,6 +1193,7 @@ export default function DiscoverPanel() {
                 </div>
               ))}
             </div>
+            </div>
           )}
 
           {isBrowsing && hasMore && !isLoading && creators.length > 0 && (
@@ -1233,7 +1266,10 @@ export default function DiscoverPanel() {
             <div className="px-7 flex items-start gap-4 flex-shrink-0">
               <div className="relative z-10 w-20 h-20 -mt-10 rounded-full ring-4 ring-white bg-gray-200 overflow-hidden shadow-md flex-shrink-0">
                 <CreatorAvatar
-                  url={detail?.avatar_url || detailFor.avatar_url || null}
+                  // Prefer the fresh search-result picture: enrich-cache
+                  // avatar URLs are often expired club links (~24h lifetime).
+                  key={detailFor.id}
+                  url={detailFor.avatar_url || detail?.avatar_url || null}
                   name={detailFor.display_name || detailFor.handle || '?'}
                   textSize="text-2xl"
                 />
