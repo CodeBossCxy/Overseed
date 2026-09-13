@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface DiscoveredCreator {
@@ -508,10 +508,46 @@ export default function DiscoverPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort, restored])
 
+  // Filter values captured explicitly so AI-driven searches can persist the
+  // right snapshot before React state has flushed.
+  interface FilterVals {
+    query: string
+    // What the search box should show/persist when it differs from the query
+    // actually sent (AI search keeps the user's original sentence visible).
+    inputText?: string
+    platform: string
+    country: string
+    minFollowers: string
+    maxFollowers: string
+    minEngagement: string
+    maxEngagement: string
+    gender: string
+    language: string
+    bioKeywords: string
+    lastPost: string
+    audienceAge: string
+  }
+
+  const currentFilterVals = (): FilterVals => ({
+    query,
+    platform: platforms[0],
+    country,
+    minFollowers,
+    maxFollowers,
+    minEngagement,
+    maxEngagement,
+    gender,
+    language,
+    bioKeywords,
+    lastPost,
+    audienceAge,
+  })
+
   const runSearchPage = async (
     request: DiscoverySearchRequest,
     page: number,
-    preserveCurrentOnEmpty = false
+    preserveCurrentOnEmpty = false,
+    persistVals?: FilterVals
   ) => {
     setIsLoading(true)
     setError(null)
@@ -550,19 +586,20 @@ export default function DiscoverPanel() {
       setSearchHasMore(results.length === request.pageSize)
       // Persist so the results survive leaving and returning to the page
       try {
+        const v = persistVals ?? currentFilterVals()
         const saved: SavedSearchState = {
-          query,
-          platforms,
-          country,
-          minFollowers,
-          maxFollowers,
-          minEngagement,
-          maxEngagement,
-          gender,
-          language,
-          bioKeywords,
-          lastPost,
-          audienceAge,
+          query: v.inputText ?? v.query,
+          platforms: [v.platform],
+          country: v.country,
+          minFollowers: v.minFollowers,
+          maxFollowers: v.maxFollowers,
+          minEngagement: v.minEngagement,
+          maxEngagement: v.maxEngagement,
+          gender: v.gender,
+          language: v.language,
+          bioKeywords: v.bioKeywords,
+          lastPost: v.lastPost,
+          audienceAge: v.audienceAge,
           result: data,
           request,
           page,
@@ -597,42 +634,135 @@ export default function DiscoverPanel() {
       return
     }
     if (platforms.length === 0) return
+    await clubSearchWith(currentFilterVals())
+  }
 
-    /* TEMP: influencers.club search path — small pages, one platform */
-    const isClub = source === 'club'
-    const qs = isClub
-      ? new URLSearchParams({
-          q: query.trim(),
-          platform: platforms[0],
-          limit: String(CLUB_PAGE_SIZE),
-        })
-      : new URLSearchParams({
-          q: query.trim(),
-          topics: query.trim(),
-          platforms: platforms.join(','),
-          limit: String(PAGE_SIZE),
-        })
-    /* END TEMP */
-    if (country.trim()) qs.set('country', country.trim().toUpperCase())
-    if (minFollowers) qs.set('min_followers', minFollowers)
-    if (maxFollowers) qs.set('max_followers', maxFollowers)
-    if (minEngagement) qs.set('min_engagement', minEngagement)
-    if (maxEngagement) qs.set('max_engagement', maxEngagement)
-    if (gender) qs.set('gender', gender)
-    if (language) qs.set('language', language)
-    if (bioKeywords.trim()) qs.set('bio_keywords', bioKeywords.trim())
-    if (lastPost) qs.set('last_post', lastPost)
+  // Club keyword search from an explicit filter snapshot (used by both the
+  // regular Search button and the AI-parsed search).
+  const clubSearchWith = async (v: FilterVals) => {
+    const qs = new URLSearchParams({
+      q: v.query.trim(),
+      platform: v.platform,
+      limit: String(CLUB_PAGE_SIZE),
+    })
+    if (v.country.trim()) qs.set('country', v.country.trim().toUpperCase())
+    if (v.minFollowers) qs.set('min_followers', v.minFollowers)
+    if (v.maxFollowers) qs.set('max_followers', v.maxFollowers)
+    if (v.minEngagement) qs.set('min_engagement', v.minEngagement)
+    if (v.maxEngagement) qs.set('max_engagement', v.maxEngagement)
+    if (v.gender) qs.set('gender', v.gender)
+    if (v.language) qs.set('language', v.language)
+    if (v.bioKeywords.trim()) qs.set('bio_keywords', v.bioKeywords.trim())
+    if (v.lastPost) qs.set('last_post', v.lastPost)
     // Audience demographics are an Instagram-only club filter
-    if (audienceAge && platforms[0] === 'instagram') qs.set('audience_age', audienceAge)
+    if (v.audienceAge && v.platform === 'instagram') qs.set('audience_age', v.audienceAge)
 
     await runSearchPage(
-      {
-        endpoint: isClub ? 'club-search' : 'search',
-        params: qs.toString(),
-        pageSize: isClub ? CLUB_PAGE_SIZE : PAGE_SIZE,
-      },
-      0
+      { endpoint: 'club-search', params: qs.toString(), pageSize: CLUB_PAGE_SIZE },
+      0,
+      false,
+      v
     )
+  }
+
+  // AI search: parse the free-form request into filters, reflect them in the
+  // UI, then run the normal club search with the extracted values.
+  const [aiParsing, setAiParsing] = useState(false)
+  const aiSearch = async () => {
+    if (!query.trim() || aiParsing || isLoading) return
+    setAiParsing(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/discovery/parse-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: query.trim() }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(d.aiParseFailed)
+      const p = data.parsed
+      const platform = p.platform || platforms[0]
+      const originalText = query.trim()
+      const vals: FilterVals = {
+        query: p.keywords || originalText,
+        // Keep the user's original request visible in the search box
+        inputText: originalText,
+        platform,
+        // Restrict to the countries offered in the dropdown so the UI stays
+        // truthful about which filters were applied.
+        country:
+          p.country && COUNTRY_FILTER_OPTIONS.some((c) => c.code === p.country) ? p.country : '',
+        minFollowers: p.min_followers != null ? String(p.min_followers) : '',
+        maxFollowers: p.max_followers != null ? String(p.max_followers) : '',
+        minEngagement: p.min_engagement != null ? String(p.min_engagement) : '',
+        maxEngagement: p.max_engagement != null ? String(p.max_engagement) : '',
+        gender: p.gender || '',
+        language:
+          p.language && LANGUAGE_FILTER_OPTIONS.some((l) => l.code === p.language)
+            ? p.language
+            : '',
+        bioKeywords: Array.isArray(p.bio_keywords) ? p.bio_keywords.join(', ') : '',
+        lastPost: p.last_post ? String(p.last_post) : '',
+        audienceAge: platform === 'instagram' && p.audience_age ? p.audience_age : '',
+      }
+      // Reflect what the AI extracted in the visible controls (the search box
+      // keeps the original sentence)
+      setPlatforms([vals.platform])
+      setCountry(vals.country)
+      setMinFollowers(vals.minFollowers)
+      setMaxFollowers(vals.maxFollowers)
+      setMinEngagement(vals.minEngagement)
+      setMaxEngagement(vals.maxEngagement)
+      setGender(vals.gender)
+      setLanguage(vals.language)
+      setBioKeywords(vals.bioKeywords)
+      setLastPost(vals.lastPost)
+      setAudienceAge(vals.audienceAge)
+      if (
+        vals.minEngagement || vals.maxEngagement || vals.gender || vals.language ||
+        vals.bioKeywords || vals.lastPost || vals.audienceAge
+      ) {
+        setShowAdvanced(true)
+      }
+      await clubSearchWith(vals)
+    } catch (err: any) {
+      setError(err.message || d.aiParseFailed)
+    } finally {
+      setAiParsing(false)
+    }
+  }
+
+  // Voice input via the browser's Web Speech API (Chrome/Safari). The
+  // transcript lands in the search box; the user then runs AI Search.
+  const [speechReady, setSpeechReady] = useState(false)
+  const [listening, setListening] = useState(false)
+  const recognitionRef = useRef<any>(null)
+  useEffect(() => {
+    const w = window as any
+    setSpeechReady(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition))
+  }, [])
+  const toggleVoice = () => {
+    if (listening) {
+      recognitionRef.current?.stop()
+      return
+    }
+    const w = window as any
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
+    if (!SR) return
+    const rec = new SR()
+    rec.lang = locale === 'zh' ? 'zh-CN' : 'en-US'
+    rec.interimResults = true
+    rec.continuous = false
+    rec.onresult = (e: any) => {
+      let transcript = ''
+      for (const r of e.results) transcript += r[0]?.transcript || ''
+      if (transcript) setQuery(transcript)
+    }
+    rec.onend = () => setListening(false)
+    rec.onerror = () => setListening(false)
+    recognitionRef.current = rec
+    setListening(true)
+    rec.start()
   }
 
   const clearSearch = () => {
@@ -660,6 +790,30 @@ export default function DiscoverPanel() {
             placeholder={d.searchPlaceholder}
             className="flex-1 px-4 py-2.5 workspace-glass-control focus:outline-none"
           />
+          {speechReady && (
+            <button
+              type="button"
+              onClick={toggleVoice}
+              title={listening ? d.voiceListening : d.voiceInput}
+              aria-label={listening ? d.voiceListening : d.voiceInput}
+              className={`px-3.5 py-2.5 rounded-full transition ${
+                listening
+                  ? 'bg-red-100 text-red-600 animate-pulse'
+                  : 'workspace-glass-control text-gray-600 hover:brightness-105'
+              }`}
+            >
+              🎤
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={aiSearch}
+            disabled={aiParsing || isLoading || !query.trim()}
+            title={d.aiSearchHint}
+            className="px-5 py-2.5 bg-gray-900 text-white rounded-full text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ✨ {aiParsing ? d.aiParsing : d.aiSearchButton}
+          </button>
           <button
             type="submit"
             disabled={isLoading || platforms.length === 0}
