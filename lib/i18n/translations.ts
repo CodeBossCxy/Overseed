@@ -1653,6 +1653,9 @@ export const translations = {
         anyOption: 'Any',
         searchCostEstimate: 'Estimated cost: {n} credits per page of 10 results. Zero results are fully refunded.',
         browseFreeNote: 'Browsing is free. Keyword searches use {n} credits per page of 10 results.',
+        creditsN: '{n} credits',
+        chargedOncePerCreator: 'Charged once per creator — repeat views are free.',
+        outreachIncluded: 'Messaging is included with this profile unlock — no extra credits.',
       },
     },
     help: {
@@ -4179,6 +4182,9 @@ export const translations = {
         anyOption: '不限',
         searchCostEstimate: '预计消耗：每页 10 条结果 {n} 积分，无结果全额返还。',
         browseFreeNote: '浏览免费。关键词搜索每页 10 条结果消耗 {n} 积分。',
+        creditsN: '{n} 积分',
+        chargedOncePerCreator: '每位达人仅收费一次，重复查看免费。',
+        outreachIncluded: '私信已包含在主页解锁中，无需额外积分。',
       },
     },
     help: {

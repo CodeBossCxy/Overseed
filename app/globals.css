@@ -349,13 +349,15 @@ select {
 }
 
 :root {
+  /* Glassy primary CTA: translucent, softened light blues (lower saturation +
+     alpha so the blurred backdrop shows through) */
   --primary-button-gradient:
-    linear-gradient(92deg, #6474ff 0%, #7d63f7 54%, #9757ee 100%);
+    linear-gradient(92deg, rgba(154, 180, 224, 0.9) 0%, rgba(146, 171, 217, 0.88) 54%, rgba(134, 160, 210, 0.86) 100%);
   --primary-button-gradient-hover:
-    linear-gradient(92deg, #5c6dff 0%, #755bf6 52%, #8c4ee9 100%);
+    linear-gradient(92deg, rgba(142, 170, 218, 0.96) 0%, rgba(133, 160, 211, 0.94) 52%, rgba(121, 149, 204, 0.92) 100%);
   --primary-button-shadow:
-    0 10px 22px rgba(114, 97, 246, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+    0 9px 20px rgba(120, 150, 200, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 
 :is(a, button)[class*="text-white"]:is(
@@ -370,10 +372,12 @@ select {
 ) {
   color: #ffffff !important;
   background: var(--primary-button-gradient) !important;
-  border-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
   border-radius: 999px !important;
   box-shadow: var(--primary-button-shadow) !important;
-  font-weight: 800;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-weight: 500;
 }
 
 :is(a, button)[class*="text-white"]:is(
@@ -388,8 +392,8 @@ select {
 ):hover:not(:disabled) {
   background: var(--primary-button-gradient-hover) !important;
   box-shadow:
-    0 12px 26px rgba(114, 97, 246, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38) !important;
+    0 10px 22px rgba(120, 150, 200, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42) !important;
   transform: translateY(-1px);
 }
 
@@ -652,7 +656,7 @@ select {
   isolation: isolate;
   overflow: hidden;
   box-shadow:
-    0 10px 24px rgba(111, 89, 246, 0.28),
+    0 10px 24px rgba(120, 150, 200, 0.28),
     0 0 18px rgba(120, 187, 255, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.44) !important;
 }

@@ -99,6 +99,39 @@ const LANGUAGE_FILTER_OPTIONS: { code: string; label: string }[] = [
 // Audience age buckets supported by the club audience filter (IG only)
 const AUDIENCE_AGE_OPTIONS = ['13-17', '18-24', '25-34', '35-44', '45-64', '65-'] as const
 
+// Search results + filters survive navigating away and back (per tab).
+const SEARCH_STATE_KEY = 'discover:search:v1'
+
+interface SavedSearchState {
+  query: string
+  platforms: string[]
+  country: string
+  minFollowers: string
+  maxFollowers: string
+  minEngagement: string
+  maxEngagement: string
+  gender: string
+  language: string
+  bioKeywords: string
+  lastPost: string
+  audienceAge: string
+  result: SearchResult
+  request: DiscoverySearchRequest
+  page: number
+  hasMore: boolean
+}
+
+function readSavedSearch(): SavedSearchState | null {
+  try {
+    const raw = sessionStorage.getItem(SEARCH_STATE_KEY)
+    if (!raw) return null
+    const saved = JSON.parse(raw)
+    return saved?.result?.results && saved?.request ? saved : null
+  } catch {
+    return null
+  }
+}
+
 // Coverage statuses that are normal operation, not warnings worth a banner.
 const COVERAGE_OK = new Set(['ok', 'cache', 'live'])
 
@@ -155,19 +188,29 @@ export default function DiscoverPanel() {
   const [maxFollowers, setMaxFollowers] = useState('')
   const [sort, setSort] = useState<'followers' | 'recent'>('followers')
 
-  // Pricing v4 search price (credits per page of 10) for the live cost
-  // estimate under the search bar. null = credit system off / not loaded.
-  const [searchPrice, setSearchPrice] = useState<number | null>(null)
+  // Pricing v4 credit prices for the cost hints (search bar estimate, profile
+  // view, full analytics). null = credit system off / not loaded.
+  const [creditPrices, setCreditPrices] = useState<{
+    search: number | null
+    profile: number | null
+    analytics: number | null
+  } | null>(null)
   useEffect(() => {
     fetch('/api/pricing/config')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.creditSystemEnabled && typeof data.prices?.discovery_search === 'number') {
-          setSearchPrice(data.prices.discovery_search)
+        if (data?.creditSystemEnabled && data.prices) {
+          const num = (v: unknown) => (typeof v === 'number' ? v : null)
+          setCreditPrices({
+            search: num(data.prices.discovery_search),
+            profile: num(data.prices.profile_view),
+            analytics: num(data.prices.analytics),
+          })
         }
       })
       .catch(() => {})
   }, [])
+  const searchPrice = creditPrices?.search ?? null
 
   // Advanced filters (keyword search via the club API only — the local
   // browse index doesn't support them)
@@ -430,12 +473,40 @@ export default function DiscoverPanel() {
     [browseParams, narrowPlatforms, d.searchFailed]
   )
 
-  // Initial load and re-browse when the sort changes (other filters apply
-  // on submit to avoid refetching per keystroke).
+  // Restore a previous search (results + filters) when returning to the page.
+  const [restored, setRestored] = useState(false)
   useEffect(() => {
+    const saved = readSavedSearch()
+    if (saved) {
+      setQuery(saved.query)
+      setPlatforms(saved.platforms?.length ? saved.platforms : ['youtube'])
+      setCountry(saved.country || '')
+      setMinFollowers(saved.minFollowers || '')
+      setMaxFollowers(saved.maxFollowers || '')
+      setMinEngagement(saved.minEngagement || '')
+      setMaxEngagement(saved.maxEngagement || '')
+      setGender(saved.gender || '')
+      setLanguage(saved.language || '')
+      setBioKeywords(saved.bioKeywords || '')
+      setLastPost(saved.lastPost || '')
+      setAudienceAge(saved.audienceAge || '')
+      setSearchResult(saved.result)
+      setActiveSearch(saved.request)
+      setSearchPage(saved.page)
+      setSearchHasMore(saved.hasMore)
+    }
+    setRestored(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Initial load and re-browse when the sort changes (other filters apply
+  // on submit to avoid refetching per keystroke). Skipped while a saved
+  // search is being restored so browse doesn't race the restored results.
+  useEffect(() => {
+    if (!restored) return
     if (!searchResult) fetchBrowse(0, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sort])
+  }, [sort, restored])
 
   const runSearchPage = async (
     request: DiscoverySearchRequest,
@@ -477,6 +548,30 @@ export default function DiscoverPanel() {
       setActiveSearch(request)
       setSearchPage(page)
       setSearchHasMore(results.length === request.pageSize)
+      // Persist so the results survive leaving and returning to the page
+      try {
+        const saved: SavedSearchState = {
+          query,
+          platforms,
+          country,
+          minFollowers,
+          maxFollowers,
+          minEngagement,
+          maxEngagement,
+          gender,
+          language,
+          bioKeywords,
+          lastPost,
+          audienceAge,
+          result: data,
+          request,
+          page,
+          hasMore: results.length === request.pageSize,
+        }
+        sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(saved))
+      } catch {
+        // Persistence is cosmetic; quota/serialization issues are ignorable
+      }
     } catch (err: any) {
       setError(err.message || d.searchFailed)
       if (!preserveCurrentOnEmpty) {
@@ -497,6 +592,7 @@ export default function DiscoverPanel() {
       setActiveSearch(null)
       setSearchPage(0)
       setSearchHasMore(false)
+      try { sessionStorage.removeItem(SEARCH_STATE_KEY) } catch {}
       fetchBrowse(0, false)
       return
     }
@@ -545,6 +641,7 @@ export default function DiscoverPanel() {
     setActiveSearch(null)
     setSearchPage(0)
     setSearchHasMore(false)
+    try { sessionStorage.removeItem(SEARCH_STATE_KEY) } catch {}
     fetchBrowse(0, false)
   }
 
@@ -867,7 +964,7 @@ export default function DiscoverPanel() {
                     {creator.niche_tags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {creator.niche_tags.slice(0, 4).map((tag) => (
-                          <span key={tag} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs">
+                          <span key={tag} className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full text-xs">
                             {tag}
                           </span>
                         ))}
@@ -878,6 +975,11 @@ export default function DiscoverPanel() {
                         {creator.id.startsWith('club:') && (
                           <span className="text-sm text-primary-600 font-medium">
                             {d.viewDetails}
+                            {creditPrices?.profile != null && (
+                              <span className="text-xs text-gray-400 font-normal">
+                                {' '}· {d.creditsN.replace('{n}', String(creditPrices.profile))}
+                              </span>
+                            )}
                           </span>
                         )}
                         {creator.profile_url && (
@@ -886,7 +988,7 @@ export default function DiscoverPanel() {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="text-sm text-primary-600 hover:underline font-medium"
+                            className="inline-flex items-center gap-1 px-4 py-1.5 workspace-glass-control text-sm text-gray-700 backdrop-blur-md hover:brightness-105 transition"
                           >
                             {d.viewProfile} ↗
                           </a>
@@ -935,9 +1037,11 @@ export default function DiscoverPanel() {
             </div>
           )}
 
+          {/* Hidden for now — re-enable if the vendor attribution is needed
           <p className="mt-8 text-center text-xs text-gray-400">
             {d.dataAttribution}
           </p>
+          */}
         </>
       )}
 
@@ -1067,7 +1171,7 @@ export default function DiscoverPanel() {
                         {dedupeTags(detail.niche).map((n) => (
                           <span
                             key={n}
-                            className="px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium capitalize"
+                            className="px-2.5 py-1 bg-gray-200 text-gray-700 rounded-full text-xs font-medium capitalize"
                           >
                             {n}
                           </span>
@@ -1124,8 +1228,19 @@ export default function DiscoverPanel() {
                           disabled={analyticsLoading}
                           className="w-full px-4 py-2.5 border border-primary-200 bg-primary-50 text-primary-700 rounded-xl text-sm font-semibold hover:bg-primary-100 transition disabled:opacity-50"
                         >
-                          {analyticsLoading ? 'Loading analytics…' : 'View full analytics'}
+                          {analyticsLoading
+                            ? 'Loading analytics…'
+                            : `View full analytics${
+                                creditPrices?.analytics != null
+                                  ? ` · ${d.creditsN.replace('{n}', String(creditPrices.analytics))}`
+                                  : ''
+                              }`}
                         </button>
+                        {creditPrices?.analytics != null && (
+                          <p className="mt-1.5 text-[11px] text-gray-400 text-center">
+                            {d.chargedOncePerCreator}
+                          </p>
+                        )}
                         {analyticsError && (
                           <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
                             {analyticsError}
@@ -1248,6 +1363,9 @@ export default function DiscoverPanel() {
                   </a>
                 )}
                 </div>
+                {detail.contactable && creditPrices?.profile != null && (
+                  <p className="mt-2 text-[11px] text-gray-400 text-center">{d.outreachIncluded}</p>
+                )}
               </div>
             )}
           </div>

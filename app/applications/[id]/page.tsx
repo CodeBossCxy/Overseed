@@ -337,7 +337,7 @@ export default function ApplicationDetailPage() {
                   {application.campaign.categories.map((c, i) => (
                     <span
                       key={i}
-                      className="text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded"
+                      className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded"
                     >
                       {t.categoryNames[c.category.name] || c.category.name}
                     </span>
