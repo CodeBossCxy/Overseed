@@ -782,14 +782,21 @@ export default function DiscoverPanel() {
     <div>
       {/* Search + filters */}
       <form onSubmit={submit} className="workspace-glass-toolbar rounded-2xl p-5 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
+        <div className="flex flex-col gap-3">
+          <textarea
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                submit()
+              }
+            }}
             placeholder={d.searchPlaceholder}
-            className="flex-1 px-4 py-2.5 workspace-glass-control focus:outline-none"
+            rows={3}
+            className="w-full px-4 py-3 workspace-glass-control focus:outline-none resize-none leading-6"
           />
+          <div className="flex flex-wrap justify-end gap-3">
           {speechReady && (
             <button
               type="button"
@@ -830,6 +837,7 @@ export default function DiscoverPanel() {
               {d.clearSearch}
             </button>
           )}
+          </div>
         </div>
 
         {/* Live credit-cost estimate: updates as the user types/filters */}
