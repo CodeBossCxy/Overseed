@@ -25,6 +25,12 @@ enum UserType {
   ADMIN
 }
 
+enum AccountOrigin {
+  SEED     // demo/dummy content accounts created via seed scripts
+  TEAM     // internal team & manually created accounts
+  EXTERNAL // real outside registrations
+}
+
 enum BrandVerificationStatus {
   PENDING
   APPROVED
@@ -173,6 +179,7 @@ model User {
   image         String?
   password      String?
   userType         UserType         @default(INFLUENCER)
+  accountOrigin    AccountOrigin    @default(EXTERNAL)
   // Workspace view for ADMIN accounts ('BRAND' | 'INFLUENCER'); admins keep
   // userType=ADMIN and switch views via this field instead. Null = brand view.
   activeView       String?

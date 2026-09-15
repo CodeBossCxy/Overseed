@@ -33,6 +33,7 @@ export async function GET() {
         name: true,
         email: true,
         userType: true,
+        accountOrigin: true,
         subscriptionTier: true,
         isActive: true,
         createdAt: true,

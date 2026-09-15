@@ -35,6 +35,7 @@ interface UserData {
   name: string | null
   email: string
   userType: string
+  accountOrigin: string
   subscriptionTier: string
   isActive: boolean
   createdAt: string
@@ -388,6 +389,7 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 font-medium text-gray-600">Email</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Name</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Type</th>
+                    <th className="px-4 py-3 font-medium text-gray-600">Origin</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Tier</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Active</th>
                     <th className="px-4 py-3 font-medium text-gray-600 text-right">Credits Left</th>
@@ -410,6 +412,21 @@ export default function AdminDashboard() {
                             : 'bg-purple-100 text-purple-700'
                         }`}>
                           {u.userType}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                          u.accountOrigin === 'EXTERNAL'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : u.accountOrigin === 'TEAM'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {u.accountOrigin === 'EXTERNAL'
+                            ? 'External'
+                            : u.accountOrigin === 'TEAM'
+                            ? 'Team'
+                            : 'Seed (demo)'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
