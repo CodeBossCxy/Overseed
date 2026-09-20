@@ -5,12 +5,22 @@
 // Credits: 0.01 per creator returned by /public/v1/discovery/ (0 if no
 // results). Dictionary endpoints are free. Keep page sizes small.
 
+import {
+  CLUB_FILTER_DEFS,
+  CREATOR_HAS_KEYS,
+  SORT_BY_OPTIONS,
+  type ClubAdvancedFilters,
+  type ClubAudienceFilters,
+  type ClubSortBy,
+} from '@/lib/club-filter-defs'
+
 const BASE = 'https://api-dashboard.influencers.club'
 
 // Successful Club requests are cached indefinitely in PostgreSQL. This is
 // intentional: identical requests should never spend vendor credits twice.
 
 export type ClubPlatform = 'instagram' | 'youtube' | 'tiktok'
+export type { ClubAdvancedFilters, ClubAudienceFilters }
 
 export function clubConfigured(): boolean {
   return Boolean(process.env.INFLUENCERS_CLUB_API_KEY)
@@ -115,6 +125,17 @@ export interface ClubSearchOptions {
   // Only creators who also have accounts on these platforms
   // (filters.creator_has: has_instagram / has_youtube / has_tiktok)
   requirePlatforms?: ClubPlatform[]
+  // Full creator_has selection — values from CREATOR_HAS_KEYS (has_* keys).
+  // Merged with requirePlatforms into filters.creator_has.
+  creatorHas?: string[]
+  // Generic advanced filters keyed by def id (see lib/club-filter-defs.ts);
+  // values are already shaped to the club sub-schemas.
+  advanced?: ClubAdvancedFilters
+  // Extended audience demographics — Instagram only. Supersets the legacy
+  // audienceAgeRange/audienceAgeMinPct pair (both remain supported).
+  audience?: ClubAudienceFilters
+  sortBy?: ClubSortBy
+  sortOrder?: 'asc' | 'desc'
   limit: number
   page?: number
 }
@@ -166,7 +187,77 @@ function buildCacheRequest(opts: ClubSearchOptions) {
     .filter((p) => p !== opts.platform)
     .sort()
   if (requirePlatforms.length) request.require_platforms = requirePlatforms
-  return { request, query, country, bioKeywords, requirePlatforms }
+
+  // creator_has beyond the legacy platform toggles
+  const creatorHas = (opts.creatorHas ?? [])
+    .filter((k) => (CREATOR_HAS_KEYS as readonly string[]).includes(k))
+    .filter((k) => k !== `has_${opts.platform}`)
+    .sort()
+  if (creatorHas.length) request.creator_has = creatorHas
+
+  // Generic advanced filters — normalized (sorted keys, trimmed/sorted
+  // keyword lists) so semantically identical requests share a cache row.
+  const advanced: ClubAdvancedFilters = {}
+  for (const def of CLUB_FILTER_DEFS) {
+    const raw = opts.advanced?.[def.id]
+    if (raw == null) continue
+    if (def.kind === 'keywords') {
+      const list = (Array.isArray(raw) ? raw : [])
+        .map((k) => String(k).trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, 10)
+        .sort()
+      if (list.length) advanced[def.id] = list
+    } else if (def.kind === 'text') {
+      const s = String(raw).trim()
+      if (s) advanced[def.id] = s.slice(0, 100)
+    } else {
+      advanced[def.id] = raw as any
+    }
+  }
+  if (Object.keys(advanced).length) {
+    request.advanced = Object.fromEntries(
+      Object.keys(advanced)
+        .sort()
+        .map((k) => [k, advanced[k]])
+    )
+  }
+
+  // Extended audience filters (IG only)
+  const audience: ClubAudienceFilters = {}
+  if (opts.platform === 'instagram' && opts.audience) {
+    const a = opts.audience
+    if (a.ageRange) {
+      audience.ageRange = a.ageRange
+      if (a.ageMinPct != null) audience.ageMinPct = a.ageMinPct
+    }
+    if (a.gender) {
+      audience.gender = a.gender
+      if (a.genderMinPct != null) audience.genderMinPct = a.genderMinPct
+    }
+    if (a.locationName?.trim()) {
+      audience.locationName = a.locationName.trim()
+      if (a.locationType) audience.locationType = a.locationType
+      if (a.locationMinPct != null) audience.locationMinPct = a.locationMinPct
+    }
+    if (a.languageAbbr?.trim()) {
+      audience.languageAbbr = a.languageAbbr.trim().toLowerCase()
+      if (a.languageMinPct != null) audience.languageMinPct = a.languageMinPct
+    }
+    if (a.interestName?.trim()) {
+      audience.interestName = a.interestName.trim()
+      if (a.interestMinPct != null) audience.interestMinPct = a.interestMinPct
+    }
+    if (a.credibility) audience.credibility = a.credibility
+  }
+  if (Object.keys(audience).length) request.audience_v2 = audience
+
+  if (opts.sortBy && (SORT_BY_OPTIONS as readonly string[]).includes(opts.sortBy)) {
+    request.sort_by = opts.sortBy
+    request.sort_order = opts.sortOrder === 'asc' ? 'asc' : 'desc'
+  }
+
+  return { request, query, country, bioKeywords, requirePlatforms, creatorHas, advanced, audience }
 }
 
 async function hashRequest(value: unknown) {
@@ -188,7 +279,8 @@ export async function clubSearchCacheProbe(opts: ClubSearchOptions) {
 }
 
 export async function clubSearch(opts: ClubSearchOptions) {
-  const { request, query, country, bioKeywords, requirePlatforms } = buildCacheRequest(opts)
+  const { request, query, country, bioKeywords, requirePlatforms, creatorHas, advanced, audience } =
+    buildCacheRequest(opts)
   const cacheKey = await hashRequest(request)
 
   // Look up the request before resolving locations or contacting Club. A hit
@@ -242,20 +334,72 @@ export async function clubSearch(opts: ClubSearchOptions) {
     filters[key] = opts.lastPost
   }
 
-  // Audience demographics are Instagram-only (10k+ follower creators)
-  if (opts.platform === 'instagram' && opts.audienceAgeRange) {
-    filters.audience = {
-      age: [
-        {
-          range: opts.audienceAgeRange,
-          ...(opts.audienceAgeMinPct != null ? { min_pct: opts.audienceAgeMinPct } : {}),
-        },
-      ],
+  // Generic advanced filters — mapped to the platform-specific API key; a
+  // filter with no key for this platform is skipped with a warning.
+  for (const def of CLUB_FILTER_DEFS) {
+    const value = advanced[def.id]
+    if (value == null) continue
+    const key = def.keys[opts.platform]
+    if (!key) {
+      warnings.push(`Filter "${def.label.en}" is not available on ${opts.platform} — skipped.`)
+      continue
     }
+    filters[key] = value
   }
 
-  if (requirePlatforms.length) {
-    filters.creator_has = Object.fromEntries(requirePlatforms.map((p) => [`has_${p}`, true]))
+  // Audience demographics are Instagram-only (10k+ follower creators).
+  // Legacy audienceAgeRange and the extended audience block merge into one
+  // filters.audience object.
+  if (opts.platform === 'instagram') {
+    const aud: Record<string, any> = {}
+    const ageRange = audience.ageRange ?? opts.audienceAgeRange
+    const ageMinPct = audience.ageMinPct ?? opts.audienceAgeMinPct
+    if (ageRange) {
+      aud.age = [{ range: ageRange, ...(ageMinPct != null ? { min_pct: ageMinPct } : {}) }]
+    }
+    if (audience.gender) {
+      aud.gender = {
+        type: audience.gender,
+        ...(audience.genderMinPct != null ? { min_pct: audience.genderMinPct } : {}),
+      }
+    }
+    if (audience.locationName) {
+      aud.location = [
+        {
+          name: audience.locationName,
+          ...(audience.locationType ? { type: audience.locationType } : {}),
+          ...(audience.locationMinPct != null ? { min_pct: audience.locationMinPct } : {}),
+        },
+      ]
+    }
+    if (audience.languageAbbr) {
+      aud.language = [
+        {
+          language_abbr: audience.languageAbbr,
+          ...(audience.languageMinPct != null ? { min_pct: audience.languageMinPct } : {}),
+        },
+      ]
+    }
+    if (audience.interestName) {
+      aud.interests = [
+        {
+          name: audience.interestName,
+          ...(audience.interestMinPct != null ? { min_pct: audience.interestMinPct } : {}),
+        },
+      ]
+    }
+    if (audience.credibility) aud.credibility = audience.credibility
+    if (Object.keys(aud).length) filters.audience = aud
+  } else if (
+    Object.keys(audience).length ||
+    opts.audienceAgeRange
+  ) {
+    warnings.push('Audience demographic filters are Instagram-only — skipped.')
+  }
+
+  const creatorHasKeys = [...new Set([...requirePlatforms.map((p) => `has_${p}`), ...creatorHas])]
+  if (creatorHasKeys.length) {
+    filters.creator_has = Object.fromEntries(creatorHasKeys.map((k) => [k, true]))
   }
 
   if (country) {
@@ -273,8 +417,8 @@ export async function clubSearch(opts: ClubSearchOptions) {
     platform: opts.platform,
     paging: { limit: opts.limit, page: opts.page ?? 0 },
     sort: {
-      sort_by: query ? 'relevancy' : 'number_of_followers',
-      sort_order: 'desc',
+      sort_by: opts.sortBy ?? (query ? 'relevancy' : 'number_of_followers'),
+      sort_order: opts.sortOrder ?? 'desc',
     },
     filters,
   }

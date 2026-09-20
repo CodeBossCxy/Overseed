@@ -2,6 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import {
+  CLUB_FILTER_DEFS,
+  CREATOR_HAS_KEYS,
+  SORT_BY_OPTIONS,
+  AUDIENCE_CREDIBILITY_OPTIONS,
+  type ClubFilterDef,
+  type ClubFilterSection,
+} from '@/lib/club-filter-defs'
 
 interface DiscoveredCreator {
   id: string
@@ -115,6 +123,13 @@ interface SavedSearchState {
   bioKeywords: string
   lastPost: string
   audienceAge: string
+  // Generic advanced filter values keyed by query-param name; older saved
+  // states may not have these — default to empty.
+  adv?: Record<string, string>
+  creatorHas?: string[]
+  aud?: Record<string, string>
+  sortBy?: string
+  sortOrder?: string
   result: SearchResult
   request: DiscoverySearchRequest
   page: number
@@ -231,6 +246,29 @@ export default function DiscoverPanel() {
   const [bioKeywords, setBioKeywords] = useState('')
   const [lastPost, setLastPost] = useState('')
   const [audienceAge, setAudienceAge] = useState('')
+  // Generic advanced filters keyed by query-param name (`${id}`, `${id}_min`,
+  // `${id}_max`, `${id}_pct`, `${id}_months`); booleans stored as '1'.
+  const [adv, setAdv] = useState<Record<string, string>>({})
+  const setAdvField = (key: string, value: string) =>
+    setAdv((prev) => {
+      const next = { ...prev }
+      if (value) next[key] = value
+      else delete next[key]
+      return next
+    })
+  // creator_has multi-select — bare tokens without the has_ prefix
+  const [creatorHas, setCreatorHas] = useState<string[]>([])
+  // Extended audience filters (IG only) keyed by query-param name
+  const [aud, setAud] = useState<Record<string, string>>({})
+  const setAudField = (key: string, value: string) =>
+    setAud((prev) => {
+      const next = { ...prev }
+      if (value) next[key] = value
+      else delete next[key]
+      return next
+    })
+  const [sortBy, setSortBy] = useState('')
+  const [sortOrder, setSortOrder] = useState('desc')
 
   const [browseList, setBrowseList] = useState<DiscoveredCreator[] | null>(null)
   // Offset into the raw (un-narrowed) creator index for pagination — may
@@ -499,6 +537,11 @@ export default function DiscoverPanel() {
       setBioKeywords(saved.bioKeywords || '')
       setLastPost(saved.lastPost || '')
       setAudienceAge(saved.audienceAge || '')
+      setAdv(saved.adv || {})
+      setCreatorHas(saved.creatorHas || [])
+      setAud(saved.aud || {})
+      setSortBy(saved.sortBy || '')
+      setSortOrder(saved.sortOrder || 'desc')
       setSearchResult(saved.result)
       setActiveSearch(saved.request)
       setSearchPage(saved.page)
@@ -535,6 +578,11 @@ export default function DiscoverPanel() {
     bioKeywords: string
     lastPost: string
     audienceAge: string
+    adv: Record<string, string>
+    creatorHas: string[]
+    aud: Record<string, string>
+    sortBy: string
+    sortOrder: string
   }
 
   const currentFilterVals = (): FilterVals => ({
@@ -550,6 +598,11 @@ export default function DiscoverPanel() {
     bioKeywords,
     lastPost,
     audienceAge,
+    adv,
+    creatorHas,
+    aud,
+    sortBy,
+    sortOrder,
   })
 
   const runSearchPage = async (
@@ -609,6 +662,11 @@ export default function DiscoverPanel() {
           bioKeywords: v.bioKeywords,
           lastPost: v.lastPost,
           audienceAge: v.audienceAge,
+          adv: v.adv,
+          creatorHas: v.creatorHas,
+          aud: v.aud,
+          sortBy: v.sortBy,
+          sortOrder: v.sortOrder,
           result: data,
           request,
           page,
@@ -665,6 +723,32 @@ export default function DiscoverPanel() {
     if (v.lastPost) qs.set('last_post', v.lastPost)
     // Audience demographics are an Instagram-only club filter
     if (v.audienceAge && v.platform === 'instagram') qs.set('audience_age', v.audienceAge)
+    // Generic advanced filters — only send params whose def applies to the
+    // selected platform (server would skip them anyway; this keeps the URL
+    // and the billed cache key clean).
+    const applies = (paramKey: string) =>
+      CLUB_FILTER_DEFS.some(
+        (def) =>
+          def.keys[v.platform as keyof typeof def.keys] &&
+          (paramKey === def.id ||
+            paramKey === `${def.id}_min` ||
+            paramKey === `${def.id}_max` ||
+            paramKey === `${def.id}_pct` ||
+            paramKey === `${def.id}_months`)
+      )
+    for (const [k, val] of Object.entries(v.adv)) {
+      if (val && applies(k)) qs.set(k, val)
+    }
+    if (v.creatorHas.length) qs.set('creator_has', v.creatorHas.join(','))
+    if (v.platform === 'instagram') {
+      for (const [k, val] of Object.entries(v.aud)) {
+        if (val) qs.set(k, val)
+      }
+    }
+    if (v.sortBy) {
+      qs.set('sort_by', v.sortBy)
+      qs.set('sort_order', v.sortOrder === 'asc' ? 'asc' : 'desc')
+    }
 
     await runSearchPage(
       { endpoint: 'club-search', params: qs.toString(), pageSize: CLUB_PAGE_SIZE },
@@ -713,6 +797,13 @@ export default function DiscoverPanel() {
         bioKeywords: Array.isArray(p.bio_keywords) ? p.bio_keywords.join(', ') : '',
         lastPost: p.last_post ? String(p.last_post) : '',
         audienceAge: platform === 'instagram' && p.audience_age ? p.audience_age : '',
+        // AI parsing doesn't touch the extended filters — keep whatever the
+        // user has set in the advanced panel.
+        adv,
+        creatorHas,
+        aud,
+        sortBy,
+        sortOrder,
       }
       // Reflect what the AI extracted in the visible controls (the search box
       // keeps the original sentence)
@@ -786,6 +877,155 @@ export default function DiscoverPanel() {
 
   const creators = searchResult ? searchResult.results : browseList || []
   const isBrowsing = !searchResult
+
+  // ---- Advanced filter rendering (defs from lib/club-filter-defs) --------
+  const activePlatform = platforms[0] as 'instagram' | 'youtube' | 'tiktok'
+  const zh = locale === 'zh'
+  const filterLabel = (def: ClubFilterDef) => (zh ? def.label.zh : def.label.en)
+  const defsFor = (section: ClubFilterSection) =>
+    CLUB_FILTER_DEFS.filter((def) => def.section === section && def.keys[activePlatform])
+  const SECTION_TITLES: Record<ClubFilterSection, string> = {
+    performance: zh ? '数据表现' : 'Performance',
+    content: zh ? '内容与关键词' : 'Content & keywords',
+    creator: zh ? '创作者资料' : 'Creator profile',
+    exclusions: zh ? '排除条件' : 'Exclusions',
+  }
+  const inputCls = 'px-3 py-1.5 workspace-glass-control text-sm focus:outline-none'
+  const labelCls = 'block text-xs font-medium text-gray-500 mb-1.5'
+
+  const renderFilterControl = (def: ClubFilterDef) => {
+    switch (def.kind) {
+      case 'range':
+        return (
+          <div key={def.id}>
+            <label className={labelCls}>{filterLabel(def)}</label>
+            <div className="flex gap-1.5">
+              <input
+                type="number"
+                min={0}
+                value={adv[`${def.id}_min`] || ''}
+                onChange={(e) => setAdvField(`${def.id}_min`, e.target.value)}
+                placeholder={zh ? '最小' : 'min'}
+                className={`w-24 ${inputCls}`}
+              />
+              <input
+                type="number"
+                min={0}
+                value={adv[`${def.id}_max`] || ''}
+                onChange={(e) => setAdvField(`${def.id}_max`, e.target.value)}
+                placeholder={zh ? '最大' : 'max'}
+                className={`w-24 ${inputCls}`}
+              />
+            </div>
+          </div>
+        )
+      case 'growth':
+        return (
+          <div key={def.id}>
+            <label className={labelCls}>{filterLabel(def)}</label>
+            <div className="flex gap-1.5">
+              <input
+                type="number"
+                value={adv[`${def.id}_pct`] || ''}
+                onChange={(e) => setAdvField(`${def.id}_pct`, e.target.value)}
+                placeholder={zh ? '增长 %' : 'growth %'}
+                className={`w-24 ${inputCls}`}
+              />
+              <select
+                value={adv[`${def.id}_months`] || ''}
+                onChange={(e) => setAdvField(`${def.id}_months`, e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{zh ? '近 3 个月' : 'last 3 mo'}</option>
+                <option value="1">{zh ? '近 1 个月' : 'last 1 mo'}</option>
+                <option value="6">{zh ? '近 6 个月' : 'last 6 mo'}</option>
+                <option value="12">{zh ? '近 12 个月' : 'last 12 mo'}</option>
+              </select>
+            </div>
+          </div>
+        )
+      case 'keywords':
+      case 'text':
+        return (
+          <div key={def.id}>
+            <label className={labelCls}>{filterLabel(def)}</label>
+            <input
+              type="text"
+              value={adv[def.id] || ''}
+              onChange={(e) => setAdvField(def.id, e.target.value)}
+              placeholder={def.placeholder || (def.kind === 'keywords' ? (zh ? '逗号分隔' : 'comma-separated') : '')}
+              className={`w-44 ${inputCls}`}
+            />
+          </div>
+        )
+      case 'number':
+        return (
+          <div key={def.id}>
+            <label className={labelCls}>{filterLabel(def)}</label>
+            <input
+              type="number"
+              min={0}
+              value={adv[def.id] || ''}
+              onChange={(e) => setAdvField(def.id, e.target.value)}
+              className={`w-24 ${inputCls}`}
+            />
+          </div>
+        )
+      case 'enum':
+        return (
+          <div key={def.id}>
+            <label className={labelCls}>{filterLabel(def)}</label>
+            <select
+              value={adv[def.id] || ''}
+              onChange={(e) => setAdvField(def.id, e.target.value)}
+              className={inputCls}
+            >
+              <option value="">{d.anyOption}</option>
+              {def.options?.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </div>
+        )
+      case 'boolean':
+        return (
+          <button
+            key={def.id}
+            type="button"
+            onClick={() => setAdvField(def.id, adv[def.id] ? '' : '1')}
+            className={`px-3 py-1.5 rounded-full text-sm transition ${
+              adv[def.id]
+                ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
+                : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
+            }`}
+          >
+            {filterLabel(def)}
+          </button>
+        )
+    }
+  }
+
+  const renderFilterSection = (section: ClubFilterSection) => {
+    const defs = defsFor(section)
+    if (!defs.length) return null
+    const bools = defs.filter((def) => def.kind === 'boolean')
+    const others = defs.filter((def) => def.kind !== 'boolean')
+    return (
+      <div key={section} className="mt-4">
+        <p className="text-xs font-semibold text-gray-600 mb-2">{SECTION_TITLES[section]}</p>
+        {others.length > 0 && (
+          <div className="flex flex-wrap items-end gap-4">{others.map(renderFilterControl)}</div>
+        )}
+        {bools.length > 0 && (
+          <div className={`flex flex-wrap gap-2 ${others.length ? 'mt-3' : ''}`}>
+            {bools.map(renderFilterControl)}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -1033,7 +1273,201 @@ export default function DiscoverPanel() {
                   </select>
                 </div>
               )}
+              <div>
+                <label className={labelCls}>{zh ? '排序' : 'Sort by'}</label>
+                <div className="flex gap-1.5">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">{zh ? '默认' : 'Default'}</option>
+                    {SORT_BY_OPTIONS.map((o) => (
+                      <option key={o} value={o}>
+                        {zh
+                          ? { relevancy: '相关性', engagement_rate: '互动率', number_of_followers: '粉丝数', growth_rate: '增长率' }[o]
+                          : o.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                  {sortBy && (
+                    <select
+                      value={sortOrder}
+                      onChange={(e) => setSortOrder(e.target.value)}
+                      className={inputCls}
+                    >
+                      <option value="desc">{zh ? '降序' : 'desc'}</option>
+                      <option value="asc">{zh ? '升序' : 'asc'}</option>
+                    </select>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {renderFilterSection('performance')}
+            {renderFilterSection('content')}
+            {renderFilterSection('creator')}
+
+            {/* Extended audience demographics — Instagram only (10k+ creators) */}
+            {activePlatform === 'instagram' && (
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-gray-600 mb-2">
+                  {zh ? '受众画像（仅 Instagram）' : 'Audience demographics (Instagram only)'}
+                </p>
+                <div className="flex flex-wrap items-end gap-4">
+                  <div>
+                    <label className={labelCls}>{zh ? '受众性别 / 最低占比 %' : 'Audience gender / min %'}</label>
+                    <div className="flex gap-1.5">
+                      <select
+                        value={aud.audience_gender || ''}
+                        onChange={(e) => setAudField('audience_gender', e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">{d.anyOption}</option>
+                        <option value="female">{d.genderFemale}</option>
+                        <option value="male">{d.genderMale}</option>
+                      </select>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={aud.audience_gender_min_pct || ''}
+                        onChange={(e) => setAudField('audience_gender_min_pct', e.target.value)}
+                        placeholder="%"
+                        className={`w-16 ${inputCls}`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>{zh ? '受众地区 / 最低占比 %' : 'Audience location / min %'}</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={aud.audience_location || ''}
+                        onChange={(e) => setAudField('audience_location', e.target.value)}
+                        placeholder={zh ? '如 United States' : 'e.g. United States'}
+                        className={`w-40 ${inputCls}`}
+                      />
+                      <select
+                        value={aud.audience_location_type || ''}
+                        onChange={(e) => setAudField('audience_location_type', e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">{zh ? '类型' : 'type'}</option>
+                        <option value="country">{zh ? '国家' : 'country'}</option>
+                        <option value="state">{zh ? '州/省' : 'state'}</option>
+                        <option value="city">{zh ? '城市' : 'city'}</option>
+                      </select>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={aud.audience_location_min_pct || ''}
+                        onChange={(e) => setAudField('audience_location_min_pct', e.target.value)}
+                        placeholder="%"
+                        className={`w-16 ${inputCls}`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>{zh ? '受众语言 / 最低占比 %' : 'Audience language / min %'}</label>
+                    <div className="flex gap-1.5">
+                      <select
+                        value={aud.audience_language || ''}
+                        onChange={(e) => setAudField('audience_language', e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">{d.anyOption}</option>
+                        {LANGUAGE_FILTER_OPTIONS.map(({ code, label }) => (
+                          <option key={code} value={code}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={aud.audience_language_min_pct || ''}
+                        onChange={(e) => setAudField('audience_language_min_pct', e.target.value)}
+                        placeholder="%"
+                        className={`w-16 ${inputCls}`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>{zh ? '受众兴趣 / 最低占比 %' : 'Audience interest / min %'}</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={aud.audience_interest || ''}
+                        onChange={(e) => setAudField('audience_interest', e.target.value)}
+                        placeholder={zh ? '如 Fitness' : 'e.g. Fitness'}
+                        className={`w-36 ${inputCls}`}
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={aud.audience_interest_min_pct || ''}
+                        onChange={(e) => setAudField('audience_interest_min_pct', e.target.value)}
+                        placeholder="%"
+                        className={`w-16 ${inputCls}`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>{zh ? '受众可信度' : 'Audience credibility'}</label>
+                    <select
+                      value={aud.audience_credibility || ''}
+                      onChange={(e) => setAudField('audience_credibility', e.target.value)}
+                      className={inputCls}
+                    >
+                      <option value="">{d.anyOption}</option>
+                      {AUDIENCE_CREDIBILITY_OPTIONS.map((o) => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* creator_has: creators also active on these platforms/links */}
+            <details className="mt-4">
+              <summary className="text-xs font-semibold text-gray-600 cursor-pointer select-none">
+                {zh ? '同时拥有的平台/链接' : 'Also has platform / link'}
+                {creatorHas.length > 0 && ` (${creatorHas.length})`}
+              </summary>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {CREATOR_HAS_KEYS.map((key) => {
+                  const token = key.slice(4)
+                  const active = creatorHas.includes(token)
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() =>
+                        setCreatorHas((prev) =>
+                          active ? prev.filter((x) => x !== token) : [...prev, token]
+                        )
+                      }
+                      className={`px-2.5 py-1 rounded-full text-xs transition ${
+                        active
+                          ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
+                          : 'bg-gray-100 text-gray-600 font-medium hover:bg-gray-200'
+                      }`}
+                    >
+                      {token.replace(/_/g, ' ')}
+                    </button>
+                  )
+                })}
+              </div>
+            </details>
+
+            {renderFilterSection('exclusions')}
           </div>
         )}
       </form>

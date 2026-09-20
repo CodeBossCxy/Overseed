@@ -3,6 +3,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { clubSearch, clubSearchCacheProbe, type ClubPlatform } from '@/lib/influencers-club'
+import {
+  CLUB_FILTER_DEFS,
+  CREATOR_HAS_KEYS,
+  SORT_BY_OPTIONS,
+  AUDIENCE_CREDIBILITY_OPTIONS,
+  type ClubAdvancedFilters,
+  type ClubAudienceFilters,
+  type ClubSortBy,
+} from '@/lib/club-filter-defs'
 import { safeLocalCreatorDiscovery } from '@/lib/discovery'
 import { consumeQuota } from '@/lib/plan'
 import { getEffectiveTier } from '@/lib/subscription'
@@ -75,6 +84,153 @@ export async function GET(req: NextRequest) {
     const n = Number(v)
     return Number.isFinite(n) ? n : undefined
   }
+  const list = (key: string) =>
+    (params.get(key) || '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean)
+      .slice(0, 10)
+
+  // Generic advanced filters, driven by the shared def catalog. Invalid
+  // values are a client bug/tampering — reject before any charge.
+  const advanced: ClubAdvancedFilters = {}
+  for (const def of CLUB_FILTER_DEFS) {
+    switch (def.kind) {
+      case 'range': {
+        const min = num(`${def.id}_min`)
+        const max = num(`${def.id}_max`)
+        if (min != null || max != null) {
+          advanced[def.id] = {
+            ...(min != null ? { min } : {}),
+            ...(max != null ? { max } : {}),
+          }
+        }
+        break
+      }
+      case 'growth': {
+        const pct = num(`${def.id}_pct`)
+        const months = num(`${def.id}_months`)
+        if (pct != null) {
+          advanced[def.id] = {
+            growth_percentage: pct,
+            ...(months != null ? { time_range_months: Math.round(months) } : {}),
+          }
+        }
+        break
+      }
+      case 'keywords': {
+        const values = list(def.id)
+        if (values.length) advanced[def.id] = values
+        break
+      }
+      case 'boolean': {
+        const v = params.get(def.id)
+        if (v === '1' || v === 'true') advanced[def.id] = true
+        break
+      }
+      case 'number': {
+        const v = num(def.id)
+        if (v != null) advanced[def.id] = v
+        break
+      }
+      case 'enum': {
+        const v = params.get(def.id)?.trim()
+        if (v) {
+          if (!def.options?.includes(v)) {
+            return NextResponse.json(
+              { message: `Invalid ${def.id} filter`, code: 'INVALID_FILTER' },
+              { status: 400 }
+            )
+          }
+          advanced[def.id] = v
+        }
+        break
+      }
+      case 'text': {
+        const v = params.get(def.id)?.trim()
+        if (v) advanced[def.id] = v.slice(0, 100)
+        break
+      }
+    }
+  }
+
+  // creator_has multi-select: comma list of has_* keys (or bare platform
+  // tokens like "patreon"), validated against the documented key list.
+  const creatorHas = (params.get('creator_has') || '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean)
+    .map((k) => (k.startsWith('has_') ? k : `has_${k}`))
+    .slice(0, 20)
+  for (const k of creatorHas) {
+    if (!(CREATOR_HAS_KEYS as readonly string[]).includes(k)) {
+      return NextResponse.json(
+        { message: `Invalid creator_has value: ${k}`, code: 'INVALID_FILTER' },
+        { status: 400 }
+      )
+    }
+  }
+
+  // Sort
+  const sortBy = params.get('sort_by')?.trim() || undefined
+  if (sortBy && !(SORT_BY_OPTIONS as readonly string[]).includes(sortBy)) {
+    return NextResponse.json({ message: 'Invalid sort_by', code: 'INVALID_FILTER' }, { status: 400 })
+  }
+  const sortOrderRaw = params.get('sort_order')?.trim() || undefined
+  if (sortOrderRaw && sortOrderRaw !== 'asc' && sortOrderRaw !== 'desc') {
+    return NextResponse.json({ message: 'Invalid sort_order', code: 'INVALID_FILTER' }, { status: 400 })
+  }
+
+  // Extended audience filters (Instagram only; ignored otherwise)
+  const audienceGender = params.get('audience_gender')?.trim().toLowerCase() || undefined
+  if (audienceGender && audienceGender !== 'male' && audienceGender !== 'female') {
+    return NextResponse.json(
+      { message: 'Invalid audience_gender filter', code: 'INVALID_FILTER' },
+      { status: 400 }
+    )
+  }
+  const audienceLocationType = params.get('audience_location_type')?.trim() || undefined
+  if (
+    audienceLocationType &&
+    !['country', 'state', 'city'].includes(audienceLocationType)
+  ) {
+    return NextResponse.json(
+      { message: 'Invalid audience_location_type filter', code: 'INVALID_FILTER' },
+      { status: 400 }
+    )
+  }
+  const audienceLanguage = params.get('audience_language')?.trim().toLowerCase() || undefined
+  if (audienceLanguage && !/^[a-z]{2,3}$/.test(audienceLanguage)) {
+    return NextResponse.json(
+      { message: 'Invalid audience_language filter', code: 'INVALID_FILTER' },
+      { status: 400 }
+    )
+  }
+  const audienceCredibility = params.get('audience_credibility')?.trim().toLowerCase() || undefined
+  if (
+    audienceCredibility &&
+    !(AUDIENCE_CREDIBILITY_OPTIONS as readonly string[]).includes(audienceCredibility)
+  ) {
+    return NextResponse.json(
+      { message: 'Invalid audience_credibility filter', code: 'INVALID_FILTER' },
+      { status: 400 }
+    )
+  }
+  const audience: ClubAudienceFilters | undefined =
+    platform === 'instagram'
+      ? {
+          gender: audienceGender,
+          genderMinPct: num('audience_gender_min_pct'),
+          locationName: params.get('audience_location')?.trim().slice(0, 100) || undefined,
+          locationType: audienceLocationType as ClubAudienceFilters['locationType'],
+          locationMinPct: num('audience_location_min_pct'),
+          languageAbbr: audienceLanguage,
+          languageMinPct: num('audience_language_min_pct'),
+          interestName: params.get('audience_interest')?.trim().slice(0, 100) || undefined,
+          interestMinPct: num('audience_interest_min_pct'),
+          credibility: audienceCredibility,
+        }
+      : undefined
 
   const searchOpts = {
     platform,
@@ -92,6 +248,11 @@ export async function GET(req: NextRequest) {
     audienceAgeRange:
       platform === 'instagram' ? (audienceAge as '13-17' | '18-24' | '25-34' | '35-44' | '45-64' | '65-' | undefined) : undefined,
     audienceAgeMinPct: num('audience_age_min_pct'),
+    advanced: Object.keys(advanced).length ? advanced : undefined,
+    creatorHas: creatorHas.length ? creatorHas : undefined,
+    audience,
+    sortBy: sortBy as ClubSortBy | undefined,
+    sortOrder: sortOrderRaw as 'asc' | 'desc' | undefined,
     // v4: fixed page size of 10 (one billed page); legacy allows up to 25.
     limit: CREDIT_SYSTEM_ENABLED ? DISCOVERY_PAGE_SIZE : Math.min(num('limit') ?? 10, 25),
     page: num('page') ?? 0,
