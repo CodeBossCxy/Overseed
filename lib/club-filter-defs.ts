@@ -17,11 +17,7 @@ export type ClubFilterKind =
   | 'text' // free-text string — param `${id}`
   | 'growth' // {growth_percentage, time_range_months} — params `${id}_pct` / `${id}_months`
 
-export type ClubFilterSection =
-  | 'performance'
-  | 'content'
-  | 'creator'
-  | 'exclusions'
+export type ClubFilterSection = 'performance' | 'creator' | 'exclusions'
 
 export interface ClubFilterDef {
   id: string
@@ -59,78 +55,11 @@ export const CLUB_FILTER_DEFS: ClubFilterDef[] = [
     label: { en: 'Avg video views', zh: '平均视频播放量' },
   },
   {
-    id: 'avg_views_short',
-    kind: 'range',
-    section: 'performance',
-    keys: { instagram: 'average_views_for_reels', youtube: 'average_views_on_shorts' },
-    label: { en: 'Avg Reels/Shorts views', zh: 'Reels/Shorts 平均播放量' },
-  },
-  {
-    id: 'median_views_long',
-    kind: 'range',
-    section: 'performance',
-    keys: { youtube: 'median_views_long' },
-    label: { en: 'Median long-video views', zh: '长视频播放量中位数' },
-  },
-  {
-    id: 'posts_count',
-    kind: 'range',
-    section: 'performance',
-    keys: { instagram: 'number_of_posts', tiktok: 'video_count', youtube: 'number_of_videos' },
-    label: { en: 'Posts / videos count', zh: '帖子/视频数量' },
-  },
-  {
-    id: 'short_form_pct',
-    kind: 'range',
-    section: 'performance',
-    keys: { instagram: 'reels_percent', youtube: 'shorts_percentage' },
-    label: { en: 'Reels/Shorts share (%)', zh: 'Reels/Shorts 占比 (%)' },
-  },
-  {
-    id: 'income',
-    kind: 'range',
-    section: 'performance',
-    keys: { instagram: 'income', tiktok: 'income', youtube: 'income' },
-    label: { en: 'Est. income (USD)', zh: '预估收入 (美元)' },
-  },
-  {
     id: 'video_downloads',
     kind: 'range',
     section: 'performance',
     keys: { tiktok: 'average_video_downloads' },
     label: { en: 'Avg video downloads', zh: '平均视频下载量' },
-  },
-  {
-    id: 'long_video_duration',
-    kind: 'range',
-    section: 'performance',
-    keys: { youtube: 'long_video_duration' },
-    label: { en: 'Long video duration', zh: '长视频时长' },
-  },
-  {
-    id: 'stream_views',
-    kind: 'range',
-    section: 'performance',
-    keys: { youtube: 'average_stream_views' },
-    label: { en: 'Avg stream views', zh: '平均直播观看量' },
-  },
-  {
-    id: 'stream_duration',
-    kind: 'range',
-    section: 'performance',
-    keys: { youtube: 'average_stream_duration' },
-    label: { en: 'Avg stream duration', zh: '平均直播时长' },
-  },
-  {
-    id: 'posting_frequency',
-    kind: 'number',
-    section: 'performance',
-    keys: {
-      instagram: 'posting_frequency',
-      tiktok: 'posting_frequency',
-      youtube: 'posting_frequency',
-    },
-    label: { en: 'Posts per month (min)', zh: '每月发帖数 (最少)' },
   },
   {
     id: 'growth',
@@ -144,116 +73,14 @@ export const CLUB_FILTER_DEFS: ClubFilterDef[] = [
     label: { en: 'Follower growth', zh: '粉丝增长' },
   },
 
-  // ---- Content & keywords ------------------------------------------------
-  {
-    id: 'exclude_bio_keywords',
-    kind: 'keywords',
-    section: 'content',
-    keys: {
-      instagram: 'exclude_keywords_in_bio',
-      tiktok: 'exclude_keywords_in_bio',
-      youtube: 'keywords_not_in_description',
-    },
-    label: { en: 'Exclude bio keywords', zh: '排除简介关键词' },
-  },
-  {
-    id: 'hashtags',
-    kind: 'keywords',
-    section: 'content',
-    keys: { instagram: 'hashtags', tiktok: 'hashtags', youtube: 'hashtags' },
-    label: { en: 'Hashtags', zh: '话题标签' },
-  },
-  {
-    id: 'not_hashtags',
-    kind: 'keywords',
-    section: 'content',
-    keys: { instagram: 'not_hashtags', tiktok: 'not_hashtags', youtube: 'not_hashtags' },
-    label: { en: 'Exclude hashtags', zh: '排除话题标签' },
-  },
-  {
-    id: 'caption_keywords',
-    kind: 'keywords',
-    section: 'content',
-    keys: {
-      instagram: 'keywords_in_captions',
-      tiktok: 'video_description',
-      youtube: 'keywords_in_video_description',
-    },
-    label: { en: 'Keywords in captions', zh: '文案关键词' },
-  },
-  {
-    id: 'caption_keywords_exclude',
-    kind: 'keywords',
-    section: 'content',
-    keys: {
-      instagram: 'keywords_not_in_captions',
-      tiktok: 'not_video_description',
-      youtube: 'keywords_not_in_video_description',
-    },
-    label: { en: 'Exclude caption keywords', zh: '排除文案关键词' },
-  },
-  {
-    id: 'video_title_keywords',
-    kind: 'keywords',
-    section: 'content',
-    keys: { youtube: 'keywords_in_video_titles' },
-    label: { en: 'Keywords in video titles', zh: '视频标题关键词' },
-  },
-  {
-    id: 'video_title_keywords_exclude',
-    kind: 'keywords',
-    section: 'content',
-    keys: { youtube: 'keywords_not_in_video_titles' },
-    label: { en: 'Exclude video title keywords', zh: '排除视频标题关键词' },
-  },
-  {
-    id: 'topics',
-    kind: 'keywords',
-    section: 'content',
-    keys: { youtube: 'topics' },
-    label: { en: 'YouTube topics', zh: 'YouTube 主题' },
-  },
-  {
-    id: 'link_in_bio',
-    kind: 'keywords',
-    section: 'content',
-    keys: {
-      instagram: 'link_in_bio',
-      tiktok: 'link_in_bio',
-      youtube: 'links_from_description',
-    },
-    label: { en: 'Bio link contains', zh: '简介链接包含' },
-  },
-  {
-    id: 'not_link_in_bio',
-    kind: 'keywords',
-    section: 'content',
-    keys: { instagram: 'not_link_in_bio', tiktok: 'not_link_in_bio' },
-    label: { en: 'Bio link does not contain', zh: '简介链接不包含' },
-  },
-  {
-    id: 'video_links',
-    kind: 'keywords',
-    section: 'content',
-    keys: { youtube: 'links_from_video_description' },
-    label: { en: 'Links in video descriptions', zh: '视频描述中的链接' },
-  },
-  {
-    id: 'brands',
-    kind: 'keywords',
-    section: 'content',
-    keys: { instagram: 'brands', tiktok: 'brands', youtube: 'brands' },
-    label: { en: 'Partnered brands', zh: '合作品牌' },
-  },
-
   // ---- Creator profile & status ------------------------------------------
   {
     id: 'account_type',
-    kind: 'text',
+    kind: 'enum',
     section: 'creator',
     keys: { instagram: 'type', tiktok: 'type', youtube: 'type' },
     label: { en: 'Account type', zh: '账号类型' },
-    placeholder: 'e.g. business',
+    options: ['Creator', 'Business'],
   },
   {
     id: 'is_verified',
@@ -391,14 +218,6 @@ export const CLUB_FILTER_DEFS: ClubFilterDef[] = [
     options: ['90', '365'],
     label: { en: 'Last Shorts upload (days)', zh: '最近 Shorts 上传 (天)' },
   },
-  {
-    id: 'last_stream',
-    kind: 'enum',
-    section: 'creator',
-    keys: { youtube: 'last_stream_upload' },
-    options: ['90', '180', '365'],
-    label: { en: 'Last stream (days)', zh: '最近直播 (天)' },
-  },
 
   // ---- Exclusions --------------------------------------------------------
   {
@@ -418,18 +237,6 @@ export const CLUB_FILTER_DEFS: ClubFilterDef[] = [
       youtube: 'exclude_role_based_emails',
     },
     label: { en: 'Exclude role-based emails', zh: '排除公共邮箱账号' },
-  },
-  {
-    id: 'exclude_handles',
-    kind: 'keywords',
-    section: 'exclusions',
-    keys: {
-      instagram: 'exclude_handles',
-      tiktok: 'exclude_handles',
-      youtube: 'exclude_handles',
-    },
-    label: { en: 'Exclude handles', zh: '排除账号' },
-    placeholder: 'handle1, handle2',
   },
 ]
 

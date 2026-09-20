@@ -313,5 +313,11 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // Lightweight outreach-send event (no creator info stored) — used by the
+  // beta starter-tasks progress on the pricing page.
+  await prisma.pageViewEvent
+    .create({ data: { userId, path: 'action:club-outreach' } })
+    .catch(() => {})
+
   return NextResponse.json({ success: true })
 }

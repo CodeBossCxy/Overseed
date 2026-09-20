@@ -57,6 +57,8 @@ export default function CreditHistoryPanel() {
       ? `/api/credits/history?cursor=${encodeURIComponent(cursor)}`
       : '/api/credits/history'
     const res = await fetch(url)
+    // Logged-out visitors (public pricing page): hide the panel, no error.
+    if (res.status === 401) return { entries: [], nextCursor: null, legacy: true }
     if (!res.ok) throw new Error('history fetch failed')
     return res.json() as Promise<{
       entries: LedgerEntry[]

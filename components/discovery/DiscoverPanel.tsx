@@ -886,7 +886,6 @@ export default function DiscoverPanel() {
     CLUB_FILTER_DEFS.filter((def) => def.section === section && def.keys[activePlatform])
   const SECTION_TITLES: Record<ClubFilterSection, string> = {
     performance: zh ? '数据表现' : 'Performance',
-    content: zh ? '内容与关键词' : 'Content & keywords',
     creator: zh ? '创作者资料' : 'Creator profile',
     exclusions: zh ? '排除条件' : 'Exclusions',
   }
@@ -1305,7 +1304,6 @@ export default function DiscoverPanel() {
             </div>
 
             {renderFilterSection('performance')}
-            {renderFilterSection('content')}
             {renderFilterSection('creator')}
 
             {/* Extended audience demographics — Instagram only (10k+ creators) */}

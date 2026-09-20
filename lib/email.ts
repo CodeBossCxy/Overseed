@@ -10,6 +10,8 @@ function getResend() {
 }
 
 const VERIFICATION_NOTIFY_EMAIL = process.env.VERIFICATION_NOTIFY_EMAIL || 'xinyi@overseed.net'
+// Where new-user registration notifications for the internal team are sent
+const SIGNUP_NOTIFY_EMAIL = process.env.SIGNUP_NOTIFY_EMAIL || 'xinyi@overseed.net'
 
 export interface VerificationEmailInput {
   companyName: string
@@ -151,6 +153,69 @@ export async function sendVerificationSubmittedEmail(input: VerificationEmailInp
     `,
   })
   if (error) throw new Error(`Resend error: ${error.name} — ${error.message}`)
+}
+
+export interface NewUserSignupInfo {
+  name: string | null | undefined
+  email: string
+  userType: string
+  // 'credentials' or the OAuth provider name (google / facebook)
+  method: string
+  inviteCode?: string | null
+  companyName?: string | null
+  tier?: string | null
+}
+
+// Internal team notification for every new registration. NEVER throws —
+// a notify failure must not break signup.
+export async function sendNewUserSignupEmail(info: NewUserSignupInfo) {
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://overseed.net'
+    const rows: [string, string | null | undefined][] = [
+      ['Name', info.name],
+      ['Email', info.email],
+      ['Account type', info.userType],
+      ['Signup method', info.method],
+      ['Invite code', info.inviteCode],
+      ['Company', info.companyName],
+      ['Subscription tier', info.tier],
+    ]
+    const detailRows = rows
+      .filter(([, v]) => v)
+      .map(
+        ([label, value]) => `
+          <tr>
+            <td style="padding: 8px 12px; color: #6B7280; font-size: 13px; white-space: nowrap;">${escapeHtml(label)}</td>
+            <td style="padding: 8px 12px; color: #111827; font-size: 13px;">${escapeHtml(String(value))}</td>
+          </tr>`
+      )
+      .join('')
+
+    const { error } = await getResend().emails.send({
+      from: `Overseed <${process.env.EMAIL_FROM}>`,
+      to: SIGNUP_NOTIFY_EMAIL,
+      subject: `[New user] ${info.userType}: ${info.name || info.email} (${info.email})`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
+          <h1 style="color: #4F46E5; font-size: 24px; margin-bottom: 8px;">Overseed</h1>
+          <p style="color: #374151; font-size: 15px; margin-bottom: 20px;">
+            A new user just registered.
+          </p>
+          <table style="width: 100%; border-collapse: collapse; background: #F9FAFB; border-radius: 8px; margin-bottom: 8px;">
+            ${detailRows}
+          </table>
+          <div style="margin-top: 20px;">
+            <a href="${baseUrl}/admin" style="display: inline-block; background: #4F46E5; color: #ffffff; font-size: 14px; font-weight: bold; padding: 10px 20px; border-radius: 8px; text-decoration: none;">
+              Open Admin Dashboard
+            </a>
+          </div>
+        </div>
+      `,
+    })
+    if (error) console.error('Resend rejected signup notification email:', error)
+  } catch (error) {
+    console.error('Failed to send signup notification email:', error)
+  }
 }
 
 export async function sendOTPEmail(to: string, otp: string, locale: string = 'en') {

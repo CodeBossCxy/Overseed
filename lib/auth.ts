@@ -237,11 +237,28 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async createUser({ user }) {
-      // New OAuth users get Campaign Plus during beta (invite code was validated client-side before OAuth)
+      // Beta: first 20 signups get Growth Plus (OUTREACH_PLUS), later ones
+      // Campaign Plus (invite code was validated client-side before OAuth).
+      // The adapter has already created this user, so exclude them from the
+      // promo count.
+      const { defaultSignupTier } = await import('@/lib/signup-tier')
+      const tier = await defaultSignupTier({ userAlreadyCounted: true })
       if (user.id) {
         await prisma.user.update({
           where: { id: user.id },
-          data: { subscriptionTier: 'CAMPAIGN_PLUS' },
+          data: { subscriptionTier: tier },
+        })
+      }
+      // Notify the internal team (fire-and-forget; the provider name isn't
+      // available in this event, so the method is reported as 'oauth')
+      if (user.email) {
+        const { sendNewUserSignupEmail } = await import('@/lib/email')
+        void sendNewUserSignupEmail({
+          name: user.name,
+          email: user.email,
+          userType: (user as any).userType || 'INFLUENCER',
+          method: 'oauth',
+          tier,
         })
       }
     },

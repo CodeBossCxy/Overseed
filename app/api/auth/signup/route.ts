@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
-import { sendOTPEmail } from '@/lib/email'
+import { sendOTPEmail, sendNewUserSignupEmail } from '@/lib/email'
+import { defaultSignupTier } from '@/lib/signup-tier'
 
 export async function POST(request: Request) {
   try {
@@ -75,8 +76,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Hash password and create user
+    // Hash password and create user. Beta promo: the first 20 signups get
+    // Growth Plus (OUTREACH_PLUS); later ones get Campaign Plus.
     const hashedPassword = await hash(password, 12)
+    const subscriptionTier = await defaultSignupTier()
 
     const newUser = await prisma.user.create({
       data: {
@@ -84,7 +87,7 @@ export async function POST(request: Request) {
         email: email.toLowerCase(),
         password: hashedPassword,
         userType: userType === 'brand' ? 'BRAND' : 'INFLUENCER',
-        subscriptionTier: 'CAMPAIGN_PLUS',
+        subscriptionTier,
         emailVerified: null,
       },
     })
@@ -117,6 +120,17 @@ export async function POST(request: Request) {
         },
       }),
     ])
+
+    // Notify the internal team (fire-and-forget; never blocks or fails signup)
+    void sendNewUserSignupEmail({
+      name: newUser.name,
+      email: newUser.email,
+      userType: newUser.userType,
+      method: 'credentials',
+      inviteCode: betaCode.code,
+      companyName: userType === 'brand' ? businessLegalName || name : null,
+      tier: subscriptionTier,
+    })
 
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
