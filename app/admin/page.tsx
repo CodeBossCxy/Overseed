@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import MainLayout from '@/components/MainLayout'
@@ -111,6 +111,51 @@ export default function AdminDashboard() {
   const [generateMaxUses, setGenerateMaxUses] = useState(1)
   const [generateNote, setGenerateNote] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+
+  // Beta feedback filters
+  const [fbStatusFilter, setFbStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'resolved'>('all')
+  const [fbTypeFilter, setFbTypeFilter] = useState<'all' | 'bug' | 'feature' | 'general'>('all')
+  const [fbPageFilter, setFbPageFilter] = useState('all')
+  const [fbDateFrom, setFbDateFrom] = useState('')
+  const [fbDateTo, setFbDateTo] = useState('')
+  const [fbDateSort, setFbDateSort] = useState<'newest' | 'oldest'>('newest')
+
+  const fbPages = useMemo(
+    () => Array.from(new Set(betaFeedback.map(f => f.page).filter(Boolean) as string[])).sort(),
+    [betaFeedback]
+  )
+
+  const filteredFeedback = useMemo(() => {
+    let list = betaFeedback.filter(fb => {
+      if (fbStatusFilter !== 'all' && fb.status !== fbStatusFilter) return false
+      if (fbTypeFilter !== 'all' && fb.type !== fbTypeFilter) return false
+      if (fbPageFilter !== 'all' && fb.page !== fbPageFilter) return false
+      if (fbDateFrom && new Date(fb.createdAt) < new Date(fbDateFrom)) return false
+      if (fbDateTo) {
+        const end = new Date(fbDateTo)
+        end.setHours(23, 59, 59, 999)
+        if (new Date(fb.createdAt) > end) return false
+      }
+      return true
+    })
+    list = [...list].sort((a, b) =>
+      fbDateSort === 'newest'
+        ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    )
+    return list
+  }, [betaFeedback, fbStatusFilter, fbTypeFilter, fbPageFilter, fbDateFrom, fbDateTo, fbDateSort])
+
+  const fbFiltersActive =
+    fbStatusFilter !== 'all' || fbTypeFilter !== 'all' || fbPageFilter !== 'all' || fbDateFrom !== '' || fbDateTo !== ''
+
+  const clearFbFilters = () => {
+    setFbStatusFilter('all')
+    setFbTypeFilter('all')
+    setFbPageFilter('all')
+    setFbDateFrom('')
+    setFbDateTo('')
+  }
 
   useEffect(() => {
     // Access control is enforced server-side in app/admin/layout.tsx (DB check).
@@ -957,8 +1002,92 @@ export default function AdminDashboard() {
               <StatCard label="Resolved" value={betaFeedback.filter(f => f.status === 'resolved').length} accent="text-green-600" />
             </div>
 
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Status</label>
+                  <select
+                    value={fbStatusFilter}
+                    onChange={(e) => setFbStatusFilter(e.target.value as any)}
+                    className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  >
+                    <option value="all">All</option>
+                    <option value="new">New</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Type</label>
+                  <select
+                    value={fbTypeFilter}
+                    onChange={(e) => setFbTypeFilter(e.target.value as any)}
+                    className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  >
+                    <option value="all">All</option>
+                    <option value="bug">Bug</option>
+                    <option value="feature">Feature</option>
+                    <option value="general">General</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Page</label>
+                  <select
+                    value={fbPageFilter}
+                    onChange={(e) => setFbPageFilter(e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1.5 text-sm max-w-[200px]"
+                  >
+                    <option value="all">All</option>
+                    {fbPages.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">From</label>
+                  <input
+                    type="date"
+                    value={fbDateFrom}
+                    onChange={(e) => setFbDateFrom(e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">To</label>
+                  <input
+                    type="date"
+                    value={fbDateTo}
+                    onChange={(e) => setFbDateTo(e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Sort</label>
+                  <select
+                    value={fbDateSort}
+                    onChange={(e) => setFbDateSort(e.target.value as any)}
+                    className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+                  >
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                  </select>
+                </div>
+                {fbFiltersActive && (
+                  <button
+                    onClick={clearFbFilters}
+                    className="text-sm text-gray-500 hover:text-gray-700 underline pb-1.5"
+                  >
+                    Clear filters
+                  </button>
+                )}
+                <span className="ml-auto text-xs text-gray-400 pb-1.5">
+                  Showing {filteredFeedback.length} of {betaFeedback.length}
+                </span>
+              </div>
+            </div>
+
             <div className="space-y-4">
-              {betaFeedback.map((fb) => (
+              {filteredFeedback.map((fb) => (
                 <div key={fb.id} className="bg-white rounded-lg shadow-sm p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -1004,9 +1133,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               ))}
-              {betaFeedback.length === 0 && (
+              {filteredFeedback.length === 0 && (
                 <div className="bg-white rounded-lg shadow-sm p-8 text-center text-gray-400">
-                  No feedback received yet
+                  {betaFeedback.length === 0 ? 'No feedback received yet' : 'No feedback matches the current filters'}
                 </div>
               )}
             </div>
