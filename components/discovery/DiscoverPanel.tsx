@@ -59,7 +59,7 @@ const PAGE_SIZE = 50
 
 // Country filter options — ISO codes sent to the discovery APIs, labels from
 // the shared t.signupBusiness.countries map.
-const COUNTRY_FILTER_OPTIONS: { code: string; key: string }[] = [
+export const COUNTRY_FILTER_OPTIONS: { code: string; key: string }[] = [
   { code: 'US', key: 'us' },
   { code: 'UK', key: 'uk' },
   { code: 'CA', key: 'ca' },
@@ -83,7 +83,7 @@ const COUNTRY_FILTER_OPTIONS: { code: string; key: string }[] = [
 
 // Language filter options — club classifier abbreviations with native-name
 // labels (self-describing, so no i18n entries needed).
-const LANGUAGE_FILTER_OPTIONS: { code: string; label: string }[] = [
+export const LANGUAGE_FILTER_OPTIONS: { code: string; label: string }[] = [
   { code: 'en', label: 'English' },
   { code: 'zh', label: '中文' },
   { code: 'es', label: 'Español' },
@@ -105,7 +105,7 @@ const LANGUAGE_FILTER_OPTIONS: { code: string; label: string }[] = [
 ]
 
 // Audience age buckets supported by the club audience filter (IG only)
-const AUDIENCE_AGE_OPTIONS = ['13-17', '18-24', '25-34', '35-44', '45-64', '65-'] as const
+export const AUDIENCE_AGE_OPTIONS = ['13-17', '18-24', '25-34', '35-44', '45-64', '65-'] as const
 
 // Search results + filters survive navigating away and back (per tab).
 const SEARCH_STATE_KEY = 'discover:search:v1'
@@ -701,7 +701,9 @@ export default function DiscoverPanel() {
       return
     }
     if (platforms.length === 0) return
-    await clubSearchWith(currentFilterVals())
+    // Single Search button: parse the free-form query with AI (which also
+    // updates the visible filters), then run the club search.
+    await aiSearch()
   }
 
   // Club keyword search from an explicit filter snapshot (used by both the
@@ -826,7 +828,9 @@ export default function DiscoverPanel() {
       }
       await clubSearchWith(vals)
     } catch (err: any) {
-      setError(err.message || d.aiParseFailed)
+      // If the AI parse fails, fall back to a plain keyword search with the
+      // current filter values so the Search button still works.
+      await clubSearchWith(currentFilterVals())
     } finally {
       setAiParsing(false)
     }
@@ -1057,24 +1061,20 @@ export default function DiscoverPanel() {
                   : 'workspace-glass-control text-gray-600 hover:brightness-105'
               }`}
             >
-              🎤
+              <img src="/microphone.png" alt="" className="h-5 w-auto" />
             </button>
           )}
           <button
-            type="button"
-            onClick={aiSearch}
-            disabled={aiParsing || isLoading || !query.trim()}
-            title={d.aiSearchHint}
-            className="px-5 py-2.5 bg-gray-900 text-white rounded-full text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {aiParsing ? <span className="inline-flex items-center gap-2"><Spinner /> {d.aiParsing}</span> : <>✨ {d.aiSearchButton}</>}
-          </button>
-          <button
             type="submit"
-            disabled={isLoading || platforms.length === 0}
+            disabled={aiParsing || isLoading || platforms.length === 0}
+            title={d.aiSearchHint}
             className="px-6 py-2.5 bg-primary-600 text-white rounded-full font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? <span className="inline-flex items-center gap-2"><Spinner /> {d.searching}</span> : d.searchButton}
+            {aiParsing || isLoading ? (
+              <span className="inline-flex items-center gap-2"><Spinner /> {aiParsing ? d.aiParsing : d.searching}</span>
+            ) : (
+              d.searchButton
+            )}
           </button>
           {searchResult && (
             <button

@@ -805,6 +805,7 @@ export default function BrandVerificationPage() {
             <div className="text-xs text-gray-400">
               <p>{v.requiredNote}</p>
               <p className="mt-1">{v.privacyNote}</p>
+              <p className="mt-1">{v.reviewOnlyNote}</p>
             </div>
             <button
               onClick={handleSubmit}

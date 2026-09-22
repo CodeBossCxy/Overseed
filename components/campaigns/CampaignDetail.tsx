@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import CompensationBadge from './CompensationBadge'
 import CampaignStats from './CampaignStats'
+import Markdown from '@/components/Markdown'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 import { formatNumber } from '@/lib/i18n/formatNumber'
@@ -197,7 +198,9 @@ export default function CampaignDetail({
           <div className="p-6 border-b">
             <h2 className="text-xl font-semibold mb-4">{t.campaign.aboutThisCampaign}</h2>
             <div className="prose max-w-none">
-              <p className="whitespace-pre-wrap text-gray-700">{campaign.description || t.campaign.noDescription}</p>
+              {campaign.description
+                ? <Markdown className="text-gray-700">{campaign.description}</Markdown>
+                : <p className="text-gray-700">{t.campaign.noDescription}</p>}
               {/* Anti-fraud notice — shown under every campaign per spec */}
               <div className="mt-4 bg-amber-50/80 border border-amber-100 rounded-xl p-3 text-sm text-amber-800">
                 {t.brand.campaigns.antiFraud}{' '}

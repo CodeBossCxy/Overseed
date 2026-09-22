@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 import { formatNumber } from '@/lib/i18n/formatNumber'
 import { PlatformIcon } from './CampaignRowCard'
+import Markdown from '@/components/Markdown'
 
 type Props = {
   campaign: any
@@ -35,6 +36,8 @@ export default function CreatorCampaignDetail({
   const { t, locale } = useLanguage()
   const [saved, setSaved] = useState(isSaved)
   const [saveBusy, setSaveBusy] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [activeImage, setActiveImage] = useState(0)
   const spotsLeft = Math.max(0, campaign.totalSlots - campaign.filledSlots)
   const progress = campaign.totalSlots ? Math.min(100, (campaign.filledSlots / campaign.totalSlots) * 100) : 0
   const isDeadlinePassed = Boolean(campaign.deadline && new Date(campaign.deadline) < new Date())
@@ -53,7 +56,10 @@ export default function CreatorCampaignDetail({
   const category = campaign.categories
     .map((item: any) => (t.categoryNames as Record<string, string>)[item.category.name] || item.category.name)
     .join(locale === 'zh' ? '、' : ' & ') || t.campaign.campaignContent
-  const cover = campaign.images?.[0] || campaign.media?.find((item: any) => item.mediaType !== 'video')?.mediaUrl
+  const galleryImages: string[] = campaign.images?.length
+    ? campaign.images
+    : (campaign.media || []).filter((item: any) => item.mediaType !== 'video').map((item: any) => item.mediaUrl)
+  const cover = galleryImages[0]
   const budget = campaign.paymentMin
     ? `$${formatNumber(Number(campaign.paymentMin), locale)}${campaign.paymentMax ? ` – $${formatNumber(Number(campaign.paymentMax), locale)}` : '+'}`
     : campaign.giftDescription || compensationLabel
@@ -98,6 +104,25 @@ export default function CreatorCampaignDetail({
 
   const canSave = !isOwner && isAuthenticated && userType !== 'BRAND' && userType !== 'ADMIN'
 
+  const shareCampaign = async () => {
+    const url = `${window.location.origin}/campaign/${campaign.id}`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: campaign.title, url })
+        return
+      } catch {
+        // fall through to clipboard copy (e.g. user dismissed the share sheet)
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      // clipboard unavailable — ignore
+    }
+  }
+
   const primaryAction = () => {
     if (isOwner) return <Link href={`/dashboard/brand/campaigns/${campaign.id}`} className="block rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 py-4 text-center font-semibold text-white">{t.campaign.manageCampaignLink}</Link>
     if (userType === 'BRAND' || userType === 'ADMIN') return <p className="py-3 text-center text-sm text-[#7180ad]">{t.campaign.onlyCreatorsCanApply}</p>
@@ -115,15 +140,27 @@ export default function CreatorCampaignDetail({
         {/* Hero card */}
         <section className="workspace-glass-card rounded-3xl p-6">
           <div className="flex flex-col gap-6 md:flex-row">
-            <div className="relative h-64 w-full shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-[#f3e4d9] to-[#ead4c5] md:h-72 md:w-72">
-              {cover
-                ? <Image src={cover} alt={campaign.title} width={600} height={600} priority className="h-full w-full object-cover" />
-                : <div className="flex h-full w-full flex-col items-center justify-center text-[#947f79]"><span className="text-6xl">✦</span><span className="mt-3">{t.campaign.campaignCover}</span></div>}
-              {canSave && (
-                <button onClick={toggleSave} disabled={saveBusy} aria-label={saved ? 'Unsave campaign' : 'Save campaign'}
-                  className={`absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/85 shadow-sm backdrop-blur transition disabled:opacity-50 ${saved ? 'text-rose-500' : 'text-[#7180ad] hover:text-rose-500'}`}>
-                  {saved ? '♥' : '♡'}
-                </button>
+            <div className="w-full shrink-0 md:w-72">
+              <div className="relative h-64 w-full overflow-hidden rounded-2xl bg-gradient-to-br from-[#f3e4d9] to-[#ead4c5] md:h-72">
+                {cover
+                  ? <Image src={galleryImages[activeImage] || cover} alt={campaign.title} width={600} height={600} priority className="h-full w-full object-contain" />
+                  : <div className="flex h-full w-full flex-col items-center justify-center text-[#947f79]"><span className="text-6xl">✦</span><span className="mt-3">{t.campaign.campaignCover}</span></div>}
+                {canSave && (
+                  <button onClick={toggleSave} disabled={saveBusy} aria-label={saved ? 'Unsave campaign' : 'Save campaign'}
+                    className={`absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/85 shadow-sm backdrop-blur transition disabled:opacity-50 ${saved ? 'text-rose-500' : 'text-[#7180ad] hover:text-rose-500'}`}>
+                    {saved ? '♥' : '♡'}
+                  </button>
+                )}
+              </div>
+              {galleryImages.length > 1 && (
+                <div className="mt-3 flex gap-2 overflow-x-auto">
+                  {galleryImages.map((url, index) => (
+                    <button key={url} onClick={() => setActiveImage(index)} aria-label={`Image ${index + 1}`}
+                      className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 transition ${index === activeImage ? 'border-violet-500' : 'border-transparent opacity-70 hover:opacity-100'}`}>
+                      <Image src={url} alt="" width={128} height={128} className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
             <div className="min-w-0 flex-1">
@@ -171,7 +208,9 @@ export default function CreatorCampaignDetail({
         {/* About */}
         <section className="workspace-glass-card rounded-3xl p-6">
           <h2 className="text-xl font-bold">{t.campaign.aboutThisCampaign}</h2>
-          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#59678f]">{campaign.description || t.campaign.noCampaignDescriptionYet}</p>
+          {campaign.description
+            ? <Markdown className="mt-2 text-sm leading-6 text-[#59678f]">{campaign.description}</Markdown>
+            : <p className="mt-2 text-sm leading-6 text-[#59678f]">{t.campaign.noCampaignDescriptionYet}</p>}
           <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-sm text-amber-800">
             🛡 &nbsp;{t.brand.campaigns.antiFraud} <Link href="/contact" className="font-semibold underline">{t.brand.campaigns.reportNow}</Link>
           </div>
@@ -182,7 +221,7 @@ export default function CreatorCampaignDetail({
           <h2 className="mb-5 text-xl font-bold">{t.campaign.requirements}</h2>
           <div className="grid gap-6 text-sm md:grid-cols-3">
             <div>
-              <p className="flex items-center gap-2 font-semibold"><span className="text-violet-500">▣</span>{t.campaign.deliverablesRequirements}</p>
+              <p className="flex items-start gap-2 font-semibold"><svg className="mt-0.5 h-[18px] w-[18px] shrink-0 text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h4"/></svg>{t.campaign.deliverablesRequirements}</p>
               {deliverables.length
                 ? <ul className="mt-3 space-y-2 text-[#59678f]">{deliverables.map(item => <li key={item} className="flex gap-2"><span className="text-violet-500">●</span>{item}</li>)}</ul>
                 : <p className="mt-3 text-[#7884a8]">{t.campaign.finalDeliverablesNote}</p>}
@@ -205,15 +244,14 @@ export default function CreatorCampaignDetail({
         {/* Info tiles */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ['◎', t.campaign.locationLabel, location, null],
-            ['▤', t.campaign.categoryLabel, category, null],
-            ['◫', t.campaign.spotsLeftLabel, t.campaign.spotsLeftCount.replace('{n}', String(spotsLeft)), t.campaign.outOf.replace('{n}', String(campaign.totalSlots))],
-            ['▣', t.campaign.campaignPeriodLabel, campaign.campaignStartDate
+            [t.campaign.locationLabel, location, null],
+            [t.campaign.categoryLabel, category, null],
+            [t.campaign.spotsLeftLabel, t.campaign.spotsLeftCount.replace('{n}', String(spotsLeft)), t.campaign.outOf.replace('{n}', String(campaign.totalSlots))],
+            [t.campaign.campaignPeriodLabel, campaign.campaignStartDate
               ? `${formatDate(campaign.campaignStartDate, locale)}${campaign.campaignEndDate ? ` – ${formatDate(campaign.campaignEndDate, locale)}` : ''}`
               : t.campaign.flexible, null],
-          ].map(([icon, label, primary, secondary]) => (
-            <section key={label as string} className="workspace-glass-card flex items-start gap-3 rounded-3xl p-5 text-sm">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">{icon}</span>
+          ].map(([label, primary, secondary]) => (
+            <section key={label as string} className="workspace-glass-card rounded-3xl p-5 text-sm">
               <div className="min-w-0">
                 <p className="font-semibold">{label}</p>
                 <p className="mt-1 text-[#59678f]">{primary}</p>
@@ -243,6 +281,7 @@ export default function CreatorCampaignDetail({
         <div className="mt-7 space-y-3">
           {primaryAction()}
           {canSave && <button onClick={toggleSave} disabled={saveBusy} className={`w-full rounded-xl border py-4 font-semibold transition disabled:opacity-50 ${saved ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-white bg-white/25'}`}>{saved ? `♥ ${t.campaign.savedCampaignBtn}` : `♡ ${t.campaign.saveCampaignBtn}`}</button>}
+          <button onClick={shareCampaign} className={`w-full rounded-xl border py-4 font-semibold transition ${linkCopied ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-white bg-white/25'}`}>{linkCopied ? `✓ ${t.campaign.linkCopied}` : `⇗ ${t.campaign.shareCampaignBtn}`}</button>
         </div>
         {!isOwner && userType !== 'BRAND' && userType !== 'ADMIN' && (
           <div className="mt-6 space-y-4 rounded-2xl bg-white/35 p-4 text-sm">

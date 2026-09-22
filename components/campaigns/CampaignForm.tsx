@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Cropper, { type Area } from 'react-easy-crop'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import LocaleDateInput from '@/components/LocaleDateInput'
+import Markdown from '@/components/Markdown'
 
 interface Category {
   id: number
@@ -71,6 +73,30 @@ export default function CampaignForm({
 
   const spotsInvalid = formData.totalSlots === '' || parseInt(String(formData.totalSlots)) < 1
 
+  // Markdown editing for the description field: Write/Preview toggle plus a
+  // toolbar that wraps the current selection in markdown syntax.
+  const descRef = useRef<HTMLTextAreaElement>(null)
+  const [descPreview, setDescPreview] = useState(false)
+  const wrapDescSelection = (before: string, after: string, sample: string) => {
+    const el = descRef.current
+    if (!el) return
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    const text = el.value
+    const selectedText = text.slice(start, end) || sample
+    // Line prefixes (headings, lists) go at the start of the line
+    const lineStart = after === '' ? text.lastIndexOf('\n', start - 1) + 1 : start
+    const next = after === ''
+      ? text.slice(0, lineStart) + before + text.slice(lineStart)
+      : text.slice(0, start) + before + selectedText + after + text.slice(end)
+    setFormData((f) => ({ ...f, description: next }))
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = after === '' ? end + before.length : start + before.length + selectedText.length + after.length
+      el.setSelectionRange(pos, pos)
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent, asDraft = false) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -95,7 +121,7 @@ export default function CampaignForm({
       if (!formData.campaignEndDate) missing.push(cf.campaignEndDate)
       if (formData.images.length === 0) missing.push(cf.campaignImages)
       // Step 2
-      if (['PAID', 'PAID_PLUS_GIFT', 'NEGOTIABLE'].includes(formData.compensationType)) {
+      if (['PAID', 'PAID_PLUS_GIFT'].includes(formData.compensationType)) {
         if (!formData.paymentMin) missing.push(cf.paymentMin)
         if (!formData.paymentMax) missing.push(cf.paymentMax)
       }
@@ -105,7 +131,6 @@ export default function CampaignForm({
       }
       // Step 3
       if (formData.platformIds.length === 0) missing.push(cf.targetPlatforms)
-      if (!formData.contentGuidelines.trim()) missing.push(cf.contentGuidelines)
       if (missing.length > 0) {
         setError(`${cf.requiredFields}: ${missing.join(', ')}`)
         setIsSubmitting(false)
@@ -162,6 +187,94 @@ export default function CampaignForm({
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Manual crop state
+  const [cropQueue, setCropQueue] = useState<File[]>([])
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [cropAspect, setCropAspect] = useState<'free' | 'square'>('free')
+  const [naturalAspect, setNaturalAspect] = useState(1)
+  const [cropAreaPixels, setCropAreaPixels] = useState<Area | null>(null)
+
+  const showCropModal = (file: File) => {
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setCropAspect('free')
+    setCropAreaPixels(null)
+    setCropSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
+  }
+
+  const closeCropModal = () => {
+    setCropSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+  }
+
+  const createCroppedFile = async (src: string, area: Area, original: File): Promise<File> => {
+    const img = document.createElement('img')
+    await new Promise((resolve, reject) => {
+      img.onload = resolve
+      img.onerror = reject
+      img.src = src
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(area.width)
+    canvas.height = Math.round(area.height)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas unavailable')
+    ctx.drawImage(img, area.x, area.y, area.width, area.height, 0, 0, canvas.width, canvas.height)
+    const type = original.type === 'image/jpeg' ? 'image/jpeg' : 'image/png'
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Crop failed'))), type, 0.92))
+    const name = original.name.replace(/\.\w+$/, '') + (type === 'image/jpeg' ? '.jpg' : '.png')
+    return new File([blob], name, { type })
+  }
+
+  const uploadSingle = async (f: File) => {
+    const body = new FormData()
+    body.append('files', f)
+    const res = await fetch('/api/upload', { method: 'POST', body })
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data?.urls) {
+      throw new Error(data?.error || `"${f.name}" ${cf.fileTooLarge}`)
+    }
+    setFormData((prev) => ({ ...prev, images: [...prev.images, ...data.urls] }))
+  }
+
+  const cancelCrop = () => {
+    closeCropModal()
+    setCropQueue([])
+  }
+
+  const handleCropAction = async (useOriginal: boolean) => {
+    const [current, ...rest] = cropQueue
+    if (!current) return
+    let fileToUpload = current
+    if (!useOriginal && cropSrc && cropAreaPixels) {
+      try {
+        fileToUpload = await createCroppedFile(cropSrc, cropAreaPixels, current)
+      } catch {
+        // fall back to original if cropping fails
+      }
+    }
+    closeCropModal()
+    setIsUploading(true)
+    try {
+      await uploadSingle(fileToUpload)
+      setCropQueue(rest)
+      if (rest.length > 0) showCropModal(rest[0])
+    } catch (err: any) {
+      setUploadError(err.message)
+      setCropQueue([])
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   const uploadFiles = async (files: File[]) => {
     if (files.length === 0) return
 
@@ -190,28 +303,9 @@ export default function CampaignForm({
     }
 
     setUploadError(null)
-    setIsUploading(true)
-
-    try {
-      // Upload one file per request to stay under the platform's request-body limit
-      for (const f of filesToUpload) {
-        const body = new FormData()
-        body.append('files', f)
-
-        const res = await fetch('/api/upload', { method: 'POST', body })
-        const data = await res.json().catch(() => null)
-
-        if (!res.ok || !data?.urls) {
-          throw new Error(data?.error || `"${f.name}" ${cf.fileTooLarge}`)
-        }
-
-        setFormData((prev) => ({ ...prev, images: [...prev.images, ...data.urls] }))
-      }
-    } catch (err: any) {
-      setUploadError(err.message)
-    } finally {
-      setIsUploading(false)
-    }
+    // Open the crop dialog; files are uploaded one by one after the user crops or skips
+    setCropQueue(filesToUpload)
+    showCropModal(filesToUpload[0])
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,14 +400,44 @@ export default function CampaignForm({
 
       <div>
         <label className="block text-sm font-medium mb-1">{cf.description} *</label>
-        <textarea
-          rows={6}
-          required
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
-          placeholder={cf.descriptionPlaceholder}
-        />
+        <div className="border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-primary-500 overflow-hidden">
+          <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 bg-gray-50 text-gray-600">
+            {([
+              ['H1', () => wrapDescSelection('# ', '', cf.mdHeadingSample)],
+              ['H2', () => wrapDescSelection('## ', '', cf.mdHeadingSample)],
+              ['B', () => wrapDescSelection('**', '**', cf.mdBoldSample)],
+              ['I', () => wrapDescSelection('_', '_', cf.mdItalicSample)],
+              ['•', () => wrapDescSelection('- ', '', cf.mdListSample)],
+            ] as [string, () => void][]).map(([label, fn]) => (
+              <button key={label} type="button" onClick={fn} disabled={descPreview}
+                className={`px-2 py-0.5 rounded text-sm hover:bg-gray-200 disabled:opacity-40 ${label === 'B' ? 'font-bold' : label === 'I' ? 'italic' : 'font-semibold'}`}>
+                {label}
+              </button>
+            ))}
+            <div className="ml-auto flex gap-1 text-xs">
+              <button type="button" onClick={() => setDescPreview(false)} className={`px-2.5 py-1 rounded ${!descPreview ? 'bg-white shadow-sm font-semibold' : 'hover:bg-gray-200'}`}>{cf.mdWrite}</button>
+              <button type="button" onClick={() => setDescPreview(true)} className={`px-2.5 py-1 rounded ${descPreview ? 'bg-white shadow-sm font-semibold' : 'hover:bg-gray-200'}`}>{cf.mdPreview}</button>
+            </div>
+          </div>
+          {descPreview ? (
+            <div className="px-4 py-2 min-h-[9.5rem] text-gray-800">
+              {formData.description.trim()
+                ? <Markdown>{formData.description}</Markdown>
+                : <p className="text-gray-400 text-sm">{cf.mdPreviewEmpty}</p>}
+            </div>
+          ) : (
+            <textarea
+              ref={descRef}
+              rows={6}
+              required
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full px-4 py-2 focus:outline-none"
+              placeholder={cf.descriptionPlaceholder}
+            />
+          )}
+        </div>
+        <p className="mt-1 text-xs text-gray-400">{cf.mdHint}</p>
       </div>
 
       <div>
@@ -503,11 +627,11 @@ export default function CampaignForm({
       {['PAID', 'PAID_PLUS_GIFT', 'NEGOTIABLE'].includes(formData.compensationType) && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">{cf.paymentMin} *</label>
+            <label className="block text-sm font-medium mb-1">{cf.paymentMin}{formData.compensationType !== 'NEGOTIABLE' && ' *'}</label>
             <input
               type="number"
               min="0"
-              required
+              required={formData.compensationType !== 'NEGOTIABLE'}
               value={formData.paymentMin}
               onChange={(e) => setFormData({ ...formData, paymentMin: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
@@ -515,11 +639,11 @@ export default function CampaignForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">{cf.paymentMax} *</label>
+            <label className="block text-sm font-medium mb-1">{cf.paymentMax}{formData.compensationType !== 'NEGOTIABLE' && ' *'}</label>
             <input
               type="number"
               min="0"
-              required
+              required={formData.compensationType !== 'NEGOTIABLE'}
               value={formData.paymentMax}
               onChange={(e) => setFormData({ ...formData, paymentMax: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
@@ -673,10 +797,9 @@ export default function CampaignForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">{cf.contentGuidelines} *</label>
+        <label className="block text-sm font-medium mb-1">{cf.contentGuidelines}</label>
         <textarea
           rows={4}
-          required
           value={formData.contentGuidelines}
           onChange={(e) => setFormData({ ...formData, contentGuidelines: e.target.value })}
           className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
@@ -826,6 +949,48 @@ export default function CampaignForm({
           )}
         </div>
       </div>
+
+      {/* Crop dialog */}
+      {cropSrc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div data-solid className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold">{cf.cropImage}{cropQueue.length > 1 ? ` (${cropQueue.length})` : ''}</h3>
+              <div className="flex gap-1 rounded-lg bg-gray-100 p-1 text-sm">
+                {(['free', 'square'] as const).map((mode) => (
+                  <button key={mode} type="button" onClick={() => setCropAspect(mode)}
+                    className={`rounded-md px-3 py-1 transition ${cropAspect === mode ? 'bg-white font-medium shadow-sm' : 'text-gray-500'}`}>
+                    {mode === 'free' ? cf.cropFree : cf.cropSquare}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="relative h-80 w-full overflow-hidden rounded-lg bg-gray-900">
+              <Cropper
+                image={cropSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={cropAspect === 'square' ? 1 : naturalAspect}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={(_area, areaPixels) => setCropAreaPixels(areaPixels)}
+                onMediaLoaded={(size) => setNaturalAspect(size.naturalWidth / size.naturalHeight)}
+              />
+            </div>
+            <p className="mt-2 text-xs text-gray-500">{cf.cropHint}</p>
+            <input type="range" min={1} max={3} step={0.05} value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))} className="mt-2 w-full" />
+            <div className="mt-4 flex justify-end gap-3">
+              <button type="button" onClick={cancelCrop}
+                className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">{cf.cropCancel}</button>
+              <button type="button" onClick={() => handleCropAction(true)} disabled={isUploading}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50">{cf.useOriginal}</button>
+              <button type="button" onClick={() => handleCropAction(false)} disabled={isUploading}
+                className="rounded-md bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700 disabled:opacity-50">{cf.cropAndUpload}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   )
 }

@@ -5,6 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatNumber } from '@/lib/i18n/formatNumber'
+import {
+  COUNTRY_FILTER_OPTIONS,
+  LANGUAGE_FILTER_OPTIONS,
+  AUDIENCE_AGE_OPTIONS,
+} from '@/components/discovery/DiscoverPanel'
+import Markdown from '@/components/Markdown'
 
 type Creator = {
   id: string; platform: string; handle: string | null; display_name: string | null
@@ -135,9 +141,32 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   )
   const [tab, setTab] = useState<'detail' | 'direct'>('detail')
   const [query, setQuery] = useState('')
-  const [platform, setPlatform] = useState('youtube')
+  // Filters default to the campaign brief (platform / follower requirement);
+  // the brand can adjust them before running the AI match.
+  const [platform, setPlatform] = useState(() => {
+    const p = (initialCampaign.platforms[0]?.platform.name || '').toLowerCase()
+    return ['youtube', 'instagram', 'tiktok'].includes(p) ? p : 'youtube'
+  })
   const [country, setCountry] = useState('')
-  const [minFollowers, setMinFollowers] = useState('')
+  const [minFollowers, setMinFollowers] = useState(() => {
+    const min = initialCampaign.followerRequirements?.[0]?.minFollowers
+    return min ? String(min) : ''
+  })
+  const [maxFollowers, setMaxFollowers] = useState(() => {
+    const max = initialCampaign.followerRequirements?.[0]?.maxFollowers
+    return max ? String(max) : ''
+  })
+  const [minEngagement, setMinEngagement] = useState(() => {
+    const e = initialCampaign.followerRequirements?.[0]?.minEngagementRate
+    return e ? String(e) : ''
+  })
+  const [maxEngagement, setMaxEngagement] = useState('')
+  const [gender, setGender] = useState('')
+  const [language, setLanguage] = useState('')
+  const [bioKeywords, setBioKeywords] = useState('')
+  const [lastPost, setLastPost] = useState('')
+  const [audienceAge, setAudienceAge] = useState('')
+  const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [creators, setCreators] = useState<Creator[]>([])
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -157,6 +186,22 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     if (res.ok) setQueue((await res.json()).queue || [])
   }, [campaign.id])
 
+  // Apply the visible filters (same set as creator discovery's basic +
+  // advanced-basics filters) to a club-search query string.
+  const applyFilters = useCallback((qs: URLSearchParams) => {
+    if (country.trim()) qs.set('country', country.trim().toUpperCase())
+    if (minFollowers) qs.set('min_followers', minFollowers)
+    if (maxFollowers) qs.set('max_followers', maxFollowers)
+    if (minEngagement) qs.set('min_engagement', minEngagement)
+    if (maxEngagement) qs.set('max_engagement', maxEngagement)
+    if (gender) qs.set('gender', gender)
+    if (language) qs.set('language', language)
+    if (bioKeywords.trim()) qs.set('bio_keywords', bioKeywords.trim())
+    if (lastPost) qs.set('last_post', lastPost)
+    // Audience demographics are an Instagram-only club filter
+    if (audienceAge && platform === 'instagram') qs.set('audience_age', audienceAge)
+  }, [country, minFollowers, maxFollowers, minEngagement, maxEngagement, gender, language, bioKeywords, lastPost, audienceAge, platform])
+
   const discover = useCallback(async (search = '') => {
     setLoading(true); setError('')
     // KOL/YouTube API search is paused — keyword searches use the club API,
@@ -165,11 +210,12 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     const qs = new URLSearchParams({ limit: searching ? '10' : '50' })
     if (searching) {
       qs.set('q', search.trim()); qs.set('platform', platform)
+      applyFilters(qs)
     } else {
       qs.set('platform', platform); qs.set('sort', 'followers')
+      if (country) qs.set('country', country.toUpperCase())
+      if (minFollowers) qs.set('min_followers', minFollowers)
     }
-    if (country) qs.set('country', country.toUpperCase())
-    if (minFollowers) qs.set('min_followers', minFollowers)
     try {
       const endpoint = searching ? 'club-search' : 'creators'
       const res = await fetch(`/api/discovery/${endpoint}?${qs}`)
@@ -178,7 +224,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       setCreators(data?.results || [])
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false); setMatched(true) }
-  }, [country, minFollowers, platform])
+  }, [country, minFollowers, platform, applyFilters])
 
   // AI match: turn the campaign brief into search filters (parse-query),
   // then run one billed club search page with them.
@@ -194,8 +240,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         `Platforms: ${platformNames}. ${minReq ? `Minimum ${minReq} followers. ` : ''}` +
         (campaign.description || '').slice(0, 300)
       let q = catNames || campaign.title
-      let plat = platform
+      // The visible filters (pre-set from the campaign, adjustable by the
+      // user) win; AI parsing only fills in what the user left blank.
       const qs = new URLSearchParams({ limit: '10' })
+      applyFilters(qs)
       try {
         const parseRes = await fetch('/api/discovery/parse-query', {
           method: 'POST',
@@ -204,19 +252,25 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         })
         const parsed = parseRes.ok ? (await parseRes.json())?.parsed : null
         if (parsed?.keywords) q = parsed.keywords
-        if (parsed?.platform) plat = parsed.platform
-        if (parsed?.country) qs.set('country', parsed.country)
-        if (parsed?.min_followers != null) qs.set('min_followers', String(parsed.min_followers))
+        if (parsed?.country && !country.trim()) qs.set('country', parsed.country)
+        if (parsed?.min_followers != null && !minFollowers) qs.set('min_followers', String(parsed.min_followers))
+        if (parsed?.min_engagement != null && !minEngagement) qs.set('min_engagement', String(parsed.min_engagement))
+        if (parsed?.gender && !gender) qs.set('gender', parsed.gender)
+        if (parsed?.language && !language) qs.set('language', parsed.language)
       } catch {
         // Parsing is best-effort; fall back to category keywords
       }
-      qs.set('q', q); qs.set('platform', plat)
+      qs.set('q', q); qs.set('platform', platform)
       const res = await fetch(`/api/discovery/club-search?${qs}`)
       window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Creator matching is temporarily unavailable.')
       setCreators(data?.results || [])
-      setQuery(q); setPlatform(plat)
+      setQuery(q)
+      // Reflect any AI-filled blanks back into the visible filters
+      const usedCountry = qs.get('country'); const usedMin = qs.get('min_followers')
+      if (usedCountry && !country.trim()) setCountry(usedCountry)
+      if (usedMin && !minFollowers) setMinFollowers(usedMin)
       setMatched(true)
     } catch (e: any) { setError(e.message) }
     finally { setAiMatching(false) }
@@ -281,6 +335,48 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     <button onClick={() => setTab('direct')} className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${tab === 'direct' ? 'bg-white/80 shadow-sm text-[#17255f]' : 'text-[#7180ad]'}`}>{m.tabDirect}</button>
   </div>
 
+  // Shared filter controls — same set as creator discovery's basic +
+  // advanced-basics filters. Used by both the AI-match card and the
+  // post-match search row.
+  const fCls = 'workspace-glass-control px-3 py-2 text-sm'
+  const basicFilterControls = <>
+    <select value={platform} onChange={e => setPlatform(e.target.value)} className={fCls}><option value="youtube">YouTube</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select>
+    <select value={country} onChange={e => setCountry(e.target.value)} className={fCls}>
+      <option value="">{d.allCountries}</option>
+      {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>)}
+    </select>
+    <input type="number" min={0} value={minFollowers} onChange={e => setMinFollowers(e.target.value)} placeholder={d.minFollowers} className={`${fCls} w-36`}/>
+    <input type="number" min={0} value={maxFollowers} onChange={e => setMaxFollowers(e.target.value)} placeholder={d.maxFollowers} className={`${fCls} w-36`}/>
+    <button type="button" onClick={() => setShowMoreFilters(v => !v)} className="px-3 py-2 rounded-full text-sm font-medium bg-white/40 text-[#59678f] hover:bg-white/60 transition">
+      {showMoreFilters ? d.advancedFiltersHide : d.advancedFilters}
+    </button>
+  </>
+  const moreFilterControls = showMoreFilters && <>
+    <input type="number" min={0} max={100} step="0.1" value={minEngagement} onChange={e => setMinEngagement(e.target.value)} placeholder={d.minEngagement} className={`${fCls} w-32`}/>
+    <input type="number" min={0} max={100} step="0.1" value={maxEngagement} onChange={e => setMaxEngagement(e.target.value)} placeholder={d.maxEngagement} className={`${fCls} w-32`}/>
+    <select value={gender} onChange={e => setGender(e.target.value)} className={fCls}>
+      <option value="">{d.genderLabel}: {d.anyOption}</option>
+      <option value="FEMALE">{d.genderFemale}</option>
+      <option value="MALE">{d.genderMale}</option>
+    </select>
+    <select value={language} onChange={e => setLanguage(e.target.value)} className={fCls}>
+      <option value="">{d.allLanguages}</option>
+      {LANGUAGE_FILTER_OPTIONS.map(({ code, label }) => <option key={code} value={code}>{label}</option>)}
+    </select>
+    <input type="text" value={bioKeywords} onChange={e => setBioKeywords(e.target.value)} placeholder={d.bioKeywordsPlaceholder} className={`${fCls} w-48`}/>
+    <select value={lastPost} onChange={e => setLastPost(e.target.value)} className={fCls}>
+      <option value="">{d.lastPostLabel}: {d.anyOption}</option>
+      <option value="90">{d.lastPost90}</option>
+      <option value="365">{d.lastPost365}</option>
+    </select>
+    {platform === 'instagram' && (
+      <select value={audienceAge} onChange={e => setAudienceAge(e.target.value)} className={fCls}>
+        <option value="">{d.audienceAgeLabel}: {d.anyOption}</option>
+        {AUDIENCE_AGE_OPTIONS.map(range => <option key={range} value={range}>{range === '65-' ? '65+' : range}</option>)}
+      </select>
+    )}
+  </>
+
   if (tab === 'detail') {
     const category = campaign.categories.map(c => c.category.name).join(' & ') || 'Campaign'
     const platforms = campaign.platforms.map(p => p.platform.name).join(', ') || m.allPlatforms
@@ -332,7 +428,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
 
           <section className="workspace-glass-card rounded-3xl p-6">
             <h2 className="text-xl font-bold">{m.aboutTitle}</h2>
-            <p className="text-sm leading-6 text-[#59678f] mt-2 whitespace-pre-line">{campaign.description || m.noDescription}</p>
+            {campaign.description
+              ? <Markdown className="text-sm leading-6 text-[#59678f] mt-2">{campaign.description}</Markdown>
+              : <p className="text-sm leading-6 text-[#59678f] mt-2">{m.noDescription}</p>}
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-6 pt-5 border-t border-white/60 text-sm">
               <div><p className="text-[#7884a8]">{m.platforms}</p><b>{platforms}</b></div>
               <div><p className="text-[#7884a8]">{m.creatorType}</p><b>{category}{m.creatorsSuffix}</b></div>
@@ -399,11 +497,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           <form onSubmit={e => { e.preventDefault(); discover(query) }} className="mb-4">
             <div className="flex gap-2"><div className="workspace-glass-control flex-1 flex items-center gap-3 px-4 py-3">{icon(searchIcon, 'w-4 h-4')}<input value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent outline-none w-full" placeholder={d.searchByNamePlaceholder}/></div><button className="px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold">{d.searchButton}</button></div>
             <div className="flex flex-wrap gap-2 mt-3">
-
-              <select value={platform} onChange={e => setPlatform(e.target.value)} className="workspace-glass-control px-3 py-2 text-sm"><option value="youtube">YouTube</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select>
-              <input value={country} onChange={e => setCountry(e.target.value)} maxLength={2} placeholder={d.countryLabel} className="workspace-glass-control w-28 px-3 py-2 text-sm uppercase"/>
-              <input type="number" value={minFollowers} onChange={e => setMinFollowers(e.target.value)} placeholder={d.minFollowers} className="workspace-glass-control w-36 px-3 py-2 text-sm"/>
-              <button type="button" onClick={() => { setQuery(''); setCountry(''); setMinFollowers(''); setCreators([]); setMatched(false) }} className="px-3 text-sm text-[#65739e]">{d.clearAll}</button>
+              {basicFilterControls}
+              {moreFilterControls}
+              <button type="button" onClick={() => { setQuery(''); setCountry(''); setMinFollowers(''); setMaxFollowers(''); setMinEngagement(''); setMaxEngagement(''); setGender(''); setLanguage(''); setBioKeywords(''); setLastPost(''); setAudienceAge(''); setCreators([]); setMatched(false) }} className="px-3 text-sm text-[#65739e]">{d.clearAll}</button>
             </div>
           </form>
           )}
@@ -419,6 +515,13 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                     <span className="text-indigo-500 font-bold">{i + 1}.</span> {s}
                   </div>
                 ))}
+              </div>
+              <div className="mt-6 mx-auto max-w-xl">
+                <p className="text-xs text-[#7d88aa] mb-2">{m.aiMatchFiltersNote}</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {basicFilterControls}
+                  {moreFilterControls}
+                </div>
               </div>
               <button
                 type="button"
