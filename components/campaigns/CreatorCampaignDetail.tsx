@@ -50,8 +50,16 @@ export default function CreatorCampaignDetail({
     AFFILIATE: t.campaign.affiliate,
     NEGOTIABLE: t.campaign.negotiable,
   }
-  const compensationLabel = campaign.compensationType
-    ? compensationTypeLabels[campaign.compensationType] || pretty(campaign.compensationType)
+  // Multi-select compensation: join all selected types; falls back to the
+  // legacy single value on old campaigns
+  const compensationList: string[] = (campaign.compensationTypes?.length
+    ? campaign.compensationTypes
+    : campaign.compensationType ? [campaign.compensationType] : []
+  ).flatMap((v: string) => (v === 'PAID_PLUS_GIFT' ? ['PAID', 'GIFTED'] : [v]))
+  const compensationLabel = compensationList.length
+    ? [...new Set(compensationList)]
+        .map((v) => compensationTypeLabels[v] || pretty(v))
+        .join(locale === 'zh' ? ' + ' : ' + ')
     : t.campaign.campaignContent
   const category = campaign.categories
     .map((item: any) => (t.categoryNames as Record<string, string>)[item.category.name] || item.category.name)

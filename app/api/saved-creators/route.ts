@@ -94,6 +94,41 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ saved: true })
 }
 
+// PATCH /api/saved-creators { influencerId, folderId } — move a saved
+// creator into a folder (folderId: null moves it back to ungrouped).
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
+  }
+  const brandId = await getBrandId((session.user as any).id)
+  if (!brandId) {
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+  }
+
+  const { influencerId, folderId } = await req.json().catch(() => ({}))
+  if (!influencerId) {
+    return NextResponse.json({ message: 'influencerId is required', code: 'VALIDATION_ERROR' }, { status: 400 })
+  }
+  if (folderId) {
+    const folder = await prisma.savedCreatorFolder.findFirst({
+      where: { id: folderId, brandId },
+      select: { id: true },
+    })
+    if (!folder) {
+      return NextResponse.json({ message: 'Folder not found', code: 'NOT_FOUND' }, { status: 404 })
+    }
+  }
+  const { count } = await prisma.savedCreator.updateMany({
+    where: { brandId, influencerId },
+    data: { folderId: folderId || null },
+  })
+  if (count === 0) {
+    return NextResponse.json({ message: 'Saved creator not found', code: 'NOT_FOUND' }, { status: 404 })
+  }
+  return NextResponse.json({ ok: true })
+}
+
 // DELETE /api/saved-creators?influencerId=... — remove a bookmark
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions)

@@ -51,6 +51,45 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ user, lots, ledger })
   }
 
+  // view=vendor — influencers.club spend audit (club_credit_log)
+  if (searchParams.get('view') === 'vendor') {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const [rows, byKind] = await Promise.all([
+      prisma.clubCreditLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      prisma.clubCreditLog.groupBy({
+        by: ['kind'],
+        where: { createdAt: { gte: since } },
+        _sum: { cost: true },
+        _count: true,
+      }),
+    ])
+    // Attach user emails for attribution (best-effort)
+    const userIds = [...new Set(rows.map((r) => r.userId).filter(Boolean))] as string[]
+    const users = userIds.length
+      ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, email: true } })
+      : []
+    const emailById = new Map(users.map((u) => [u.id, u.email]))
+    // Most recent vendor balance echo we have
+    const latestBalance = rows.find((r) => r.creditsLeft != null)?.creditsLeft ?? null
+    return NextResponse.json({
+      latestBalance,
+      totals30d: byKind.map((k) => ({ kind: k.kind, cost: k._sum.cost, calls: k._count })),
+      rows: rows.map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        cost: r.cost,
+        resultCount: r.resultCount,
+        creditsLeft: r.creditsLeft,
+        reference: r.reference,
+        email: r.userId ? emailById.get(r.userId) || r.userId : null,
+        createdAt: r.createdAt,
+      })),
+    })
+  }
+
   const [plans, packs, prices] = await Promise.all([
     prisma.planConfig.findMany({ orderBy: { priceMonthly: 'asc' } }),
     prisma.creditPackConfig.findMany({ orderBy: { sortOrder: 'asc' } }),

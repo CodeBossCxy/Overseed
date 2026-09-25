@@ -241,13 +241,15 @@ export const authOptions: NextAuthOptions = {
       // Campaign Plus (invite code was validated client-side before OAuth).
       // The adapter has already created this user, so exclude them from the
       // promo count.
-      const { defaultSignupTier } = await import('@/lib/signup-tier')
+      const { defaultSignupTier, grantPromoSignupCredits } = await import('@/lib/signup-tier')
       const tier = await defaultSignupTier({ userAlreadyCounted: true })
       if (user.id) {
         await prisma.user.update({
           where: { id: user.id },
           data: { subscriptionTier: tier },
         })
+        // Growth Plus promo includes the tier's 900 monthly credits
+        await grantPromoSignupCredits(user.id, tier)
       }
       // Notify the internal team (fire-and-forget; the provider name isn't
       // available in this event, so the method is reported as 'oauth')

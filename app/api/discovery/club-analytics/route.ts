@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const analytics = await clubAnalytics(platform, handle)
+    const analytics = await clubAnalytics(platform, handle, userId)
     return NextResponse.json(analytics)
   } catch (err: any) {
     // Don't charge for a failed first fetch

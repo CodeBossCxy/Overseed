@@ -47,7 +47,14 @@ export default function CampaignForm({
     campaignStartDate: initialData?.campaignStartDate ? new Date(initialData.campaignStartDate).toISOString().split('T')[0] : '',
     campaignEndDate: initialData?.campaignEndDate ? new Date(initialData.campaignEndDate).toISOString().split('T')[0] : '',
     totalSlots: initialData?.totalSlots || 10,
-    compensationType: initialData?.compensationType || 'PAID',
+    // Multi-select; legacy single values map onto it (PAID_PLUS_GIFT → both)
+    compensationTypes: (initialData?.compensationTypes?.length
+      ? initialData.compensationTypes
+      : initialData?.compensationType
+        ? initialData.compensationType === 'PAID_PLUS_GIFT'
+          ? ['PAID', 'GIFTED']
+          : [initialData.compensationType]
+        : ['PAID']) as string[],
     paymentMin: initialData?.paymentMin || '',
     paymentMax: initialData?.paymentMax || '',
     giftDescription: initialData?.giftDescription || '',
@@ -121,11 +128,12 @@ export default function CampaignForm({
       if (!formData.campaignEndDate) missing.push(cf.campaignEndDate)
       if (formData.images.length === 0) missing.push(cf.campaignImages)
       // Step 2
-      if (['PAID', 'PAID_PLUS_GIFT'].includes(formData.compensationType)) {
+      if (formData.compensationTypes.length === 0) missing.push(cf.compensationType)
+      if (formData.compensationTypes.includes('PAID')) {
         if (!formData.paymentMin) missing.push(cf.paymentMin)
         if (!formData.paymentMax) missing.push(cf.paymentMax)
       }
-      if (['GIFTED', 'PAID_PLUS_GIFT'].includes(formData.compensationType)) {
+      if (formData.compensationTypes.includes('GIFTED')) {
         if (!formData.giftDescription.trim()) missing.push(cf.giftDescription)
         if (!formData.giftValue) missing.push(cf.giftValue)
       }
@@ -598,22 +606,28 @@ export default function CampaignForm({
 
       <div>
         <label className="block text-sm font-medium mb-2">{cf.compensationType} *</label>
+        <p className="text-xs text-gray-500 mb-2">{cf.compensationMultiHint}</p>
         <div className="space-y-2">
           {[
             { value: 'PAID', label: cf.paid, desc: cf.paidDesc },
             { value: 'GIFTED', label: cf.gifted, desc: cf.giftedDesc },
-            { value: 'PAID_PLUS_GIFT', label: cf.paidPlusGift, desc: cf.paidPlusGiftDesc },
             { value: 'AFFILIATE', label: cf.affiliate, desc: cf.affiliateDesc },
             { value: 'NEGOTIABLE', label: cf.negotiable, desc: cf.negotiableDesc },
           ].map((option) => (
             <label key={option.value} className="flex items-start gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50">
               <input
-                type="radio"
-                name="compensationType"
+                type="checkbox"
                 value={option.value}
-                checked={formData.compensationType === option.value}
-                onChange={(e) => setFormData({ ...formData, compensationType: e.target.value })}
-                className="mt-1"
+                checked={formData.compensationTypes.includes(option.value)}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    compensationTypes: e.target.checked
+                      ? [...formData.compensationTypes, option.value]
+                      : formData.compensationTypes.filter((v: string) => v !== option.value),
+                  })
+                }
+                className="mt-1 rounded"
               />
               <div>
                 <span className="font-medium">{option.label}</span>
@@ -624,14 +638,14 @@ export default function CampaignForm({
         </div>
       </div>
 
-      {['PAID', 'PAID_PLUS_GIFT', 'NEGOTIABLE'].includes(formData.compensationType) && (
+      {(formData.compensationTypes.includes('PAID') || formData.compensationTypes.includes('NEGOTIABLE')) && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">{cf.paymentMin}{formData.compensationType !== 'NEGOTIABLE' && ' *'}</label>
+            <label className="block text-sm font-medium mb-1">{cf.paymentMin}{formData.compensationTypes.includes('PAID') && ' *'}</label>
             <input
               type="number"
               min="0"
-              required={formData.compensationType !== 'NEGOTIABLE'}
+              required={formData.compensationTypes.includes('PAID')}
               value={formData.paymentMin}
               onChange={(e) => setFormData({ ...formData, paymentMin: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
@@ -639,11 +653,11 @@ export default function CampaignForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">{cf.paymentMax}{formData.compensationType !== 'NEGOTIABLE' && ' *'}</label>
+            <label className="block text-sm font-medium mb-1">{cf.paymentMax}{formData.compensationTypes.includes('PAID') && ' *'}</label>
             <input
               type="number"
               min="0"
-              required={formData.compensationType !== 'NEGOTIABLE'}
+              required={formData.compensationTypes.includes('PAID')}
               value={formData.paymentMax}
               onChange={(e) => setFormData({ ...formData, paymentMax: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
@@ -653,7 +667,7 @@ export default function CampaignForm({
         </div>
       )}
 
-      {['GIFTED', 'PAID_PLUS_GIFT'].includes(formData.compensationType) && (
+      {formData.compensationTypes.includes('GIFTED') && (
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">{cf.giftDescription} *</label>

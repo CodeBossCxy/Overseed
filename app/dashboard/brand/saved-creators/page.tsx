@@ -52,6 +52,13 @@ export default function SavedCreatorsPage() {
 
   const [saved, setSaved] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  // Brand-defined subfolders; '' = All
+  const [folders, setFolders] = useState<{ id: string; name: string; count: number }[]>([])
+  const [activeFolder, setActiveFolder] = useState('')
+  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [folderName, setFolderName] = useState('')
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
   const [query, setQuery] = useState('')
   const [platform, setPlatform] = useState('')
   const [country, setCountry] = useState('')
@@ -70,6 +77,75 @@ export default function SavedCreatorsPage() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [isUGCTranslated, locale])
+
+  const loadFolders = () =>
+    fetch('/api/saved-creators/folders')
+      .then((res) => (res.ok ? res.json() : { folders: [] }))
+      .then((data) => setFolders(data.folders || []))
+      .catch(() => {})
+  useEffect(() => { loadFolders() }, [])
+
+  const createFolder = async () => {
+    const name = folderName.trim()
+    if (!name || folderBusy) return
+    setFolderBusy(true); setFolderError('')
+    try {
+      const res = await fetch('/api/saved-creators/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Could not create folder')
+      setFolders((prev) => [...prev, data.folder])
+      setActiveFolder(data.folder.id)
+      setFolderName(''); setCreatingFolder(false); setPage(1)
+    } catch (e: any) {
+      setFolderError(e.message)
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const renameFolder = async (id: string) => {
+    const current = folders.find((f) => f.id === id)
+    const name = window.prompt(s.folderNamePlaceholder, current?.name || '')?.trim()
+    if (!name || name === current?.name) return
+    const res = await fetch('/api/saved-creators/folders', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, name }),
+    })
+    if (res.ok) setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)))
+    else setFolderError((await res.json().catch(() => null))?.message || 'Rename failed')
+  }
+
+  const deleteFolder = async (id: string) => {
+    if (!window.confirm(s.deleteFolderConfirm)) return
+    const res = await fetch(`/api/saved-creators/folders?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    if (res.ok) {
+      setFolders((prev) => prev.filter((f) => f.id !== id))
+      setSaved((prev) => prev.map((row) => (row.folderId === id ? { ...row, folderId: null } : row)))
+      if (activeFolder === id) setActiveFolder('')
+    }
+  }
+
+  const moveToFolder = async (influencerId: string, folderId: string) => {
+    setBusyId(influencerId)
+    try {
+      const res = await fetch('/api/saved-creators', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ influencerId, folderId: folderId || null }),
+      })
+      if (res.ok) {
+        setSaved((prev) => prev.map((row) => (row.influencerId === influencerId ? { ...row, folderId: folderId || null } : row)))
+        loadFolders()
+      }
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   const maxFollowers = (inf: any) =>
     Math.max(0, ...(inf?.socialAccounts || []).map((a: any) => a.followerCount || 0))
@@ -104,6 +180,7 @@ export default function SavedCreatorsPage() {
 
   const visible = useMemo(() => {
     let list = [...saved]
+    if (activeFolder) list = list.filter((row) => row.folderId === activeFolder)
     const q = query.trim().toLowerCase()
     if (q) {
       list = list.filter((row) => {
@@ -130,7 +207,7 @@ export default function SavedCreatorsPage() {
       list.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime())
     }
     return list
-  }, [saved, query, platform, country, category, minFollowers, sort])
+  }, [saved, activeFolder, query, platform, country, category, minFollowers, sort])
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -140,7 +217,10 @@ export default function SavedCreatorsPage() {
     setBusyId(influencerId)
     try {
       const res = await fetch(`/api/saved-creators?influencerId=${influencerId}`, { method: 'DELETE' })
-      if (res.ok) setSaved((prev) => prev.filter((row) => row.influencerId !== influencerId))
+      if (res.ok) {
+        setSaved((prev) => prev.filter((row) => row.influencerId !== influencerId))
+        loadFolders()
+      }
     } finally {
       setBusyId(null)
     }
@@ -175,6 +255,59 @@ export default function SavedCreatorsPage() {
             <p className="text-gray-500 mt-1">{s.subtitle}</p>
           </div>
           <UGCTranslateToggle isLoading={loading} />
+        </div>
+
+        {/* Folders */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => { setActiveFolder(''); setPage(1) }}
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
+              activeFolder === '' ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200' : 'bg-white/45 text-gray-600 hover:bg-white/70'
+            }`}
+          >
+            {s.all} <span className="text-gray-400 font-normal">({saved.length})</span>
+          </button>
+          {folders.map((f) => (
+            <span key={f.id} className="inline-flex items-center">
+              <button
+                onClick={() => { setActiveFolder(f.id); setPage(1) }}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
+                  activeFolder === f.id ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200' : 'bg-white/45 text-gray-600 hover:bg-white/70'
+                }`}
+              >
+                📁 {f.name} <span className="text-gray-400 font-normal">({f.count})</span>
+              </button>
+              {activeFolder === f.id && (
+                <span className="ml-1 flex gap-0.5">
+                  <button onClick={() => renameFolder(f.id)} title={s.renameFolder} className="px-1.5 py-1 text-xs text-gray-400 hover:text-gray-700 transition">✎</button>
+                  <button onClick={() => deleteFolder(f.id)} title={s.deleteFolder} className="px-1.5 py-1 text-xs text-gray-400 hover:text-red-500 transition">🗑</button>
+                </span>
+              )}
+            </span>
+          ))}
+          {creatingFolder ? (
+            <span className="inline-flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={folderName}
+                onChange={(e) => setFolderName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') createFolder(); if (e.key === 'Escape') { setCreatingFolder(false); setFolderName(''); setFolderError('') } }}
+                maxLength={40}
+                placeholder={s.folderNamePlaceholder}
+                className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none w-40"
+              />
+              <button onClick={createFolder} disabled={folderBusy || !folderName.trim()} className="px-3 py-1.5 rounded-full text-sm font-semibold bg-primary-600 text-white disabled:opacity-50">{s.createFolder}</button>
+              <button onClick={() => { setCreatingFolder(false); setFolderName(''); setFolderError('') }} className="px-2 py-1.5 text-sm text-gray-500">{s.folderCancel}</button>
+            </span>
+          ) : (
+            <button
+              onClick={() => setCreatingFolder(true)}
+              className="px-4 py-1.5 rounded-full text-sm font-semibold text-primary-600 bg-white/45 hover:bg-white/70 transition"
+            >
+              + {s.newFolder}
+            </button>
+          )}
+          {folderError && <span className="text-xs text-red-600">{folderError}</span>}
         </div>
 
         {/* Toolbar */}
@@ -245,8 +378,20 @@ export default function SavedCreatorsPage() {
               const eng = topEngagement(inf)
               return (
                 <div key={row.influencerId} className="workspace-glass-card rounded-2xl p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs text-gray-400">{savedAgo(row.savedAt)}</span>
+                  <div className="flex items-center justify-between mb-3 gap-2">
+                    <span className="text-xs text-gray-400 flex-shrink-0">{savedAgo(row.savedAt)}</span>
+                    {folders.length > 0 && (
+                      <select
+                        value={row.folderId || ''}
+                        onChange={(e) => moveToFolder(row.influencerId, e.target.value)}
+                        disabled={busyId === row.influencerId}
+                        className="ml-auto max-w-[45%] truncate px-2 py-1 workspace-glass-control text-xs text-gray-600 focus:outline-none disabled:opacity-50"
+                        title={s.moveToFolder}
+                      >
+                        <option value="">{s.ungrouped}</option>
+                        {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      </select>
+                    )}
                     <button
                       onClick={() => unsave(row.influencerId)}
                       disabled={busyId === row.influencerId}

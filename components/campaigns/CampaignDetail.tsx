@@ -327,6 +327,7 @@ export default function CampaignDetail({
             <h3 className="text-lg font-semibold mb-3">{t.campaign.compensation}</h3>
             <CompensationBadge
               type={campaign.compensationType}
+              types={(campaign as any).compensationTypes}
               paymentMin={campaign.paymentMin}
               paymentMax={campaign.paymentMax}
               giftDescription={campaign.giftDescription}

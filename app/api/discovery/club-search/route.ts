@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { clubSearch, clubSearchCacheProbe, type ClubPlatform } from '@/lib/influencers-club'
+import { clubSearch, clubSearchCacheProbe, mergeEnrichedProfileFields, type ClubPlatform } from '@/lib/influencers-club'
 import {
   CLUB_FILTER_DEFS,
   CREATOR_HAS_KEYS,
@@ -13,6 +13,7 @@ import {
   type ClubSortBy,
 } from '@/lib/club-filter-defs'
 import { safeLocalCreatorDiscovery } from '@/lib/discovery'
+import { youtubeSearchCreators, youtubeConfigured } from '@/lib/youtube'
 import { consumeQuota } from '@/lib/plan'
 import { getEffectiveTier } from '@/lib/subscription'
 import { deductCredits } from '@/lib/credits'
@@ -64,9 +65,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'Invalid last_post filter', code: 'INVALID_FILTER' }, { status: 400 })
   }
   const AUDIENCE_AGES = ['13-17', '18-24', '25-34', '35-44', '45-64', '65-'] as const
-  const audienceAge = params.get('audience_age')?.trim() || undefined
-  if (audienceAge && !(AUDIENCE_AGES as readonly string[]).includes(audienceAge)) {
-    return NextResponse.json({ message: 'Invalid audience_age filter', code: 'INVALID_FILTER' }, { status: 400 })
+  // Multi-select: comma-separated list of age ranges
+  const audienceAges = (params.get('audience_age') || '')
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean)
+  for (const a of audienceAges) {
+    if (!(AUDIENCE_AGES as readonly string[]).includes(a)) {
+      return NextResponse.json({ message: 'Invalid audience_age filter', code: 'INVALID_FILTER' }, { status: 400 })
+    }
   }
   const language = params.get('language')?.trim().toLowerCase() || undefined
   if (language && !/^[a-z]{2,3}$/.test(language)) {
@@ -90,6 +97,41 @@ export async function GET(req: NextRequest) {
       .map((k) => k.trim())
       .filter(Boolean)
       .slice(0, 10)
+
+  // ---- Search tasks -------------------------------------------------------
+  // Every search submission is a task; pages fetched within it are
+  // snapshotted. Re-viewing a snapshotted page is free (no charge, no vendor
+  // call). A task_id with an unseen page falls through to normal billing,
+  // searching with the task's stored parameters.
+  const taskIdParam = params.get('task_id')?.trim() || null
+  const requestedPage = num('page') ?? 0
+  let task: { id: string; platform: string; request: unknown } | null = null
+  if (taskIdParam) {
+    task = await prisma.discoverySearchTask.findFirst({
+      where: { id: taskIdParam, userId },
+      select: { id: true, platform: true, request: true },
+    })
+    if (!task) {
+      return NextResponse.json({ message: 'Search task not found', code: 'TASK_NOT_FOUND' }, { status: 404 })
+    }
+    const snapshot = await prisma.discoveryTaskPage.findUnique({
+      where: { taskId_page: { taskId: task.id, page: requestedPage } },
+    })
+    if (snapshot) {
+      const taskId = task.id
+      after(async () => {
+        await prisma.discoverySearchTask
+          .update({ where: { id: taskId }, data: { updatedAt: new Date() } })
+          .catch(() => {})
+      })
+      return NextResponse.json({
+        ...(snapshot.data as any),
+        task_id: taskId,
+        page: requestedPage,
+        from_task: true,
+      })
+    }
+  }
 
   // Generic advanced filters, driven by the shared def catalog. Invalid
   // values are a client bug/tampering — reject before any charge.
@@ -246,7 +288,9 @@ export async function GET(req: NextRequest) {
     lastPost: lastPostRaw ? (Number(lastPostRaw) as 90 | 365) : undefined,
     // Audience demographics are Instagram-only; ignore for other platforms
     audienceAgeRange:
-      platform === 'instagram' ? (audienceAge as '13-17' | '18-24' | '25-34' | '35-44' | '45-64' | '65-' | undefined) : undefined,
+      platform === 'instagram' && audienceAges.length
+        ? (audienceAges as ('13-17' | '18-24' | '25-34' | '35-44' | '45-64' | '65-')[])
+        : undefined,
     audienceAgeMinPct: num('audience_age_min_pct'),
     advanced: Object.keys(advanced).length ? advanced : undefined,
     creatorHas: creatorHas.length ? creatorHas : undefined,
@@ -255,19 +299,91 @@ export async function GET(req: NextRequest) {
     sortOrder: sortOrderRaw as 'asc' | 'desc' | undefined,
     // v4: fixed page size of 10 (one billed page); legacy allows up to 25.
     limit: CREDIT_SYSTEM_ENABLED ? DISCOVERY_PAGE_SIZE : Math.min(num('limit') ?? 10, 25),
-    page: num('page') ?? 0,
+    page: requestedPage,
+    logUserId: userId,
+  }
+
+  if (task) {
+    // Unseen page of an existing task: search with the task's stored
+    // parameters so results stay consistent even if the client's filter
+    // state has drifted since the task was created.
+    Object.assign(searchOpts, task.request as any, {
+      page: requestedPage,
+      logUserId: userId,
+    })
+  }
+
+  // Persist the fetched page into its task (creating the task on a fresh
+  // search) and return the task id for the client to keep. Best-effort: a
+  // persistence failure must not hide results.
+  const persistTaskPage = async (result: any): Promise<string | null> => {
+    try {
+      if (task) {
+        await prisma.discoveryTaskPage.upsert({
+          where: { taskId_page: { taskId: task.id, page: requestedPage } },
+          create: { taskId: task.id, page: requestedPage, data: result },
+          update: { data: result },
+        })
+        await prisma.discoverySearchTask.update({
+          where: { id: task.id },
+          data: { updatedAt: new Date() },
+        })
+        return task.id
+      }
+      const { logUserId: _u, page: _p, ...requestRest } = searchOpts as any
+      const label =
+        [searchOpts.platform, searchOpts.query, searchOpts.country]
+          .filter(Boolean)
+          .join(' · ') || searchOpts.platform
+      const created = await prisma.discoverySearchTask.create({
+        data: {
+          userId,
+          platform: searchOpts.platform,
+          // Strip undefined values (not representable in Json columns)
+          request: JSON.parse(JSON.stringify(requestRest)),
+          label,
+          pages: { create: { page: requestedPage, data: result } },
+        },
+        select: { id: true },
+      })
+      return created.id
+    } catch (err) {
+      console.error('discovery task persistence failed:', err)
+      return task?.id ?? null
+    }
   }
 
   // Pricing v4: every search page costs credits (config: discovery_search per
   // page of 10). Charged up front; adjusted after results come back. The
   // cache probe is free, so it runs in parallel with the wallet charge —
   // repeat searches skip the vendor round-trip entirely.
+  // YouTube keyword searches run on the YouTube Data API instead of the
+  // club API (richer fields: country/bio/language/niche, stable avatars).
+  // Results are shaped identically, and billing is unchanged.
+  const useYoutube =
+    searchOpts.platform === 'youtube' && youtubeConfigured() && Boolean(searchOpts.query)
+  const ytWarnings: string[] = []
+  if (useYoutube) {
+    // Club-only filters that the YouTube path can't honor — same "skipped"
+    // warnings the club path emits for unsupported platform filters.
+    if (gender) ytWarnings.push('Gender filter is not available on youtube — skipped.')
+    for (const def of CLUB_FILTER_DEFS) {
+      if (advanced[def.id] != null) {
+        ytWarnings.push(`Filter "${def.label.en}" is not available on youtube — skipped.`)
+      }
+    }
+    if (creatorHas.length) {
+      ytWarnings.push('Creator-has filters are not available on youtube — skipped.')
+    }
+  }
+
   let searchCharge: { referenceId: string; refund: () => Promise<void> } | null = null
   let cachedResult: Awaited<ReturnType<typeof clubSearchCacheProbe>> = null
   if (CREDIT_SYSTEM_ENABLED) {
     const referenceId = `discovery:${userId}:${Date.now()}`
     const [probe, charge] = await Promise.all([
-      clubSearchCacheProbe(searchOpts),
+      // The YouTube path has its own pool cache inside youtubeSearchCreators
+      useYoutube ? Promise.resolve(null) : clubSearchCacheProbe(searchOpts),
       chargeCredits(userId, 'discovery_search', referenceId),
     ])
     if (!charge.ok) {
@@ -328,13 +444,38 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = cachedResult ?? (await clubSearch(searchOpts))
+    const result = await mergeEnrichedProfileFields(
+      useYoutube
+        ? await youtubeSearchCreators({
+            query: searchOpts.query!,
+            country: searchOpts.country,
+            language: searchOpts.language,
+            minFollowers: searchOpts.minFollowers,
+            maxFollowers: searchOpts.maxFollowers,
+            minEngagement: searchOpts.minEngagement,
+            maxEngagement: searchOpts.maxEngagement,
+            bioKeywords: searchOpts.bioKeywords ?? [],
+            lastPost: searchOpts.lastPost,
+            sortBy: searchOpts.sortBy,
+            sortOrder: searchOpts.sortOrder,
+            limit: searchOpts.limit,
+            page: searchOpts.page,
+            warnings: ytWarnings,
+            // Engagement backfill runs after the response is sent
+            defer: (task) => after(task),
+          })
+        : cachedResult ?? (await clubSearch(searchOpts))
+    )
     settleAfterResponse(result?.results?.length ?? 0)
-    return NextResponse.json(result)
+    const taskId = await persistTaskPage(result)
+    return NextResponse.json({ ...result, task_id: taskId, page: requestedPage })
   } catch (err: any) {
     console.warn('Influencers Club search unavailable; using Overseed creator index:', err?.message)
     const local = await safeLocalCreatorDiscovery(params, true)
     settleAfterResponse(local?.results?.length ?? 0)
-    return NextResponse.json(local)
+    // Fallback results were billed the same way — snapshot them so a
+    // revisit of this page stays free.
+    const taskId = await persistTaskPage(local)
+    return NextResponse.json({ ...local, task_id: taskId, page: requestedPage })
   }
 }

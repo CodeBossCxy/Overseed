@@ -235,6 +235,7 @@ model User {
   quotaUsage         QuotaUsage[]
   creditLots         CreditLot[]
   creditLedger       CreditLedgerEntry[]
+  discoveryTasks     DiscoverySearchTask[]
 
   @@map("users")
 }
@@ -427,6 +428,7 @@ model BrandProfile {
   campaigns Campaign[]
   collaborations Collaboration[]
   savedCreators  SavedCreator[]
+  savedCreatorFolders SavedCreatorFolder[]
 
   @@map("brand_profiles")
 }
@@ -479,6 +481,9 @@ model Campaign {
 
   // Compensation
   compensationType CompensationType
+  // Multi-select compensation (PAID/GIFTED/AFFILIATE/NEGOTIABLE);
+  // compensationType stays as the derived legacy value for filters/badges.
+  compensationTypes CompensationType[] @default([])
   paymentMin       Decimal?       @db.Decimal(10, 2)
   paymentMax       Decimal?       @db.Decimal(10, 2)
   giftDescription  String?
@@ -898,6 +903,69 @@ model ClubSearchCache {
   @@map("club_search_cache")
 }
 
+// Audit trail of Influencers Club vendor credit spend. One row per billed
+// live call: discovery (0.01 x results returned), enrichment or analytics
+// (1 credit each).
+// Cache hits and free dictionary/probe calls are not logged. No FK to User
+// so rows survive account deletion.
+model ClubCreditLog {
+  id          String   @id @default(cuid())
+  // 'discovery' | 'enrichment' | 'analytics'
+  kind        String
+  // Vendor credits spent by this call (estimated from documented pricing).
+  cost        Decimal  @db.Decimal(10, 2)
+  // Creators returned (discovery rows only).
+  resultCount Int?
+  // credits_left reported by the vendor in this response, when present.
+  creditsLeft Decimal? @db.Decimal(10, 2)
+  // Discovery: cache key. Enrichment: '{platform}:{handle}'.
+  reference   String
+  userId      String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("club_credit_log")
+}
+
+// One creator-discovery search submission = one task. Stores the normalized
+// search parameters (no page number) and a per-page snapshot of results.
+// Re-viewing a snapshotted page is free; fetching a page the task has not
+// seen yet is billed like a fresh search page.
+model DiscoverySearchTask {
+  id        String   @id @default(cuid())
+  userId    String
+  platform  String
+  // Normalized search parameters (same shape as the club cache request,
+  // minus paging) — enough to re-run the search for new pages.
+  request   Json
+  // Display summary, e.g. "instagram · skincare · US".
+  label     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pages DiscoveryTaskPage[]
+
+  @@index([userId, updatedAt])
+  @@map("discovery_search_tasks")
+}
+
+// Snapshot of one fetched result page within a task. Presence of a row
+// means the page was already paid for — serving it again is free.
+model DiscoveryTaskPage {
+  id        String   @id @default(cuid())
+  taskId    String
+  page      Int
+  // Shaped search response (results/warnings/...) as returned to the client.
+  data      Json
+  createdAt DateTime @default(now())
+
+  task DiscoverySearchTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, page])
+  @@map("discovery_task_pages")
+}
+
 // ===========================================
 // BETA TEST
 // ===========================================
@@ -989,13 +1057,31 @@ model SavedCreator {
   brandId      String
   influencerId String
   savedAt      DateTime @default(now())
+  // Optional brand-defined grouping; null = ungrouped ("All" only)
+  folderId     String?
 
-  brand      BrandProfile      @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  influencer InfluencerProfile @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  brand      BrandProfile        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  influencer InfluencerProfile   @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  folder     SavedCreatorFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   @@id([brandId, influencerId])
   @@index([influencerId])
+  @@index([folderId])
   @@map("saved_creators")
+}
+
+// Brand-defined subfolders for organizing saved creators
+model SavedCreatorFolder {
+  id        String   @id @default(cuid())
+  brandId   String
+  name      String
+  createdAt DateTime @default(now())
+
+  brand    BrandProfile   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  creators SavedCreator[]
+
+  @@unique([brandId, name])
+  @@map("saved_creator_folders")
 }
 
 model SavedCampaign {

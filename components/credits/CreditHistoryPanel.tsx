@@ -51,6 +51,9 @@ export default function CreditHistoryPanel() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+
+  const PREVIEW_ROWS = 5
 
   const load = useCallback(async (cursor?: string | null) => {
     const url = cursor
@@ -178,50 +181,81 @@ export default function CreditHistoryPanel() {
         <p className="text-sm text-gray-400 mt-3">{ch.empty}</p>
       ) : (
         <>
-          <div className="overflow-x-auto mt-2">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-gray-400">
-                  <th className="py-2 pr-4 font-medium">{ch.colDate}</th>
-                  <th className="py-2 pr-4 font-medium">{ch.colDescription}</th>
-                  <th className="py-2 pr-4 font-medium text-right">{ch.colChange}</th>
-                  <th className="py-2 font-medium text-right">{ch.colBalance}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((e) => (
-                  <tr key={e.id} className="border-t border-gray-100">
-                    <td className="py-2.5 pr-4 text-gray-500 whitespace-nowrap">
-                      {formatDateTime(e.createdAt, locale)}
-                    </td>
-                    <td className="py-2.5 pr-4 text-gray-700">{describe(e)}</td>
-                    <td
-                      className={`py-2.5 pr-4 text-right font-semibold whitespace-nowrap ${
-                        e.delta >= 0 ? 'text-emerald-600' : 'text-rose-500'
-                      }`}
-                    >
-                      {e.delta >= 0 ? '+' : ''}
-                      {formatNumber(e.delta, locale)}
-                    </td>
-                    <td className="py-2.5 text-right text-gray-500 whitespace-nowrap">
-                      {formatNumber(e.balanceAfter, locale)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {nextCursor && (
+          {renderTable(entries.slice(0, PREVIEW_ROWS))}
+          {(entries.length > PREVIEW_ROWS || nextCursor) && (
             <button
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition disabled:opacity-50"
+              onClick={() => setShowModal(true)}
+              className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition"
             >
-              {ch.loadMore}
+              {ch.viewAll}
             </button>
           )}
         </>
       )}
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowModal(false)}>
+          <div data-solid className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-lg font-bold text-gray-900">{ch.title}</p>
+              <button onClick={() => setShowModal(false)} aria-label={ch.close}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                ✕
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {renderTable(entries)}
+              {nextCursor && (
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition disabled:opacity-50"
+                >
+                  {ch.loadMore}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+
+  function renderTable(rows: LedgerEntry[]) {
+    return (
+      <div className="overflow-x-auto mt-2">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-gray-400">
+              <th className="py-2 pr-4 font-medium">{ch.colDate}</th>
+              <th className="py-2 pr-4 font-medium">{ch.colDescription}</th>
+              <th className="py-2 pr-4 font-medium text-right">{ch.colChange}</th>
+              <th className="py-2 font-medium text-right">{ch.colBalance}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((e) => (
+              <tr key={e.id} className="border-t border-gray-100">
+                <td className="py-2.5 pr-4 text-gray-500 whitespace-nowrap">
+                  {formatDateTime(e.createdAt, locale)}
+                </td>
+                <td className="py-2.5 pr-4 text-gray-700">{describe(e)}</td>
+                <td
+                  className={`py-2.5 pr-4 text-right font-semibold whitespace-nowrap ${
+                    e.delta >= 0 ? 'text-emerald-600' : 'text-rose-500'
+                  }`}
+                >
+                  {e.delta >= 0 ? '+' : ''}
+                  {formatNumber(e.delta, locale)}
+                </td>
+                <td className="py-2.5 text-right text-gray-500 whitespace-nowrap">
+                  {formatNumber(e.balanceAfter, locale)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { sendOTPEmail, sendNewUserSignupEmail } from '@/lib/email'
-import { defaultSignupTier } from '@/lib/signup-tier'
+import { defaultSignupTier, grantPromoSignupCredits } from '@/lib/signup-tier'
 
 export async function POST(request: Request) {
   try {
@@ -91,6 +91,9 @@ export async function POST(request: Request) {
         emailVerified: null,
       },
     })
+
+    // Growth Plus promo includes the tier's 900 monthly credits
+    await grantPromoSignupCredits(newUser.id, subscriptionTier)
 
     // Create brand profile with verification info for brand signups
     if (userType === 'brand') {

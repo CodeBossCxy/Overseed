@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { getTranslatedEntities } from '@/lib/translation-service'
 import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
+import { normalizeCompensationTypes, deriveLegacyCompensationType } from '@/lib/compensation'
 
 export async function GET(req: NextRequest) {
   try {
@@ -157,8 +158,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Validate required fields
-    if (!data.title || !data.compensationType) {
+    // Validate required fields (compensationTypes array preferred; legacy
+    // single compensationType still accepted)
+    const compensationTypes = normalizeCompensationTypes(data.compensationTypes, data.compensationType)
+    if (!data.title || compensationTypes.length === 0) {
       return NextResponse.json(
         { message: 'Title and compensation type are required', code: 'VALIDATION_ERROR' },
         { status: 400 }
@@ -180,7 +183,8 @@ export async function POST(req: NextRequest) {
         campaignStartDate: data.campaignStartDate ? new Date(data.campaignStartDate) : null,
         campaignEndDate: data.campaignEndDate ? new Date(data.campaignEndDate) : null,
         totalSlots: data.totalSlots || 10,
-        compensationType: data.compensationType,
+        compensationType: deriveLegacyCompensationType(compensationTypes),
+        compensationTypes,
         paymentMin: data.paymentMin,
         paymentMax: data.paymentMax,
         giftDescription: data.giftDescription,

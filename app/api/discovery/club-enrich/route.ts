@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const detail = await clubEnrich(platform, handle)
+    const detail = await clubEnrich(platform, handle, userId)
     return NextResponse.json(detail)
   } catch (err: any) {
     // Don't charge for a failed first view

@@ -6,6 +6,7 @@ import { getTranslatedEntity } from '@/lib/translation-service'
 import { SupportedLanguage, isSupportedLanguage } from '@/lib/db/translations'
 import { Campaign, assertTransition, type CampaignStatus } from '@/lib/status'
 import { sendCampaignCancelledEmail } from '@/lib/notification-emails'
+import { normalizeCompensationTypes, deriveLegacyCompensationType } from '@/lib/compensation'
 
 export async function GET(
   req: NextRequest,
@@ -177,6 +178,13 @@ export async function PATCH(
       }
     }
 
+    // Multi-select compensation: only touch the fields when the request
+    // includes compensation data (PATCH is partial)
+    const compensationTypes =
+      data.compensationTypes !== undefined || data.compensationType !== undefined
+        ? normalizeCompensationTypes(data.compensationTypes, data.compensationType)
+        : undefined
+
     // Update campaign
     const campaign = await prisma.campaign.update({
       where: { id: id },
@@ -190,7 +198,8 @@ export async function PATCH(
         campaignStartDate: data.campaignStartDate ? new Date(data.campaignStartDate) : undefined,
         campaignEndDate: data.campaignEndDate ? new Date(data.campaignEndDate) : undefined,
         totalSlots: data.totalSlots,
-        compensationType: data.compensationType,
+        compensationType: compensationTypes?.length ? deriveLegacyCompensationType(compensationTypes) : undefined,
+        compensationTypes: compensationTypes?.length ? compensationTypes : undefined,
         paymentMin: data.paymentMin,
         paymentMax: data.paymentMax,
         giftDescription: data.giftDescription,

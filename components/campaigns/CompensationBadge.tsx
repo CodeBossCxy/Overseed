@@ -4,6 +4,8 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface CompensationBadgeProps {
   type: string
+  // Multi-select compensation; falls back to the single legacy `type`
+  types?: string[] | null
   paymentMin?: number | string | null
   paymentMax?: number | string | null
   giftDescription?: string | null
@@ -12,6 +14,7 @@ interface CompensationBadgeProps {
 
 export default function CompensationBadge({
   type,
+  types,
   paymentMin,
   paymentMax,
   giftDescription,
@@ -36,7 +39,7 @@ export default function CompensationBadge({
     }).format(num)
   }
 
-  const getCompensationDisplay = () => {
+  const getCompensationDisplay = (type: string) => {
     switch (type) {
       case 'PAID':
         return {
@@ -85,16 +88,25 @@ export default function CompensationBadge({
     }
   }
 
-  const display = getCompensationDisplay()
+  // One chip per selected type; PAID_PLUS_GIFT expands to Paid + Gifted.
+  const list = [...new Set((types?.length ? types : [type]).flatMap((v) =>
+    v === 'PAID_PLUS_GIFT' ? ['PAID', 'GIFTED'] : [v]
+  ))]
+  const displays = list.map(getCompensationDisplay)
+  const amount = displays.find((d) => d.amount)?.amount
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <span className={`${sizeClasses[size]} ${display.color} rounded-full font-medium`}>
-        {display.label}
-      </span>
-      {display.amount && (
+      <div className="flex flex-wrap justify-end gap-1">
+        {displays.map((d) => (
+          <span key={d.label} className={`${sizeClasses[size]} ${d.color} rounded-full font-medium`}>
+            {d.label}
+          </span>
+        ))}
+      </div>
+      {amount && (
         <span className={`font-semibold text-primary-600 ${size === 'lg' ? 'text-xl' : size === 'md' ? 'text-lg' : 'text-sm'}`}>
-          {display.amount}
+          {amount}
         </span>
       )}
     </div>

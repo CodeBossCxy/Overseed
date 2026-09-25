@@ -18,6 +18,7 @@ interface DiscoveredCreator {
   display_name: string | null
   bio: string | null
   country: string | null
+  language?: string | null
   follower_count: number | null
   engagement_rate: string | number | null
   niche_tags: string[]
@@ -134,6 +135,9 @@ interface SavedSearchState {
   request: DiscoverySearchRequest
   page: number
   hasMore: boolean
+  // Server-side search task id: pages already fetched within it are served
+  // from snapshots for free; only unseen pages are billed.
+  taskId?: string | null
 }
 
 function readSavedSearch(): SavedSearchState | null {
@@ -280,6 +284,16 @@ export default function DiscoverPanel() {
   const [activeSearch, setActiveSearch] = useState<DiscoverySearchRequest | null>(null)
   const [searchPage, setSearchPage] = useState(0)
   const [searchHasMore, setSearchHasMore] = useState(false)
+  // Active search task (server-side). Pagination sends it so already-fetched
+  // pages are re-served free of charge.
+  const [searchTaskId, setSearchTaskId] = useState<string | null>(null)
+  // Search-history dropdown (previous tasks; opening one is free)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyTasks, setHistoryTasks] = useState<
+    | { id: string; platform: string; label: string; updated_at: string; page_count: number }[]
+    | null
+  >(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -546,6 +560,7 @@ export default function DiscoverPanel() {
       setActiveSearch(saved.request)
       setSearchPage(saved.page)
       setSearchHasMore(saved.hasMore)
+      setSearchTaskId(saved.taskId ?? null)
     }
     setRestored(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -609,7 +624,8 @@ export default function DiscoverPanel() {
     request: DiscoverySearchRequest,
     page: number,
     preserveCurrentOnEmpty = false,
-    persistVals?: FilterVals
+    persistVals?: FilterVals,
+    taskId?: string | null
   ) => {
     setIsLoading(true)
     setError(null)
@@ -618,6 +634,9 @@ export default function DiscoverPanel() {
     try {
       const qs = new URLSearchParams(request.params)
       if (request.endpoint === 'club-search') qs.set('page', String(page))
+      // Within an existing task, already-fetched pages are served from the
+      // server snapshot for free; only unseen pages are billed.
+      if (request.endpoint === 'club-search' && taskId) qs.set('task_id', taskId)
       // The offset is ignored by Club, but lets Overseed's local fallback
       // return the corresponding page if the provider is unavailable.
       qs.set('offset', String(page * request.pageSize))
@@ -646,6 +665,8 @@ export default function DiscoverPanel() {
       setActiveSearch(request)
       setSearchPage(page)
       setSearchHasMore(results.length === request.pageSize)
+      const newTaskId: string | null = data?.task_id ?? taskId ?? null
+      setSearchTaskId(newTaskId)
       // Persist so the results survive leaving and returning to the page
       try {
         const v = persistVals ?? currentFilterVals()
@@ -671,6 +692,7 @@ export default function DiscoverPanel() {
           request,
           page,
           hasMore: results.length === request.pageSize,
+          taskId: newTaskId,
         }
         sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(saved))
       } catch {
@@ -683,6 +705,7 @@ export default function DiscoverPanel() {
         setActiveSearch(null)
         setSearchPage(0)
         setSearchHasMore(false)
+        setSearchTaskId(null)
       }
     } finally {
       setIsLoading(false)
@@ -696,19 +719,24 @@ export default function DiscoverPanel() {
       setActiveSearch(null)
       setSearchPage(0)
       setSearchHasMore(false)
+      setSearchTaskId(null)
       try { sessionStorage.removeItem(SEARCH_STATE_KEY) } catch {}
       fetchBrowse(0, false)
       return
     }
     if (platforms.length === 0) return
-    // Single Search button: parse the free-form query with AI (which also
-    // updates the visible filters), then run the club search.
-    await aiSearch()
+    // Single Search button: the query goes straight to the search backend —
+    // the club API applies natural language natively (filters.ai_search) and
+    // the YouTube path searches the raw text, so no LLM pre-parse hop is
+    // needed (it used to add 3-8s of latency before every search).
+    await clubSearchWith(currentFilterVals())
   }
 
   // Club keyword search from an explicit filter snapshot (used by both the
-  // regular Search button and the AI-parsed search).
-  const clubSearchWith = async (v: FilterVals) => {
+  // regular Search button and the AI-parsed search). `persist` lets the
+  // caller save a different snapshot (the user's visible filter values)
+  // than the one actually searched with.
+  const clubSearchWith = async (v: FilterVals, persist?: FilterVals) => {
     const qs = new URLSearchParams({
       q: v.query.trim(),
       platform: v.platform,
@@ -756,84 +784,8 @@ export default function DiscoverPanel() {
       { endpoint: 'club-search', params: qs.toString(), pageSize: CLUB_PAGE_SIZE },
       0,
       false,
-      v
+      persist ?? v
     )
-  }
-
-  // AI search: parse the free-form request into filters, reflect them in the
-  // UI, then run the normal club search with the extracted values.
-  const [aiParsing, setAiParsing] = useState(false)
-  const aiSearch = async () => {
-    if (!query.trim() || aiParsing || isLoading) return
-    setAiParsing(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/discovery/parse-query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: query.trim() }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(d.aiParseFailed)
-      const p = data.parsed
-      const platform = p.platform || platforms[0]
-      const originalText = query.trim()
-      const vals: FilterVals = {
-        query: p.keywords || originalText,
-        // Keep the user's original request visible in the search box
-        inputText: originalText,
-        platform,
-        // Restrict to the countries offered in the dropdown so the UI stays
-        // truthful about which filters were applied.
-        country:
-          p.country && COUNTRY_FILTER_OPTIONS.some((c) => c.code === p.country) ? p.country : '',
-        minFollowers: p.min_followers != null ? String(p.min_followers) : '',
-        maxFollowers: p.max_followers != null ? String(p.max_followers) : '',
-        minEngagement: p.min_engagement != null ? String(p.min_engagement) : '',
-        maxEngagement: p.max_engagement != null ? String(p.max_engagement) : '',
-        gender: p.gender || '',
-        language:
-          p.language && LANGUAGE_FILTER_OPTIONS.some((l) => l.code === p.language)
-            ? p.language
-            : '',
-        bioKeywords: Array.isArray(p.bio_keywords) ? p.bio_keywords.join(', ') : '',
-        lastPost: p.last_post ? String(p.last_post) : '',
-        audienceAge: platform === 'instagram' && p.audience_age ? p.audience_age : '',
-        // AI parsing doesn't touch the extended filters — keep whatever the
-        // user has set in the advanced panel.
-        adv,
-        creatorHas,
-        aud,
-        sortBy,
-        sortOrder,
-      }
-      // Reflect what the AI extracted in the visible controls (the search box
-      // keeps the original sentence)
-      setPlatforms([vals.platform])
-      setCountry(vals.country)
-      setMinFollowers(vals.minFollowers)
-      setMaxFollowers(vals.maxFollowers)
-      setMinEngagement(vals.minEngagement)
-      setMaxEngagement(vals.maxEngagement)
-      setGender(vals.gender)
-      setLanguage(vals.language)
-      setBioKeywords(vals.bioKeywords)
-      setLastPost(vals.lastPost)
-      setAudienceAge(vals.audienceAge)
-      if (
-        vals.minEngagement || vals.maxEngagement || vals.gender || vals.language ||
-        vals.bioKeywords || vals.lastPost || vals.audienceAge
-      ) {
-        setShowAdvanced(true)
-      }
-      await clubSearchWith(vals)
-    } catch (err: any) {
-      // If the AI parse fails, fall back to a plain keyword search with the
-      // current filter values so the Search button still works.
-      await clubSearchWith(currentFilterVals())
-    } finally {
-      setAiParsing(false)
-    }
   }
 
   // Voice input via the browser's Web Speech API (Chrome/Safari). The
@@ -875,8 +827,111 @@ export default function DiscoverPanel() {
     setActiveSearch(null)
     setSearchPage(0)
     setSearchHasMore(false)
+    setSearchTaskId(null)
     try { sessionStorage.removeItem(SEARCH_STATE_KEY) } catch {}
     fetchBrowse(0, false)
+  }
+
+  // ---- Search history (tasks) --------------------------------------------
+  const toggleHistory = async () => {
+    const opening = !historyOpen
+    setHistoryOpen(opening)
+    if (!opening) return
+    setHistoryLoading(true)
+    try {
+      const res = await fetch('/api/discovery/tasks')
+      const data = await res.json().catch(() => null)
+      setHistoryTasks(res.ok && Array.isArray(data?.tasks) ? data.tasks : [])
+    } catch {
+      setHistoryTasks([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  // Reopen a previous search task: restore its filters and show its page-0
+  // snapshot. Entirely free — no vendor call, no charge. Paging within the
+  // task only bills pages that were never fetched before.
+  const openHistoryTask = async (id: string) => {
+    setHistoryOpen(false)
+    setIsLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/discovery/tasks/${id}`)
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || d.searchFailed)
+      const req = data.request || {}
+      const str = (v: unknown) => (v == null ? '' : String(v))
+      setQuery(str(req.query))
+      setPlatforms([data.platform])
+      setCountry(str(req.country))
+      setMinFollowers(str(req.minFollowers))
+      setMaxFollowers(str(req.maxFollowers))
+      setMinEngagement(str(req.minEngagement))
+      setMaxEngagement(str(req.maxEngagement))
+      setGender(str(req.gender))
+      setLanguage(str(req.language))
+      setBioKeywords(Array.isArray(req.bioKeywords) ? req.bioKeywords.join(', ') : '')
+      setLastPost(str(req.lastPost))
+      setAudienceAge(str(req.audienceAgeRange))
+      // Stored advanced/audience filters are normalized (not UI param maps);
+      // they still apply server-side via the task, so clear the UI state.
+      setAdv({})
+      setAud({})
+      setCreatorHas(Array.isArray(req.creatorHas) ? req.creatorHas : [])
+      setSortBy(str(req.sortBy))
+      setSortOrder(req.sortOrder === 'asc' ? 'asc' : 'desc')
+
+      const request: DiscoverySearchRequest = {
+        endpoint: 'club-search',
+        params: new URLSearchParams({ task_id: id }).toString(),
+        pageSize: CLUB_PAGE_SIZE,
+      }
+      const snapshot = data.data
+      if (snapshot) {
+        const results = Array.isArray(snapshot.results) ? snapshot.results : []
+        setSearchResult(snapshot)
+        setActiveSearch(request)
+        setSearchPage(data.page ?? 0)
+        setSearchHasMore(results.length === CLUB_PAGE_SIZE)
+        setSearchTaskId(id)
+        try {
+          const saved: SavedSearchState = {
+            query: str(req.query),
+            platforms: [data.platform],
+            country: str(req.country),
+            minFollowers: str(req.minFollowers),
+            maxFollowers: str(req.maxFollowers),
+            minEngagement: str(req.minEngagement),
+            maxEngagement: str(req.maxEngagement),
+            gender: str(req.gender),
+            language: str(req.language),
+            bioKeywords: Array.isArray(req.bioKeywords) ? req.bioKeywords.join(', ') : '',
+            lastPost: str(req.lastPost),
+            audienceAge: str(req.audienceAgeRange),
+            adv: {},
+            creatorHas: Array.isArray(req.creatorHas) ? req.creatorHas : [],
+            aud: {},
+            sortBy: str(req.sortBy),
+            sortOrder: req.sortOrder === 'asc' ? 'asc' : 'desc',
+            result: snapshot,
+            request,
+            page: data.page ?? 0,
+            hasMore: results.length === CLUB_PAGE_SIZE,
+            taskId: id,
+          }
+          sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(saved))
+        } catch {}
+      } else {
+        // No snapshot for page 0 (shouldn't happen) — fetch through the
+        // search route with the task id so billing dedup still applies.
+        await runSearchPage(request, 0, false, undefined, id)
+      }
+    } catch (err: any) {
+      setError(err.message || d.searchFailed)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const creators = searchResult ? searchResult.results : browseList || []
@@ -1061,17 +1116,61 @@ export default function DiscoverPanel() {
                   : 'workspace-glass-control text-gray-600 hover:brightness-105'
               }`}
             >
-              <img src="/microphone.png" alt="" className="h-5 w-auto" />
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="9" y="2" width="6" height="12" rx="3" />
+                <path d="M5 10v1a7 7 0 0 0 14 0v-1" />
+                <path d="M12 18v4M8 22h8" />
+              </svg>
             </button>
           )}
+          {/* Search history: previous tasks; reopening one is free */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={toggleHistory}
+              className="px-4 py-2.5 workspace-glass-control text-gray-600 rounded-full font-semibold hover:brightness-105 transition"
+            >
+              {d.searchHistory}
+            </button>
+            {historyOpen && (
+              <div
+                data-solid
+                className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 z-40 p-2 text-left"
+              >
+                <p className="px-3 pt-2 pb-0.5 text-xs font-semibold text-gray-500">{d.searchHistoryTitle}</p>
+                <p className="px-3 pb-2 text-[11px] text-gray-400">{d.historyFreeNote}</p>
+                {historyLoading ? (
+                  <div className="p-4 flex justify-center text-gray-400"><Spinner /></div>
+                ) : !historyTasks?.length ? (
+                  <p className="px-3 pb-3 text-sm text-gray-400">{d.historyEmpty}</p>
+                ) : (
+                  historyTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => openHistoryTask(task.id)}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-gray-50 transition"
+                    >
+                      <span className="block text-sm font-medium text-gray-800 truncate">{task.label}</span>
+                      <span className="block text-xs text-gray-400">
+                        {new Date(task.updated_at).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US')}
+                        {' · '}
+                        {d.historyPages.replace('{n}', String(task.page_count))}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <button
             type="submit"
-            disabled={aiParsing || isLoading || platforms.length === 0}
+            disabled={isLoading || platforms.length === 0}
             title={d.aiSearchHint}
             className="px-6 py-2.5 bg-primary-600 text-white rounded-full font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {aiParsing || isLoading ? (
-              <span className="inline-flex items-center gap-2"><Spinner /> {aiParsing ? d.aiParsing : d.searching}</span>
+            {isLoading ? (
+              <span className="inline-flex items-center gap-2"><Spinner /> {d.searching}</span>
             ) : (
               d.searchButton
             )}
@@ -1258,18 +1357,33 @@ export default function DiscoverPanel() {
               {platforms[0] === 'instagram' && (
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.audienceAgeLabel}</label>
-                  <select
-                    value={audienceAge}
-                    onChange={(e) => setAudienceAge(e.target.value)}
-                    className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-                  >
-                    <option value="">{d.anyOption}</option>
-                    {AUDIENCE_AGE_OPTIONS.map((range) => (
-                      <option key={range} value={range}>
-                        {range === '65-' ? '65+' : range}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex flex-wrap gap-1.5">
+                    {AUDIENCE_AGE_OPTIONS.map((range) => {
+                      const selected = audienceAge.split(',').filter(Boolean)
+                      const active = selected.includes(range)
+                      return (
+                        <button
+                          key={range}
+                          type="button"
+                          onClick={() =>
+                            setAudienceAge(
+                              (active
+                                ? selected.filter((r) => r !== range)
+                                : [...selected, range]
+                              ).join(',')
+                            )
+                          }
+                          className={`px-3 py-1.5 rounded-full text-sm transition ${
+                            active
+                              ? 'bg-primary-600 text-white font-medium'
+                              : 'workspace-glass-control text-gray-700 hover:brightness-105'
+                          }`}
+                        >
+                          {range === '65-' ? '65+' : range}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
               <div>
@@ -1573,6 +1687,11 @@ export default function DiscoverPanel() {
                       <p className="font-medium truncate">
                         {creator.display_name || creator.handle || creator.id}
                       </p>
+                      {creator.handle && (
+                        <span className="text-xs text-gray-400 truncate flex-shrink">
+                          @{creator.handle.replace(/^@/, '')}
+                        </span>
+                      )}
                       <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs flex-shrink-0">
                         {PLATFORM_LABELS[creator.platform] || creator.platform}
                       </span>
@@ -1583,6 +1702,9 @@ export default function DiscoverPanel() {
                         <> · {Number(creator.engagement_rate).toFixed(1)}% {d.engagement}</>
                       )}
                       {creator.country && <> · {creator.country}</>}
+                      {creator.language && (
+                        <> · {LANGUAGE_FILTER_OPTIONS.find((l) => l.code === creator.language)?.label || creator.language}</>
+                      )}
                     </p>
                     {creator.bio && (
                       <p className="text-sm text-gray-600 mt-1.5 line-clamp-2">{creator.bio}</p>
@@ -1616,7 +1738,7 @@ export default function DiscoverPanel() {
                             onClick={(e) => e.stopPropagation()}
                             className="inline-flex items-center gap-1 px-4 py-1.5 workspace-glass-control text-sm text-gray-700 backdrop-blur-md hover:brightness-105 transition"
                           >
-                            {d.viewProfile} ↗
+                            {d.openOnPlatform.replace('{platform}', PLATFORM_LABELS[creator.platform] || creator.platform)} ↗
                           </a>
                         )}
                       </div>
@@ -1644,7 +1766,7 @@ export default function DiscoverPanel() {
             <div className="mt-6 flex items-center justify-center gap-3">
               <button
                 type="button"
-                onClick={() => activeSearch && runSearchPage(activeSearch, searchPage - 1, true)}
+                onClick={() => activeSearch && runSearchPage(activeSearch, searchPage - 1, true, undefined, searchTaskId)}
                 disabled={!activeSearch || searchPage === 0 || isLoading}
                 className="px-5 py-2.5 bg-white/55 text-gray-700 rounded-full font-semibold hover:bg-white/75 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -1655,7 +1777,7 @@ export default function DiscoverPanel() {
               </span>
               <button
                 type="button"
-                onClick={() => activeSearch && runSearchPage(activeSearch, searchPage + 1, true)}
+                onClick={() => activeSearch && runSearchPage(activeSearch, searchPage + 1, true, undefined, searchTaskId)}
                 disabled={!activeSearch || !searchHasMore || isLoading}
                 className="px-5 py-2.5 bg-primary-600 text-white rounded-full font-semibold hover:bg-primary-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -1989,7 +2111,7 @@ export default function DiscoverPanel() {
                     rel="noopener noreferrer"
                     className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition"
                   >
-                    View profile ↗
+                    {d.openOnPlatform.replace('{platform}', PLATFORM_LABELS[detailFor.platform] || detailFor.platform)} ↗
                   </a>
                 )}
                 </div>

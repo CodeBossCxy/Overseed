@@ -33,6 +33,33 @@ function authHeaders() {
   }
 }
 
+// Best-effort audit row for every billed vendor call (club_credit_log).
+// Never throws: losing a log row must not break search/enrichment.
+async function logClubSpend(entry: {
+  kind: 'discovery' | 'enrichment' | 'analytics'
+  cost: number
+  resultCount?: number
+  creditsLeft?: number | null
+  reference: string
+  userId?: string | null
+}): Promise<void> {
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    await prisma.clubCreditLog.create({
+      data: {
+        kind: entry.kind,
+        cost: entry.cost,
+        resultCount: entry.resultCount ?? null,
+        creditsLeft: typeof entry.creditsLeft === 'number' ? entry.creditsLeft : null,
+        reference: entry.reference,
+        userId: entry.userId ?? null,
+      },
+    })
+  } catch (error) {
+    console.error('club credit log write failed:', error)
+  }
+}
+
 // ISO-2 country code -> club location string, via the free locations
 // dictionary. Cached per platform+code for the life of the server process.
 const locationCache = new Map<string, string | null>()
@@ -119,8 +146,9 @@ export interface ClubSearchOptions {
   // Days since last post: 90 or 365 (last_post; YouTube:
   // last_upload_long_video). Omit for "any".
   lastPost?: 90 | 365
-  // Audience age filter — Instagram only, creators with 10k+ followers
-  audienceAgeRange?: '13-17' | '18-24' | '25-34' | '35-44' | '45-64' | '65-'
+  // Audience age filter — Instagram only, creators with 10k+ followers.
+  // Multiple ranges are OR-ed by the provider.
+  audienceAgeRange?: ('13-17' | '18-24' | '25-34' | '35-44' | '45-64' | '65-')[]
   audienceAgeMinPct?: number
   // Only creators who also have accounts on these platforms
   // (filters.creator_has: has_instagram / has_youtube / has_tiktok)
@@ -138,6 +166,9 @@ export interface ClubSearchOptions {
   sortOrder?: 'asc' | 'desc'
   limit: number
   page?: number
+  // Attributed to club_credit_log rows only — deliberately excluded from
+  // buildCacheRequest so it never affects the cache key.
+  logUserId?: string
 }
 
 function cachedSearchResult(data: any, extraWarnings: string[] = []) {
@@ -179,8 +210,11 @@ function buildCacheRequest(opts: ClubSearchOptions) {
   if (opts.language) request.language = opts.language
   if (bioKeywords.length) request.bio_keywords = bioKeywords
   if (opts.lastPost) request.last_post = opts.lastPost
-  if (opts.platform === 'instagram' && opts.audienceAgeRange) {
-    request.audience_age = opts.audienceAgeRange
+  if (opts.platform === 'instagram' && opts.audienceAgeRange?.length) {
+    const ages = [...opts.audienceAgeRange].sort()
+    // Single selection keeps the legacy scalar shape so pre-existing cache
+    // rows for one-range requests keep hitting.
+    request.audience_age = ages.length === 1 ? ages[0] : ages
     if (opts.audienceAgeMinPct != null) request.audience_age_min_pct = opts.audienceAgeMinPct
   }
   const requirePlatforms = (opts.requirePlatforms ?? [])
@@ -352,10 +386,13 @@ export async function clubSearch(opts: ClubSearchOptions) {
   // filters.audience object.
   if (opts.platform === 'instagram') {
     const aud: Record<string, any> = {}
-    const ageRange = audience.ageRange ?? opts.audienceAgeRange
+    const ageRanges = audience.ageRange ? [audience.ageRange] : opts.audienceAgeRange ?? []
     const ageMinPct = audience.ageMinPct ?? opts.audienceAgeMinPct
-    if (ageRange) {
-      aud.age = [{ range: ageRange, ...(ageMinPct != null ? { min_pct: ageMinPct } : {}) }]
+    if (ageRanges.length) {
+      aud.age = ageRanges.map((range) => ({
+        range,
+        ...(ageMinPct != null ? { min_pct: ageMinPct } : {}),
+      }))
     }
     if (audience.gender) {
       aud.gender = {
@@ -470,21 +507,36 @@ export async function clubSearch(opts: ClubSearchOptions) {
 
   // Same shape as the KOL proxy so DiscoverPanel renders results unchanged.
   const accounts = Array.isArray(data?.accounts) ? data.accounts : []
-  const results = accounts.map((a: any) => ({
-    id: `club:${opts.platform}:${a.user_id}`,
-    platform: opts.platform,
-    handle: a.profile?.username ?? null,
-    display_name: a.profile?.full_name || a.profile?.username || null,
-    bio: null,
-    country: null,
-    follower_count: a.profile?.followers ?? null,
-    engagement_rate: a.profile?.engagement_percent ?? null,
-    niche_tags: [],
-    profile_url: a.profile?.username ? PROFILE_URL[opts.platform](a.profile.username) : null,
-    // NOTE: club picture URLs expire after ~24h; fine for transient search results
-    avatar_url: a.profile?.picture ?? null,
-    score: a.similarity_score ?? null,
-  }))
+  const results = accounts.map((a: any) => {
+    const p = a.profile || {}
+    // Vendor field names vary between platforms/versions — map defensively
+    // and surface whatever is present so the cards can show it.
+    const nicheTags = [p.categories, p.interests, p.topics, p.niche]
+      .filter(Array.isArray)
+      .flat()
+      .filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
+    return {
+      id: `club:${opts.platform}:${a.user_id}`,
+      platform: opts.platform,
+      handle: p.username ?? null,
+      display_name: p.full_name || p.username || null,
+      bio: p.biography ?? p.bio ?? p.description ?? null,
+      // The search response carries no location/language of its own, but any
+      // active country/language filter was matched by every returned creator
+      // — stamp those values so the cards can show them (free, always true).
+      country:
+        p.country ?? p.geo_country ?? p.location_country ?? p.location ??
+        (country ? country.toUpperCase() : null),
+      language: p.language ?? p.lang ?? opts.language ?? null,
+      follower_count: p.followers ?? null,
+      engagement_rate: p.engagement_percent ?? null,
+      niche_tags: [...new Set(nicheTags)].slice(0, 8),
+      profile_url: p.username ? PROFILE_URL[opts.platform](p.username) : null,
+      // NOTE: club picture URLs expire after ~24h; fine for transient search results
+      avatar_url: p.picture ?? null,
+      score: a.similarity_score ?? null,
+    }
+  })
 
   const shaped = {
     results,
@@ -496,6 +548,15 @@ export async function clubSearch(opts: ClubSearchOptions) {
     live_calls: 1,
     cached: false,
   }
+
+  await logClubSpend({
+    kind: 'discovery',
+    cost: results.length * 0.01,
+    resultCount: results.length,
+    creditsLeft: data?.credits_left ?? null,
+    reference: cacheKey,
+    userId: opts.logUserId,
+  })
 
   try {
     const { prisma } = await import('@/lib/prisma')
@@ -726,7 +787,67 @@ function cleanCachedDetail(detail: any) {
     : detail
 }
 
-export async function clubEnrich(platform: ClubPlatform, handle: string) {
+// Search responses only carry name/followers/engagement — fill in
+// country/language/bio/niche/avatar from the permanent enrichment cache
+// (free: no vendor call) for creators whose profile was viewed before.
+export async function mergeEnrichedProfileFields<T extends { results?: any[] }>(result: T): Promise<T> {
+  const results = result?.results
+  if (!Array.isArray(results) || results.length === 0) return result
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const byPlatform = new Map<string, string[]>()
+    for (const r of results) {
+      if (!r?.handle || !r?.platform) continue
+      const list = byPlatform.get(r.platform) || []
+      list.push(String(r.handle).toLowerCase())
+      byPlatform.set(r.platform, list)
+    }
+    if (byPlatform.size === 0) return result
+    const rows = await prisma.creatorEnrichmentCache.findMany({
+      where: {
+        OR: [...byPlatform.entries()].map(([platform, handles]) => ({
+          platform,
+          handle: { in: handles },
+        })),
+      },
+    })
+    if (rows.length === 0) return result
+    const detailByKey = new Map(
+      rows.map((row) => [`${row.platform}:${row.handle}`, (row.data as any)?.detail])
+    )
+    return {
+      ...result,
+      results: results.map((r: any) => {
+        const d = r?.handle
+          ? detailByKey.get(`${r.platform}:${String(r.handle).toLowerCase()}`)
+          : null
+        if (!d) return r
+        return {
+          ...r,
+          bio: r.bio ?? stripContactLines(d.bio),
+          country: r.country ?? d.location ?? null,
+          language: r.language ?? d.language ?? null,
+          avatar_url: r.avatar_url ?? d.avatar_url ?? null,
+          niche_tags:
+            Array.isArray(r.niche_tags) && r.niche_tags.length
+              ? r.niche_tags
+              : Array.isArray(d.niche)
+                ? d.niche
+                : [],
+        }
+      }),
+    }
+  } catch {
+    // Merging is best-effort decoration; never break search on it.
+    return result
+  }
+}
+
+export async function clubEnrich(
+  platform: ClubPlatform,
+  handle: string,
+  logUserId?: string
+) {
   const cacheKey = `${platform}:${handle.toLowerCase()}`
   const cached = enrichCache.get(cacheKey)
   if (cached) return cleanCachedDetail(cached)
@@ -763,6 +884,14 @@ export async function clubEnrich(platform: ClubPlatform, handle: string) {
   }
   const r = data?.result
   if (!r) throw new Error('No data available for this creator')
+
+  await logClubSpend({
+    kind: 'enrichment',
+    cost: 1,
+    creditsLeft: typeof data?.credits_left === 'number' ? data.credits_left : null,
+    reference: cacheKey,
+    userId: logUserId,
+  })
 
   // Stash the email for the server-side outreach route; it is NOT included
   // in the detail object returned to the client.
@@ -853,7 +982,11 @@ function parseAudienceSection(section: any) {
   }
 }
 
-export async function clubAnalytics(platform: ClubPlatform, handle: string) {
+export async function clubAnalytics(
+  platform: ClubPlatform,
+  handle: string,
+  logUserId?: string
+) {
   const cacheHandle = `${handle.toLowerCase()}${ANALYTICS_CACHE_SUFFIX}`
   const cacheKey = `${platform}:${cacheHandle}`
   const inMemory = enrichCache.get(cacheKey)
@@ -889,6 +1022,14 @@ export async function clubAnalytics(platform: ClubPlatform, handle: string) {
   }
   const r = data?.result
   if (!r) throw new Error('No analytics available for this creator')
+
+  await logClubSpend({
+    kind: 'analytics',
+    cost: 1,
+    creditsLeft: typeof data?.credits_left === 'number' ? data.credits_left : null,
+    reference: cacheKey,
+    userId: logUserId,
+  })
 
   const main = r[platform] || {}
   const analytics = {

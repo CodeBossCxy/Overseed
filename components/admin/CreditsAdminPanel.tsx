@@ -60,6 +60,23 @@ interface LedgerRow {
   createdAt: string
 }
 
+interface VendorRow {
+  id: string
+  kind: string
+  cost: string | number
+  resultCount: number | null
+  creditsLeft: string | number | null
+  reference: string
+  email: string | null
+  createdAt: string
+}
+
+interface VendorTotal {
+  kind: string
+  cost: string | number | null
+  calls: number
+}
+
 export default function CreditsAdminPanel() {
   const [plans, setPlans] = useState<PlanRow[]>([])
   const [packs, setPacks] = useState<PackRow[]>([])
@@ -79,6 +96,11 @@ export default function CreditsAdminPanel() {
   const [lots, setLots] = useState<LotRow[]>([])
   const [ledger, setLedger] = useState<LedgerRow[]>([])
 
+  // Vendor (influencers.club) spend audit
+  const [vendorRows, setVendorRows] = useState<VendorRow[]>([])
+  const [vendorTotals, setVendorTotals] = useState<VendorTotal[]>([])
+  const [vendorBalance, setVendorBalance] = useState<string | number | null>(null)
+
   const load = async () => {
     setLoading(true)
     try {
@@ -96,6 +118,15 @@ export default function CreditsAdminPanel() {
 
   useEffect(() => {
     load()
+    fetch('/api/admin/credits?view=vendor')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return
+        setVendorRows(data.rows || [])
+        setVendorTotals(data.totals30d || [])
+        setVendorBalance(data.latestBalance ?? null)
+      })
+      .catch(() => {})
   }, [])
 
   const flash = (text: string) => {
@@ -331,6 +362,58 @@ export default function CreditsAdminPanel() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* Vendor (influencers.club) spend audit */}
+      <section className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="font-bold text-gray-900 mb-1">Vendor spend (influencers.club)</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          One row per billed vendor call from club_credit_log; cache hits are free and not logged.
+          {vendorBalance != null && (
+            <> Latest vendor balance: <b className="text-gray-700">{Number(vendorBalance).toFixed(2)} credits</b>.</>
+          )}
+        </p>
+        {vendorTotals.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {vendorTotals.map((t) => (
+              <span key={t.kind} className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700">
+                <b>{t.kind}</b> (30d): {Number(t.cost || 0).toFixed(2)} credits · {t.calls} calls
+              </span>
+            ))}
+          </div>
+        )}
+        {vendorRows.length === 0 ? (
+          <p className="text-sm text-gray-400">No billed vendor calls logged yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-500 border-b">
+                  <th className="py-2">When</th>
+                  <th>Kind</th>
+                  <th>Cost</th>
+                  <th>Results</th>
+                  <th>Vendor bal.</th>
+                  <th>Triggered by</th>
+                  <th>Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendorRows.map((r) => (
+                  <tr key={r.id} className="border-b border-gray-50">
+                    <td className="py-1.5 whitespace-nowrap text-gray-500">{new Date(r.createdAt).toLocaleString()}</td>
+                    <td>{r.kind}</td>
+                    <td className="tabular-nums">{Number(r.cost).toFixed(2)}</td>
+                    <td className="tabular-nums">{r.resultCount ?? '—'}</td>
+                    <td className="tabular-nums">{r.creditsLeft != null ? Number(r.creditsLeft).toFixed(2) : '—'}</td>
+                    <td className="text-gray-500">{r.email || '—'}</td>
+                    <td className="text-gray-400 max-w-[220px] truncate" title={r.reference}>{r.reference}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>

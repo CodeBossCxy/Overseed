@@ -188,6 +188,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ id: stri
                 <p className="text-xs font-medium text-gray-500 mb-1.5">Compensation</p>
                 <CompensationBadge
                   type={campaign.compensationType}
+                  types={(campaign as any).compensationTypes}
                   paymentMin={campaign.paymentMin as any}
                   paymentMax={campaign.paymentMax as any}
                   giftDescription={campaign.giftDescription}

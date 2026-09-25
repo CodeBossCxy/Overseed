@@ -159,6 +159,7 @@ export default function CampaignCard({ campaign }: CampaignCardProps) {
         <div className="hidden md:flex flex-col items-end justify-between">
           <CompensationBadge
             type={campaign.compensationType}
+            types={(campaign as any).compensationTypes}
             paymentMin={campaign.paymentMin}
             paymentMax={campaign.paymentMax}
             giftDescription={campaign.giftDescription}
