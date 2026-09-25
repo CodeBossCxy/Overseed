@@ -1088,7 +1088,7 @@ export default function DiscoverPanel() {
   return (
     <div>
       {/* Search + filters */}
-      <form onSubmit={submit} className="workspace-glass-toolbar rounded-2xl p-5 mb-6">
+      <form onSubmit={submit} className="workspace-glass-toolbar rounded-2xl p-5 mb-6 overflow-visible relative z-10">
         <div className="flex flex-col gap-3">
           <textarea
             value={query}
@@ -1135,7 +1135,7 @@ export default function DiscoverPanel() {
             {historyOpen && (
               <div
                 data-solid
-                className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 z-40 p-2 text-left"
+                className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 z-[100] p-2 text-left"
               >
                 <p className="px-3 pt-2 pb-0.5 text-xs font-semibold text-gray-500">{d.searchHistoryTitle}</p>
                 <p className="px-3 pb-2 text-[11px] text-gray-400">{d.historyFreeNote}</p>
