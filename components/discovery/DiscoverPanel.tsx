@@ -1202,8 +1202,33 @@ export default function DiscoverPanel() {
 
   return (
     <div>
+      {/* Campaign-first tip */}
+      <div className="mb-4 flex items-start gap-3 rounded-2xl bg-gradient-to-r from-primary-50 to-orange-50 border border-primary-100 px-5 py-4">
+        <svg className="w-5 h-5 mt-0.5 text-primary-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.09 6.26L20.18 9l-5 4.27L16.82 20 12 16.9 7.18 20l1.64-6.73-5-4.27 6.09-.74z"/></svg>
+        <p className="text-sm text-gray-700">{d.campaignFirstTip}</p>
+      </div>
+
       {/* Search + filters */}
       <form onSubmit={submit} className="workspace-glass-toolbar rounded-2xl p-5 mb-6 overflow-visible relative z-10">
+        {/* Platform selector — above the search field */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {PLATFORMS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => togglePlatform(p)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm transition ${
+                platforms.includes(p)
+                  ? 'bg-white font-bold shadow-sm ring-1 ring-gray-200'
+                  : 'bg-gray-100/60 font-medium hover:bg-gray-100 opacity-60'
+              }`}
+            >
+              <PlatformLogo platform={p} size={20} />
+              <span>{PLATFORM_LABELS[p]}</span>
+            </button>
+          ))}
+        </div>
+
         <div className="flex flex-col gap-3">
           <textarea
             value={query}
@@ -1218,7 +1243,7 @@ export default function DiscoverPanel() {
             rows={3}
             className="w-full px-4 py-3 workspace-glass-control focus:outline-none resize-none leading-6"
           />
-          <div className="flex flex-wrap justify-end gap-3">
+          <div className="flex flex-wrap justify-end items-center gap-3">
           {speechReady && (
             <button
               type="button"
@@ -1250,6 +1275,19 @@ export default function DiscoverPanel() {
               d.searchButton
             )}
           </button>
+          {/* Info icon — hover to see search task billing note */}
+          <div className="relative group">
+            <button type="button" className="w-8 h-8 rounded-full workspace-glass-control text-gray-400 hover:text-gray-600 flex items-center justify-center transition" aria-label="Info">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </button>
+            <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute right-0 top-full mt-2 w-80 p-4 bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 z-[100] text-sm text-gray-600 leading-relaxed">
+              {d.searchTaskNote}
+            </div>
+          </div>
           {searchResult && (
             <button
               type="button"
@@ -1272,26 +1310,6 @@ export default function DiscoverPanel() {
         )}
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
-          <div>
-            <span className="block text-xs font-medium text-gray-500 mb-1.5">{d.platformsLabel}</span>
-            <div className="flex gap-2">
-              {PLATFORMS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => togglePlatform(p)}
-                  title={PLATFORM_LABELS[p]}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition ${
-                    platforms.includes(p)
-                      ? 'bg-white font-bold shadow-sm ring-1 ring-gray-200'
-                      : 'bg-gray-100 font-medium hover:bg-gray-200 opacity-50'
-                  }`}
-                >
-                  <PlatformLogo platform={p} size={18} />
-                </button>
-              ))}
-            </div>
-          </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.countryLabel}</label>
             <select
