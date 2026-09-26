@@ -15,7 +15,7 @@ import { walletRefund } from '@/lib/wallet'
 // in config); repeat views of the same creator are free (stable reference).
 // Remove together with the other TEMP influencers.club pieces.
 
-const CLUB_PLATFORMS: ClubPlatform[] = ['instagram', 'youtube', 'tiktok']
+const CLUB_PLATFORMS: ClubPlatform[] = ['instagram', 'youtube', 'tiktok', 'twitter', 'onlyfans', 'twitch']
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)

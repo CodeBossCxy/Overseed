@@ -50,11 +50,14 @@ interface DiscoverySearchRequest {
   pageSize: number
 }
 
-const PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const
+const PLATFORMS = ['youtube', 'instagram', 'tiktok', 'twitter', 'twitch', 'onlyfans'] as const
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: 'YouTube',
   instagram: 'Instagram',
   tiktok: 'TikTok',
+  twitter: 'X / Twitter',
+  twitch: 'Twitch',
+  onlyfans: 'OnlyFans',
 }
 const PAGE_SIZE = 50
 
@@ -290,7 +293,7 @@ export default function DiscoverPanel() {
   // Search-history dropdown (previous tasks; opening one is free)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyTasks, setHistoryTasks] = useState<
-    | { id: string; platform: string; label: string; updated_at: string; page_count: number }[]
+    | { id: string; platform: string; label: string; request: any; updated_at: string; page_count: number }[]
     | null
   >(null)
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -566,6 +569,14 @@ export default function DiscoverPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Load search history on mount so the tasks table is visible immediately
+  useEffect(() => {
+    fetch('/api/discovery/tasks')
+      .then((r) => r.json())
+      .then((data) => setHistoryTasks(Array.isArray(data?.tasks) ? data.tasks : []))
+      .catch(() => setHistoryTasks([]))
+  }, [])
+
   // Initial load and re-browse when the sort changes (other filters apply
   // on submit to avoid refetching per keystroke). Skipped while a saved
   // search is being restored so browse doesn't race the restored results.
@@ -821,6 +832,13 @@ export default function DiscoverPanel() {
     rec.start()
   }
 
+  const refreshHistory = () => {
+    fetch('/api/discovery/tasks')
+      .then((r) => r.json())
+      .then((data) => setHistoryTasks(Array.isArray(data?.tasks) ? data.tasks : []))
+      .catch(() => {})
+  }
+
   const clearSearch = () => {
     setQuery('')
     setSearchResult(null)
@@ -829,7 +847,104 @@ export default function DiscoverPanel() {
     setSearchHasMore(false)
     setSearchTaskId(null)
     try { sessionStorage.removeItem(SEARCH_STATE_KEY) } catch {}
+    refreshHistory()
     fetchBrowse(0, false)
+  }
+
+  // ---- Platform logos (inline SVGs) --------------------------------------
+  const igGradId = useRef(`ig-grad-${Math.random().toString(36).slice(2, 8)}`).current
+  const PlatformLogo = ({ platform, size = 20 }: { platform: string; size?: number }) => {
+    switch (platform) {
+      case 'instagram':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-label="Instagram">
+            <defs>
+              <radialGradient id={igGradId} cx="30%" cy="107%" r="150%">
+                <stop offset="0%" stopColor="#fdf497" />
+                <stop offset="5%" stopColor="#fdf497" />
+                <stop offset="45%" stopColor="#fd5949" />
+                <stop offset="60%" stopColor="#d6249f" />
+                <stop offset="90%" stopColor="#285AEB" />
+              </radialGradient>
+            </defs>
+            <rect x="2" y="2" width="20" height="20" rx="6" fill={`url(#${igGradId})`} />
+            <circle cx="12" cy="12" r="4.5" stroke="white" strokeWidth="1.8" fill="none" />
+            <circle cx="17.5" cy="6.5" r="1.2" fill="white" />
+          </svg>
+        )
+      case 'youtube':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-label="YouTube">
+            <rect x="1" y="4" width="22" height="16" rx="4" fill="#FF0000" />
+            <polygon points="10,8.5 16,12 10,15.5" fill="white" />
+          </svg>
+        )
+      case 'tiktok':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-label="TikTok">
+            <rect x="2" y="2" width="20" height="20" rx="5" fill="black" />
+            <path d="M16.5 7.5c-.8-.5-1.3-1.4-1.3-2.5h-2.2v10.2a2.3 2.3 0 1 1-1.6-2.2V10.7a4.5 4.5 0 1 0 3.8 4.5V10a5.3 5.3 0 0 0 3.1 1V8.8a3.3 3.3 0 0 1-1.8-.3z" fill="white" />
+            <path d="M16.2 7.2c-.7-.5-1.2-1.3-1.2-2.2h-2v10a2.2 2.2 0 1 1-1.5-2.1v-2.2a4.3 4.3 0 1 0 3.7 4.4V9.7a5.1 5.1 0 0 0 3 1V8.5a3.2 3.2 0 0 1-2-1.3z" fill="#25F4EE" opacity="0.7" />
+          </svg>
+        )
+      case 'twitter':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-label="X / Twitter">
+            <rect x="2" y="2" width="20" height="20" rx="5" fill="black" />
+            <path d="M7 7l4.5 5.5L7 17h1.2l3.8-3.8L15 17h3l-4.8-5.8L17 7h-1.2l-3.5 3.5L9.5 7H7z" fill="white" />
+          </svg>
+        )
+      case 'twitch':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-label="Twitch">
+            <rect x="2" y="2" width="20" height="20" rx="5" fill="#9146FF" />
+            <path d="M7 6l-1 3v8h3v2h2l2-2h3l4-4V6H7zm11 6.5l-2 2h-3l-1.5 1.5V14.5H8.5V7.5h9.5v5z" fill="white" />
+            <rect x="14" y="9" width="1.5" height="3.5" rx="0.5" fill="white" />
+            <rect x="11" y="9" width="1.5" height="3.5" rx="0.5" fill="white" />
+          </svg>
+        )
+      case 'onlyfans':
+        return (
+          <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-label="OnlyFans">
+            <rect x="2" y="2" width="20" height="20" rx="5" fill="#00AFF0" />
+            <circle cx="12" cy="12" r="5" stroke="white" strokeWidth="1.8" fill="none" />
+            <circle cx="12" cy="12" r="1.5" fill="white" />
+          </svg>
+        )
+      default:
+        return <span className="text-sm font-medium text-gray-600">{platform}</span>
+    }
+  }
+
+  // Relative time formatter for history table
+  const relativeTime = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return locale === 'zh' ? '刚刚' : 'just now'
+    if (mins < 60) return locale === 'zh' ? `${mins} 分钟前` : `${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return locale === 'zh' ? `${hours} 小时前` : `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    if (days < 30) return locale === 'zh' ? `${days} 天前` : `${days}d ago`
+    const months = Math.floor(days / 30)
+    return locale === 'zh' ? `${months} 个月前` : `${months}mo ago`
+  }
+
+  // Extract filter tags from a task's request object for display
+  const taskFilterTags = (req: any, platform: string): string[] => {
+    if (!req || typeof req !== 'object') return []
+    const tags: string[] = []
+    if (req.country) tags.push(req.country)
+    if (req.minFollowers || req.maxFollowers) {
+      const fmt = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}K` : String(n)
+      const min = req.minFollowers ? fmt(req.minFollowers) : '0'
+      const max = req.maxFollowers ? fmt(req.maxFollowers) : '∞'
+      tags.push(`${locale === 'zh' ? '粉丝 ' : ''}${min}–${max}`)
+    }
+    if (req.query) tags.push(req.query)
+    if (req.language) tags.push(req.language)
+    if (req.gender) tags.push(req.gender === 'MALE' ? (locale === 'zh' ? '男' : 'Male') : (locale === 'zh' ? '女' : 'Female'))
+    return tags
   }
 
   // ---- Search history (tasks) --------------------------------------------
@@ -1123,46 +1238,6 @@ export default function DiscoverPanel() {
               </svg>
             </button>
           )}
-          {/* Search history: previous tasks; reopening one is free */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={toggleHistory}
-              className="px-4 py-2.5 workspace-glass-control text-gray-600 rounded-full font-semibold hover:brightness-105 transition"
-            >
-              {d.searchHistory}
-            </button>
-            {historyOpen && (
-              <div
-                data-solid
-                className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 z-[100] p-2 text-left"
-              >
-                <p className="px-3 pt-2 pb-0.5 text-xs font-semibold text-gray-500">{d.searchHistoryTitle}</p>
-                <p className="px-3 pb-2 text-[11px] text-gray-400">{d.historyFreeNote}</p>
-                {historyLoading ? (
-                  <div className="p-4 flex justify-center text-gray-400"><Spinner /></div>
-                ) : !historyTasks?.length ? (
-                  <p className="px-3 pb-3 text-sm text-gray-400">{d.historyEmpty}</p>
-                ) : (
-                  historyTasks.map((task) => (
-                    <button
-                      key={task.id}
-                      type="button"
-                      onClick={() => openHistoryTask(task.id)}
-                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-gray-50 transition"
-                    >
-                      <span className="block text-sm font-medium text-gray-800 truncate">{task.label}</span>
-                      <span className="block text-xs text-gray-400">
-                        {new Date(task.updated_at).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US')}
-                        {' · '}
-                        {d.historyPages.replace('{n}', String(task.page_count))}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
           <button
             type="submit"
             disabled={isLoading || platforms.length === 0}
@@ -1205,13 +1280,14 @@ export default function DiscoverPanel() {
                   key={p}
                   type="button"
                   onClick={() => togglePlatform(p)}
-                  className={`px-3 py-1.5 rounded-full text-sm transition ${
+                  title={PLATFORM_LABELS[p]}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition ${
                     platforms.includes(p)
-                      ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
-                      : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
+                      ? 'bg-white font-bold shadow-sm ring-1 ring-gray-200'
+                      : 'bg-gray-100 font-medium hover:bg-gray-200 opacity-50'
                   }`}
                 >
-                  {PLATFORM_LABELS[p]}
+                  <PlatformLogo platform={p} size={18} />
                 </button>
               ))}
             </div>
@@ -1619,7 +1695,76 @@ export default function DiscoverPanel() {
           </div>
         )}
 
-      {!unavailable && (
+      {/* Search history table — shown when no search results are active */}
+      {!unavailable && !searchResult && !isLoading && (
+        <div className="workspace-glass-card rounded-2xl p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-1">{d.mySearchTasks}</h2>
+          <p className="text-sm text-gray-400 mb-4">{d.mySearchTasksHint}</p>
+          {!historyTasks ? (
+            <div className="py-8 flex justify-center text-gray-400"><Spinner /></div>
+          ) : historyTasks.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-400">{d.historyEmpty}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                    <th className="pb-2 pr-4 font-medium">{d.taskName}</th>
+                    <th className="pb-2 pr-4 font-medium">{d.taskPlatform}</th>
+                    <th className="pb-2 pr-4 font-medium">{d.taskFilters}</th>
+                    <th className="pb-2 pr-4 font-medium text-right">{d.taskCreatorsViewed}</th>
+                    <th className="pb-2 font-medium text-right">{d.taskLastViewed}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyTasks.map((task) => {
+                    const tags = taskFilterTags(task.request, task.platform)
+                    const visibleTags = tags.slice(0, 3)
+                    const extraCount = tags.length - visibleTags.length
+                    return (
+                      <tr
+                        key={task.id}
+                        onClick={() => openHistoryTask(task.id)}
+                        className="border-b border-gray-50 hover:bg-gray-50/60 cursor-pointer transition"
+                      >
+                        <td className="py-3 pr-4">
+                          <span className="font-medium text-gray-800">{task.label}</span>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-1.5">
+                            <PlatformLogo platform={task.platform} size={18} />
+                            <span className="text-gray-600 capitalize">{PLATFORM_LABELS[task.platform] || task.platform}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <div className="flex flex-wrap gap-1">
+                            {visibleTags.map((tag, i) => (
+                              <span key={i} className="inline-block px-2 py-0.5 rounded-full bg-gray-100 text-xs text-gray-600">{tag}</span>
+                            ))}
+                            {extraCount > 0 && (
+                              <span className="inline-block px-2 py-0.5 rounded-full bg-gray-100 text-xs text-gray-400">
+                                {d.taskMoreFilters.replace('{n}', String(extraCount))}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-right font-semibold text-gray-700">
+                          {task.page_count * 10}
+                        </td>
+                        <td className="py-3 text-right text-gray-400 text-xs whitespace-nowrap">
+                          {relativeTime(task.updated_at)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!unavailable && (searchResult || isLoading) && (
         <>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">

@@ -33,6 +33,19 @@ export async function GET() {
                 },
               },
             },
+            outreachRecipient: {
+              select: {
+                id: true,
+                handle: true,
+                displayName: true,
+                avatarUrl: true,
+                platform: true,
+                status: true,
+                outreachCampaign: {
+                  select: { id: true, title: true, brandId: true },
+                },
+              },
+            },
             participants: {
               include: {
                 conversation: false,
@@ -90,14 +103,42 @@ export async function GET() {
           })
         }
 
+        // Outreach conversation (no application — brand reached out to external creator)
+        if (conv.outreachRecipient) {
+          const or = conv.outreachRecipient
+          return {
+            id: conv.id,
+            type: 'outreach' as const,
+            applicationId: null,
+            outreachRecipientId: or.id,
+            campaignTitle: or.outreachCampaign.title,
+            campaignId: or.outreachCampaign.id,
+            creatorHandle: or.handle,
+            creatorName: or.displayName,
+            creatorAvatar: or.avatarUrl,
+            creatorPlatform: or.platform,
+            outreachStatus: or.status,
+            brandProfileId: or.outreachCampaign.brandId,
+            favorited: false,
+            otherUser,
+            lastMessage: conv.messages[0] || null,
+            unreadCount,
+            updatedAt: conv.updatedAt,
+          }
+        }
+
+        // Standard application conversation
         return {
           id: conv.id,
+          type: 'application' as const,
           applicationId: conv.applicationId,
-          campaignTitle: conv.application.campaign.title,
-          campaignId: conv.application.campaign.id,
-          influencerId: conv.application.influencerId,
-          brandProfileId: conv.application.campaign.brandId,
-          favorited: favoritedBrandIds.has(conv.application.campaign.brandId),
+          campaignTitle: conv.application?.campaign.title ?? 'Unknown',
+          campaignId: conv.application?.campaign.id ?? '',
+          influencerId: conv.application?.influencerId,
+          brandProfileId: conv.application?.campaign.brandId ?? '',
+          favorited: conv.application?.campaign.brandId
+            ? favoritedBrandIds.has(conv.application.campaign.brandId)
+            : false,
           otherUser,
           lastMessage: conv.messages[0] || null,
           unreadCount,

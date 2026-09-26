@@ -67,6 +67,18 @@ export async function GET(
             },
           },
         },
+        outreachRecipient: {
+          select: {
+            id: true,
+            handle: true,
+            displayName: true,
+            avatarUrl: true,
+            platform: true,
+            outreachCampaign: {
+              select: { id: true, title: true },
+            },
+          },
+        },
         participants: true,
       },
     })
@@ -88,8 +100,8 @@ export async function GET(
       conversation: {
         id: conversation?.id,
         applicationId: conversation?.applicationId,
-        campaignTitle: conversation?.application.campaign.title,
-        campaignId: conversation?.application.campaign.id,
+        campaignTitle: conversation?.application?.campaign.title ?? conversation?.outreachRecipientId ?? '',
+        campaignId: conversation?.application?.campaign.id ?? '',
         otherUser,
       },
       hasMore: messages.length === limit,

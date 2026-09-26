@@ -30,6 +30,8 @@ const ICONS = {
   search: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
   sparkles: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z',
   briefcase: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  megaphone: 'M10 34V6h2l14 8v12L12 34h-2zm16-10v-8',
+  send: 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5',
 } as const
 
 interface NavItem {
@@ -135,6 +137,7 @@ export default function WorkspaceLayout({
           { href: '/dashboard/brand/campaigns', label: w.myCampaigns, icon: ICONS.briefcase },
           { href: '/dashboard/brand/saved-creators', label: t.brand.savedCreators.title, icon: ICONS.bookmark },
           { href: '/dashboard/brand/discover', label: t.nav.findInfluencer, icon: ICONS.search },
+          { href: '/dashboard/brand/outreach', label: 'Mass Outreach', icon: ICONS.send },
           { href: '/dashboard/messages', label: w.messages, icon: ICONS.chat },
           { href: '/dashboard/brand/profile', label: w.brandProfile, icon: ICONS.user },
           { href: '/ai-assistant', label: w.aiAssistant, icon: ICONS.sparkles },

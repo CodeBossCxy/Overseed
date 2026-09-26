@@ -19,7 +19,7 @@ const BASE = 'https://api-dashboard.influencers.club'
 // Successful Club requests are cached indefinitely in PostgreSQL. This is
 // intentional: identical requests should never spend vendor credits twice.
 
-export type ClubPlatform = 'instagram' | 'youtube' | 'tiktok'
+export type ClubPlatform = 'instagram' | 'youtube' | 'tiktok' | 'twitter' | 'onlyfans' | 'twitch'
 export type { ClubAdvancedFilters, ClubAudienceFilters }
 
 export function clubConfigured(): boolean {
@@ -125,6 +125,9 @@ const PROFILE_URL: Record<ClubPlatform, (handle: string) => string> = {
   instagram: (h) => `https://www.instagram.com/${h}`,
   youtube: (h) => `https://www.youtube.com/@${h}`,
   tiktok: (h) => `https://www.tiktok.com/@${h}`,
+  twitter: (h) => `https://x.com/${h}`,
+  onlyfans: (h) => `https://onlyfans.com/${h}`,
+  twitch: (h) => `https://www.twitch.tv/${h}`,
 }
 
 export interface ClubSearchOptions {

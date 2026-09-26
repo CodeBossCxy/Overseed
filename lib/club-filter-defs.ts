@@ -6,7 +6,7 @@
 //
 // Client-safe: no server-only imports.
 
-export type ClubPlatform = 'instagram' | 'youtube' | 'tiktok'
+export type ClubPlatform = 'instagram' | 'youtube' | 'tiktok' | 'twitter' | 'onlyfans' | 'twitch'
 
 export type ClubFilterKind =
   | 'range' // {min?, max?} numeric — params `${id}_min` / `${id}_max`

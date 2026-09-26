@@ -146,6 +146,23 @@ enum CreditLedgerType {
   ADMIN_ADJUSTMENT
 }
 
+enum OutreachCampaignStatus {
+  DRAFT
+  SELECTING
+  READY
+  SENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum OutreachRecipientStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
 // ===========================================
 // MULTILINGUAL SUPPORT
 // ===========================================
@@ -236,6 +253,7 @@ model User {
   creditLots         CreditLot[]
   creditLedger       CreditLedgerEntry[]
   discoveryTasks     DiscoverySearchTask[]
+  outreachCampaigns  OutreachCampaign[]
 
   @@map("users")
 }
@@ -662,14 +680,16 @@ model Application {
 // ===========================================
 
 model Conversation {
-  id            String   @id @default(cuid())
-  applicationId String   @unique
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  applicationId       String?  @unique
+  outreachRecipientId String?  @unique
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  messages      Message[]
-  participants  ConversationParticipant[]
+  application        Application?       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  outreachRecipient  OutreachRecipient?  @relation(fields: [outreachRecipientId], references: [id], onDelete: Cascade)
+  messages           Message[]
+  participants       ConversationParticipant[]
 
   @@index([updatedAt])
   @@map("conversations")
@@ -1110,6 +1130,105 @@ model SavedSearch {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("saved_searches")
+}
+
+// ===========================================
+// MASS OUTREACH
+// ===========================================
+
+// Reusable creator intelligence cache — every creator surfaced by any outreach
+// or discovery enrichment is persisted here, building a proprietary directory
+// that speeds up and cheapens future lookups for all users.
+model CreatorProfile {
+  id                  String   @id @default(cuid())
+  platform            String
+  handle              String
+  displayName         String?
+  avatarUrl           String?
+  bio                 String?  @db.Text
+  email               String?
+  followerCount       Int?
+  engagementRate      Decimal? @db.Decimal(7, 3)
+  country             String?
+  language            String?
+  nicheTags           String[] @default([])
+  audienceDemographics Json?
+  contentCategories   String[] @default([])
+  avgViews            Int?
+  avgLikes            Int?
+  // Anti-spam: track contact frequency across all brands
+  lastContactedAt     DateTime?
+  contactCount        Int      @default(0)
+  firstSeenAt         DateTime @default(now())
+  lastRefreshedAt     DateTime @default(now())
+  refreshCount        Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  outreachRecipients  OutreachRecipient[]
+
+  @@unique([platform, handle])
+  @@index([platform, country])
+  @@index([lastContactedAt])
+  @@map("creator_profiles")
+}
+
+// A mass outreach batch — brand submits brief + criteria + quantity, AI selects
+// creators, then the system sends personalized cold emails.
+model OutreachCampaign {
+  id            String                 @id @default(cuid())
+  userId        String
+  brandId       String
+  title         String
+  briefMessage  String                 @db.Text
+  quantity      Int
+  platform      String                 @default("instagram")
+  // AI criteria: niche, location, follower range, language, etc.
+  criteria      Json?
+  status        OutreachCampaignStatus @default(DRAFT)
+  // Totals populated after send
+  totalSent     Int                    @default(0)
+  totalFailed   Int                    @default(0)
+  creditsCost   Int                    @default(0)
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipients    OutreachRecipient[]
+
+  @@index([userId, createdAt])
+  @@index([brandId, status])
+  @@map("outreach_campaigns")
+}
+
+// Each creator in an outreach batch, with match scoring and delivery tracking.
+model OutreachRecipient {
+  id                  String                  @id @default(cuid())
+  outreachCampaignId  String
+  creatorProfileId    String
+  platform            String
+  handle              String
+  displayName         String?
+  email               String?
+  avatarUrl           String?
+  followerCount       Int?
+  engagementRate      Decimal?                @db.Decimal(7, 3)
+  matchScore          Decimal?                @db.Decimal(5, 2)
+  matchReason         String?
+  status              OutreachRecipientStatus @default(PENDING)
+  sentAt              DateTime?
+  errorMessage        String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  outreachCampaign    OutreachCampaign        @relation(fields: [outreachCampaignId], references: [id], onDelete: Cascade)
+  creatorProfile      CreatorProfile          @relation(fields: [creatorProfileId], references: [id])
+  conversation        Conversation?
+
+  @@unique([outreachCampaignId, handle])
+  @@index([outreachCampaignId, status])
+  @@map("outreach_recipients")
 }
 
 // ===========================================

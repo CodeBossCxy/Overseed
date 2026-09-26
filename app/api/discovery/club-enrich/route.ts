@@ -14,7 +14,7 @@ import { walletRefund } from '@/lib/wallet'
 // stripped server-side in lib/influencers-club.ts. Remove together with the
 // other TEMP influencers.club pieces.
 
-const CLUB_PLATFORMS: ClubPlatform[] = ['instagram', 'youtube', 'tiktok']
+const CLUB_PLATFORMS: ClubPlatform[] = ['instagram', 'youtube', 'tiktok', 'twitter', 'onlyfans', 'twitch']
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)

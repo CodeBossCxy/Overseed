@@ -30,7 +30,7 @@ const DISCOVERY_PAGE_SIZE = 10
 // the server. Remove together with lib/influencers-club.ts and the
 // "Data source" picker in DiscoverPanel.tsx.
 
-const CLUB_PLATFORMS: ClubPlatform[] = ['instagram', 'youtube', 'tiktok']
+const CLUB_PLATFORMS: ClubPlatform[] = ['instagram', 'youtube', 'tiktok', 'twitter', 'onlyfans', 'twitch']
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)

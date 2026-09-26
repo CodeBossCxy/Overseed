@@ -12,12 +12,20 @@ import { getPusherClient } from '@/lib/pusher-client'
 
 interface ConversationItem {
   id: string
-  applicationId: string
+  type?: 'application' | 'outreach'
+  applicationId: string | null
   campaignTitle: string
   campaignId: string
   influencerId?: string
   brandProfileId?: string
   favorited?: boolean
+  // Outreach-specific fields
+  outreachRecipientId?: string
+  creatorHandle?: string
+  creatorName?: string | null
+  creatorAvatar?: string | null
+  creatorPlatform?: string
+  outreachStatus?: string
   otherUser: {
     id: string
     name: string | null
@@ -401,7 +409,9 @@ export default function MessagesPage() {
     if (!q) return true
     return (
       (conv.otherUser?.name || '').toLowerCase().includes(q) ||
-      (conv.campaignTitle || '').toLowerCase().includes(q)
+      (conv.campaignTitle || '').toLowerCase().includes(q) ||
+      (conv.creatorName || '').toLowerCase().includes(q) ||
+      (conv.creatorHandle || '').toLowerCase().includes(q)
     )
   })
 
@@ -515,7 +525,9 @@ export default function MessagesPage() {
                   >
                     {/* Avatar */}
                     <div className="w-14 h-14 bg-white/65 ring-1 ring-white rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {conv.otherUser?.image ? (
+                      {conv.type === 'outreach' && conv.creatorAvatar ? (
+                        <img src={conv.creatorAvatar} alt="" className="w-14 h-14 rounded-full object-cover" />
+                      ) : conv.otherUser?.image ? (
                         <img
                           src={conv.otherUser.image}
                           alt=""
@@ -523,7 +535,7 @@ export default function MessagesPage() {
                         />
                       ) : (
                         <span className="text-primary-700 font-bold text-lg">
-                          {conv.otherUser?.name?.charAt(0)?.toUpperCase() || '?'}
+                          {(conv.type === 'outreach' ? conv.creatorName || conv.creatorHandle : conv.otherUser?.name)?.charAt(0)?.toUpperCase() || '?'}
                         </span>
                       )}
                     </div>
@@ -532,7 +544,12 @@ export default function MessagesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-base text-[#172760] truncate flex items-center gap-1.5">
-                          {conv.otherUser?.name || t.messages.unknownUser}
+                          {conv.type === 'outreach'
+                            ? (conv.creatorName || `@${conv.creatorHandle}`)
+                            : (conv.otherUser?.name || t.messages.unknownUser)}
+                          {conv.type === 'outreach' && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 flex-shrink-0">Outreach</span>
+                          )}
                           {isFavorited(conv) && (
                             <svg className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M12 2l2.9 6.26 6.86.62-5.18 4.55 1.52 6.72L12 16.67l-6.1 3.48 1.52-6.72L2.24 8.88l6.86-.62L12 2z" />
@@ -601,11 +618,20 @@ export default function MessagesPage() {
                     className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0"
                   >
                   <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-white/65 ring-1 ring-white flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {convDetails.otherUser?.image ? <img src={convDetails.otherUser.image} alt="" className="w-full h-full object-cover" /> : <span className="text-base sm:text-xl font-bold text-primary-700">{convDetails.otherUser?.name?.charAt(0)?.toUpperCase() || '?'}</span>}
+                    {selectedConv?.type === 'outreach' && selectedConv?.creatorAvatar
+                      ? <img src={selectedConv.creatorAvatar} alt="" className="w-full h-full object-cover" />
+                      : convDetails.otherUser?.image
+                        ? <img src={convDetails.otherUser.image} alt="" className="w-full h-full object-cover" />
+                        : <span className="text-base sm:text-xl font-bold text-primary-700">{(selectedConv?.type === 'outreach' ? selectedConv?.creatorName || selectedConv?.creatorHandle : convDetails.otherUser?.name)?.charAt(0)?.toUpperCase() || '?'}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base sm:text-lg font-bold text-[#172760] truncate flex items-center gap-2">
-                      {convDetails.otherUser?.name || t.messages.unknownUser}
+                      {selectedConv?.type === 'outreach'
+                        ? (selectedConv?.creatorName || `@${selectedConv?.creatorHandle}`)
+                        : (convDetails.otherUser?.name || t.messages.unknownUser)}
+                      {selectedConv?.type === 'outreach' && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 flex-shrink-0">Outreach</span>
+                      )}
                       {selectedConv && isFavorited(selectedConv) && (
                         <>
                           <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -617,7 +643,11 @@ export default function MessagesPage() {
                         </>
                       )}
                     </h3>
-                    <p className="text-xs sm:text-sm text-[#6b7ba3] mt-0.5 sm:mt-1 truncate">{isBrand ? 'Creator collaboration' : 'Brand collaboration'}</p>
+                    <p className="text-xs sm:text-sm text-[#6b7ba3] mt-0.5 sm:mt-1 truncate">
+                      {selectedConv?.type === 'outreach'
+                        ? `Outreach · @${selectedConv?.creatorHandle} · ${selectedConv?.creatorPlatform}`
+                        : isBrand ? 'Creator collaboration' : 'Brand collaboration'}
+                    </p>
                   </div>
                   </Link>
                   <div className="flex items-center gap-2 flex-shrink-0">
