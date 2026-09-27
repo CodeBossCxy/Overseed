@@ -39,9 +39,13 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
         select: { handle: true },
       })
 
+      const criteria: OutreachCriteria = {
+        ...(campaign.criteria as any ?? {}),
+        platform: (campaign.criteria as any)?.platform || campaign.platform,
+      }
       const scored = await selectCreators(
         campaign.briefMessage,
-        campaign.criteria as unknown as OutreachCriteria,
+        criteria,
         campaign.quantity,
         existing.map((e) => e.handle)
       )

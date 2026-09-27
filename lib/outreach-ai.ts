@@ -8,13 +8,22 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export interface OutreachCriteria {
-  platform: 'instagram' | 'youtube' | 'tiktok'
+  platform: string
   niche?: string
   country?: string
   minFollowers?: number
   maxFollowers?: number
   language?: string
   keywords?: string[]
+  // Extended fields from the refined form (passed to AI scoring)
+  niches?: string[]
+  countries?: string[]
+  languages?: string[]
+  minEngagement?: number
+  contentFormats?: string[]
+  audienceCountries?: string[]
+  excludeContacted?: boolean
+  brandSafety?: string[]
 }
 
 export interface ScoredCreator {
@@ -274,7 +283,8 @@ export async function selectCreators(
         // contacted 3+ times in the last 30 days
         { AND: [{ contactCount: { gte: 3 } }, { lastContactedAt: { gte: thirtyDaysAgo } }] },
       ],
-      ...(criteria.country ? { country: criteria.country } : {}),
+      // Country: fuzzy match — "US" matches "US", "United States", "New York, United States"
+      ...(criteria.country ? { country: { contains: criteria.country, mode: 'insensitive' as const } } : {}),
       ...(criteria.language ? { language: criteria.language } : {}),
       ...(criteria.minFollowers != null || criteria.maxFollowers != null
         ? {
@@ -284,8 +294,12 @@ export async function selectCreators(
             },
           }
         : {}),
+      ...(criteria.minEngagement != null
+        ? { engagementRate: { gte: criteria.minEngagement } }
+        : {}),
+      // Niche: check if ANY of the creator's tags contains the search niche (fuzzy)
       ...(criteria.niche
-        ? { nicheTags: { has: criteria.niche } }
+        ? { nicheTags: { hasSome: [criteria.niche, ...criteria.niche.split(/\s*[&,]\s*/)] } }
         : {}),
     },
     take: Math.ceil(quantity * 3),
@@ -294,17 +308,18 @@ export async function selectCreators(
   const filtered = cachedProfiles.filter((p) => !excludeSet.has(p.handle.toLowerCase()))
 
   // ── Step 2: supplement with Influencers Club if cache is thin ───────────────
-  const threshold = quantity * 1.5
-  if (filtered.length < threshold) {
+  // Only search Club if cache doesn't have enough creators for the request
+  if (filtered.length < quantity) {
     try {
-      const { clubSearch, clubEnrich } = await import('@/lib/influencers-club')
+      const { clubSearch, clubEnrich, getCreatorContactEmail } = await import('@/lib/influencers-club')
 
       const searchResult = await clubSearch({
-        platform: criteria.platform,
+        platform: criteria.platform as any,
         query: [criteria.niche, ...(criteria.keywords ?? [])].filter(Boolean).join(' ') || undefined,
         country: criteria.country,
         minFollowers: criteria.minFollowers,
         maxFollowers: criteria.maxFollowers,
+        minEngagement: criteria.minEngagement,
         language: criteria.language,
         limit: Math.min(50, quantity * 2),
       })
@@ -323,30 +338,33 @@ export async function selectCreators(
       await Promise.allSettled(
         toEnrich.map(async (c) => {
           try {
-            const detail = await clubEnrich(criteria.platform, c.handle)
-            const email: string | null = detail?.email ?? null
+            const detail = await clubEnrich(criteria.platform as any, c.handle)
+            // Email is server-side only — fetch from contact cache (populated by clubEnrich)
+            const email = await getCreatorContactEmail(criteria.platform as any, c.handle) ?? null
             if (!email) return
 
             const handle = String(c.handle).toLowerCase()
             // Check if already in filtered set
             if (filtered.some((p) => p.handle === handle)) return
 
+            const followers = detail?.followers ?? c.follower_count ?? c.followers ?? null
+            const engagement = detail?.engagement_percent ?? c.engagement_rate ?? null
+
+            // Enforce follower range from criteria — don't add out-of-range creators
+            if (typeof followers === 'number') {
+              if (criteria.minFollowers != null && followers < criteria.minFollowers) return
+              if (criteria.maxFollowers != null && followers > criteria.maxFollowers) return
+            }
             const id = await upsertCreatorProfile(criteria.platform, handle, {
-              displayName: detail?.name ?? c.name ?? null,
+              displayName: detail?.name ?? c.display_name ?? c.name ?? null,
               avatarUrl: detail?.avatar_url ?? c.avatar_url ?? null,
               bio: detail?.bio ?? null,
               email,
-              followerCount:
-                typeof (detail?.followers ?? c.followers) === 'number'
-                  ? detail?.followers ?? c.followers
-                  : null,
-              engagementRate:
-                typeof (detail?.engagement_rate ?? c.engagement_rate) === 'number'
-                  ? detail?.engagement_rate ?? c.engagement_rate
-                  : null,
+              followerCount: typeof followers === 'number' ? followers : null,
+              engagementRate: typeof engagement === 'number' ? engagement : null,
               country: detail?.location ?? c.country ?? null,
               language: detail?.language ?? c.language ?? null,
-              nicheTags: Array.isArray(detail?.niche) ? detail.niche : [],
+              nicheTags: Array.isArray(detail?.niche) ? detail.niche : (Array.isArray(c.niche_tags) ? c.niche_tags : []),
               contentCategories: Array.isArray(detail?.content_categories)
                 ? detail.content_categories
                 : [],
@@ -359,21 +377,15 @@ export async function selectCreators(
               id,
               platform: criteria.platform,
               handle,
-              displayName: detail?.name ?? c.name ?? null,
+              displayName: detail?.name ?? c.display_name ?? c.name ?? null,
               avatarUrl: detail?.avatar_url ?? c.avatar_url ?? null,
               bio: detail?.bio ?? null,
               email,
-              followerCount:
-                typeof (detail?.followers ?? c.followers) === 'number'
-                  ? detail?.followers ?? c.followers
-                  : null,
-              engagementRate:
-                typeof (detail?.engagement_rate ?? c.engagement_rate) === 'number'
-                  ? detail?.engagement_rate ?? c.engagement_rate
-                  : null,
+              followerCount: typeof followers === 'number' ? followers : null,
+              engagementRate: typeof engagement === 'number' ? engagement : null,
               country: detail?.location ?? c.country ?? null,
               language: detail?.language ?? c.language ?? null,
-              nicheTags: Array.isArray(detail?.niche) ? detail.niche : [],
+              nicheTags: Array.isArray(detail?.niche) ? detail.niche : (Array.isArray(c.niche_tags) ? c.niche_tags : []),
               audienceDemographics: null,
               contentCategories: Array.isArray(detail?.content_categories)
                 ? detail.content_categories
@@ -431,6 +443,12 @@ export async function selectCreators(
     }
   })
 
-  scored.sort((a, b) => b.matchScore - a.matchScore)
-  return scored.slice(0, quantity)
+  // Post-filter: enforce minEngagement for creators supplemented via enrichment
+  // (the DB query filters cached profiles, but enriched ones may slip through)
+  const qualified = criteria.minEngagement != null
+    ? scored.filter((c) => c.engagementRate == null || c.engagementRate >= criteria.minEngagement!)
+    : scored
+
+  qualified.sort((a, b) => b.matchScore - a.matchScore)
+  return qualified.slice(0, quantity)
 }

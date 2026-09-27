@@ -72,9 +72,16 @@ https://www.overseed.net
 This email was sent by Overseed on behalf of ${input.brandName}.`
 }
 
+// Round-robin counter for distributing test emails across a comma-separated
+// CLUB_OUTREACH_TEST_RECIPIENT list (e.g. "a@test.com,b@test.com,c@test.com").
+let testRecipientIndex = 0
+
 export async function sendOutreachEmail(input: OutreachEmailInput): Promise<OutreachEmailResult> {
   try {
-    const to = process.env.CLUB_OUTREACH_TEST_RECIPIENT || input.recipientEmail
+    const testList = process.env.CLUB_OUTREACH_TEST_RECIPIENT?.split(',').map((e) => e.trim()).filter(Boolean)
+    const to = testList?.length
+      ? testList[testRecipientIndex++ % testList.length]
+      : input.recipientEmail
     const { error } = await getResend().emails.send({
       from: `Overseed <${process.env.EMAIL_FROM}>`,
       to,

@@ -143,7 +143,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const to = process.env.CLUB_OUTREACH_TEST_RECIPIENT || creatorEmail
+  const testList = process.env.CLUB_OUTREACH_TEST_RECIPIENT?.split(',').map((e) => e.trim()).filter(Boolean)
+  const to = testList?.length ? testList[0] : creatorEmail
   const brandName = brand.companyName || user.name || 'A brand on Overseed'
 
   const attachments = await Promise.all(

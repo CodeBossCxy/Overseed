@@ -128,14 +128,14 @@ interface CollabDetails {
 
 interface Recipient {
   id: string
-  name: string
+  displayName: string | null
   handle: string
   avatarUrl: string | null
   platform: string
-  followers: number
-  engagementRate: number
-  matchScore: number
-  matchReason: string
+  followerCount: number | null
+  engagementRate: number | null
+  matchScore: number | null
+  matchReason: string | null
 }
 
 interface SendResult {
@@ -1112,21 +1112,21 @@ export default function NewOutreachPage() {
                       <img src={r.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
                     ) : (
                       <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                        {(r.name || r.handle || '?').charAt(0).toUpperCase()}
+                        {(r.displayName || r.handle || '?').charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-900 truncate">{r.name || r.handle}</span>
+                        <span className="text-sm font-semibold text-gray-900 truncate">{r.displayName || r.handle}</span>
                         <span className="text-xs text-gray-400">{r.handle}</span>
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5 flex gap-3">
-                        <span>{formatFollowers(r.followers)} {zh ? '粉丝' : 'followers'}</span>
-                        {r.engagementRate > 0 && <span>{r.engagementRate.toFixed(1)}% {zh ? '互动率' : 'eng.'}</span>}
+                        <span>{formatFollowers(r.followerCount ?? 0)} {zh ? '粉丝' : 'followers'}</span>
+                        {r.engagementRate != null && Number(r.engagementRate) > 0 && <span>{Number(r.engagementRate).toFixed(1)}% {zh ? '互动率' : 'eng.'}</span>}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <MatchScoreBadge score={r.matchScore} />
+                      <MatchScoreBadge score={Number(r.matchScore)} />
                       {r.matchReason && (
                         <span className="text-xs text-gray-400 max-w-28 text-right truncate">{r.matchReason}</span>
                       )}
