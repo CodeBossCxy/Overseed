@@ -1,11 +1,13 @@
+import { Suspense } from 'react'
 import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import BrandCampaignsClient from '@/components/dashboard/BrandCampaignsClient'
+import DashboardLoading from '../loading'
 
-export default async function BrandCampaignsPage() {
+async function CampaignsContent() {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
@@ -39,11 +41,19 @@ export default async function BrandCampaignsPage() {
   })
 
   return (
+    <BrandCampaignsClient
+      campaigns={JSON.parse(JSON.stringify(campaigns))}
+      isVerified={brandProfile.brandVerificationStatus === 'APPROVED'}
+    />
+  )
+}
+
+export default function BrandCampaignsPage() {
+  return (
     <BrandWorkspaceLayout>
-      <BrandCampaignsClient
-        campaigns={JSON.parse(JSON.stringify(campaigns))}
-        isVerified={brandProfile.brandVerificationStatus === 'APPROVED'}
-      />
+      <Suspense fallback={<DashboardLoading />}>
+        <CampaignsContent />
+      </Suspense>
     </BrandWorkspaceLayout>
   )
 }

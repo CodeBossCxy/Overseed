@@ -178,19 +178,23 @@ export default function WorkspaceLayout({
 
     setMobileOpen(false)
     setAccountOpen(false)
-    prefetchRoute(href)
     if (href !== pathname) setPendingHref(href)
-  }, [pathname, prefetchRoute])
+  }, [pathname])
 
   useEffect(() => {
     setPendingHref(null)
   }, [pathname])
 
+  // Safety valve: if navigation stalls for 5s, force-push and clear the
+  // pending state so the UI doesn't stay stuck with a dimmed skeleton.
   useEffect(() => {
     if (!pendingHref) return
-    const timeout = window.setTimeout(() => setPendingHref(null), 12000)
+    const timeout = window.setTimeout(() => {
+      router.push(pendingHref)
+      setPendingHref(null)
+    }, 5000)
     return () => window.clearTimeout(timeout)
-  }, [pendingHref])
+  }, [pendingHref, router])
 
   const userName = session?.user?.name || roleLabel
   const initials = userName
