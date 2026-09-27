@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const VALID_PLATFORMS = ['instagram', 'youtube', 'tiktok']
+const VALID_PLATFORMS = ['instagram', 'youtube', 'tiktok', 'twitter', 'onlyfans', 'twitch']
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { title, briefMessage, quantity, platform, criteria } = body
+    const { title, briefMessage, quantity, platform, criteria, collaborationDetails } = body
 
     if (!title || typeof title !== 'string' || !title.trim()) {
       return NextResponse.json({ message: 'title is required', code: 'VALIDATION_ERROR' }, { status: 400 })
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
         quantity,
         platform,
         criteria: criteria ?? null,
+        collaborationDetails: collaborationDetails ?? null,
         status: 'DRAFT',
       },
     })

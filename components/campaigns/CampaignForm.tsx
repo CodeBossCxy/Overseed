@@ -33,7 +33,7 @@ export default function CampaignForm({
   isEditing = false,
 }: CampaignFormProps) {
   const router = useRouter()
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
   const cf = t.campaignForm
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -390,25 +390,28 @@ export default function CampaignForm({
     }))
   }
 
+  const fieldCls = 'w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white'
+
   const renderStep1 = () => (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">{cf.basicInfo}</h2>
-
       <div>
-        <label className="block text-sm font-medium mb-1">{cf.campaignTitle} *</label>
-        <input
-          type="text"
-          required
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
-          placeholder={cf.campaignTitlePlaceholder}
-        />
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.campaignTitle} <span className="text-red-500">*</span></label>
+        <div className="relative">
+          <input
+            type="text"
+            required
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value.slice(0, 100) })}
+            className={fieldCls}
+            placeholder={cf.campaignTitlePlaceholder}
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-300">{formData.title.length}/100</span>
+        </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">{cf.description} *</label>
-        <div className="border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-primary-500 overflow-hidden">
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.description} <span className="text-red-500">*</span></label>
+        <div className="border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-primary-500 overflow-hidden">
           <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 bg-gray-50 text-gray-600">
             {([
               ['H1', () => wrapDescSelection('# ', '', cf.mdHeadingSample)],
@@ -449,7 +452,7 @@ export default function CampaignForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">{cf.categories} *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{cf.categories} <span className="text-red-500">*</span></label>
         <div className="flex flex-wrap gap-2">
           {categories.map((cat) => (
             <button
@@ -470,7 +473,7 @@ export default function CampaignForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">{cf.applicationDeadline} *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.applicationDeadline} <span className="text-red-500">*</span></label>
           <LocaleDateInput
             required
             value={formData.deadline}
@@ -480,7 +483,7 @@ export default function CampaignForm({
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">
-            {cf.numberOfSpots} * <span className="text-xs text-gray-400 font-normal">({cf.spotsMinHint})</span>
+            {cf.numberOfSpots} <span className="text-red-500">*</span> <span className="text-xs text-gray-400 font-normal">({cf.spotsMinHint})</span>
           </label>
           <input
             type="number"
@@ -871,96 +874,236 @@ export default function CampaignForm({
     </div>
   )
 
+  const stepLabels = [cf.stepBasicInfo, cf.stepCompensation, cf.stepRequirements]
+  const nextStepLabel = step < 3 ? stepLabels[step] : null
+  const zh = locale === 'zh'
+
+  // Tips for the sidebar
+  const tips = zh
+    ? [
+        '明确说明目标和受众',
+        '包含关键产品细节或要点',
+        '选择相关的类别',
+        '设置合理的截止日期',
+        '在下一步提供清晰的合作要求',
+      ]
+    : [
+        'Be specific about your goals and target audience',
+        'Include key product details or talking points',
+        'Choose relevant categories',
+        'Set a realistic application deadline',
+        'Provide clear collaboration requirements in the next step',
+      ]
+
   return (
-    <form onSubmit={(e) => handleSubmit(e, false)} className="max-w-3xl mx-auto">
-      {/* Progress Steps */}
+    <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
+      {/* Back link */}
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition mb-4"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+        </svg>
+        {cf.back}
+      </button>
+
+      {/* Page header */}
+      <div className="mb-6">
+        <p className="text-xs font-bold tracking-widest text-primary-600 uppercase mb-1">
+          {zh ? '创建活动' : 'CREATE CAMPAIGN'}
+        </p>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {isEditing
+            ? (zh ? '编辑活动' : 'Edit Campaign')
+            : (zh ? '创建新活动' : 'Create a New Campaign')}
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {zh
+            ? '设置达人合作活动，让 AI 帮你找到最合适的达人。'
+            : 'Set up a creator collaboration campaign and let AI help you find the best creators.'}
+        </p>
+      </div>
+
+      {/* Step progress bar */}
       <div className="mb-8">
-        <div className="flex items-start">
-          {[
-            { s: 1, label: cf.stepBasicInfo },
-            { s: 2, label: cf.stepCompensation },
-            { s: 3, label: cf.stepRequirements },
-          ].map(({ s, label }) => (
-            <div key={s} className="contents">
-              <div className="flex flex-col items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => { if (s > 1 && spotsInvalid) return; setStep(s) }}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition ${
-                    step === s
-                      ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-300'
-                      : step > s
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {step > s ? '✓' : s}
-                </button>
-                <span className="text-sm text-gray-600 whitespace-nowrap">{label}</span>
+        <div className="flex items-center">
+          {stepLabels.map((label, i) => {
+            const s = i + 1
+            const done = step > s
+            const active = step === s
+            return (
+              <div key={s} className="contents">
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { if (s > 1 && spotsInvalid) return; setStep(s) }}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition ${
+                      active
+                        ? 'bg-primary-600 text-white ring-4 ring-primary-100'
+                        : done
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {done ? '✓' : s}
+                  </button>
+                  <span className={`text-xs font-medium whitespace-nowrap ${active ? 'text-primary-600' : 'text-gray-400'}`}>
+                    {label}
+                  </span>
+                </div>
+                {s < 3 && (
+                  <div className={`flex-1 h-0.5 mx-3 mt-[-16px] rounded-full ${done ? 'bg-primary-600' : 'bg-gray-200'}`} />
+                )}
               </div>
-              {s < 3 && (
-                <div className={`flex-1 h-1 mx-2 mt-[18px] ${step > s ? 'bg-green-500' : 'bg-gray-200'}`} />
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
+    <form onSubmit={(e) => handleSubmit(e, false)}>
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
           {error}
         </div>
       )}
 
-      {/* Form Steps */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-      </div>
+      <div className="flex gap-8 items-start">
+        {/* Left: Form */}
+        <div className="flex-1 min-w-0">
+          <div className="workspace-glass-card rounded-2xl p-7">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">{stepLabels[step - 1]}</h2>
+            <p className="text-sm text-gray-400 mb-6">
+              {step === 1
+                ? (zh ? '告诉我们关于您活动的信息。' : 'Tell us about your campaign.')
+                : step === 2
+                  ? (zh ? '设置达人的报酬方式。' : 'Set up how creators will be compensated.')
+                  : (zh ? '定义内容和平台要求。' : 'Define content and platform requirements.')}
+            </p>
+            {step === 1 && renderStep1()}
+            {step === 2 && renderStep2()}
+            {step === 3 && renderStep3()}
+          </div>
 
-      {/* Navigation */}
-      <div className="mt-6 flex items-center justify-between">
-        <div>
-          {step > 1 && (
+          {/* Navigation */}
+          <div className="mt-6 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(step - 1)}
-              className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-            >
-              {cf.back}
-            </button>
-          )}
-        </div>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={(e) => handleSubmit(e, true)}
-            disabled={isSubmitting}
-            className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
-          >
-            {cf.saveAsDraft}
-          </button>
-          {step < 3 ? (
-            <button
-              key="next"
-              type="button"
-              disabled={step === 1 && spotsInvalid}
-              onClick={() => setStep(step + 1)}
-              className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {cf.next}
-            </button>
-          ) : (
-            <button
-              key="submit"
-              type="submit"
+              onClick={(e) => handleSubmit(e, true)}
               disabled={isSubmitting}
-              className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition disabled:opacity-50"
+              className="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition disabled:opacity-50"
             >
-              {isSubmitting ? cf.saving : isEditing ? cf.updateCampaign : cf.submitForReview}
+              {cf.saveAsDraft}
             </button>
-          )}
+            <div className="flex gap-3">
+              {step > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setStep(step - 1)}
+                  className="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition"
+                >
+                  {cf.back}
+                </button>
+              )}
+              {step < 3 ? (
+                <button
+                  key="next"
+                  type="button"
+                  disabled={step === 1 && spotsInvalid}
+                  onClick={() => setStep(step + 1)}
+                  className="px-6 py-2.5 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                >
+                  {cf.next}{nextStepLabel ? `: ${nextStepLabel}` : ''} <span aria-hidden>→</span>
+                </button>
+              ) : (
+                <button
+                  key="submit"
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition disabled:opacity-50"
+                >
+                  {isSubmitting ? cf.saving : isEditing ? cf.updateCampaign : cf.submitForReview}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Sidebar */}
+        <div className="hidden lg:block w-80 flex-shrink-0 space-y-6">
+          {/* Campaign Preview */}
+          <div className="workspace-glass-card rounded-2xl p-5">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">{zh ? '活动预览' : 'Campaign Preview'}</h3>
+                <p className="text-xs text-gray-400">{zh ? '达人将看到这样的活动展示。' : 'This is how your campaign will appear to creators.'}</p>
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                  {formData.images.length > 0 ? (
+                    <img src={formData.images[0]} alt="" className="w-full h-full rounded-lg object-cover" />
+                  ) : (
+                    <svg className="w-5 h-5 text-orange-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                    </svg>
+                  )}
+                </div>
+                <span className="text-sm font-semibold text-gray-900 truncate">
+                  {formData.title || (zh ? '活动标题' : 'Campaign Title')}
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <div className="h-2.5 bg-gray-100 rounded-full w-full" />
+                <div className="h-2.5 bg-gray-100 rounded-full w-4/5" />
+                <div className="h-2.5 bg-gray-100 rounded-full w-3/5" />
+              </div>
+              <div className="flex items-center gap-4 pt-1 text-xs text-gray-400">
+                <span className="inline-flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" /></svg>
+                  {formData.categoryIds.length > 0
+                    ? categories.find((c) => c.id === formData.categoryIds[0])?.name || (zh ? '类别' : 'Category')
+                    : (zh ? '类别' : 'Category')}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+                  {formData.totalSlots || 10} {zh ? '个名额' : 'spots'}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
+                  {formData.deadline || (zh ? '截止日期' : 'Deadline')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tips */}
+          <div className="workspace-glass-card rounded-2xl p-5">
+            <div className="flex items-start gap-3 mb-4">
+              <span className="text-xl">💡</span>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">{zh ? '成功活动的小技巧' : 'Tips for a successful campaign'}</h3>
+              </div>
+            </div>
+            <ul className="space-y-2.5">
+              {tips.map((tip, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
+                  <svg className="w-4 h-4 mt-0.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                  {tip}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -1006,5 +1149,6 @@ export default function CampaignForm({
         </div>
       )}
     </form>
+    </div>
   )
 }

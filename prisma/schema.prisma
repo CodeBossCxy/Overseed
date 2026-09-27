@@ -1185,6 +1185,7 @@ model OutreachCampaign {
   platform      String                 @default("instagram")
   // AI criteria: niche, location, follower range, language, etc.
   criteria      Json?
+  collaborationDetails Json?
   status        OutreachCampaignStatus @default(DRAFT)
   // Totals populated after send
   totalSent     Int                    @default(0)

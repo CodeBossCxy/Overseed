@@ -1,12 +1,13 @@
+import { Suspense } from 'react'
 import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import CampaignForm from '@/components/campaigns/CampaignForm'
-import { NewCampaignHeading } from '@/components/dashboard/BrandCampaignHeadings'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import DashboardLoading from '../../loading'
 
-export default async function NewCampaignPage() {
+async function NewCampaignContent() {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
@@ -15,7 +16,6 @@ export default async function NewCampaignPage() {
 
   const userId = (session.user as any).id
 
-  // Read userType from DB (not JWT session) to avoid stale-token redirects
   const dbUser = await prisma.user.findUnique({
     where: { id: userId },
     select: { userType: true },
@@ -25,7 +25,6 @@ export default async function NewCampaignPage() {
     redirect('/dashboard/influencer')
   }
 
-  // Check if user has a brand profile
   const brandProfile = await prisma.brandProfile.findUnique({
     where: { userId },
   })
@@ -45,13 +44,15 @@ export default async function NewCampaignPage() {
     }),
   ])
 
+  return <CampaignForm categories={categories} platforms={platforms} />
+}
+
+export default function NewCampaignPage() {
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-4xl mx-auto workspace-page-tight pb-8">
-        <NewCampaignHeading />
-
-        <CampaignForm categories={categories} platforms={platforms} />
-      </div>
+      <Suspense fallback={<DashboardLoading />}>
+        <NewCampaignContent />
+      </Suspense>
     </BrandWorkspaceLayout>
   )
 }
