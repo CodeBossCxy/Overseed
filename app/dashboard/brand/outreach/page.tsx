@@ -51,6 +51,8 @@ export default function OutreachListPage() {
 
   const hasItems = items.length > 0
 
+  const maintenanceMode = true // flip to false to re-enable mass outreach
+
   return (
     <BrandWorkspaceLayout>
       <div className="max-w-6xl mx-auto space-y-8">
@@ -70,8 +72,29 @@ export default function OutreachListPage() {
           </p>
         </div>
 
+        {/* ---- Maintenance banner ---- */}
+        {maintenanceMode && (
+          <div className="rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 px-6 py-5">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 mt-0.5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+              </svg>
+              <div>
+                <h3 className="text-base font-bold text-amber-800">
+                  {zh ? '批量触达功能维护中' : 'Mass Outreach Under Maintenance'}
+                </h3>
+                <p className="text-sm text-amber-700 mt-1">
+                  {zh
+                    ? '我们正在升级批量触达引擎，以提供更精准的创作者匹配和更丰富的数据。功能恢复后，我们将通过邮件通知所有用户。感谢您的耐心等待！'
+                    : 'We are upgrading our mass outreach engine to deliver more accurate creator matching and richer data. We will notify all users via email when the feature is back. Thank you for your patience!'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ---- Hero banner ---- */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary-50 via-orange-50 to-rose-50 border border-primary-100 px-8 py-10 md:px-12 md:py-12">
+        <div className={`relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary-50 via-orange-50 to-rose-50 border border-primary-100 px-8 py-10 md:px-12 md:py-12 ${maintenanceMode ? 'opacity-40 pointer-events-none select-none' : ''}`}>
           <div className="max-w-lg relative z-10">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 leading-snug">
               {zh ? '将创意变成合作' : 'Turn ideas into partnerships'}
