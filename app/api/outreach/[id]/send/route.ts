@@ -95,6 +95,11 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
 
     const brandName = brand.companyName || user.name || 'A brand on Overseed'
 
+    // Link to the source campaign if the outreach was created from one,
+    // otherwise fall back to the Overseed home page.
+    const collab = campaign.collaborationDetails as Record<string, any> | null
+    const linkedCampaignId = collab?.campaignId ?? collab?.sourceCampaignId ?? null
+
     const inputs: OutreachEmailInput[] = pendingRecipients.map((r) => ({
       recipientEmail: r.email!,
       recipientName: r.displayName,
@@ -103,6 +108,7 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       briefMessage: campaign.briefMessage,
       platform: r.platform,
       handle: r.handle,
+      campaignId: linkedCampaignId ?? undefined,
     }))
 
     const results = await sendOutreachBatch(inputs)

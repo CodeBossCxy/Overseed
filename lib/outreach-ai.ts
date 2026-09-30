@@ -311,7 +311,7 @@ export async function selectCreators(
   // Only search Club if cache doesn't have enough creators for the request
   if (filtered.length < quantity) {
     try {
-      const { clubSearch, clubEnrich, getCreatorContactEmail } = await import('@/lib/influencers-club')
+      const { clubSearch, clubEnrichProfile, getCreatorContactEmail } = await import('@/lib/influencers-club')
 
       const searchResult = await clubSearch({
         platform: criteria.platform as any,
@@ -338,8 +338,9 @@ export async function selectCreators(
       await Promise.allSettled(
         toEnrich.map(async (c) => {
           try {
-            const detail = await clubEnrich(criteria.platform as any, c.handle)
-            // Email is server-side only — fetch from contact cache (populated by clubEnrich)
+            // Use profile enrichment (~0.2 credits) instead of full (~1 credit)
+            const detail = await clubEnrichProfile(criteria.platform as any, c.handle)
+            // Email is server-side only — fetch from contact cache (populated by enrichment)
             const email = await getCreatorContactEmail(criteria.platform as any, c.handle) ?? null
             if (!email) return
 

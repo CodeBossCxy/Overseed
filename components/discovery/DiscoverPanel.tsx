@@ -1200,16 +1200,41 @@ export default function DiscoverPanel() {
     )
   }
 
+  const maintenanceMode = true // flip to false to re-enable creator search
+
   return (
     <div>
+      {/* Maintenance banner */}
+      {maintenanceMode && (
+        <div className="mb-6 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 px-6 py-5">
+          <div className="flex items-start gap-3">
+            <svg className="w-6 h-6 mt-0.5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+            </svg>
+            <div>
+              <h3 className="text-base font-bold text-amber-800">
+                {locale === 'zh' ? '创作者搜索功能维护中' : 'Creator Search Under Maintenance'}
+              </h3>
+              <p className="text-sm text-amber-700 mt-1">
+                {locale === 'zh'
+                  ? '我们正在升级创作者搜索引擎，以提供更好的搜索结果和更多的创作者数据。功能恢复后，我们将通过邮件通知所有用户。感谢您的耐心等待！'
+                  : 'We are upgrading our creator search engine to deliver better results and richer creator data. We will notify all users via email when the feature is back. Thank you for your patience!'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Campaign-first tip */}
-      <div className="mb-4 flex items-start gap-3 rounded-2xl bg-gradient-to-r from-primary-50 to-orange-50 border border-primary-100 px-5 py-4">
-        <svg className="w-5 h-5 mt-0.5 text-primary-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.09 6.26L20.18 9l-5 4.27L16.82 20 12 16.9 7.18 20l1.64-6.73-5-4.27 6.09-.74z"/></svg>
-        <p className="text-sm text-gray-700">{d.campaignFirstTip}</p>
-      </div>
+      {!maintenanceMode && (
+        <div className="mb-4 flex items-start gap-3 rounded-2xl bg-gradient-to-r from-primary-50 to-orange-50 border border-primary-100 px-5 py-4">
+          <svg className="w-5 h-5 mt-0.5 text-primary-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.09 6.26L20.18 9l-5 4.27L16.82 20 12 16.9 7.18 20l1.64-6.73-5-4.27 6.09-.74z"/></svg>
+          <p className="text-sm text-gray-700">{d.campaignFirstTip}</p>
+        </div>
+      )}
 
       {/* Search + filters */}
-      <form onSubmit={submit} className="workspace-glass-toolbar rounded-2xl p-5 mb-6 overflow-visible relative z-10">
+      <form onSubmit={maintenanceMode ? (e) => e.preventDefault() : submit} className={`workspace-glass-toolbar rounded-2xl p-5 mb-6 overflow-visible relative z-10 ${maintenanceMode ? 'opacity-40 pointer-events-none select-none' : ''}`}>
         {/* Platform selector — above the search field */}
         <div className="flex flex-wrap gap-2 mb-4">
           {PLATFORMS.map((p) => (
@@ -1241,7 +1266,7 @@ export default function DiscoverPanel() {
             }}
             placeholder={d.searchPlaceholder}
             rows={3}
-            className="w-full px-4 py-3 workspace-glass-control focus:outline-none resize-none leading-6"
+            className="w-full px-4 py-3 workspace-glass-control rounded-lg focus:outline-none resize-none leading-6"
           />
           <div className="flex flex-wrap justify-end items-center gap-3">
           {speechReady && (
@@ -1822,90 +1847,108 @@ export default function DiscoverPanel() {
               </div>
             )}
             <div
-              className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity ${
+              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 transition-opacity ${
                 isLoading ? 'opacity-40 pointer-events-none' : ''
               }`}
             >
               {creators.map((creator) => (
-                // TEMP: club results open the detail popup on click
                 <div
                   key={creator.id}
                   onClick={
                     creator.id.startsWith('club:') ? () => openDetail(creator) : undefined
                   }
-                  className={`workspace-glass-card rounded-2xl p-5 flex gap-4 ${
+                  className={`workspace-glass-card rounded-2xl p-5 flex flex-col items-center text-center ${
                     creator.id.startsWith('club:')
                       ? 'cursor-pointer hover:shadow-md transition'
                       : ''
                   }`}
                 >
-                  <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                    <CreatorAvatar
-                      url={creator.avatar_url}
-                      name={creator.display_name || creator.handle || '?'}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium truncate">
+                  {/* Avatar + Name */}
+                  <div className="flex items-center gap-3 w-full mb-3">
+                    <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 ring-2 ring-white">
+                      <CreatorAvatar
+                        url={creator.avatar_url}
+                        name={creator.display_name || creator.handle || '?'}
+                        textSize="text-xl"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="font-bold text-[15px] text-gray-900 truncate">
                         {creator.display_name || creator.handle || creator.id}
                       </p>
                       {creator.handle && (
-                        <span className="text-xs text-gray-400 truncate flex-shrink">
+                        <p className="text-xs text-gray-400 truncate">
                           @{creator.handle.replace(/^@/, '')}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[11px] font-medium">
+                          {PLATFORM_LABELS[creator.platform] || creator.platform}
                         </span>
-                      )}
-                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs flex-shrink-0">
-                        {PLATFORM_LABELS[creator.platform] || creator.platform}
-                      </span>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                      {formatFollowers(creator.follower_count, locale)} {d.followers}
-                      {creator.engagement_rate != null && (
-                        <> · {Number(creator.engagement_rate).toFixed(1)}% {d.engagement}</>
-                      )}
-                      {creator.country && <> · {creator.country}</>}
-                      {creator.language && (
-                        <> · {LANGUAGE_FILTER_OPTIONS.find((l) => l.code === creator.language)?.label || creator.language}</>
-                      )}
-                    </p>
-                    {creator.bio && (
-                      <p className="text-sm text-gray-600 mt-1.5 line-clamp-2">{creator.bio}</p>
-                    )}
-                    {creator.niche_tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {creator.niche_tags.slice(0, 4).map((tag) => (
-                          <span key={tag} className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full text-xs">
-                            {tag}
-                          </span>
-                        ))}
+                  </div>
+
+                  {/* Stats */}
+                  <div className="flex items-center justify-center gap-6 w-full py-3 border-t border-gray-100">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{formatFollowers(creator.follower_count, locale)}</p>
+                        <p className="text-[10px] text-gray-400">{d.followers}</p>
+                      </div>
+                    </div>
+                    {creator.engagement_rate != null && (
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">{Number(creator.engagement_rate).toFixed(1)}%</p>
+                          <p className="text-[10px] text-gray-400">{d.engagement}</p>
+                        </div>
                       </div>
                     )}
-                    {(creator.profile_url || creator.id.startsWith('club:')) && (
-                      <div className="mt-3 flex items-center gap-4">
-                        {creator.id.startsWith('club:') && (
-                          <span className="text-sm text-primary-600 font-medium">
-                            {d.viewDetails}
-                            {creditPrices?.profile != null && (
-                              <span className="text-xs text-gray-400 font-normal">
-                                {' '}· {d.creditsN.replace('{n}', String(creditPrices.profile))}
-                              </span>
-                            )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 w-full mt-3">
+                    {creator.id.startsWith('club:') ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); openDetail(creator) }}
+                        className="flex-1 px-3 py-2 workspace-glass-control rounded-xl text-sm font-medium text-gray-700 hover:brightness-105 transition text-center"
+                      >
+                        {d.viewDetails}
+                        {creditPrices?.profile != null && (
+                          <span className="text-[10px] text-gray-400 font-normal ml-1">
+                            {d.creditsN.replace('{n}', String(creditPrices.profile))}
                           </span>
                         )}
-                        {creator.profile_url && (
-                          <a
-                            href={creator.profile_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 px-4 py-1.5 workspace-glass-control text-sm text-gray-700 backdrop-blur-md hover:brightness-105 transition"
-                          >
-                            {d.openOnPlatform.replace('{platform}', PLATFORM_LABELS[creator.platform] || creator.platform)} ↗
-                          </a>
-                        )}
-                      </div>
-                    )}
+                      </button>
+                    ) : creator.profile_url ? (
+                      <a
+                        href={creator.profile_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-1 px-3 py-2 workspace-glass-control rounded-xl text-sm font-medium text-gray-700 hover:brightness-105 transition text-center"
+                      >
+                        {d.viewDetails}
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-2 workspace-glass-control rounded-xl text-gray-400 hover:text-primary-600 transition flex-shrink-0"
+                      title="Save"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               ))}

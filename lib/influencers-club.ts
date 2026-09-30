@@ -961,6 +961,92 @@ export async function clubEnrich(
 }
 
 // ---------------------------------------------------------------------------
+// Profile enrichment (no audience data) — uses /profile/ endpoint which costs
+// ~0.2 credits vs 1 credit for /full/. Returns the same creator profile but
+// without cross-platform accounts or audience demographics. Sufficient for
+// getting the email address for outreach.
+// ---------------------------------------------------------------------------
+
+export async function clubEnrichProfile(
+  platform: ClubPlatform,
+  handle: string,
+  logUserId?: string
+) {
+  const cacheKey = `${platform}:${handle.toLowerCase()}`
+
+  // Return from in-memory or DB cache — same cache as full enrich
+  const cached = enrichCache.get(cacheKey)
+  if (cached) return cleanCachedDetail(cached)
+
+  const dbCached = await readDbEnrichCache(platform, handle)
+  if (dbCached) {
+    enrichCache.set(cacheKey, dbCached.detail)
+    contactEmailCache.set(cacheKey, dbCached.email)
+    return cleanCachedDetail(dbCached.detail)
+  }
+
+  if (!clubConfigured()) {
+    throw new Error('Influencers Club API not configured')
+  }
+
+  const res = await fetch(`${BASE}/public/v1/creators/enrich/handle/profile/`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ handle, platform }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(60000),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const detail =
+      data?.detail || data?.message || data?.error || `Profile enrichment failed (${res.status})`
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+  }
+  const r = data?.result
+  if (!r) throw new Error('No data available for this creator')
+
+  await logClubSpend({
+    kind: 'enrichment',
+    cost: data?.credits_cost ?? 0.2,
+    creditsLeft: typeof data?.credits_left === 'number' ? data.credits_left : null,
+    reference: `profile:${cacheKey}`,
+    userId: logUserId,
+  })
+
+  contactEmailCache.set(
+    cacheKey,
+    typeof r.email === 'string' && r.email.includes('@') ? r.email : null
+  )
+
+  const main = r[platform] || {}
+  const detail = {
+    platform,
+    handle,
+    name: main.full_name || main.title || r.first_name || handle,
+    avatar_url: (await rehostAvatar(main.profile_picture ?? null)) ?? main.profile_picture ?? null,
+    bio: stripContactLines(main.biography ?? main.description),
+    location: r.location ?? null,
+    language: r.speaking_language ?? null,
+    gender: r.gender ?? null,
+    is_business: r.is_business ?? null,
+    has_brand_deals: r.has_brand_deals ?? null,
+    niche: [main.niche_class, main.niche_sub_class]
+      .flat()
+      .filter((x: any) => typeof x === 'string'),
+    hashtags: (main.hashtags || main.video_hashtags || []).slice(0, 8),
+    followers: main.follower_count ?? main.subscriber_count ?? null,
+    engagement_percent: main.engagement_percent ?? null,
+    avg_views: main.avg_views ?? null,
+    avg_likes: main.avg_likes ?? null,
+    contactable: contactEmailCache.get(cacheKey) != null,
+  }
+
+  enrichCache.set(cacheKey, detail)
+  await writeDbEnrichCache(platform, handle, detail, contactEmailCache.get(cacheKey) ?? null)
+  return detail
+}
+
+// ---------------------------------------------------------------------------
 // Full analytics (audience demographics) — same 1-credit enrich call but with
 // include_audience_data: true. Cached under a "#analytics" pseudo-handle in
 // the same permanent table so repeat views never re-bill upstream.
