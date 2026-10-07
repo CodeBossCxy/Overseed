@@ -7,9 +7,13 @@ import {
   CREATOR_HAS_KEYS,
   SORT_BY_OPTIONS,
   AUDIENCE_CREDIBILITY_OPTIONS,
-  type ClubFilterDef,
-  type ClubFilterSection,
 } from '@/lib/club-filter-defs'
+import {
+  CREATORDB_FIELD_MAP,
+  CREATORDB_LANGUAGE_OPTIONS,
+  type CreatorDbCanonicalField,
+  type CreatorDbFilterOp,
+} from '@/lib/creatordb-filter-fields'
 
 interface DiscoveredCreator {
   id: string
@@ -35,6 +39,10 @@ interface SearchResult {
   live_calls: number
   // TEMP: present only on influencers.club responses
   credits_left?: string | null
+  credits_used?: number | null
+  trace_id?: string | null
+  has_next_page?: boolean
+  next_offset?: number | null
 }
 
 /* TEMP: influencers.club data source — remove this block together with
@@ -111,6 +119,15 @@ export const LANGUAGE_FILTER_OPTIONS: { code: string; label: string }[] = [
 // Audience age buckets supported by the club audience filter (IG only)
 export const AUDIENCE_AGE_OPTIONS = ['13-17', '18-24', '25-34', '35-44', '45-64', '65-'] as const
 
+const FOLLOWER_TIER_OPTIONS = [
+  { value: '', min: '', max: '', label: { en: 'All tiers', zh: '全部层级' } },
+  { value: 'nano', min: '1000', max: '10000', label: { en: 'Nano (1K-10K)', zh: 'Nano（1千-1万）' } },
+  { value: 'micro', min: '10000', max: '100000', label: { en: 'Micro (10K-100K)', zh: 'Micro（1万-10万）' } },
+  { value: 'mid', min: '100000', max: '500000', label: { en: 'Mid-tier (100K-500K)', zh: '中腰部（10万-50万）' } },
+  { value: 'macro', min: '500000', max: '1000000', label: { en: 'Macro (500K-1M)', zh: 'Macro（50万-100万）' } },
+  { value: 'mega', min: '1000000', max: '', label: { en: 'Mega (1M+)', zh: 'Mega（100万+）' } },
+] as const
+
 // Search results + filters survive navigating away and back (per tab).
 const SEARCH_STATE_KEY = 'discover:search:v1'
 
@@ -134,6 +151,7 @@ interface SavedSearchState {
   aud?: Record<string, string>
   sortBy?: string
   sortOrder?: string
+  creatorDbFilters?: CreatorDbFilterInput[]
   result: SearchResult
   request: DiscoverySearchRequest
   page: number
@@ -142,6 +160,63 @@ interface SavedSearchState {
   // from snapshots for free; only unseen pages are billed.
   taskId?: string | null
 }
+
+interface CreatorDbFilterInput {
+  field: CreatorDbCanonicalField
+  op: CreatorDbFilterOp
+  value: string
+}
+
+function restoreCreatorDbFilters(value: unknown): CreatorDbFilterInput[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((filter: any) => {
+    if (!filter || !Object.prototype.hasOwnProperty.call(CREATORDB_FIELD_MAP, filter.field)) return []
+    if (!['=', 'in', '>', '<'].includes(filter.op)) return []
+    return [{
+      field: filter.field as CreatorDbCanonicalField,
+      op: filter.op as CreatorDbFilterOp,
+      value: Array.isArray(filter.value) ? filter.value.join(', ') : String(filter.value ?? ''),
+    }]
+  })
+}
+
+const CREATORDB_FILTER_GROUPS = [
+  {
+    id: 'creator',
+    label: { en: 'Creator info', zh: '创作者信息' },
+    description: { en: 'Basic information about the creator.', zh: '创作者的基本资料。' },
+    fields: ['country', 'mainLanguage', 'isAccountVerified', 'niches', 'hashtags'],
+  },
+  {
+    id: 'audience',
+    label: { en: 'Audience', zh: '受众' },
+    description: { en: 'Location and demographic makeup of the audience.', zh: '受众的地区和人口结构。' },
+    fields: ['audienceLocation', 'audienceAge', 'audienceGender', 'audienceMaleRatio', 'audienceFemaleRatio'],
+  },
+  {
+    id: 'performance',
+    label: { en: 'Account performance', zh: '账号表现' },
+    description: { en: 'Audience size, activity, growth, and platform score.', zh: '受众规模、活跃度、增长和平台评分。' },
+    fields: ['followers', 'totalContents', 'followerGrowth30d', 'contentsIn30Days', 'platformScore', 'lastPublishTime'],
+  },
+  {
+    id: 'shorts',
+    label: { en: 'Short-form content', zh: '短视频表现' },
+    description: { en: 'Views, likes, comments, engagement, and growth for recent short videos.', zh: '近期短视频的播放、点赞、评论、互动和增长。' },
+    fields: [
+      'shortAvgViews', 'shortMedianViews', 'shortMinViews', 'shortMaxViews',
+      'shortAvgLikes', 'shortMedianLikes', 'shortMinLikes', 'shortMaxLikes',
+      'shortAvgComments', 'shortMedianComments', 'shortMinComments', 'shortMaxComments',
+      'shortEngagementRate', 'shortViewsGrowth', 'shortLikesGrowth',
+      'shortCommentsGrowth', 'shortEngagementRateGrowth',
+    ],
+  },
+] as const satisfies readonly {
+  id: string
+  label: { en: string; zh: string }
+  description: { en: string; zh: string }
+  fields: readonly CreatorDbCanonicalField[]
+}[]
 
 function readSavedSearch(): SavedSearchState | null {
   try {
@@ -161,6 +236,7 @@ const COVERAGE_OK = new Set(['ok', 'cache', 'live'])
 // referrers) and a fallback to the creator's initial if the URL has rotted.
 function CreatorAvatar({ url, name, textSize = '' }: { url: string | null; name: string; textSize?: string }) {
   const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [url])
   if (!url || failed) {
     return (
       <div className={`w-full h-full flex items-center justify-center text-gray-400 font-bold ${textSize}`}>
@@ -182,10 +258,7 @@ function CreatorAvatar({ url, name, textSize = '' }: { url: string | null; name:
 
 function formatFollowers(count: number | null, locale: string): string {
   if (count == null) return '—'
-  return new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(count)
+  return new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US').format(count)
 }
 
 // Creator discovery UI shared by the standalone database page and the
@@ -217,6 +290,7 @@ export default function DiscoverPanel() {
   const [country, setCountry] = useState('')
   const [minFollowers, setMinFollowers] = useState('')
   const [maxFollowers, setMaxFollowers] = useState('')
+  const [followerTierMode, setFollowerTierMode] = useState('')
   const [sort, setSort] = useState<'followers' | 'recent'>('followers')
 
   // Pricing v4 credit prices for the cost hints (search bar estimate, profile
@@ -245,7 +319,6 @@ export default function DiscoverPanel() {
 
   // Advanced filters (keyword search via the club API only — the local
   // browse index doesn't support them)
-  const [showAdvanced, setShowAdvanced] = useState(false)
   const [minEngagement, setMinEngagement] = useState('')
   const [maxEngagement, setMaxEngagement] = useState('')
   const [gender, setGender] = useState('')
@@ -276,6 +349,11 @@ export default function DiscoverPanel() {
     })
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState('desc')
+  const [creatorDbFilters, setCreatorDbFilters] = useState<CreatorDbFilterInput[]>([])
+  const activeCreatorDbFilters = creatorDbFilters.filter((filter) => filter.value.trim() !== '')
+  const creatorDbFilterLimitExceeded = activeCreatorDbFilters.length > 10
+  const [openFilterSections, setOpenFilterSections] = useState<Record<string, boolean>>({ audience: true, creator: true, performance: true })
+  const toggleFilterSection = (key: string) => setOpenFilterSections((prev) => ({ ...prev, [key]: !prev[key] }))
 
   const [browseList, setBrowseList] = useState<DiscoveredCreator[] | null>(null)
   // Offset into the raw (un-narrowed) creator index for pagination — may
@@ -316,6 +394,7 @@ export default function DiscoverPanel() {
   // radio buttons.
   const togglePlatform = (p: string) => {
     setPlatforms([p])
+    if (!['instagram', 'tiktok', 'youtube'].includes(p)) setCreatorDbFilters([])
     setSearchResult(null)
     setActiveSearch(null)
     setSearchPage(0)
@@ -559,6 +638,7 @@ export default function DiscoverPanel() {
       setAud(saved.aud || {})
       setSortBy(saved.sortBy || '')
       setSortOrder(saved.sortOrder || 'desc')
+      setCreatorDbFilters(restoreCreatorDbFilters(saved.creatorDbFilters))
       setSearchResult(saved.result)
       setActiveSearch(saved.request)
       setSearchPage(saved.page)
@@ -609,6 +689,7 @@ export default function DiscoverPanel() {
     aud: Record<string, string>
     sortBy: string
     sortOrder: string
+    creatorDbFilters: CreatorDbFilterInput[]
   }
 
   const currentFilterVals = (): FilterVals => ({
@@ -629,6 +710,7 @@ export default function DiscoverPanel() {
     aud,
     sortBy,
     sortOrder,
+    creatorDbFilters,
   })
 
   const runSearchPage = async (
@@ -650,7 +732,10 @@ export default function DiscoverPanel() {
       if (request.endpoint === 'club-search' && taskId) qs.set('task_id', taskId)
       // The offset is ignored by Club, but lets Overseed's local fallback
       // return the corresponding page if the provider is unavailable.
-      qs.set('offset', String(page * request.pageSize))
+      const nextOffset = page === searchPage + 1 && typeof searchResult?.next_offset === 'number'
+        ? searchResult.next_offset
+        : page * request.pageSize
+      qs.set('offset', String(nextOffset))
 
       const res = await fetch(`/api/discovery/${request.endpoint}?${qs}`)
       window.dispatchEvent(new Event('credits:refresh'))
@@ -675,7 +760,7 @@ export default function DiscoverPanel() {
       setSearchResult(data)
       setActiveSearch(request)
       setSearchPage(page)
-      setSearchHasMore(results.length === request.pageSize)
+      setSearchHasMore(typeof data?.has_next_page === 'boolean' ? data.has_next_page : results.length === request.pageSize)
       const newTaskId: string | null = data?.task_id ?? taskId ?? null
       setSearchTaskId(newTaskId)
       // Persist so the results survive leaving and returning to the page
@@ -699,10 +784,11 @@ export default function DiscoverPanel() {
           aud: v.aud,
           sortBy: v.sortBy,
           sortOrder: v.sortOrder,
+          creatorDbFilters: v.creatorDbFilters,
           result: data,
           request,
           page,
-          hasMore: results.length === request.pageSize,
+          hasMore: typeof data?.has_next_page === 'boolean' ? data.has_next_page : results.length === request.pageSize,
           taskId: newTaskId,
         }
         sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(saved))
@@ -725,7 +811,8 @@ export default function DiscoverPanel() {
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (!query.trim()) {
+    if (creatorDbFilterLimitExceeded) return
+    if (!query.trim() && activeCreatorDbFilters.length === 0) {
       setSearchResult(null)
       setActiveSearch(null)
       setSearchPage(0)
@@ -748,11 +835,26 @@ export default function DiscoverPanel() {
   // caller save a different snapshot (the user's visible filter values)
   // than the one actually searched with.
   const clubSearchWith = async (v: FilterVals, persist?: FilterVals) => {
+    const populatedCreatorDbFilters = v.creatorDbFilters.filter((filter) => filter.value.trim() !== '')
     const qs = new URLSearchParams({
-      q: v.query.trim(),
       platform: v.platform,
-      limit: String(CLUB_PAGE_SIZE),
+      limit: String(populatedCreatorDbFilters.length ? 100 : CLUB_PAGE_SIZE),
     })
+    if (v.query.trim()) qs.set('q', v.query.trim())
+    if (populatedCreatorDbFilters.length) {
+      const filters = populatedCreatorDbFilters.map((filter) => {
+        const field = filter.field as CreatorDbCanonicalField
+        const type = CREATORDB_FIELD_MAP[field].type
+        return {
+          field,
+          op: filter.op,
+          value: filter.op === 'in'
+            ? filter.value.split(',').map((value) => value.trim()).filter(Boolean)
+            : type === 'number' ? Number(filter.value) : type === 'boolean' ? filter.value === 'true' : filter.value.trim(),
+        }
+      })
+      qs.set('cdb_filters', JSON.stringify(filters))
+    }
     if (v.country.trim()) qs.set('country', v.country.trim().toUpperCase())
     if (v.minFollowers) qs.set('min_followers', v.minFollowers)
     if (v.maxFollowers) qs.set('max_followers', v.maxFollowers)
@@ -792,7 +894,7 @@ export default function DiscoverPanel() {
     }
 
     await runSearchPage(
-      { endpoint: 'club-search', params: qs.toString(), pageSize: CLUB_PAGE_SIZE },
+      { endpoint: 'club-search', params: qs.toString(), pageSize: populatedCreatorDbFilters.length ? 100 : CLUB_PAGE_SIZE },
       0,
       false,
       persist ?? v
@@ -996,11 +1098,13 @@ export default function DiscoverPanel() {
       setCreatorHas(Array.isArray(req.creatorHas) ? req.creatorHas : [])
       setSortBy(str(req.sortBy))
       setSortOrder(req.sortOrder === 'asc' ? 'asc' : 'desc')
+      setCreatorDbFilters(restoreCreatorDbFilters(req.creatorDbFilters))
 
+      const presetPageSize = req.creatorDbPreset || req.creatorDbFilters ? Math.min(Number(req.limit) || 100, 100) : CLUB_PAGE_SIZE
       const request: DiscoverySearchRequest = {
         endpoint: 'club-search',
         params: new URLSearchParams({ task_id: id }).toString(),
-        pageSize: CLUB_PAGE_SIZE,
+        pageSize: presetPageSize,
       }
       const snapshot = data.data
       if (snapshot) {
@@ -1008,7 +1112,7 @@ export default function DiscoverPanel() {
         setSearchResult(snapshot)
         setActiveSearch(request)
         setSearchPage(data.page ?? 0)
-        setSearchHasMore(results.length === CLUB_PAGE_SIZE)
+        setSearchHasMore(typeof snapshot.has_next_page === 'boolean' ? snapshot.has_next_page : results.length === presetPageSize)
         setSearchTaskId(id)
         try {
           const saved: SavedSearchState = {
@@ -1029,10 +1133,11 @@ export default function DiscoverPanel() {
             aud: {},
             sortBy: str(req.sortBy),
             sortOrder: req.sortOrder === 'asc' ? 'asc' : 'desc',
+            creatorDbFilters: restoreCreatorDbFilters(req.creatorDbFilters),
             result: snapshot,
             request,
             page: data.page ?? 0,
-            hasMore: results.length === CLUB_PAGE_SIZE,
+            hasMore: typeof snapshot.has_next_page === 'boolean' ? snapshot.has_next_page : results.length === presetPageSize,
             taskId: id,
           }
           sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(saved))
@@ -1051,156 +1156,54 @@ export default function DiscoverPanel() {
 
   const creators = searchResult ? searchResult.results : browseList || []
   const isBrowsing = !searchResult
+  const matchedFollowerTier = FOLLOWER_TIER_OPTIONS.find(
+    (tier) => tier.min === minFollowers && tier.max === maxFollowers
+  )
+  const followerTierValue =
+    followerTierMode === 'custom'
+      ? 'custom'
+      : matchedFollowerTier?.value ?? (minFollowers || maxFollowers ? 'custom' : '')
+  const setFollowerTier = (value: string) => {
+    setFollowerTierMode(value === 'custom' ? 'custom' : '')
+    if (value === 'custom') {
+      setMinFollowers((current) => current || '0')
+      return
+    }
+    const tier = FOLLOWER_TIER_OPTIONS.find((option) => option.value === value)
+    if (!tier) return
+    setMinFollowers(tier.min)
+    setMaxFollowers(tier.max)
+  }
+  const showCustomFollowerRange = followerTierValue === 'custom'
+  useEffect(() => {
+    if (showCustomFollowerRange && !minFollowers) {
+      setMinFollowers('0')
+    }
+  }, [showCustomFollowerRange, minFollowers])
 
-  // ---- Advanced filter rendering (defs from lib/club-filter-defs) --------
+  // ---- Advanced filter rendering --------
   const activePlatform = platforms[0] as 'instagram' | 'youtube' | 'tiktok'
   const zh = locale === 'zh'
-  const filterLabel = (def: ClubFilterDef) => (zh ? def.label.zh : def.label.en)
-  const defsFor = (section: ClubFilterSection) =>
-    CLUB_FILTER_DEFS.filter((def) => def.section === section && def.keys[activePlatform])
-  const SECTION_TITLES: Record<ClubFilterSection, string> = {
-    performance: zh ? '数据表现' : 'Performance',
-    creator: zh ? '创作者资料' : 'Creator profile',
-    exclusions: zh ? '排除条件' : 'Exclusions',
-  }
   const inputCls = 'px-3 py-1.5 workspace-glass-control text-sm focus:outline-none'
   const labelCls = 'block text-xs font-medium text-gray-500 mb-1.5'
-
-  const renderFilterControl = (def: ClubFilterDef) => {
-    switch (def.kind) {
-      case 'range':
-        return (
-          <div key={def.id}>
-            <label className={labelCls}>{filterLabel(def)}</label>
-            <div className="flex gap-1.5">
-              <input
-                type="number"
-                min={0}
-                value={adv[`${def.id}_min`] || ''}
-                onChange={(e) => setAdvField(`${def.id}_min`, e.target.value)}
-                placeholder={zh ? '最小' : 'min'}
-                className={`w-24 ${inputCls}`}
-              />
-              <input
-                type="number"
-                min={0}
-                value={adv[`${def.id}_max`] || ''}
-                onChange={(e) => setAdvField(`${def.id}_max`, e.target.value)}
-                placeholder={zh ? '最大' : 'max'}
-                className={`w-24 ${inputCls}`}
-              />
-            </div>
-          </div>
-        )
-      case 'growth':
-        return (
-          <div key={def.id}>
-            <label className={labelCls}>{filterLabel(def)}</label>
-            <div className="flex gap-1.5">
-              <input
-                type="number"
-                value={adv[`${def.id}_pct`] || ''}
-                onChange={(e) => setAdvField(`${def.id}_pct`, e.target.value)}
-                placeholder={zh ? '增长 %' : 'growth %'}
-                className={`w-24 ${inputCls}`}
-              />
-              <select
-                value={adv[`${def.id}_months`] || ''}
-                onChange={(e) => setAdvField(`${def.id}_months`, e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{zh ? '近 3 个月' : 'last 3 mo'}</option>
-                <option value="1">{zh ? '近 1 个月' : 'last 1 mo'}</option>
-                <option value="6">{zh ? '近 6 个月' : 'last 6 mo'}</option>
-                <option value="12">{zh ? '近 12 个月' : 'last 12 mo'}</option>
-              </select>
-            </div>
-          </div>
-        )
-      case 'keywords':
-      case 'text':
-        return (
-          <div key={def.id}>
-            <label className={labelCls}>{filterLabel(def)}</label>
-            <input
-              type="text"
-              value={adv[def.id] || ''}
-              onChange={(e) => setAdvField(def.id, e.target.value)}
-              placeholder={def.placeholder || (def.kind === 'keywords' ? (zh ? '逗号分隔' : 'comma-separated') : '')}
-              className={`w-44 ${inputCls}`}
-            />
-          </div>
-        )
-      case 'number':
-        return (
-          <div key={def.id}>
-            <label className={labelCls}>{filterLabel(def)}</label>
-            <input
-              type="number"
-              min={0}
-              value={adv[def.id] || ''}
-              onChange={(e) => setAdvField(def.id, e.target.value)}
-              className={`w-24 ${inputCls}`}
-            />
-          </div>
-        )
-      case 'enum':
-        return (
-          <div key={def.id}>
-            <label className={labelCls}>{filterLabel(def)}</label>
-            <select
-              value={adv[def.id] || ''}
-              onChange={(e) => setAdvField(def.id, e.target.value)}
-              className={inputCls}
-            >
-              <option value="">{d.anyOption}</option>
-              {def.options?.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-          </div>
-        )
-      case 'boolean':
-        return (
-          <button
-            key={def.id}
-            type="button"
-            onClick={() => setAdvField(def.id, adv[def.id] ? '' : '1')}
-            className={`px-3 py-1.5 rounded-full text-sm transition ${
-              adv[def.id]
-                ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
-                : 'bg-gray-100 text-gray-700 font-medium hover:bg-gray-200'
-            }`}
-          >
-            {filterLabel(def)}
-          </button>
-        )
+  const creatorDbFilterFor = (field: CreatorDbCanonicalField): CreatorDbFilterInput => {
+    const existing = creatorDbFilters.find((filter) => filter.field === field)
+    if (existing) return existing
+    const type = CREATORDB_FIELD_MAP[field].type
+    return {
+      field,
+      op: type === 'string' || type === 'boolean' ? '=' : '>',
+      value: '',
     }
   }
+  const updateCreatorDbFilter = (field: CreatorDbCanonicalField, patch: Partial<CreatorDbFilterInput>) =>
+    setCreatorDbFilters((current) => {
+      const index = current.findIndex((filter) => filter.field === field)
+      if (index < 0) return [...current, { ...creatorDbFilterFor(field), ...patch }]
+      return current.map((filter, i) => i === index ? { ...filter, ...patch } : filter)
+    })
 
-  const renderFilterSection = (section: ClubFilterSection) => {
-    const defs = defsFor(section)
-    if (!defs.length) return null
-    const bools = defs.filter((def) => def.kind === 'boolean')
-    const others = defs.filter((def) => def.kind !== 'boolean')
-    return (
-      <div key={section} className="mt-4">
-        <p className="text-xs font-semibold text-gray-600 mb-2">{SECTION_TITLES[section]}</p>
-        {others.length > 0 && (
-          <div className="flex flex-wrap items-end gap-4">{others.map(renderFilterControl)}</div>
-        )}
-        {bools.length > 0 && (
-          <div className={`flex flex-wrap gap-2 ${others.length ? 'mt-3' : ''}`}>
-            {bools.map(renderFilterControl)}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const maintenanceMode = true // flip to false to re-enable creator search
+  const maintenanceMode = false // set to true to temporarily disable creator search
 
   return (
     <div>
@@ -1266,7 +1269,7 @@ export default function DiscoverPanel() {
             }}
             placeholder={d.searchPlaceholder}
             rows={3}
-            className="w-full px-4 py-3 workspace-glass-control rounded-lg focus:outline-none resize-none leading-6"
+            className="w-full px-4 py-3 workspace-glass-control workspace-glass-control-square focus:outline-none resize-none leading-6"
           />
           <div className="flex flex-wrap justify-end items-center gap-3">
           {speechReady && (
@@ -1290,7 +1293,7 @@ export default function DiscoverPanel() {
           )}
           <button
             type="submit"
-            disabled={isLoading || platforms.length === 0}
+            disabled={isLoading || platforms.length === 0 || creatorDbFilterLimitExceeded}
             title={d.aiSearchHint}
             className="px-6 py-2.5 bg-primary-600 text-white rounded-full font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -1309,7 +1312,7 @@ export default function DiscoverPanel() {
                 <line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
             </button>
-            <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute right-0 top-full mt-2 w-80 p-4 bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 z-[100] text-sm text-gray-600 leading-relaxed">
+            <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute right-0 top-full mt-2 w-80 p-4 rounded-2xl shadow-xl ring-1 ring-gray-200 z-[200] text-sm text-gray-600 leading-relaxed" style={{ backgroundColor: '#ffffff' }}>
               {d.searchTaskNote}
             </div>
           </div>
@@ -1328,379 +1331,339 @@ export default function DiscoverPanel() {
         {/* Live credit-cost estimate: updates as the user types/filters */}
         {searchPrice != null && (
           <p className="mt-2 text-xs text-gray-400">
-            {query.trim()
+            {query.trim() || activeCreatorDbFilters.length > 0
               ? d.searchCostEstimate.replace('{n}', String(searchPrice))
               : d.browseFreeNote.replace('{n}', String(searchPrice))}
           </p>
         )}
 
-        <div className="mt-4 flex flex-wrap items-end gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.countryLabel}</label>
-            <select
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+        {/* ── Structured filter sections ── */}
+        <div className="mt-4">
+          {/* Filter header */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="8" y1="18" x2="16" y2="18"/></svg>
+              <span className="text-sm font-semibold text-gray-800">{zh ? '筛选条件' : 'Filters'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setCountry(''); setFollowerTier(''); setMinFollowers(''); setMaxFollowers('')
+                setCreatorDbFilters([]); setAudienceAge('')
+              }}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition"
             >
-              <option value="">{d.allCountries}</option>
-              {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
-                <option key={code} value={code}>
-                  {(t.signupBusiness.countries as Record<string, string>)[key] || code}
-                </option>
-              ))}
-            </select>
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              {zh ? '重置全部' : 'Reset all'}
+            </button>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.minFollowers}</label>
-            <input
-              type="number"
-              min={0}
-              value={minFollowers}
-              onChange={(e) => setMinFollowers(e.target.value)}
-              placeholder="10000"
-              className="w-32 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-            />
+
+          {/* Section 1 — Audience */}
+          <div className="rounded-xl bg-gradient-to-r from-green-50/40 to-transparent border border-gray-100 mb-2">
+            <button type="button" onClick={() => toggleFilterSection('audience')} className="w-full flex items-center justify-between px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold flex items-center justify-center">1</span>
+                <div className="text-left">
+                  <span className="text-xs font-semibold text-gray-800">{zh ? '受众' : 'Audience'}</span>
+                  <span className="ml-2 text-[10px] text-gray-400">{zh ? '你想触达谁？' : 'Who do you want to reach?'}</span>
+                </div>
+              </div>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.audience ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            {openFilterSections.audience && (
+              <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+                {/* Country / region */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                      {zh ? '国家 / 地区' : 'Country / region'}
+                    </span>
+                  </label>
+                  <select value={country} onChange={(e) => setCountry(e.target.value)} className={`w-full ${inputCls}`}>
+                    <option value="">{d.allCountries}</option>
+                    {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
+                      <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Language */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M12 22l5-10 5 10"/><path d="M14 18h6"/></svg>
+                      {zh ? '语言' : 'Language'}
+                    </span>
+                  </label>
+                  {['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? (
+                    <select
+                      value={creatorDbFilterFor('mainLanguage').value}
+                      onChange={(e) => updateCreatorDbFilter('mainLanguage', { value: e.target.value })}
+                      className={`w-full ${inputCls}`}
+                    >
+                      <option value="">{zh ? '全部语言' : 'All languages'}</option>
+                      {CREATORDB_LANGUAGE_OPTIONS.map(([value, langLabel]) => (
+                        <option key={value} value={value}>{langLabel}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select value={language} onChange={(e) => setLanguage(e.target.value)} className={`w-full ${inputCls}`}>
+                      <option value="">{d.allLanguages}</option>
+                      {LANGUAGE_FILTER_OPTIONS.map(({ code, label: langLabel }) => (
+                        <option key={code} value={code}>{langLabel}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                {/* Audience age */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      {zh ? '受众年龄' : 'Audience age'}
+                    </span>
+                  </label>
+                  <select
+                    value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('audienceAge').value : audienceAge}
+                    onChange={(e) => {
+                      if (['instagram', 'tiktok', 'youtube'].includes(activePlatform)) {
+                        updateCreatorDbFilter('audienceAge', { value: e.target.value })
+                      } else {
+                        setAudienceAge(e.target.value)
+                      }
+                    }}
+                    className={`w-full ${inputCls}`}
+                  >
+                    <option value="">{d.anyOption}</option>
+                    {['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map((age) => <option key={age} value={age}>{age}</option>)}
+                  </select>
+                </div>
+                {/* Gender */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a8.38 8.38 0 0 1 13 0"/></svg>
+                      {zh ? '性别' : 'Gender'}
+                    </span>
+                  </label>
+                  <select
+                    value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('audienceGender').value : gender}
+                    onChange={(e) => {
+                      if (['instagram', 'tiktok', 'youtube'].includes(activePlatform)) {
+                        updateCreatorDbFilter('audienceGender', { value: e.target.value })
+                      } else {
+                        setGender(e.target.value)
+                      }
+                    }}
+                    className={`w-full ${inputCls}`}
+                  >
+                    <option value="">{d.anyOption}</option>
+                    <option value="female">{d.genderFemale}</option>
+                    <option value="male">{d.genderMale}</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.maxFollowers}</label>
-            <input
-              type="number"
-              min={0}
-              value={maxFollowers}
-              onChange={(e) => setMaxFollowers(e.target.value)}
-              placeholder="1000000"
-              className="w-32 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-            />
+
+          {/* Section 2 — Creator */}
+          <div className="rounded-xl bg-gradient-to-r from-blue-50/40 to-transparent border border-gray-100 mb-2">
+            <button type="button" onClick={() => toggleFilterSection('creator')} className="w-full flex items-center justify-between px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center">2</span>
+                <div className="text-left">
+                  <span className="text-xs font-semibold text-gray-800">{zh ? '创作者' : 'Creator'}</span>
+                  <span className="ml-2 text-[10px] text-gray-400">{zh ? '寻找合适的创作者类型' : 'Find the right type of creators'}</span>
+                </div>
+              </div>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.creator ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            {openFilterSections.creator && (
+              <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+                {/* Verified account */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                      {zh ? '认证账号' : 'Verified account'}
+                    </span>
+                  </label>
+                  <select
+                    value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('isAccountVerified').value : ''}
+                    onChange={(e) => updateCreatorDbFilter('isAccountVerified', { value: e.target.value })}
+                    className={`w-full ${inputCls}`}
+                  >
+                    <option value="">{d.anyOption}</option>
+                    <option value="true">{zh ? '是' : 'Yes'}</option>
+                    <option value="false">{zh ? '否' : 'No'}</option>
+                  </select>
+                </div>
+                {/* Hashtags */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-gray-400">#</span>
+                      {zh ? '标签（可选）' : 'Hashtags (optional)'}
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('hashtags').value : ''}
+                    onChange={(e) => updateCreatorDbFilter('hashtags', { value: e.target.value })}
+                    placeholder={zh ? '如 #护肤, #旅行' : 'e.g. #skincare, #travel'}
+                    className={`w-full ${inputCls}`}
+                  />
+                </div>
+                {/* Niches */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                      {zh ? '领域' : 'Niches'}
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('niches').value : ''}
+                    onChange={(e) => updateCreatorDbFilter('niches', { value: e.target.value })}
+                    placeholder={zh ? '全部领域' : 'All niches'}
+                    className={`w-full ${inputCls}`}
+                  />
+                </div>
+                {/* Followers / subscribers */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      {zh ? '粉丝数' : 'Followers / subscribers'}
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      value={minFollowers}
+                      onChange={(e) => { setMinFollowers(e.target.value); setFollowerTier('custom') }}
+                      placeholder={zh ? '如 10000' : 'e.g. 10000'}
+                      className={`w-1/2 ${inputCls}`}
+                    />
+                    <span className="text-gray-300 text-xs">–</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={maxFollowers}
+                      onChange={(e) => { setMaxFollowers(e.target.value); setFollowerTier('custom') }}
+                      placeholder={zh ? '如 1000000' : 'e.g. 1000000'}
+                      className={`w-1/2 ${inputCls}`}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Section 3 — Performance */}
+          <div className="rounded-xl bg-gradient-to-r from-purple-50/40 to-transparent border border-gray-100 mb-2">
+            <button type="button" onClick={() => toggleFilterSection('performance')} className="w-full flex items-center justify-between px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold flex items-center justify-center">3</span>
+                <div className="text-left">
+                  <span className="text-xs font-semibold text-gray-800">{zh ? '数据表现' : 'Performance'}</span>
+                  <span className="ml-2 text-[10px] text-gray-400">{zh ? '关注真实影响力的创作者' : 'Focus on creators with real impact'}</span>
+                </div>
+              </div>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.performance ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            {openFilterSections.performance && (
+              <div className="px-3 pb-3 grid grid-cols-3 gap-3">
+                {/* Average short views */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      {zh ? '平均短视频播放量' : 'Average short views'}
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('shortAvgViews').value : ''}
+                      onChange={(e) => updateCreatorDbFilter('shortAvgViews', { op: '>', value: e.target.value })}
+                      placeholder={zh ? '如 5000 次播放' : 'e.g. 5000 views'}
+                      className={`w-full ${inputCls}`}
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-300 pointer-events-none">{zh ? '≥ 次播放' : '≥ views'}</span>
+                  </div>
+                </div>
+                {/* Average engagement rate */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                      {zh ? '平均互动率' : 'Average engagement rate'}
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min={0}
+                      value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('shortEngagementRate').value : ''}
+                      onChange={(e) => updateCreatorDbFilter('shortEngagementRate', { op: '>', value: e.target.value })}
+                      placeholder={zh ? '如 2.5%' : 'e.g. 2.5%'}
+                      className={`w-full ${inputCls}`}
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-300 pointer-events-none">≥ %</span>
+                  </div>
+                </div>
+                {/* Followers growth (30d) */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                      {zh ? '粉丝增长 (30天)' : 'Followers growth (30d)'}
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('followerGrowth30d').value : ''}
+                      onChange={(e) => updateCreatorDbFilter('followerGrowth30d', { op: '>', value: e.target.value })}
+                      placeholder={zh ? '如 500 新增粉丝' : 'e.g. 500 new followers'}
+                      className={`w-full ${inputCls}`}
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-300 pointer-events-none">{zh ? '≥ 新粉丝' : '≥ new'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sort (when browsing) */}
           {isBrowsing && (
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.sortLabel}</label>
+            <div className="mt-2 flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-500">{d.sortLabel}</label>
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as 'followers' | 'recent')}
-                className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
+                className={inputCls}
               >
                 <option value="followers">{d.sortFollowers}</option>
                 <option value="recent">{d.sortRecent}</option>
               </select>
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => setShowAdvanced((v) => !v)}
-            className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
-          >
-            {showAdvanced ? d.advancedFiltersHide : d.advancedFilters}
-          </button>
+
+          {creatorDbFilterLimitExceeded && (
+            <p className="mt-2 text-xs font-semibold text-red-600">
+              {zh
+                ? '筛选条件已超过 10 个。请清空至少一个条件后再提交。'
+                : 'Filter limit exceeded (10 max). Clear at least one before submitting.'}
+            </p>
+          )}
         </div>
-
-        {showAdvanced && (
-          <div className="mt-4 pt-4 border-t border-gray-200/60">
-            <p className="text-xs text-gray-400 mb-3">{d.advancedHint}</p>
-            <div className="flex flex-wrap items-end gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.minEngagement}</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.1"
-                  value={minEngagement}
-                  onChange={(e) => setMinEngagement(e.target.value)}
-                  placeholder="1"
-                  className="w-24 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.maxEngagement}</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.1"
-                  value={maxEngagement}
-                  onChange={(e) => setMaxEngagement(e.target.value)}
-                  placeholder="10"
-                  className="w-24 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.genderLabel}</label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-                >
-                  <option value="">{d.anyOption}</option>
-                  <option value="FEMALE">{d.genderFemale}</option>
-                  <option value="MALE">{d.genderMale}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.languageLabel}</label>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-                >
-                  <option value="">{d.allLanguages}</option>
-                  {LANGUAGE_FILTER_OPTIONS.map(({ code, label }) => (
-                    <option key={code} value={code}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.bioKeywordsLabel}</label>
-                <input
-                  type="text"
-                  value={bioKeywords}
-                  onChange={(e) => setBioKeywords(e.target.value)}
-                  placeholder={d.bioKeywordsPlaceholder}
-                  className="w-48 px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.lastPostLabel}</label>
-                <select
-                  value={lastPost}
-                  onChange={(e) => setLastPost(e.target.value)}
-                  className="px-3 py-1.5 workspace-glass-control text-sm focus:outline-none"
-                >
-                  <option value="">{d.anyOption}</option>
-                  <option value="90">{d.lastPost90}</option>
-                  <option value="365">{d.lastPost365}</option>
-                </select>
-              </div>
-              {platforms[0] === 'instagram' && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">{d.audienceAgeLabel}</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {AUDIENCE_AGE_OPTIONS.map((range) => {
-                      const selected = audienceAge.split(',').filter(Boolean)
-                      const active = selected.includes(range)
-                      return (
-                        <button
-                          key={range}
-                          type="button"
-                          onClick={() =>
-                            setAudienceAge(
-                              (active
-                                ? selected.filter((r) => r !== range)
-                                : [...selected, range]
-                              ).join(',')
-                            )
-                          }
-                          className={`px-3 py-1.5 rounded-full text-sm transition ${
-                            active
-                              ? 'bg-primary-600 text-white font-medium'
-                              : 'workspace-glass-control text-gray-700 hover:brightness-105'
-                          }`}
-                        >
-                          {range === '65-' ? '65+' : range}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className={labelCls}>{zh ? '排序' : 'Sort by'}</label>
-                <div className="flex gap-1.5">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className={inputCls}
-                  >
-                    <option value="">{zh ? '默认' : 'Default'}</option>
-                    {SORT_BY_OPTIONS.map((o) => (
-                      <option key={o} value={o}>
-                        {zh
-                          ? { relevancy: '相关性', engagement_rate: '互动率', number_of_followers: '粉丝数', growth_rate: '增长率' }[o]
-                          : o.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
-                  {sortBy && (
-                    <select
-                      value={sortOrder}
-                      onChange={(e) => setSortOrder(e.target.value)}
-                      className={inputCls}
-                    >
-                      <option value="desc">{zh ? '降序' : 'desc'}</option>
-                      <option value="asc">{zh ? '升序' : 'asc'}</option>
-                    </select>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {renderFilterSection('performance')}
-            {renderFilterSection('creator')}
-
-            {/* Extended audience demographics — Instagram only (10k+ creators) */}
-            {activePlatform === 'instagram' && (
-              <div className="mt-4">
-                <p className="text-xs font-semibold text-gray-600 mb-2">
-                  {zh ? '受众画像（仅 Instagram）' : 'Audience demographics (Instagram only)'}
-                </p>
-                <div className="flex flex-wrap items-end gap-4">
-                  <div>
-                    <label className={labelCls}>{zh ? '受众性别 / 最低占比 %' : 'Audience gender / min %'}</label>
-                    <div className="flex gap-1.5">
-                      <select
-                        value={aud.audience_gender || ''}
-                        onChange={(e) => setAudField('audience_gender', e.target.value)}
-                        className={inputCls}
-                      >
-                        <option value="">{d.anyOption}</option>
-                        <option value="female">{d.genderFemale}</option>
-                        <option value="male">{d.genderMale}</option>
-                      </select>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={aud.audience_gender_min_pct || ''}
-                        onChange={(e) => setAudField('audience_gender_min_pct', e.target.value)}
-                        placeholder="%"
-                        className={`w-16 ${inputCls}`}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>{zh ? '受众地区 / 最低占比 %' : 'Audience location / min %'}</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={aud.audience_location || ''}
-                        onChange={(e) => setAudField('audience_location', e.target.value)}
-                        placeholder={zh ? '如 United States' : 'e.g. United States'}
-                        className={`w-40 ${inputCls}`}
-                      />
-                      <select
-                        value={aud.audience_location_type || ''}
-                        onChange={(e) => setAudField('audience_location_type', e.target.value)}
-                        className={inputCls}
-                      >
-                        <option value="">{zh ? '类型' : 'type'}</option>
-                        <option value="country">{zh ? '国家' : 'country'}</option>
-                        <option value="state">{zh ? '州/省' : 'state'}</option>
-                        <option value="city">{zh ? '城市' : 'city'}</option>
-                      </select>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={aud.audience_location_min_pct || ''}
-                        onChange={(e) => setAudField('audience_location_min_pct', e.target.value)}
-                        placeholder="%"
-                        className={`w-16 ${inputCls}`}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>{zh ? '受众语言 / 最低占比 %' : 'Audience language / min %'}</label>
-                    <div className="flex gap-1.5">
-                      <select
-                        value={aud.audience_language || ''}
-                        onChange={(e) => setAudField('audience_language', e.target.value)}
-                        className={inputCls}
-                      >
-                        <option value="">{d.anyOption}</option>
-                        {LANGUAGE_FILTER_OPTIONS.map(({ code, label }) => (
-                          <option key={code} value={code}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={aud.audience_language_min_pct || ''}
-                        onChange={(e) => setAudField('audience_language_min_pct', e.target.value)}
-                        placeholder="%"
-                        className={`w-16 ${inputCls}`}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>{zh ? '受众兴趣 / 最低占比 %' : 'Audience interest / min %'}</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={aud.audience_interest || ''}
-                        onChange={(e) => setAudField('audience_interest', e.target.value)}
-                        placeholder={zh ? '如 Fitness' : 'e.g. Fitness'}
-                        className={`w-36 ${inputCls}`}
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={aud.audience_interest_min_pct || ''}
-                        onChange={(e) => setAudField('audience_interest_min_pct', e.target.value)}
-                        placeholder="%"
-                        className={`w-16 ${inputCls}`}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>{zh ? '受众可信度' : 'Audience credibility'}</label>
-                    <select
-                      value={aud.audience_credibility || ''}
-                      onChange={(e) => setAudField('audience_credibility', e.target.value)}
-                      className={inputCls}
-                    >
-                      <option value="">{d.anyOption}</option>
-                      {AUDIENCE_CREDIBILITY_OPTIONS.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* creator_has: creators also active on these platforms/links */}
-            <details className="mt-4">
-              <summary className="text-xs font-semibold text-gray-600 cursor-pointer select-none">
-                {zh ? '同时拥有的平台/链接' : 'Also has platform / link'}
-                {creatorHas.length > 0 && ` (${creatorHas.length})`}
-              </summary>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {CREATOR_HAS_KEYS.map((key) => {
-                  const token = key.slice(4)
-                  const active = creatorHas.includes(token)
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() =>
-                        setCreatorHas((prev) =>
-                          active ? prev.filter((x) => x !== token) : [...prev, token]
-                        )
-                      }
-                      className={`px-2.5 py-1 rounded-full text-xs transition ${
-                        active
-                          ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
-                          : 'bg-gray-100 text-gray-600 font-medium hover:bg-gray-200'
-                      }`}
-                    >
-                      {token.replace(/_/g, ' ')}
-                    </button>
-                  )
-                })}
-              </div>
-            </details>
-
-            {renderFilterSection('exclusions')}
-          </div>
-        )}
       </form>
 
       {/* States */}
@@ -1851,9 +1814,9 @@ export default function DiscoverPanel() {
                 isLoading ? 'opacity-40 pointer-events-none' : ''
               }`}
             >
-              {creators.map((creator) => (
+              {creators.map((creator, creatorIndex) => (
                 <div
-                  key={creator.id}
+                  key={`${searchTaskId ?? activeSearch?.params ?? 'browse'}:${searchPage}:${creator.id}:${creatorIndex}`}
                   onClick={
                     creator.id.startsWith('club:') ? () => openDetail(creator) : undefined
                   }

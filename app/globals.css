@@ -637,6 +637,10 @@ select {
     0 5px 16px rgba(45, 49, 78, 0.035) !important;
 }
 
+.workspace-glass-control.workspace-glass-control-square {
+  border-radius: 8px !important;
+}
+
 .workspace-glass-control:focus {
   border-color: rgba(125, 99, 247, 0.42) !important;
   box-shadow:

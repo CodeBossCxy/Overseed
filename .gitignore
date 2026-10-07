@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local data exports (may contain production-derived records)
 /exports/
+
+# Local vendor usage audit logs
+/logs/

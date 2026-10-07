@@ -4,7 +4,8 @@ import { Resend } from 'resend'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { containsBannedContent } from '@/lib/message-filter'
-import { getCreatorContactEmail, type ClubPlatform } from '@/lib/influencers-club'
+import { type ClubPlatform } from '@/lib/influencers-club'
+import { discoveryGetContactEmail } from '@/lib/discovery-provider'
 import { consumeQuota, releaseQuota } from '@/lib/plan'
 import { getEffectiveTier } from '@/lib/subscription'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const creatorEmail = await getCreatorContactEmail(platform, handle)
+  const creatorEmail = await discoveryGetContactEmail(platform, handle)
   if (!creatorEmail) {
     return NextResponse.json(
       { message: 'This creator cannot be reached yet', code: 'NOT_REACHABLE' },

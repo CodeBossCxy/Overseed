@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { clubAnalytics, type ClubPlatform } from '@/lib/influencers-club'
+import { type ClubPlatform } from '@/lib/influencers-club'
+import { discoveryAnalytics } from '@/lib/discovery-provider'
 import { deductCredits, hasPriorDeduction, refundDeduction } from '@/lib/credits'
 import { getEffectiveTier } from '@/lib/subscription'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const analytics = await clubAnalytics(platform, handle, userId)
+    const analytics = await discoveryAnalytics(platform, handle, { logUserId: userId })
     return NextResponse.json(analytics)
   } catch (err: any) {
     // Don't charge for a failed first fetch

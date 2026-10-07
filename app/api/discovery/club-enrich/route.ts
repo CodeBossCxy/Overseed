@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { clubEnrich, type ClubPlatform } from '@/lib/influencers-club'
+import { type ClubPlatform } from '@/lib/influencers-club'
+import { discoveryEnrich } from '@/lib/discovery-provider'
 import { deductCredits, hasPriorDeduction, refundDeduction } from '@/lib/credits'
 import { getEffectiveTier } from '@/lib/subscription'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const detail = await clubEnrich(platform, handle, userId)
+    const detail = await discoveryEnrich(platform, handle, { logUserId: userId })
     return NextResponse.json(detail)
   } catch (err: any) {
     // Don't charge for a failed first view

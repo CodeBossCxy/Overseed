@@ -169,6 +169,12 @@ export interface ClubSearchOptions {
   sortOrder?: 'asc' | 'desc'
   limit: number
   page?: number
+  // CreatorDB-only preset search. Ignored by the Club provider.
+  creatorDbPreset?: import('@/lib/creatordb-filter-presets').CreatorDbPresetId
+  creatorDbOverrides?: import('@/lib/creatordb-search-request').CreatorDbPresetOverrides
+  creatorDbFilters?: import('@/lib/creatordb-search-request').CreatorDbCanonicalFilter[]
+  creatorDbSortField?: import('@/lib/creatordb-filter-fields').CreatorDbCanonicalField
+  creatorDbOffset?: number
   // Attributed to club_credit_log rows only — deliberately excluded from
   // buildCacheRequest so it never affects the cache key.
   logUserId?: string

@@ -51,7 +51,7 @@ export default function OutreachListPage() {
 
   const hasItems = items.length > 0
 
-  const maintenanceMode = true // flip to false to re-enable mass outreach
+  const maintenanceMode = false // set to true to temporarily disable mass outreach
 
   return (
     <BrandWorkspaceLayout>

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const VALID_PLATFORMS = ['instagram', 'youtube', 'tiktok', 'twitter', 'onlyfans', 'twitch']
+const VALID_PLATFORMS = ['instagram', 'youtube', 'tiktok']
 
 export async function POST(req: NextRequest) {
   try {

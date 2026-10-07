@@ -1,5 +1,5 @@
 // AI-powered creator selection for mass outreach campaigns.
-// 1. Queries CreatorProfile cache first (free), then Influencers Club (costs credits)
+// 1. Queries CreatorProfile cache first (free), then the configured discovery provider
 // 2. Uses AI to score/rank creators by relevance to brand's brief
 // 3. Enforces anti-spam guards (no creator contacted >3x in 30 days)
 
@@ -265,7 +265,8 @@ export async function selectCreators(
   brandBrief: string,
   criteria: OutreachCriteria,
   quantity: number,
-  excludeHandles: string[] = []
+  excludeHandles: string[] = [],
+  logUserId?: string,
 ): Promise<ScoredCreator[]> {
   const now = new Date()
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
@@ -307,13 +308,12 @@ export async function selectCreators(
 
   const filtered = cachedProfiles.filter((p) => !excludeSet.has(p.handle.toLowerCase()))
 
-  // ── Step 2: supplement with Influencers Club if cache is thin ───────────────
-  // Only search Club if cache doesn't have enough creators for the request
+  // ── Step 2: supplement with the configured provider if cache is thin ────────
   if (filtered.length < quantity) {
     try {
-      const { clubSearch, clubEnrichProfile, getCreatorContactEmail } = await import('@/lib/influencers-club')
+      const { discoverySearch, discoveryEnrichForOutreach } = await import('@/lib/discovery-provider')
 
-      const searchResult = await clubSearch({
+      const searchResult = await discoverySearch({
         platform: criteria.platform as any,
         query: [criteria.niche, ...(criteria.keywords ?? [])].filter(Boolean).join(' ') || undefined,
         country: criteria.country,
@@ -321,32 +321,37 @@ export async function selectCreators(
         maxFollowers: criteria.maxFollowers,
         minEngagement: criteria.minEngagement,
         language: criteria.language,
-        limit: Math.min(50, quantity * 2),
+        limit: Math.min(100, Math.max(quantity, quantity * 2)),
+        logUserId,
       })
 
-      const clubCreators: Array<{ handle: string; [k: string]: any }> = Array.isArray(
+      const providerCreators: Array<{ handle: string; [k: string]: any }> = Array.isArray(
         searchResult?.results
       )
         ? searchResult.results
         : []
 
       // Enrich top results to get emails
-      const toEnrich = clubCreators
+      const toEnrich = providerCreators
         .filter((c) => c?.handle && !excludeSet.has(String(c.handle).toLowerCase()))
-        .slice(0, Math.ceil(quantity * 2))
+        .slice(0, Math.min(100, Math.ceil(quantity * 2)))
 
-      await Promise.allSettled(
-        toEnrich.map(async (c) => {
-          try {
-            // Use profile enrichment (~0.2 credits) instead of full (~1 credit)
-            const detail = await clubEnrichProfile(criteria.platform as any, c.handle)
-            // Email is server-side only — fetch from contact cache (populated by enrichment)
-            const email = await getCreatorContactEmail(criteria.platform as any, c.handle) ?? null
-            if (!email) return
+      // Keep paid enrichment traffic bounded and stop once the campaign has
+      // enough contactable creators.
+      for (let batchStart = 0; batchStart < toEnrich.length && filtered.length < quantity; batchStart += 5) {
+        await Promise.allSettled(
+          toEnrich.slice(batchStart, batchStart + 5).map(async (c) => {
+            try {
+              const { detail, email } = await discoveryEnrichForOutreach(
+                criteria.platform,
+                c.handle,
+                { logUserId },
+              )
+              if (!email) return
 
-            const handle = String(c.handle).toLowerCase()
-            // Check if already in filtered set
-            if (filtered.some((p) => p.handle === handle)) return
+              const handle = String(c.handle).toLowerCase()
+              // Check if already in filtered set
+              if (filtered.some((p) => p.handle === handle)) return
 
             const followers = detail?.followers ?? c.follower_count ?? c.followers ?? null
             const engagement = detail?.engagement_percent ?? c.engagement_rate ?? null
@@ -401,13 +406,14 @@ export async function selectCreators(
               createdAt: new Date(),
               updatedAt: new Date(),
             } as any)
-          } catch (err) {
-            console.error('outreach-ai: clubEnrich failed for', c.handle, err)
-          }
-        })
-      )
+            } catch (err) {
+              console.error('outreach-ai: provider enrichment failed for', c.handle, err)
+            }
+          })
+        )
+      }
     } catch (err) {
-      console.error('outreach-ai: clubSearch supplement failed', err)
+      console.error('outreach-ai: provider search supplement failed', err)
     }
   }
 

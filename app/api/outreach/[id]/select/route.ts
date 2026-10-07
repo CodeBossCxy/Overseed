@@ -47,7 +47,8 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
         campaign.briefMessage,
         criteria,
         campaign.quantity,
-        existing.map((e) => e.handle)
+        existing.map((e) => e.handle),
+        userId,
       )
 
       await Promise.all(

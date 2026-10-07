@@ -17,9 +17,6 @@ const PLATFORMS = [
   { value: 'instagram', label: 'Instagram' },
   { value: 'youtube', label: 'YouTube' },
   { value: 'tiktok', label: 'TikTok' },
-  { value: 'twitter', label: 'X / Twitter' },
-  { value: 'twitch', label: 'Twitch' },
-  { value: 'onlyfans', label: 'OnlyFans' },
 ]
 
 const NICHE_OPTIONS = [
@@ -366,14 +363,19 @@ export default function NewOutreachPage() {
     c.niches = criteria.niches
     if (criteria.countries.length) c.country = criteria.countries[0]
     c.countries = criteria.countries
-    if (criteria.followerMin) c.followerMin = Number(criteria.followerMin)
-    if (criteria.followerMax) c.followerMax = Number(criteria.followerMax)
+    if (criteria.followerMin) c.minFollowers = Number(criteria.followerMin)
+    if (criteria.followerMax) c.maxFollowers = Number(criteria.followerMax)
     if (criteria.languages.length) c.language = criteria.languages[0]
     c.languages = criteria.languages
     if (criteria.minEngagement) c.minEngagement = Number(criteria.minEngagement)
     if (criteria.contentFormats.length) c.contentFormats = criteria.contentFormats
     if (criteria.audienceCountries.length) c.audienceCountries = criteria.audienceCountries
-    if (criteria.keywords.trim()) c.keywords = criteria.keywords.trim()
+    if (criteria.keywords.trim()) {
+      c.keywords = criteria.keywords
+        .split(',')
+        .map((keyword) => keyword.trim())
+        .filter(Boolean)
+    }
     c.excludeContacted = criteria.excludeContacted
     if (criteria.brandSafety.length) c.brandSafety = criteria.brandSafety
     return Object.keys(c).length > 0 ? c : null

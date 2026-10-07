@@ -2,7 +2,11 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { clubSearch, clubSearchCacheProbe, mergeEnrichedProfileFields, type ClubPlatform } from '@/lib/influencers-club'
+import { mergeEnrichedProfileFields, type ClubPlatform } from '@/lib/influencers-club'
+import { discoverySearch, discoverySearchCacheProbe, getProvider, providerName } from '@/lib/discovery-provider'
+import { CREATORDB_FIELD_MAP, CREATORDB_PLATFORMS, type CreatorDbCanonicalField, type CreatorDbFilterOp, type CreatorDbPlatform } from '@/lib/creatordb-filter-fields'
+import { CREATORDB_PRESETS, type CreatorDbFilterValue, type CreatorDbPresetId } from '@/lib/creatordb-filter-presets'
+import { buildCustomSearchRequest, buildSearchRequest, type CreatorDbCanonicalFilter, type CreatorDbExtraFilter, type CreatorDbPresetOverrides } from '@/lib/creatordb-search-request'
 import {
   CLUB_FILTER_DEFS,
   CREATOR_HAS_KEYS,
@@ -274,6 +278,123 @@ export async function GET(req: NextRequest) {
         }
       : undefined
 
+  // CreatorDB preset mode. Validate and fully build once before charging so
+  // malformed or >10-filter searches never consume either Overseed or vendor
+  // credits. Query params stay explicit so saved search tasks remain portable.
+  const presetRaw = params.get('cdb_preset')?.trim().toUpperCase() || undefined
+  const customFiltersRaw = params.get('cdb_filters')
+  let creatorDbPreset: CreatorDbPresetId | undefined
+  let creatorDbOverrides: CreatorDbPresetOverrides | undefined
+  let creatorDbFilters: CreatorDbCanonicalFilter[] | undefined
+  let creatorDbSortField: CreatorDbCanonicalField | undefined
+  if (customFiltersRaw) {
+    if (getProvider() !== 'creatordb' || !CREATORDB_PLATFORMS.includes(platform as CreatorDbPlatform)) {
+      return NextResponse.json(
+        { message: 'CreatorDB filters support Instagram, TikTok, and YouTube', code: 'INVALID_FILTER' },
+        { status: 400 },
+      )
+    }
+    try {
+      const parsed = JSON.parse(customFiltersRaw)
+      if (!Array.isArray(parsed)) throw new Error('Filters must be an array')
+      creatorDbFilters = parsed.map((item: any) => ({
+        field: item.field as CreatorDbCanonicalField,
+        op: item.op as CreatorDbFilterOp,
+        value: item.value as CreatorDbFilterValue,
+      }))
+      creatorDbSortField = (params.get('cdb_sort') || 'followers') as CreatorDbCanonicalField
+      buildCustomSearchRequest(
+        platform as CreatorDbPlatform,
+        creatorDbFilters,
+        { pageSize: Math.min(num('limit') ?? 100, 100), offset: num('offset') ?? 0 },
+        creatorDbSortField,
+        params.get('sort_order') !== 'asc',
+      )
+    } catch (error) {
+      return NextResponse.json(
+        { message: error instanceof Error ? error.message : 'Invalid CreatorDB filters', code: 'INVALID_FILTER' },
+        { status: 400 },
+      )
+    }
+  }
+  if (presetRaw) {
+    if (getProvider() !== 'creatordb') {
+      return NextResponse.json(
+        { message: 'Advanced Filter presets require the CreatorDB provider', code: 'INVALID_FILTER' },
+        { status: 400 },
+      )
+    }
+    if (!CREATORDB_PLATFORMS.includes(platform as CreatorDbPlatform) || !(presetRaw in CREATORDB_PRESETS)) {
+      return NextResponse.json(
+        { message: 'CreatorDB presets support Instagram, TikTok, and YouTube with preset A-D', code: 'INVALID_FILTER' },
+        { status: 400 },
+      )
+    }
+    creatorDbPreset = presetRaw as CreatorDbPresetId
+    const preset = CREATORDB_PRESETS[creatorDbPreset]
+    const values: Record<string, CreatorDbFilterValue | null> = {}
+    for (const filter of preset.filters) {
+      const raw = params.get(`cdb_${filter.id}`)
+      if (raw == null) continue
+      if (!raw.trim()) {
+        values[filter.id] = null
+      } else if (filter.field === 'niches') {
+        values[filter.id] = raw.split(',').map((value) => value.trim()).filter(Boolean)
+      } else if (CREATORDB_FIELD_MAP[filter.field].type === 'number') {
+        const value = Number(raw)
+        if (!Number.isFinite(value)) {
+          return NextResponse.json(
+            { message: `${filter.label} must be a number`, code: 'INVALID_FILTER' },
+            { status: 400 },
+          )
+        }
+        values[filter.id] = value
+      } else {
+        values[filter.id] = raw.trim()
+      }
+    }
+
+    let extraFilters: CreatorDbExtraFilter[] | undefined
+    const extrasRaw = params.get('cdb_extra_filters')
+    if (extrasRaw) {
+      try {
+        const parsed = JSON.parse(extrasRaw)
+        if (!Array.isArray(parsed)) throw new Error('not an array')
+        extraFilters = parsed.map((item: any) => ({
+          field: item.field as CreatorDbCanonicalField,
+          op: item.op as CreatorDbFilterOp,
+          value: item.value as CreatorDbFilterValue,
+        }))
+      } catch {
+        return NextResponse.json(
+          { message: 'cdb_extra_filters must be a JSON array', code: 'INVALID_FILTER' },
+          { status: 400 },
+        )
+      }
+    }
+
+    creatorDbOverrides = {
+      country: params.get('cdb_country') ?? params.get('country') ?? undefined,
+      audienceLocation: params.get('cdb_audience_location') ?? undefined,
+      lastPublishDays: num('cdb_last_publish_days') ?? undefined,
+      values,
+      extraFilters,
+    }
+    try {
+      buildSearchRequest(
+        platform as CreatorDbPlatform,
+        creatorDbPreset,
+        creatorDbOverrides,
+        { pageSize: Math.min(num('limit') ?? 100, 100), offset: num('offset') ?? 0 },
+      )
+    } catch (error) {
+      return NextResponse.json(
+        { message: error instanceof Error ? error.message : 'Invalid CreatorDB filters', code: 'INVALID_FILTER' },
+        { status: 400 },
+      )
+    }
+  }
+
   const searchOpts = {
     platform,
     query: params.get('q')?.trim() || undefined,
@@ -298,8 +419,15 @@ export async function GET(req: NextRequest) {
     sortBy: sortBy as ClubSortBy | undefined,
     sortOrder: sortOrderRaw as 'asc' | 'desc' | undefined,
     // v4: fixed page size of 10 (one billed page); legacy allows up to 25.
-    limit: CREDIT_SYSTEM_ENABLED ? DISCOVERY_PAGE_SIZE : Math.min(num('limit') ?? 10, 25),
+    limit: creatorDbPreset || creatorDbFilters
+      ? Math.min(num('limit') ?? 100, 100)
+      : CREDIT_SYSTEM_ENABLED ? DISCOVERY_PAGE_SIZE : Math.min(num('limit') ?? 10, 25),
     page: requestedPage,
+    creatorDbPreset,
+    creatorDbOverrides,
+    creatorDbFilters,
+    creatorDbSortField,
+    creatorDbOffset: creatorDbPreset || creatorDbFilters ? (num('offset') ?? requestedPage * Math.min(num('limit') ?? 100, 100)) : undefined,
     logUserId: userId,
   }
 
@@ -307,8 +435,12 @@ export async function GET(req: NextRequest) {
     // Unseen page of an existing task: search with the task's stored
     // parameters so results stay consistent even if the client's filter
     // state has drifted since the task was created.
+    const taskUsesCreatorDbSearch = Boolean((task.request as any)?.creatorDbPreset || (task.request as any)?.creatorDbFilters)
     Object.assign(searchOpts, task.request as any, {
       page: requestedPage,
+      creatorDbOffset: creatorDbPreset || creatorDbFilters || taskUsesCreatorDbSearch
+        ? (num('offset') ?? requestedPage * Math.min(Number((task.request as any)?.limit) || 100, 100))
+        : undefined,
       logUserId: userId,
     })
   }
@@ -378,12 +510,12 @@ export async function GET(req: NextRequest) {
   }
 
   let searchCharge: { referenceId: string; refund: () => Promise<void> } | null = null
-  let cachedResult: Awaited<ReturnType<typeof clubSearchCacheProbe>> = null
+  let cachedResult: Awaited<ReturnType<typeof discoverySearchCacheProbe>> = null
   if (CREDIT_SYSTEM_ENABLED) {
     const referenceId = `discovery:${userId}:${Date.now()}`
     const [probe, charge] = await Promise.all([
       // The YouTube path has its own pool cache inside youtubeSearchCreators
-      useYoutube ? Promise.resolve(null) : clubSearchCacheProbe(searchOpts),
+      useYoutube ? Promise.resolve(null) : discoverySearchCacheProbe(searchOpts),
       chargeCredits(userId, 'discovery_search', referenceId),
     ])
     if (!charge.ok) {
@@ -423,7 +555,10 @@ export async function GET(req: NextRequest) {
   // v4: zero results → full refund; short page → refund the unfilled share
   // (charge kept = max(1, ceil(price·n/10))). Single atomic, idempotent op.
   const settleCharge = async (resultCount: number) => {
-    if (!searchCharge || resultCount >= DISCOVERY_PAGE_SIZE) return
+    // CreatorDB search billing is per request/filter block, not per returned
+    // creator. A zero-match preset search still costs one vendor credit.
+    const isCreatorDbAdvancedSearch = Boolean(creatorDbPreset || creatorDbFilters || (task?.request as any)?.creatorDbPreset || (task?.request as any)?.creatorDbFilters)
+    if (!searchCharge || isCreatorDbAdvancedSearch || resultCount >= DISCOVERY_PAGE_SIZE) return
     const price = await getCreditPrice('discovery_search')
     const keep =
       resultCount > 0 ? Math.max(1, Math.ceil((price * resultCount) / DISCOVERY_PAGE_SIZE)) : 0
@@ -464,13 +599,32 @@ export async function GET(req: NextRequest) {
             // Engagement backfill runs after the response is sent
             defer: (task) => after(task),
           })
-        : cachedResult ?? (await clubSearch(searchOpts))
+        : cachedResult ?? (await discoverySearch(searchOpts))
     )
     settleAfterResponse(result?.results?.length ?? 0)
     const taskId = await persistTaskPage(result)
     return NextResponse.json({ ...result, task_id: taskId, page: requestedPage })
   } catch (err: any) {
-    console.warn('Influencers Club search unavailable; using Overseed creator index:', err?.message)
+    const isCreatorDbAdvancedSearch = Boolean(creatorDbPreset || creatorDbFilters || (task?.request as any)?.creatorDbPreset || (task?.request as any)?.creatorDbFilters)
+    if (isCreatorDbAdvancedSearch) {
+      if (searchCharge) {
+        try {
+          await searchCharge.refund()
+        } catch (refundError) {
+          console.error('CreatorDB preset search refund failed:', refundError)
+        }
+      }
+      const upstreamStatus = Number(err?.httpStatus)
+      return NextResponse.json(
+        {
+          message: err?.message || 'CreatorDB search failed',
+          code: err?.errorCode || 'CREATORDB_SEARCH_FAILED',
+          traceId: err?.traceId || null,
+        },
+        { status: upstreamStatus >= 400 && upstreamStatus < 500 ? upstreamStatus : 502 },
+      )
+    }
+    console.warn(`${providerName()} search unavailable; using Overseed creator index:`, err?.message)
     const local = await safeLocalCreatorDiscovery(params, true)
     settleAfterResponse(local?.results?.length ?? 0)
     // Fallback results were billed the same way — snapshot them so a
