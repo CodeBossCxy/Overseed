@@ -58,7 +58,7 @@ interface DiscoverySearchRequest {
   pageSize: number
 }
 
-const PLATFORMS = ['youtube', 'instagram', 'tiktok', 'twitter', 'twitch', 'onlyfans'] as const
+const PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: 'YouTube',
   instagram: 'Instagram',
@@ -1374,20 +1374,33 @@ export default function DiscoverPanel() {
             </button>
             {openFilterSections.audience && (
               <div className="px-3 pb-3 grid grid-cols-4 gap-3">
-                {/* Country / region */}
+                {/* Audience location */}
                 <div>
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                      {zh ? '国家 / 地区' : 'Country / region'}
+                      {zh ? '受众所在地' : 'Audience location'}
                     </span>
                   </label>
-                  <select value={country} onChange={(e) => setCountry(e.target.value)} className={`w-full ${inputCls}`}>
-                    <option value="">{d.allCountries}</option>
-                    {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
-                      <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>
-                    ))}
-                  </select>
+                  {['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? (
+                    <select
+                      value={creatorDbFilterFor('audienceLocation').value}
+                      onChange={(e) => updateCreatorDbFilter('audienceLocation', { value: e.target.value })}
+                      className={`w-full ${inputCls}`}
+                    >
+                      <option value="">{zh ? '全部地区' : 'Anywhere'}</option>
+                      {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
+                        <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select value={country} onChange={(e) => setCountry(e.target.value)} className={`w-full ${inputCls}`}>
+                      <option value="">{d.allCountries}</option>
+                      {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
+                        <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 {/* Language */}
                 <div>
@@ -1482,6 +1495,21 @@ export default function DiscoverPanel() {
             </button>
             {openFilterSections.creator && (
               <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+                {/* Creator's country */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      {zh ? '创作者所在国' : "Creator's country"}
+                    </span>
+                  </label>
+                  <select value={country} onChange={(e) => setCountry(e.target.value)} className={`w-full ${inputCls}`}>
+                    <option value="">{zh ? '全部国家' : 'Any country'}</option>
+                    {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
+                      <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>
+                    ))}
+                  </select>
+                </div>
                 {/* Verified account */}
                 <div>
                   <label className={labelCls}>
