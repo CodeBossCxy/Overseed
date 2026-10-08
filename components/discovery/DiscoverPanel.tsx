@@ -1729,6 +1729,37 @@ export default function DiscoverPanel() {
                     />
                   </div>
                 </div>
+                {/* Last active */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      {zh ? '最近活跃' : 'Last active'}
+                    </span>
+                  </label>
+                  <select
+                    value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('lastPublishTime').value : lastPost}
+                    onChange={(e) => {
+                      if (['instagram', 'tiktok', 'youtube'].includes(activePlatform)) {
+                        const v = e.target.value
+                        if (v === '-365') {
+                          updateCreatorDbFilter('lastPublishTime', { op: '<', value: v })
+                        } else {
+                          updateCreatorDbFilter('lastPublishTime', { op: '>', value: v })
+                        }
+                      } else {
+                        setLastPost(e.target.value)
+                      }
+                    }}
+                    className={`w-full ${inputCls}`}
+                  >
+                    <option value="">{d.anyOption}</option>
+                    <option value="90">{zh ? '近3个月活跃' : 'Within 3 months'}</option>
+                    <option value="180">{zh ? '近6个月活跃' : 'Within 6 months'}</option>
+                    <option value="365">{zh ? '近1年活跃' : 'Within 1 year'}</option>
+                    <option value="-365">{zh ? '超过1年未活跃' : 'Over 1 year ago'}</option>
+                  </select>
+                </div>
               </div>
             )}
           </div>

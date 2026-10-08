@@ -132,6 +132,15 @@ export function buildCustomSearchRequest(
       value = value / 100
     }
 
+    // lastPublishTime: the UI sends day counts (90, 180, 365, -365).
+    // Convert to Unix timestamp in milliseconds for CreatorDB.
+    // Negative values mean "older than X days" (op flips to <).
+    if (field === 'lastPublishTime' && typeof value === 'number' && Math.abs(value) < 100_000) {
+      const days = Math.abs(value)
+      value = Date.now() - days * 24 * 60 * 60 * 1000
+      if (rawValue as number < 0) op = '<'
+    }
+
     // Country / language code normalization (existing)
     const normalized = (field === 'country' || field === 'audienceLocation') && typeof value === 'string'
       ? creatorDbCountryCode(value)
