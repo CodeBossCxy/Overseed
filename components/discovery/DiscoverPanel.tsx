@@ -58,6 +58,113 @@ interface DiscoverySearchRequest {
   pageSize: number
 }
 
+// ---- Niche autocomplete with suggestions from CreatorDB ----
+function NicheAutocomplete({
+  platform, value, onChange, labelCls, inputCls, zh,
+}: {
+  platform: string; value: string; onChange: (v: string) => void
+  labelCls: string; inputCls: string; zh: boolean
+}) {
+  const [query, setQuery] = useState(value)
+  const [suggestions, setSuggestions] = useState<{ id: string; name: string; channelCount: number }[]>([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Sync external value changes
+  useEffect(() => { setQuery(value) }, [value])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const fetchSuggestions = useCallback((q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/discovery/niches?platform=${platform}&q=${encodeURIComponent(q)}&limit=15`)
+        const data = await res.json()
+        setSuggestions(data.niches || [])
+      } catch {
+        setSuggestions([])
+      }
+      setLoading(false)
+    }, 200)
+  }, [platform])
+
+  const handleFocus = () => {
+    setOpen(true)
+    fetchSuggestions(query)
+  }
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value
+    setQuery(v)
+    onChange(v)
+    setOpen(true)
+    fetchSuggestions(v)
+  }
+
+  const selectNiche = (name: string) => {
+    // Append to comma-separated list if already has values
+    const current = query.split(',').map((s) => s.trim()).filter(Boolean)
+    if (!current.some((c) => c.toLowerCase() === name.toLowerCase())) {
+      current.push(name)
+    }
+    const joined = current.join(', ')
+    setQuery(joined)
+    onChange(joined)
+    setOpen(false)
+  }
+
+  const formatCount = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}K` : String(n)
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className={labelCls}>
+        <span className="inline-flex items-center gap-1">
+          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          {zh ? '领域' : 'Niches'}
+        </span>
+      </label>
+      <input
+        type="text"
+        value={query}
+        onChange={handleInput}
+        onFocus={handleFocus}
+        placeholder={zh ? '如 Fashion, Beauty' : 'e.g. Fashion, Beauty'}
+        className={`w-full ${inputCls}`}
+      />
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-52 overflow-y-auto">
+          {loading && <div className="px-3 py-2 text-xs text-gray-400">{zh ? '加载中...' : 'Loading...'}</div>}
+          {!loading && suggestions.length === 0 && (
+            <div className="px-3 py-2 text-xs text-gray-400">{zh ? '无匹配领域' : 'No matching niches'}</div>
+          )}
+          {!loading && suggestions.map((niche) => (
+            <button
+              key={niche.id}
+              type="button"
+              onClick={() => selectNiche(niche.name)}
+              className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center justify-between"
+            >
+              <span className="truncate">{niche.name}</span>
+              <span className="text-[10px] text-gray-400 ml-2 flex-shrink-0">{formatCount(niche.channelCount)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: 'YouTube',
@@ -1586,21 +1693,14 @@ export default function DiscoverPanel() {
                   />
                 </div>
                 {/* Niches */}
-                <div>
-                  <label className={labelCls}>
-                    <span className="inline-flex items-center gap-1">
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                      {zh ? '领域' : 'Niches'}
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('niches').value : ''}
-                    onChange={(e) => updateCreatorDbFilter('niches', { value: e.target.value })}
-                    placeholder={zh ? '全部领域' : 'All niches'}
-                    className={`w-full ${inputCls}`}
-                  />
-                </div>
+                <NicheAutocomplete
+                  platform={activePlatform}
+                  value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('niches').value : ''}
+                  onChange={(v) => updateCreatorDbFilter('niches', { value: v })}
+                  labelCls={labelCls}
+                  inputCls={inputCls}
+                  zh={zh}
+                />
                 {/* Followers / subscribers */}
                 <div>
                   <label className={labelCls}>
