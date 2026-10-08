@@ -1,6 +1,31 @@
 import { appendFile, mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
+import { PrismaClient } from '@prisma/client'
+
+// Dedicated Prisma client for the credit log DB. When CREATORDB_LOG_DATABASE_URL
+// is set (e.g. the Neon production URL), logs always go to that DB regardless
+// of which DATABASE_URL the rest of the app uses. This lets local dev and
+// production share a single depletion log.
+const logDbUrl = process.env.CREATORDB_LOG_DATABASE_URL
+
+const globalForLogPrisma = globalThis as unknown as {
+  creatorDbLogPrisma: PrismaClient | undefined
+}
+
+function getLogPrisma(): PrismaClient {
+  if (logDbUrl) {
+    if (!globalForLogPrisma.creatorDbLogPrisma) {
+      globalForLogPrisma.creatorDbLogPrisma = new PrismaClient({
+        datasources: { db: { url: logDbUrl } },
+      })
+    }
+    return globalForLogPrisma.creatorDbLogPrisma
+  }
+  // No dedicated URL — fall back to the app's default prisma instance
+  // (imported lazily to avoid circular deps).
+  return require('@/lib/prisma').prisma as PrismaClient
+}
 
 // Vendor credits, not the user's Overseed wallet. Never log API keys,
 // request bodies, creator contacts, or full provider responses.
@@ -71,12 +96,13 @@ export async function creatorDbFetch(
     usageStatus: creditsUsed === null ? 'not_reported' : 'reported', reportedCreditFields,
     resultCount: Array.isArray(data?.data?.creatorList) ? data.data.creatorList.length : null,
   })
-  // Write to DB for persistent depletion tracking
+  // Write to DB for persistent depletion tracking.
+  // Uses CREATORDB_LOG_DATABASE_URL when set so local + prod share one log.
   try {
-    const { prisma } = await import('@/lib/prisma')
+    const logDb = getLogPrisma()
     const creditsAfter = numeric(data?.creditsAvailable) ?? numeric(data?.remainingQuota) ?? null
     const creditsBefore = creditsAfter !== null && creditsUsed !== null ? creditsAfter + creditsUsed : null
-    await prisma.creatorDbCreditLog.create({
+    await logDb.creatorDbCreditLog.create({
       data: {
         userId: context.userId ?? null,
         endpoint,
