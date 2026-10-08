@@ -261,16 +261,31 @@ function buildCreatorDbRequestBody(opts: ClubSearchOptions): { body: object; pla
         },
       )
     : null
-  const filters = customRequest?.filters ?? presetRequest?.filters ?? buildFilters(opts)
+  // When custom/preset filters exist, also merge in basic filters (country,
+  // followers, engagement) that the UI sends as standard query params rather
+  // than as cdb_filters. Deduplicate by filterName so user-set cdb_filters
+  // take precedence over the auto-generated ones.
+  const baseFilters = customRequest?.filters ?? presetRequest?.filters ?? buildFilters(opts)
+  let filters: typeof baseFilters
+  if (customRequest || presetRequest) {
+    const basicFilters = buildFilters(opts)
+    const existingNames = new Set(baseFilters.map((f: { filterName: string }) => f.filterName))
+    const missing = basicFilters.filter((f) => !existingNames.has(f.filterName))
+    filters = [...baseFilters, ...missing]
+    if (filters.length > 10) {
+      // Trim to 10 — keep the explicit cdb_filters, drop overflow basic ones
+      filters = [...baseFilters, ...missing.slice(0, 10 - baseFilters.length)]
+    }
+  } else {
+    filters = baseFilters
+  }
   const pageSize = customRequest?.pageSize ?? presetRequest?.pageSize ?? Math.min(opts.limit || 10, 100)
   const offset = customRequest?.offset ?? presetRequest?.offset ?? (opts.page ?? 0) * pageSize
-  const body = customRequest ?? presetRequest ?? {
-    filters,
-    pageSize,
-    offset,
-    sortBy: mapSortBy(opts.sortBy, opts.platform),
-    desc: opts.sortOrder !== 'asc',
-  }
+  const body = customRequest
+    ? { ...customRequest, filters }
+    : presetRequest
+      ? { ...presetRequest, filters }
+      : { filters, pageSize, offset, sortBy: mapSortBy(opts.sortBy, opts.platform), desc: opts.sortOrder !== 'asc' }
   return { body, platformPath }
 }
 
