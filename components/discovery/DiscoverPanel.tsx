@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import {
   CLUB_FILTER_DEFS,
@@ -58,24 +58,72 @@ interface DiscoverySearchRequest {
   pageSize: number
 }
 
-// ---- Niche autocomplete with suggestions from CreatorDB ----
+// ---- Niche autocomplete — hardcoded suggestions (no API call) ----
+const NICHE_LIST: { name: string; channelCount: number }[] = [
+  { name: 'Fashion', channelCount: 18000 },
+  { name: 'Beauty', channelCount: 15000 },
+  { name: 'Fitness', channelCount: 12000 },
+  { name: 'Travel', channelCount: 11000 },
+  { name: 'Food', channelCount: 10000 },
+  { name: 'Comedy', channelCount: 9000 },
+  { name: 'Music', channelCount: 9000 },
+  { name: 'Gaming', channelCount: 8500 },
+  { name: 'Lifestyle', channelCount: 8000 },
+  { name: 'Tech', channelCount: 7500 },
+  { name: 'Education', channelCount: 7000 },
+  { name: 'Photography', channelCount: 6500 },
+  { name: 'Dance', channelCount: 6000 },
+  { name: 'DIY', channelCount: 5500 },
+  { name: 'Art', channelCount: 5000 },
+  { name: 'Sports', channelCount: 5000 },
+  { name: 'Health', channelCount: 4800 },
+  { name: 'Cooking', channelCount: 4500 },
+  { name: 'Vlog', channelCount: 4500 },
+  { name: 'Motivation', channelCount: 4200 },
+  { name: 'Pets', channelCount: 4000 },
+  { name: 'Parenting', channelCount: 3800 },
+  { name: 'Finance', channelCount: 3500 },
+  { name: 'Business', channelCount: 3500 },
+  { name: 'Entertainment', channelCount: 3500 },
+  { name: 'Science', channelCount: 3200 },
+  { name: 'Automotive', channelCount: 3000 },
+  { name: 'Outdoors', channelCount: 3000 },
+  { name: 'Yoga', channelCount: 2800 },
+  { name: 'Skincare', channelCount: 2800 },
+  { name: 'Makeup', channelCount: 2700 },
+  { name: 'Home Decor', channelCount: 2500 },
+  { name: 'Gardening', channelCount: 2500 },
+  { name: 'Shorts', channelCount: 3000 },
+  { name: 'Trending', channelCount: 3000 },
+  { name: 'Anime', channelCount: 2200 },
+  { name: 'Movies', channelCount: 2200 },
+  { name: 'Book', channelCount: 2000 },
+  { name: 'Luxury', channelCount: 2000 },
+  { name: 'Streetwear', channelCount: 1800 },
+  { name: 'Wellness', channelCount: 1800 },
+  { name: 'Cryptocurrency', channelCount: 1500 },
+  { name: 'Real Estate', channelCount: 1500 },
+  { name: 'Architecture', channelCount: 1200 },
+  { name: 'Sustainability', channelCount: 1000 },
+  { name: 'Mental Health', channelCount: 1000 },
+  { name: 'Camping', channelCount: 900 },
+  { name: 'Photography', channelCount: 6500 },
+  { name: 'Nail Art', channelCount: 800 },
+  { name: 'Tattoo', channelCount: 700 },
+]
+
 function NicheAutocomplete({
-  platform, value, onChange, labelCls, inputCls, zh,
+  value, onChange, labelCls, inputCls, zh,
 }: {
   platform: string; value: string; onChange: (v: string) => void
   labelCls: string; inputCls: string; zh: boolean
 }) {
   const [query, setQuery] = useState(value)
-  const [suggestions, setSuggestions] = useState<{ id: string; name: string; channelCount: number }[]>([])
   const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Sync external value changes
   useEffect(() => { setQuery(value) }, [value])
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
@@ -84,36 +132,24 @@ function NicheAutocomplete({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const fetchSuggestions = useCallback((q: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(async () => {
-      setLoading(true)
-      try {
-        const res = await fetch(`/api/discovery/niches?platform=${platform}&q=${encodeURIComponent(q)}&limit=15`)
-        const data = await res.json()
-        setSuggestions(data.niches || [])
-      } catch {
-        setSuggestions([])
-      }
-      setLoading(false)
-    }, 200)
-  }, [platform])
+  const filtered = useMemo(() => {
+    const lastSegment = query.split(',').pop()?.trim().toLowerCase() || ''
+    if (!lastSegment) return NICHE_LIST.slice(0, 15)
+    const prefix = NICHE_LIST.filter((n) => n.name.toLowerCase().startsWith(lastSegment))
+    const substring = NICHE_LIST.filter((n) => !n.name.toLowerCase().startsWith(lastSegment) && n.name.toLowerCase().includes(lastSegment))
+    return [...prefix, ...substring].slice(0, 15)
+  }, [query])
 
-  const handleFocus = () => {
-    setOpen(true)
-    fetchSuggestions(query)
-  }
+  const handleFocus = () => { setOpen(true) }
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value
     setQuery(v)
     onChange(v)
     setOpen(true)
-    fetchSuggestions(v)
   }
 
   const selectNiche = (name: string) => {
-    // Append to comma-separated list if already has values
     const current = query.split(',').map((s) => s.trim()).filter(Boolean)
     if (!current.some((c) => c.toLowerCase() === name.toLowerCase())) {
       current.push(name)
@@ -143,14 +179,13 @@ function NicheAutocomplete({
         className={`w-full ${inputCls}`}
       />
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-52 overflow-y-auto">
-          {loading && <div className="px-3 py-2 text-xs text-gray-400">{zh ? '加载中...' : 'Loading...'}</div>}
-          {!loading && suggestions.length === 0 && (
+        <div className="absolute z-50 mt-1 w-full bg-white/100 rounded-lg shadow-lg border border-gray-200 max-h-52 overflow-y-auto" style={{ backdropFilter: 'none', background: '#ffffff' }}>
+          {filtered.length === 0 && (
             <div className="px-3 py-2 text-xs text-gray-400">{zh ? '无匹配领域' : 'No matching niches'}</div>
           )}
-          {!loading && suggestions.map((niche) => (
+          {filtered.map((niche, i) => (
             <button
-              key={niche.id}
+              key={`${niche.name}-${i}`}
               type="button"
               onClick={() => selectNiche(niche.name)}
               className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center justify-between"
@@ -1709,24 +1744,28 @@ export default function DiscoverPanel() {
                       {zh ? '粉丝数' : 'Followers / subscribers'}
                     </span>
                   </label>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min={0}
+                  <div className="flex items-center gap-1.5">
+                    <select
                       value={minFollowers}
                       onChange={(e) => { setMinFollowers(e.target.value); setFollowerTier('custom') }}
-                      placeholder={zh ? '如 10000' : 'e.g. 10000'}
                       className={`w-1/2 ${inputCls}`}
-                    />
-                    <span className="text-gray-300 text-xs">–</span>
-                    <input
-                      type="number"
-                      min={0}
+                    >
+                      <option value="">Min</option>
+                      {[1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000].map((n) => (
+                        <option key={n} value={String(n)}>{n.toLocaleString()}</option>
+                      ))}
+                    </select>
+                    <span className="text-gray-400 font-medium text-sm">–</span>
+                    <select
                       value={maxFollowers}
                       onChange={(e) => { setMaxFollowers(e.target.value); setFollowerTier('custom') }}
-                      placeholder={zh ? '如 1000000' : 'e.g. 1000000'}
                       className={`w-1/2 ${inputCls}`}
-                    />
+                    >
+                      <option value="">Max</option>
+                      {[5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 5000000, 10000000].map((n) => (
+                        <option key={n} value={String(n)}>{n.toLocaleString()}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 {/* Last active */}
@@ -1777,7 +1816,7 @@ export default function DiscoverPanel() {
               <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.performance ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
             </button>
             {openFilterSections.performance && (
-              <div className="px-3 pb-3 grid grid-cols-3 gap-3">
+              <div className="px-3 pb-3 grid grid-cols-4 gap-3">
                 {/* Average short views */}
                 <div>
                   <label className={labelCls}>
@@ -1795,7 +1834,7 @@ export default function DiscoverPanel() {
                       placeholder={zh ? '如 5000 次播放' : 'e.g. 5000 views'}
                       className={`w-full ${inputCls}`}
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-300 pointer-events-none">{zh ? '≥ 次播放' : '≥ views'}</span>
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 次播放' : '≥ views'}</span>
                   </div>
                 </div>
                 {/* Average engagement rate */}
@@ -1816,7 +1855,7 @@ export default function DiscoverPanel() {
                       placeholder={zh ? '如 2.5%' : 'e.g. 2.5%'}
                       className={`w-full ${inputCls}`}
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-300 pointer-events-none">≥ %</span>
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">≥ %</span>
                   </div>
                 </div>
                 {/* Followers growth (30d) */}
@@ -1836,7 +1875,27 @@ export default function DiscoverPanel() {
                       placeholder={zh ? '如 500 新增粉丝' : 'e.g. 500 new followers'}
                       className={`w-full ${inputCls}`}
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-300 pointer-events-none">{zh ? '≥ 新粉丝' : '≥ new'}</span>
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 新粉丝' : '≥ new'}</span>
+                  </div>
+                </div>
+                {/* Content count (30d) */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                      {zh ? '近30天发布数' : 'Posts in last 30d'}
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('contentsIn30Days').value : ''}
+                      onChange={(e) => updateCreatorDbFilter('contentsIn30Days', { op: '>', value: e.target.value })}
+                      placeholder={zh ? '如 5 条内容' : 'e.g. 5 posts'}
+                      className={`w-full ${inputCls}`}
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 条' : '≥ posts'}</span>
                   </div>
                 </div>
               </div>
