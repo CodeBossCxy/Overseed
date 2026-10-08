@@ -1190,9 +1190,11 @@ export default function DiscoverPanel() {
     const existing = creatorDbFilters.find((filter) => filter.field === field)
     if (existing) return existing
     const type = CREATORDB_FIELD_MAP[field].type
+    // Fields that require the 'in' operator with array values in CreatorDB
+    const arrayFields: CreatorDbCanonicalField[] = ['hashtags', 'niches', 'audienceAge']
     return {
       field,
-      op: type === 'string' || type === 'boolean' ? '=' : '>',
+      op: arrayFields.includes(field) ? 'in' : type === 'string' || type === 'boolean' ? '=' : '>',
       value: '',
     }
   }

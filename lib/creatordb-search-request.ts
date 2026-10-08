@@ -104,7 +104,29 @@ export function buildCustomSearchRequest(
   }
   if (!CREATORDB_FIELD_MAP[sortField]?.sortable) throw new Error(`${sortField} cannot be used for sorting`)
 
-  const filters = selectedFilters.map(({ field, op, value }) => {
+  const filters = selectedFilters.map(({ field, op: rawOp, value: rawValue }) => {
+    // --- Normalize operator and value for fields with known semantics ---
+
+    let op = rawOp
+    let value: CreatorDbFilterValue = rawValue
+
+    // Fields that always require the 'in' operator with an array value.
+    // The UI may send op "=" with a single string — auto-promote.
+    const ARRAY_FIELDS: CreatorDbCanonicalField[] = ['hashtags', 'niches', 'audienceAge']
+    if (ARRAY_FIELDS.includes(field) && op === '=' && typeof value === 'string') {
+      op = 'in'
+      value = value.split(',').map((v) => v.trim()).filter(Boolean)
+    }
+
+    // Engagement rate fields: CreatorDB stores as decimal 0-1, but users
+    // enter percent (e.g. 2 for 2%). Convert values > 1 automatically.
+    const isEngagementRate = field.toLowerCase().includes('engagementrate')
+      || creatorDbFieldName(field, platform).toLowerCase().includes('engagementrate')
+    if (isEngagementRate && typeof value === 'number' && value > 1) {
+      value = value / 100
+    }
+
+    // Country / language code normalization (existing)
     const normalized = (field === 'country' || field === 'audienceLocation') && typeof value === 'string'
       ? creatorDbCountryCode(value)
       : field === 'mainLanguage' && typeof value === 'string'
