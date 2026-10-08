@@ -1453,29 +1453,70 @@ export default function DiscoverPanel() {
                     {['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map((age) => <option key={age} value={age}>{age}</option>)}
                   </select>
                 </div>
-                {/* Gender */}
+                {/* Gender composition */}
                 <div>
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a8.38 8.38 0 0 1 13 0"/></svg>
-                      {zh ? '性别' : 'Gender'}
+                      {zh ? '性别构成' : 'Gender'}
                     </span>
                   </label>
-                  <select
-                    value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('audienceGender').value : gender}
-                    onChange={(e) => {
-                      if (['instagram', 'tiktok', 'youtube'].includes(activePlatform)) {
-                        updateCreatorDbFilter('audienceGender', { value: e.target.value })
-                      } else {
-                        setGender(e.target.value)
-                      }
-                    }}
-                    className={`w-full ${inputCls}`}
-                  >
-                    <option value="">{d.anyOption}</option>
-                    <option value="female">{d.genderFemale}</option>
-                    <option value="male">{d.genderMale}</option>
-                  </select>
+                  {['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? (() => {
+                    const femaleVal = creatorDbFilterFor('audienceFemaleRatio').value
+                    const femalePct = femaleVal ? Math.round(Number(femaleVal) * 100) : 50
+                    const isActive = femaleVal !== ''
+                    return (
+                      <div className="space-y-1">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={femalePct}
+                          onChange={(e) => {
+                            const pct = Number(e.target.value)
+                            updateCreatorDbFilter('audienceFemaleRatio', { op: '>', value: String(pct / 100) })
+                            // Clear the old audienceGender filter if it was set
+                            updateCreatorDbFilter('audienceGender', { value: '' })
+                          }}
+                          className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-pink-500"
+                          style={{
+                            background: isActive
+                              ? `linear-gradient(to right, #ec4899 0%, #ec4899 ${femalePct}%, #3b82f6 ${femalePct}%, #3b82f6 100%)`
+                              : '#e5e7eb',
+                          }}
+                        />
+                        <div className="flex justify-between text-[10px] text-gray-500">
+                          <span style={{ color: isActive ? '#ec4899' : undefined }}>
+                            {zh ? '女' : 'F'} {isActive ? `${femalePct}%+` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateCreatorDbFilter('audienceFemaleRatio', { value: '' })
+                              updateCreatorDbFilter('audienceGender', { value: '' })
+                            }}
+                            className="text-[10px] text-gray-400 hover:text-gray-600"
+                          >
+                            {isActive ? (zh ? '重置' : 'Reset') : (zh ? '任意' : 'Any')}
+                          </button>
+                          <span style={{ color: isActive ? '#3b82f6' : undefined }}>
+                            {isActive ? `${100 - femalePct}%+` : ''} {zh ? '男' : 'M'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })() : (
+                    <select
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value)}
+                      className={`w-full ${inputCls}`}
+                    >
+                      <option value="">{d.anyOption}</option>
+                      <option value="female">{d.genderFemale}</option>
+                      <option value="male">{d.genderMale}</option>
+                    </select>
+                  )}
                 </div>
               </div>
             )}
