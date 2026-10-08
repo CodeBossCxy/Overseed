@@ -83,11 +83,17 @@ function validateValue(
   if ((field === 'country' || field === 'audienceLocation') && (typeof value !== 'string' || !/^[A-Z]{3}$/.test(value))) {
     throw new Error(`${field} must be an ISO 3166-1 alpha-3 code such as USA`)
   }
-  if (field === 'audienceGender' && !CREATORDB_AUDIENCE_GENDERS.includes(value as any)) {
-    throw new Error(`audienceGender must be ${CREATORDB_AUDIENCE_GENDERS.join(' or ')}`)
+  if (field === 'audienceGender') {
+    const vals = Array.isArray(value) ? value : [value]
+    if (vals.some((v) => !CREATORDB_AUDIENCE_GENDERS.includes(v as any))) {
+      throw new Error(`audienceGender must be ${CREATORDB_AUDIENCE_GENDERS.join(' or ')}`)
+    }
   }
-  if (field === 'audienceAge' && !CREATORDB_AUDIENCE_AGES.includes(value as any)) {
-    throw new Error(`audienceAge must be one of ${CREATORDB_AUDIENCE_AGES.join(', ')}`)
+  if (field === 'audienceAge') {
+    const vals = Array.isArray(value) ? value : [value]
+    if (vals.some((v) => !CREATORDB_AUDIENCE_AGES.includes(v as any))) {
+      throw new Error(`audienceAge must be one of ${CREATORDB_AUDIENCE_AGES.join(', ')}`)
+    }
   }
 }
 
