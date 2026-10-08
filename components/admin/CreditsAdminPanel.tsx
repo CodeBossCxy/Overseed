@@ -77,6 +77,31 @@ interface VendorTotal {
   calls: number
 }
 
+interface CdbLogRow {
+  id: string
+  endpoint: string
+  platform: string | null
+  creditsUsedThis: number
+  creditsBefore: number | null
+  creditsAfter: number | null
+  userId: string | null
+  success: boolean
+  resultCount: number | null
+  durationMs: number | null
+  createdAt: string
+}
+
+interface CdbSummary {
+  totalRows: number
+  totalCreditsUsed: number
+  creditsBefore: number | null
+  creditsAfter: number | null
+  firstEntry: string | null
+  lastEntry: string | null
+  byPlatform: { platform: string | null; count: number; creditsUsed: number }[]
+  topUsers: { userId: string | null; count: number; creditsUsed: number }[]
+}
+
 export default function CreditsAdminPanel() {
   const [plans, setPlans] = useState<PlanRow[]>([])
   const [packs, setPacks] = useState<PackRow[]>([])
@@ -100,6 +125,11 @@ export default function CreditsAdminPanel() {
   const [vendorRows, setVendorRows] = useState<VendorRow[]>([])
   const [vendorTotals, setVendorTotals] = useState<VendorTotal[]>([])
   const [vendorBalance, setVendorBalance] = useState<string | number | null>(null)
+
+  // CreatorDB vendor spend
+  const [cdbRows, setCdbRows] = useState<CdbLogRow[]>([])
+  const [cdbSummary, setCdbSummary] = useState<CdbSummary | null>(null)
+  const [cdbLoading, setCdbLoading] = useState(true)
 
   const load = async () => {
     setLoading(true)
@@ -127,6 +157,17 @@ export default function CreditsAdminPanel() {
         setVendorBalance(data.latestBalance ?? null)
       })
       .catch(() => {})
+    // CreatorDB logs
+    Promise.all([
+      fetch('/api/admin/creatordb-logs?summary=true').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/admin/creatordb-logs?limit=50').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([summary, rows]) => {
+        if (summary) setCdbSummary(summary)
+        if (rows?.logs) setCdbRows(rows.logs)
+      })
+      .catch(() => {})
+      .finally(() => setCdbLoading(false))
   }, [])
 
   const flash = (text: string) => {
@@ -363,6 +404,98 @@ export default function CreditsAdminPanel() {
               </div>
             </div>
           </div>
+        )}
+      </section>
+
+      {/* Vendor (CreatorDB) spend audit */}
+      <section className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="font-bold text-gray-900 mb-1">Vendor spend (CreatorDB)</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          One row per billed CreatorDB API call; cache hits are free and not logged.
+          {cdbSummary && cdbSummary.creditsAfter != null && (
+            <> Latest vendor balance: <b className="text-gray-700">{cdbSummary.creditsAfter} credits</b>.</>
+          )}
+        </p>
+        {cdbLoading ? (
+          <p className="text-sm text-gray-400">Loading CreatorDB logs…</p>
+        ) : (
+          <>
+            {cdbSummary && cdbSummary.byPlatform.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                <span className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700">
+                  <b>Total</b>: {cdbSummary.totalCreditsUsed} credits · {cdbSummary.totalRows} calls
+                </span>
+                {cdbSummary.byPlatform.map((p) => (
+                  <span key={p.platform ?? 'unknown'} className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700">
+                    <b>{p.platform ?? 'unknown'}</b>: {p.creditsUsed} credits · {p.count} calls
+                  </span>
+                ))}
+              </div>
+            )}
+            {cdbSummary && cdbSummary.topUsers.length > 0 && (
+              <details className="mb-4">
+                <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">Top users by credit usage</summary>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full text-xs max-w-md">
+                    <thead>
+                      <tr className="text-left text-gray-500 border-b">
+                        <th className="py-1.5 pr-3">User ID</th>
+                        <th className="pr-3 text-right">Credits used</th>
+                        <th className="text-right">Calls</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cdbSummary.topUsers.map((u) => (
+                        <tr key={u.userId ?? 'anon'} className="border-b last:border-0">
+                          <td className="py-1 pr-3 font-mono text-gray-600">{u.userId ?? '—'}</td>
+                          <td className="pr-3 text-right tabular-nums">{u.creditsUsed}</td>
+                          <td className="text-right tabular-nums">{u.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            )}
+            {cdbRows.length === 0 ? (
+              <p className="text-sm text-gray-400">No billed CreatorDB calls logged yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 border-b">
+                      <th className="py-2">When</th>
+                      <th>Endpoint</th>
+                      <th>Platform</th>
+                      <th>Credits</th>
+                      <th>Before</th>
+                      <th>After</th>
+                      <th>Results</th>
+                      <th>ms</th>
+                      <th>OK</th>
+                      <th>User</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cdbRows.map((r) => (
+                      <tr key={r.id} className="border-b border-gray-50">
+                        <td className="py-1.5 whitespace-nowrap text-gray-500">{new Date(r.createdAt).toLocaleString()}</td>
+                        <td className="font-mono text-xs max-w-[180px] truncate" title={r.endpoint}>{r.endpoint}</td>
+                        <td>{r.platform ?? '—'}</td>
+                        <td className="tabular-nums">{r.creditsUsedThis}</td>
+                        <td className="tabular-nums text-gray-400">{r.creditsBefore ?? '—'}</td>
+                        <td className="tabular-nums text-gray-400">{r.creditsAfter ?? '—'}</td>
+                        <td className="tabular-nums">{r.resultCount ?? '—'}</td>
+                        <td className="tabular-nums text-gray-400">{r.durationMs ?? '—'}</td>
+                        <td>{r.success ? '✓' : <span className="text-red-500">✗</span>}</td>
+                        <td className="text-gray-500 font-mono text-xs max-w-[120px] truncate" title={r.userId ?? undefined}>{r.userId ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </section>
 

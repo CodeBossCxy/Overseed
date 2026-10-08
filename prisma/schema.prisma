@@ -568,6 +568,8 @@ model CampaignOutreach {
   nicheTags         String[] @default([])
   status            String   @default("SHORTLISTED")
   requestedAt       DateTime?
+  sentAt            DateTime?
+  errorMessage      String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

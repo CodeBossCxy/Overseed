@@ -30,6 +30,15 @@ interface ClubUsageRow {
   total: number
 }
 
+interface CdbOverviewSummary {
+  totalRows: number
+  totalCreditsUsed: number
+  creditsBefore: number | null
+  creditsAfter: number | null
+  byPlatform: { platform: string | null; count: number; creditsUsed: number }[]
+  topUsers: { userId: string | null; count: number; creditsUsed: number }[]
+}
+
 interface UserData {
   id: string
   name: string | null
@@ -90,6 +99,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<UserData[]>([])
   const [recentAiLogs, setRecentAiLogs] = useState<AiLog[]>([])
   const [clubUsage, setClubUsage] = useState<ClubUsageRow[]>([])
+  const [cdbOverview, setCdbOverview] = useState<CdbOverviewSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'ai-usage' | 'credits' | 'beta-codes' | 'beta-feedback' | 'brand-verification' | 'campaign-review'>('overview')
 
@@ -172,13 +182,19 @@ export default function AdminDashboard() {
 
     const fetchData = async () => {
       try {
-        const res = await fetch('/api/admin/stats')
-        if (res.ok) {
-          const data = await res.json()
+        const [statsRes, cdbRes] = await Promise.all([
+          fetch('/api/admin/stats'),
+          fetch('/api/admin/creatordb-logs?summary=true'),
+        ])
+        if (statsRes.ok) {
+          const data = await statsRes.json()
           setOverview(data.overview)
           setUsers(data.users)
           setRecentAiLogs(data.recentAiLogs)
           setClubUsage(data.clubUsage || [])
+        }
+        if (cdbRes.ok) {
+          setCdbOverview(await cdbRes.json())
         }
       } catch (error) {
         console.error('Failed to fetch admin stats:', error)
@@ -364,6 +380,19 @@ export default function AdminDashboard() {
                 accent="text-orange-600"
               />
               <StatCard
+                label="CreatorDB Credits"
+                value={
+                  cdbOverview
+                    ? `${cdbOverview.creditsAfter ?? '?'} remaining (${cdbOverview.totalCreditsUsed} used)`
+                    : 'N/A'
+                }
+                accent={
+                  cdbOverview?.creditsAfter != null && cdbOverview.creditsAfter < 100
+                    ? 'text-red-600'
+                    : 'text-blue-600'
+                }
+              />
+              <StatCard
                 label="Influencers Club Credits"
                 value={
                   overview.clubCreditsLeft != null
@@ -377,6 +406,65 @@ export default function AdminDashboard() {
                 }
               />
             </div>
+
+            {/* CreatorDB usage summary */}
+            {cdbOverview && cdbOverview.totalRows > 0 && (
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="font-semibold text-gray-900">CreatorDB Usage</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {cdbOverview.totalCreditsUsed} vendor credits consumed across {cdbOverview.totalRows} API calls.
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                        <th className="px-6 py-2.5 font-medium">Platform</th>
+                        <th className="px-6 py-2.5 font-medium text-right">API Calls</th>
+                        <th className="px-6 py-2.5 font-medium text-right">Credits Used</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cdbOverview.byPlatform.map((p) => (
+                        <tr key={p.platform ?? 'unknown'} className="border-b border-gray-50">
+                          <td className="px-6 py-2.5 font-medium text-gray-900">{p.platform ?? 'unknown'}</td>
+                          <td className="px-6 py-2.5 text-right tabular-nums">{p.count}</td>
+                          <td className="px-6 py-2.5 text-right tabular-nums font-semibold">{p.creditsUsed}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {cdbOverview.topUsers.length > 0 && (
+                  <>
+                    <div className="px-6 py-3 border-t border-gray-100">
+                      <h3 className="text-xs font-medium text-gray-500">Top Users by Credit Usage</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                            <th className="px-6 py-2.5 font-medium">User</th>
+                            <th className="px-6 py-2.5 font-medium text-right">API Calls</th>
+                            <th className="px-6 py-2.5 font-medium text-right">Credits Used</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cdbOverview.topUsers.map((u) => (
+                            <tr key={u.userId ?? 'anon'} className="border-b border-gray-50">
+                              <td className="px-6 py-2.5 font-mono text-xs text-gray-600">{u.userId ?? '—'}</td>
+                              <td className="px-6 py-2.5 text-right tabular-nums">{u.count}</td>
+                              <td className="px-6 py-2.5 text-right tabular-nums font-semibold">{u.creditsUsed}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Per-user Influencers Club usage (billed platform charges;
                 cache hits don't re-bill upstream, so this is an upper bound

@@ -434,9 +434,9 @@ export default function NewOutreachPage() {
       }
       const result = await sendRes.json()
       setSendResult({
-        sent: result.sent ?? 0,
-        failed: result.failed ?? 0,
-        creditsUsed: result.creditsUsed ?? 0,
+        sent: result.totalSent ?? 0,
+        failed: result.totalFailed ?? 0,
+        creditsUsed: result.creditsCost ?? 0,
       })
       setStep(4)
     } catch (err: any) {
