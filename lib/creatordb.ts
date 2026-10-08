@@ -3,6 +3,7 @@
 // Search results are normalized to the same shape as lib/influencers-club.ts
 // so the rest of the app (DiscoverPanel, club-search route) works unchanged.
 
+import { createHash } from 'node:crypto'
 import { creatorDbFetch } from '@/lib/creatordb-usage'
 import type { ClubSearchOptions } from '@/lib/influencers-club'
 import { buildCustomSearchRequest, buildSearchRequest } from '@/lib/creatordb-search-request'
@@ -230,32 +231,12 @@ function mapSortBy(sortBy: string | undefined, platform: string): string {
 
 const RETRY_DELAYS_MS = [250, 750]
 
-async function searchFetch(url: string, init: RequestInit, userId?: string): Promise<Response> {
-  let attempt = 0
-  while (true) {
-    try {
-      const response = await creatorDbFetch(url, {
-        ...init,
-        signal: AbortSignal.timeout(30000),
-      }, { userId })
-      if (response.status < 500 || attempt >= RETRY_DELAYS_MS.length) return response
-    } catch (error) {
-      if (attempt >= RETRY_DELAYS_MS.length) throw error
-    }
-    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]))
-    attempt += 1
-  }
-}
-
-// Main search function — returns the same shape as clubSearch()
-export async function creatordbSearch(opts: ClubSearchOptions) {
+// Builds the request body sent to CreatorDB for a given set of search options.
+// Extracted so both creatordbSearch and creatordbSearchCacheProbe can hash
+// the exact same payload without duplicating logic.
+function buildCreatorDbRequestBody(opts: ClubSearchOptions): { body: object; platformPath: string } | null {
   const platformPath = PLATFORM_PATH[opts.platform]
-  if (!platformPath) {
-    throw new Error(`CreatorDB does not support platform: ${opts.platform}`)
-  }
-  if (!creatordbConfigured()) {
-    throw new Error('CreatorDB API not configured')
-  }
+  if (!platformPath) return null
 
   const customRequest = opts.creatorDbFilters
     ? buildCustomSearchRequest(
@@ -281,16 +262,43 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
       )
     : null
   const filters = customRequest?.filters ?? presetRequest?.filters ?? buildFilters(opts)
-  if (filters.length > 10) {
-    throw new Error(`CreatorDB searches are limited to 10 filters (received ${filters.length})`)
-  }
   const pageSize = customRequest?.pageSize ?? presetRequest?.pageSize ?? Math.min(opts.limit || 10, 100)
   const offset = customRequest?.offset ?? presetRequest?.offset ?? (opts.page ?? 0) * pageSize
-  const warnings: string[] = []
+  const body = customRequest ?? presetRequest ?? {
+    filters,
+    pageSize,
+    offset,
+    sortBy: mapSortBy(opts.sortBy, opts.platform),
+    desc: opts.sortOrder !== 'asc',
+  }
+  return { body, platformPath }
+}
 
-  // Platforms not supported by CreatorDB search
+function cdbCacheKey(body: object): string {
+  return 'cdb:' + createHash('sha1').update(JSON.stringify(body)).digest('hex')
+}
+
+async function searchFetch(url: string, init: RequestInit, userId?: string): Promise<Response> {
+  let attempt = 0
+  while (true) {
+    try {
+      const response = await creatorDbFetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(30000),
+      }, { userId })
+      if (response.status < 500 || attempt >= RETRY_DELAYS_MS.length) return response
+    } catch (error) {
+      if (attempt >= RETRY_DELAYS_MS.length) throw error
+    }
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]))
+    attempt += 1
+  }
+}
+
+// Main search function — returns the same shape as clubSearch()
+export async function creatordbSearch(opts: ClubSearchOptions) {
   if (!PLATFORM_PATH[opts.platform]) {
-    warnings.push(`CreatorDB does not support ${opts.platform} search — skipped.`)
+    const warnings: string[] = [`CreatorDB does not support ${opts.platform} search — skipped.`]
     return {
       results: [],
       total: 0,
@@ -302,13 +310,32 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
       cached: false,
     }
   }
+  if (!creatordbConfigured()) {
+    throw new Error('CreatorDB API not configured')
+  }
 
-  const body = customRequest ?? presetRequest ?? {
-    filters,
-    pageSize,
-    offset,
-    sortBy: mapSortBy(opts.sortBy, opts.platform),
-    desc: opts.sortOrder !== 'asc',
+  const built = buildCreatorDbRequestBody(opts)
+  if (!built) {
+    throw new Error(`CreatorDB does not support platform: ${opts.platform}`)
+  }
+  const { body, platformPath } = built
+  const warnings: string[] = []
+
+  // Check cache before making API call
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const cacheKey = cdbCacheKey(body)
+    const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
+    if (hit) {
+      return { ...(hit.data as object), cached: true }
+    }
+  } catch {
+    // Cache miss or DB error — proceed with live call
+  }
+
+  const filters = Array.isArray((body as any).filters) ? (body as any).filters : []
+  if (filters.length > 10) {
+    throw new Error(`CreatorDB searches are limited to 10 filters (received ${filters.length})`)
   }
 
   const res = await searchFetch(`${BASE}/${platformPath}/search`, {
@@ -320,6 +347,12 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
 
   const data = await res.json().catch(() => null)
   if (!res.ok || !data?.success) {
+    console.error('[CreatorDB] Search failed', {
+      status: res.status,
+      url: `${BASE}/${platformPath}/search`,
+      requestBody: JSON.stringify(body),
+      response: JSON.stringify(data),
+    })
     const detail = data?.errorDescription || data?.message || data?.error || `CreatorDB search failed (${res.status})`
     throw new CreatorDbApiError(
       typeof detail === 'string' ? detail : JSON.stringify(detail),
@@ -331,7 +364,9 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
 
   const creatorList = Array.isArray(data?.data?.creatorList) ? data.data.creatorList : []
   const followerField = FOLLOWER_FIELD[opts.platform] || 'totalFollowers'
-  const sortMetricField = body.sortBy
+  const bodyAny = body as any
+  const sortMetricField = bodyAny.sortBy
+  const bodyOffset: number = bodyAny.offset ?? 0
 
   const results = creatorList.map((c: any, index: number) => {
     const channelId = String(c.channelId || '').trim()
@@ -340,7 +375,7 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
     // CreatorDB sometimes returns search rows without either identifier.
     // Never emit the shared `cdb:<platform>:` id: duplicate React keys can
     // make a card from the preceding search survive reconciliation.
-    const resultIdentity = channelId || uniqueId || `result-${offset + index}`
+    const resultIdentity = channelId || uniqueId || `result-${bodyOffset + index}`
     const profile = c.profile || {}
     const perf = c.performance || {}
     const engRate = perf.avgRecentContentsEngagementRate
@@ -384,7 +419,7 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
     }
   })
 
-  return {
+  const result = {
     results,
     total: data.data?.totalResults ?? results.length,
     credits_left: data.creditsAvailable ?? data.remainingQuota ?? null,
@@ -399,12 +434,35 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
     live_calls: 1,
     cached: false,
   }
+
+  // Save to cache for future requests
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const cacheKey = cdbCacheKey(body)
+    await prisma.clubSearchCache.upsert({
+      where: { key: cacheKey },
+      create: { key: cacheKey, request: body as any, data: result as any },
+      update: { request: body as any, data: result as any, fetchedAt: new Date() },
+    })
+  } catch {
+    // Cache write failure is non-fatal
+  }
+
+  return result
 }
 
-// Cache probe — CreatorDB has no separate cache; always returns null
-// (the app's own club_search_cache layer handles caching above this)
-export async function creatordbSearchCacheProbe(_opts: ClubSearchOptions) {
-  return null
+// Cache probe — checks club_search_cache for a matching CreatorDB request.
+export async function creatordbSearchCacheProbe(opts: ClubSearchOptions) {
+  try {
+    const built = buildCreatorDbRequestBody(opts)
+    if (!built) return null
+    const { prisma } = await import('@/lib/prisma')
+    const cacheKey = cdbCacheKey(built.body)
+    const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
+    return hit ? { ...(hit.data as object), cached: true } : null
+  } catch {
+    return null
+  }
 }
 
 // ---------------------------------------------------------------------------

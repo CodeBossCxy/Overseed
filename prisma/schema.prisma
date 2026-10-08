@@ -947,6 +947,28 @@ model ClubCreditLog {
   @@map("club_credit_log")
 }
 
+// Audit trail of CreatorDB vendor credit spend. One row per API call.
+// Tracks what was searched, who searched, and credit depletion.
+model CreatorDbCreditLog {
+  id              String   @id @default(cuid())
+  userId          String?
+  endpoint        String
+  platform        String?
+  searchFilters   Json?
+  creditsUsedThis Int?
+  creditsBefore   Int?
+  creditsAfter    Int?
+  traceId         String?
+  success         Boolean
+  resultCount     Int?
+  durationMs      Int?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("creatordb_credit_log")
+}
+
 // One creator-discovery search submission = one task. Stores the normalized
 // search parameters (no page number) and a per-page snapshot of results.
 // Re-viewing a snapshotted page is free; fetching a page the task has not

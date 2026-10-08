@@ -624,7 +624,13 @@ export async function GET(req: NextRequest) {
         { status: upstreamStatus >= 400 && upstreamStatus < 500 ? upstreamStatus : 502 },
       )
     }
-    console.warn(`${providerName()} search unavailable; using Overseed creator index:`, err?.message)
+    console.warn(`${providerName()} search unavailable; using Overseed creator index:`, err?.message, {
+      httpStatus: err?.httpStatus,
+      errorCode: err?.errorCode,
+      traceId: err?.traceId,
+      platform,
+      searchOpts: JSON.stringify(searchOpts),
+    })
     const local = await safeLocalCreatorDiscovery(params, true)
     settleAfterResponse(local?.results?.length ?? 0)
     // Fallback results were billed the same way — snapshot them so a

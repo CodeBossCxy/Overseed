@@ -24,6 +24,16 @@ function numeric(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+function extractPlatform(endpoint: string): string | null {
+  const match = endpoint.match(/\/(instagram|youtube|tiktok)\//)
+  return match ? match[1] : null
+}
+
+function safeParseBody(body: BodyInit | null | undefined): any {
+  if (!body || typeof body !== 'string') return null
+  try { return JSON.parse(body) } catch { return null }
+}
+
 export async function creatorDbFetch(
   url: string,
   init: RequestInit,
@@ -61,5 +71,28 @@ export async function creatorDbFetch(
     usageStatus: creditsUsed === null ? 'not_reported' : 'reported', reportedCreditFields,
     resultCount: Array.isArray(data?.data?.creatorList) ? data.data.creatorList.length : null,
   })
+  // Write to DB for persistent depletion tracking
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const creditsAfter = numeric(data?.creditsAvailable) ?? numeric(data?.remainingQuota) ?? null
+    const creditsBefore = creditsAfter !== null && creditsUsed !== null ? creditsAfter + creditsUsed : null
+    await prisma.creatorDbCreditLog.create({
+      data: {
+        userId: context.userId ?? null,
+        endpoint,
+        platform: extractPlatform(endpoint),
+        searchFilters: safeParseBody(init.body),
+        creditsUsedThis: creditsUsed,
+        creditsBefore,
+        creditsAfter,
+        traceId: typeof data?.traceId === 'string' ? data.traceId : null,
+        success: response.ok && data?.success === true,
+        resultCount: Array.isArray(data?.data?.creatorList) ? data.data.creatorList.length : null,
+        durationMs: Date.now() - started,
+      },
+    })
+  } catch (dbErr) {
+    console.error('[CreatorDB usage] DB write failed:', dbErr)
+  }
   return response
 }
