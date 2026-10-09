@@ -107,7 +107,6 @@ const NICHE_LIST: { name: string; channelCount: number }[] = [
   { name: 'Sustainability', channelCount: 1000 },
   { name: 'Mental Health', channelCount: 1000 },
   { name: 'Camping', channelCount: 900 },
-  { name: 'Photography', channelCount: 6500 },
   { name: 'Nail Art', channelCount: 800 },
   { name: 'Tattoo', channelCount: 700 },
 ]

@@ -16,6 +16,7 @@ import {
   type CreatorDbFilterValue,
   type CreatorDbPresetId,
 } from '@/lib/creatordb-filter-presets'
+import { resolveNiches, translateTerm, type NicheResolveResult } from '@/lib/creatordb-niches'
 
 export interface CreatorDbExtraFilter {
   field: CreatorDbCanonicalField
@@ -50,6 +51,7 @@ export interface CreatorDbSearchRequest {
   desc: boolean
   pageSize: number
   offset: number
+  nicheResolution?: NicheResolveResult
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -97,6 +99,22 @@ function validateValue(
   }
 }
 
+// ── Resolve niches: user names → CreatorDB taxonomy IDs ────────────────────────
+
+function resolveNicheFilter(
+  platform: CreatorDbPlatform,
+  rawValue: CreatorDbFilterValue,
+): { ids: string[]; resolution: NicheResolveResult } | null {
+  const terms: string = typeof rawValue === 'string'
+    ? rawValue
+    : Array.isArray(rawValue)
+      ? (rawValue as string[]).join(', ')
+      : ''
+  if (!terms.trim()) return null
+  const resolution = resolveNiches(platform, terms)
+  return { ids: resolution.ids, resolution }
+}
+
 export function buildCustomSearchRequest(
   platform: CreatorDbPlatform,
   selectedFilters: CreatorDbCanonicalFilter[],
@@ -110,38 +128,64 @@ export function buildCustomSearchRequest(
   }
   if (!CREATORDB_FIELD_MAP[sortField]?.sortable) throw new Error(`${sortField} cannot be used for sorting`)
 
-  const filters = selectedFilters.map(({ field, op: rawOp, value: rawValue }) => {
-    // --- Normalize operator and value for fields with known semantics ---
+  // Resolve niches to taxonomy IDs. If every term is unmatched, drop the
+  // niche filter entirely — the caller can inspect nicheResolution to
+  // surface suggestions to the user.
+  let mergedFilters = [...selectedFilters]
+  let nicheResolution: NicheResolveResult | undefined
+  const nicheFilter = mergedFilters.find((f) => f.field === 'niches')
+  if (nicheFilter) {
+    const resolved = resolveNicheFilter(platform, nicheFilter.value)
+    mergedFilters = mergedFilters.filter((f) => f.field !== 'niches')
+    if (resolved) {
+      nicheResolution = resolved.resolution
+      if (resolved.ids.length > 0) {
+        mergedFilters.push({ field: 'niches', op: 'in', value: resolved.ids })
+      }
+    }
+  }
 
+  // Translate non-English hashtags to English (CreatorDB hashtags are English-only)
+  const hashtagFilter = mergedFilters.find((f) => f.field === 'hashtags')
+  if (hashtagFilter) {
+    const rawTerms: string[] = typeof hashtagFilter.value === 'string'
+      ? hashtagFilter.value.split(',').map((v) => v.trim()).filter(Boolean)
+      : Array.isArray(hashtagFilter.value)
+        ? (hashtagFilter.value as string[]).map((v) => v.trim()).filter(Boolean)
+        : []
+    const translated = rawTerms.map((t) => translateTerm(t) ?? t)
+    // Always use array form + 'in' op since the ARRAY_FIELDS auto-promote
+    // only fires for op '=', but the UI may already send op 'in'.
+    hashtagFilter.value = translated
+    hashtagFilter.op = 'in'
+  }
+
+  const filters = mergedFilters.map(({ field, op: rawOp, value: rawValue }) => {
     let op = rawOp
     let value: CreatorDbFilterValue = rawValue
 
     // Fields that always require the 'in' operator with an array value.
-    // The UI may send op "=" with a single string — auto-promote.
     const ARRAY_FIELDS: CreatorDbCanonicalField[] = ['hashtags', 'niches', 'audienceAge']
     if (ARRAY_FIELDS.includes(field) && op === '=' && typeof value === 'string') {
       op = 'in'
       value = value.split(',').map((v) => v.trim()).filter(Boolean)
     }
 
-    // Engagement rate fields: CreatorDB stores as decimal 0-1, but users
-    // enter percent (e.g. 2 for 2%). Convert values > 1 automatically.
+    // Engagement rate: users enter percent, API stores 0-1 decimal.
     const isEngagementRate = field.toLowerCase().includes('engagementrate')
       || creatorDbFieldName(field, platform).toLowerCase().includes('engagementrate')
     if (isEngagementRate && typeof value === 'number' && value > 1) {
       value = value / 100
     }
 
-    // lastPublishTime: the UI sends day counts (90, 180, 365, -365).
-    // Convert to Unix timestamp in milliseconds for CreatorDB.
-    // Negative values mean "older than X days" (op flips to <).
+    // lastPublishTime: day counts → Unix ms timestamps.
     if (field === 'lastPublishTime' && typeof value === 'number' && Math.abs(value) < 100_000) {
       const days = Math.abs(value)
       value = Date.now() - days * 24 * 60 * 60 * 1000
       if (rawValue as number < 0) op = '<'
     }
 
-    // Country / language code normalization (existing)
+    // Country / language code normalization
     const normalized = (field === 'country' || field === 'audienceLocation') && typeof value === 'string'
       ? creatorDbCountryCode(value)
       : field === 'mainLanguage' && typeof value === 'string'
@@ -157,7 +201,7 @@ export function buildCustomSearchRequest(
   const offset = pagination.offset ?? 0
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) throw new Error('pageSize must be an integer between 1 and 100')
   if (!Number.isInteger(offset) || offset < 0) throw new Error('offset must be a non-negative integer')
-  return { filters, sortBy: creatorDbFieldName(sortField, platform), desc, pageSize, offset }
+  return { filters, sortBy: creatorDbFieldName(sortField, platform), desc, pageSize, offset, nicheResolution }
 }
 
 export function buildSearchRequest(
@@ -202,13 +246,25 @@ export function buildSearchRequest(
   ]
 
   const filters: CreatorDbApiFilter[] = []
+  let nicheResolution: NicheResolveResult | undefined
   for (const filter of configured) {
     if (isEmpty(filter.value)) continue
-    const value = filter.field === 'niches' && Array.isArray(filter.value)
-      ? [...new Set(filter.value.map((v) => v.trim()).filter(Boolean))]
-      : (filter.field === 'country' || filter.field === 'audienceLocation') && typeof filter.value === 'string'
-        ? creatorDbCountryCode(filter.value)
-        : filter.value as CreatorDbFilterValue
+
+    // Resolve niches to taxonomy IDs for preset searches too
+    if (filter.field === 'niches') {
+      const resolved = resolveNicheFilter(platform, filter.value as CreatorDbFilterValue)
+      if (resolved) {
+        nicheResolution = resolved.resolution
+        if (resolved.ids.length > 0) {
+          filters.push({ filterName: creatorDbFieldName('niches', platform), op: 'in', value: resolved.ids })
+        }
+      }
+      continue
+    }
+
+    const value = (filter.field === 'country' || filter.field === 'audienceLocation') && typeof filter.value === 'string'
+      ? creatorDbCountryCode(filter.value)
+      : filter.value as CreatorDbFilterValue
     if (isEmpty(value)) continue
     validateValue(filter.field, filter.op, value)
     filters.push({ filterName: creatorDbFieldName(filter.field, platform), op: filter.op, value })
@@ -231,5 +287,6 @@ export function buildSearchRequest(
     desc: preset.desc,
     pageSize,
     offset,
+    nicheResolution,
   }
 }

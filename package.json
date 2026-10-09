@@ -29,6 +29,7 @@
     "bcryptjs": "^2.4.3",
     "docx": "^9.6.1",
     "exceljs": "^4.4.0",
+    "fastest-levenshtein": "^1.0.16",
     "file-saver": "^2.0.5",
     "geist": "^1.7.0",
     "next": "^15.5.12",

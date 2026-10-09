@@ -234,7 +234,7 @@ const RETRY_DELAYS_MS = [250, 750]
 // Builds the request body sent to CreatorDB for a given set of search options.
 // Extracted so both creatordbSearch and creatordbSearchCacheProbe can hash
 // the exact same payload without duplicating logic.
-function buildCreatorDbRequestBody(opts: ClubSearchOptions): { body: object; platformPath: string } | null {
+function buildCreatorDbRequestBody(opts: ClubSearchOptions): { body: object; platformPath: string; nicheResolution?: import('@/lib/creatordb-niches').NicheResolveResult } | null {
   const platformPath = PLATFORM_PATH[opts.platform]
   if (!platformPath) return null
 
@@ -281,12 +281,15 @@ function buildCreatorDbRequestBody(opts: ClubSearchOptions): { body: object; pla
   }
   const pageSize = customRequest?.pageSize ?? presetRequest?.pageSize ?? Math.min(opts.limit || 10, 100)
   const offset = customRequest?.offset ?? presetRequest?.offset ?? (opts.page ?? 0) * pageSize
+  const nicheResolution = customRequest?.nicheResolution ?? presetRequest?.nicheResolution
   const body = customRequest
-    ? { ...customRequest, filters }
+    ? { ...customRequest, filters, nicheResolution: undefined }
     : presetRequest
-      ? { ...presetRequest, filters }
+      ? { ...presetRequest, filters, nicheResolution: undefined }
       : { filters, pageSize, offset, sortBy: mapSortBy(opts.sortBy, opts.platform), desc: opts.sortOrder !== 'asc' }
-  return { body, platformPath }
+  // Strip nicheResolution from the body sent to the API — it's metadata only
+  delete (body as any).nicheResolution
+  return { body, platformPath, nicheResolution }
 }
 
 function cdbCacheKey(body: object): string {
@@ -333,8 +336,27 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
   if (!built) {
     throw new Error(`CreatorDB does not support platform: ${opts.platform}`)
   }
-  const { body, platformPath } = built
+  const { body, platformPath, nicheResolution } = built
   const warnings: string[] = []
+
+  // Surface translation, fuzzy-match, or unmatched niche feedback as warnings
+  if (nicheResolution) {
+    for (const m of nicheResolution.matched) {
+      if (m.translatedFrom) {
+        warnings.push(`Niche "${m.translatedFrom}" translated to "${m.term}"`)
+      }
+    }
+    for (const fm of nicheResolution.fuzzyMatched) {
+      const prefix = fm.translatedFrom ? `"${fm.translatedFrom}" → ` : ''
+      warnings.push(`Niche ${prefix}"${fm.term}" matched as "${fm.matchedName}" (${fm.score}% similarity)`)
+    }
+    for (const um of nicheResolution.unmatched) {
+      const suggestions = um.suggestions.length > 0
+        ? ` Did you mean: ${um.suggestions.join(', ')}?`
+        : ''
+      warnings.push(`Niche "${um.term}" not found.${suggestions}`)
+    }
+  }
 
   // Check cache before making API call
   try {
@@ -448,6 +470,7 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
     cache_hits: 0,
     live_calls: 1,
     cached: false,
+    niche_resolution: nicheResolution ?? null,
   }
 
   // Save to cache for future requests
