@@ -7,6 +7,7 @@ import { discoverySearch, discoverySearchCacheProbe, getProvider, providerName }
 import { CREATORDB_FIELD_MAP, CREATORDB_PLATFORMS, type CreatorDbCanonicalField, type CreatorDbFilterOp, type CreatorDbPlatform } from '@/lib/creatordb-filter-fields'
 import { CREATORDB_PRESETS, type CreatorDbFilterValue, type CreatorDbPresetId } from '@/lib/creatordb-filter-presets'
 import { buildCustomSearchRequest, buildSearchRequest, type CreatorDbCanonicalFilter, type CreatorDbExtraFilter, type CreatorDbPresetOverrides } from '@/lib/creatordb-search-request'
+import { parseDiscoveryQuery, toCreatorDbFilters } from '@/lib/discovery-ai'
 import {
   CLUB_FILTER_DEFS,
   CREATOR_HAS_KEYS,
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams
 
   // Validate everything cheap BEFORE any charge.
-  const platform = (params.get('platform') || 'instagram') as ClubPlatform
+  let platform = (params.get('platform') || 'instagram') as ClubPlatform
   if (!CLUB_PLATFORMS.includes(platform)) {
     return NextResponse.json({ message: 'Unsupported platform', code: 'UNSUPPORTED_PLATFORM' }, { status: 400 })
   }
@@ -395,9 +396,60 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── AI search: parse natural language → structured CreatorDB filters ──
+  // When the user typed a free-form query and didn't set any structured
+  // filters, use AI to convert the text into CreatorDB canonical filters.
+  // This adds ~1-2s on the first search but the result is cached in the
+  // task for pagination so subsequent pages are instant.
+  let aiParsed: Awaited<ReturnType<typeof parseDiscoveryQuery>> | null = null
+  const rawQuery = params.get('q')?.trim() || ''
+  if (
+    rawQuery &&
+    !creatorDbFilters &&
+    !creatorDbPreset &&
+    !taskIdParam &&
+    getProvider() === 'creatordb' &&
+    CREATORDB_PLATFORMS.includes(platform as CreatorDbPlatform)
+  ) {
+    try {
+      aiParsed = await parseDiscoveryQuery(rawQuery)
+      const converted = toCreatorDbFilters(aiParsed)
+      if (converted.filters.length > 0) {
+        creatorDbFilters = converted.filters.map((f) => ({
+          field: f.field,
+          op: f.op,
+          value: f.value as CreatorDbFilterValue,
+        }))
+        creatorDbSortField = 'followers'
+        // If the AI detected a different platform, override the URL param
+        if (aiParsed.platform && CLUB_PLATFORMS.includes(aiParsed.platform as ClubPlatform)) {
+          platform = aiParsed.platform as ClubPlatform
+        }
+        // Validate the built request (reject before charging if invalid)
+        try {
+          buildCustomSearchRequest(
+            platform as CreatorDbPlatform,
+            creatorDbFilters,
+            { pageSize: Math.min(num('limit') ?? 100, 100), offset: num('offset') ?? 0 },
+            creatorDbSortField,
+            params.get('sort_order') !== 'asc',
+          )
+        } catch {
+          // AI produced invalid filters — fall back to keyword search
+          creatorDbFilters = undefined
+          creatorDbSortField = undefined
+        }
+      }
+    } catch (err) {
+      console.warn('[discovery-ai] AI parse failed, falling back to keyword search:', err)
+    }
+  }
+
   const searchOpts = {
     platform,
-    query: params.get('q')?.trim() || undefined,
+    // When AI parsing produced structured filters, don't also pass the raw
+    // query as a keyword — it would get merged as duplicate hashtags.
+    query: (aiParsed && creatorDbFilters) ? undefined : (params.get('q')?.trim() || undefined),
     country: params.get('country')?.trim() || undefined,
     minFollowers: num('min_followers'),
     maxFollowers: num('max_followers'),
@@ -449,6 +501,11 @@ export async function GET(req: NextRequest) {
   // search) and return the task id for the client to keep. Best-effort: a
   // persistence failure must not hide results.
   const persistTaskPage = async (result: any): Promise<string | null> => {
+    // Don't store empty results — avoids caching failed/zero-result searches
+    // that would block future retries with the same parameters.
+    const resultCount = Array.isArray(result?.results) ? result.results.length : 0
+    if (resultCount === 0) return task?.id ?? null
+
     try {
       if (task) {
         await prisma.discoveryTaskPage.upsert({
@@ -552,13 +609,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // v4: zero results → full refund; short page → refund the unfilled share
-  // (charge kept = max(1, ceil(price·n/10))). Single atomic, idempotent op.
+  // v4: zero results → full refund; short page → proportional refund.
+  // Applies to ALL search types including CreatorDB advanced searches.
+  // (CreatorDB vendor credits are non-recoverable, but Overseed wallet
+  // credits are refunded so the user isn't double-penalized.)
   const settleCharge = async (resultCount: number) => {
-    // CreatorDB search billing is per request/filter block, not per returned
-    // creator. A zero-match preset search still costs one vendor credit.
+    if (!searchCharge) return
     const isCreatorDbAdvancedSearch = Boolean(creatorDbPreset || creatorDbFilters || (task?.request as any)?.creatorDbPreset || (task?.request as any)?.creatorDbFilters)
-    if (!searchCharge || isCreatorDbAdvancedSearch || resultCount >= DISCOVERY_PAGE_SIZE) return
+    // For advanced searches: only refund on zero results (full refund).
+    // For standard searches: zero → full refund, partial → proportional.
+    if (isCreatorDbAdvancedSearch) {
+      if (resultCount > 0) return // got results — keep the charge
+      const price = await getCreditPrice('discovery_search')
+      await walletRefund(userId, searchCharge.referenceId, { amount: price })
+      return
+    }
+    if (resultCount >= DISCOVERY_PAGE_SIZE) return
     const price = await getCreditPrice('discovery_search')
     const keep =
       resultCount > 0 ? Math.max(1, Math.ceil((price * resultCount) / DISCOVERY_PAGE_SIZE)) : 0
@@ -603,7 +669,27 @@ export async function GET(req: NextRequest) {
     )
     settleAfterResponse(result?.results?.length ?? 0)
     const taskId = await persistTaskPage(result)
-    return NextResponse.json({ ...result, task_id: taskId, page: requestedPage })
+    return NextResponse.json({
+      ...result,
+      task_id: taskId,
+      page: requestedPage,
+      ...(aiParsed ? {
+        ai_parsed: {
+          niches: aiParsed.niches,
+          keywords: aiParsed.keywords,
+          platform: aiParsed.platform,
+          country: aiParsed.country,
+          audience_location: aiParsed.audience_location,
+          min_followers: aiParsed.min_followers,
+          max_followers: aiParsed.max_followers,
+          min_engagement: aiParsed.min_engagement,
+          language: aiParsed.language,
+          audience_age: aiParsed.audience_age,
+          last_post: aiParsed.last_post,
+          min_avg_views: aiParsed.min_avg_views,
+        },
+      } : {}),
+    })
   } catch (err: any) {
     const isCreatorDbAdvancedSearch = Boolean(creatorDbPreset || creatorDbFilters || (task?.request as any)?.creatorDbPreset || (task?.request as any)?.creatorDbFilters)
     if (isCreatorDbAdvancedSearch) {

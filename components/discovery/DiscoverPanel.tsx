@@ -904,6 +904,51 @@ export default function DiscoverPanel() {
       setSearchHasMore(typeof data?.has_next_page === 'boolean' ? data.has_next_page : results.length === request.pageSize)
       const newTaskId: string | null = data?.task_id ?? taskId ?? null
       setSearchTaskId(newTaskId)
+
+      // ── Populate filter UI from AI-parsed query ──
+      // When the server used AI to convert a free-form query into structured
+      // filters, reflect those filters in the UI so the user can adjust them.
+      if (data?.ai_parsed && page === 0) {
+        const ai = data.ai_parsed
+        // Switch platform tab if AI detected a different one
+        if (ai.platform && ['instagram', 'tiktok', 'youtube'].includes(ai.platform)) {
+          setPlatforms([ai.platform])
+        }
+        // Country
+        if (ai.country) setCountry(ai.country)
+        // Followers
+        if (ai.min_followers != null) setMinFollowers(String(ai.min_followers))
+        if (ai.max_followers != null) setMaxFollowers(String(ai.max_followers))
+        // Build CreatorDB filter inputs from the AI output
+        const aiFilters: CreatorDbFilterInput[] = []
+        if (ai.niches) {
+          aiFilters.push({ field: 'niches' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: ai.niches })
+        }
+        if (ai.keywords) {
+          aiFilters.push({ field: 'hashtags' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: ai.keywords })
+        }
+        if (ai.audience_location) {
+          aiFilters.push({ field: 'audienceLocation' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: ai.audience_location })
+        }
+        if (ai.language) {
+          aiFilters.push({ field: 'mainLanguage' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: ai.language })
+        }
+        if (ai.audience_age) {
+          aiFilters.push({ field: 'audienceAge' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: ai.audience_age })
+        }
+        if (ai.min_engagement != null) {
+          aiFilters.push({ field: 'shortEngagementRate' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: String(ai.min_engagement) })
+        }
+        if (ai.min_avg_views != null) {
+          aiFilters.push({ field: 'shortAvgViews' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: String(ai.min_avg_views) })
+        }
+        if (ai.last_post != null) {
+          aiFilters.push({ field: 'lastPublishTime' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: String(ai.last_post) })
+        }
+        if (aiFilters.length > 0) {
+          setCreatorDbFilters(aiFilters)
+        }
+      }
       // Persist so the results survive leaving and returning to the page
       try {
         const v = persistVals ?? currentFilterVals()
