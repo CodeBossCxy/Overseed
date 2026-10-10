@@ -123,8 +123,8 @@ export function buildCustomSearchRequest(
   desc = true,
 ): CreatorDbSearchRequest {
   if (!CREATORDB_PLATFORMS.includes(platform)) throw new Error(`Unsupported CreatorDB platform: ${platform}`)
-  if (selectedFilters.length > 10) {
-    throw new Error(`CreatorDB searches are limited to 10 filters (received ${selectedFilters.length})`)
+  if (selectedFilters.length > 20) {
+    throw new Error(`CreatorDB searches are limited to 20 filters (received ${selectedFilters.length})`)
   }
   if (!CREATORDB_FIELD_MAP[sortField]?.sortable) throw new Error(`${sortField} cannot be used for sorting`)
 
@@ -270,8 +270,8 @@ export function buildSearchRequest(
     filters.push({ filterName: creatorDbFieldName(filter.field, platform), op: filter.op, value })
   }
 
-  if (filters.length > 10) {
-    throw new Error(`CreatorDB searches are limited to 10 filters (received ${filters.length})`)
+  if (filters.length > 20) {
+    throw new Error(`CreatorDB searches are limited to 20 filters (received ${filters.length})`)
   }
 
   const pageSize = pagination.pageSize ?? 100

@@ -209,10 +209,8 @@ function buildFilters(opts: ClubSearchOptions): CdbFilter[] {
     filters.push({ filterName: followerField, op: '>', value: 1000 })
   }
 
-  // Never silently drop user intent: the 10-filter cap is also the one-credit
-  // budget boundary for this feature.
-  if (filters.length > 10) {
-    throw new Error(`CreatorDB searches are limited to 10 filters (received ${filters.length})`)
+  if (filters.length > 20) {
+    throw new Error(`CreatorDB searches are limited to 20 filters (received ${filters.length})`)
   }
   return filters
 }
@@ -272,9 +270,9 @@ function buildCreatorDbRequestBody(opts: ClubSearchOptions): { body: object; pla
     const existingNames = new Set(baseFilters.map((f: { filterName: string }) => f.filterName))
     const missing = basicFilters.filter((f) => !existingNames.has(f.filterName))
     filters = [...baseFilters, ...missing]
-    if (filters.length > 10) {
-      // Trim to 10 — keep the explicit cdb_filters, drop overflow basic ones
-      filters = [...baseFilters, ...missing.slice(0, 10 - baseFilters.length)]
+    if (filters.length > 20) {
+      // Trim to 20 — keep the explicit cdb_filters, drop overflow basic ones
+      filters = [...baseFilters, ...missing.slice(0, 20 - baseFilters.length)]
     }
   } else {
     filters = baseFilters
@@ -371,8 +369,8 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
   }
 
   const filters = Array.isArray((body as any).filters) ? (body as any).filters : []
-  if (filters.length > 10) {
-    throw new Error(`CreatorDB searches are limited to 10 filters (received ${filters.length})`)
+  if (filters.length > 20) {
+    throw new Error(`CreatorDB searches are limited to 20 filters (received ${filters.length})`)
   }
 
   const res = await searchFetch(`${BASE}/${platformPath}/search`, {

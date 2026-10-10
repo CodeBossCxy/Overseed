@@ -30,6 +30,24 @@ import { walletRefund, getCreditPrice } from '@/lib/wallet'
 // Zero results → full refund; fewer than 10 → proportional (ceil, min 1).
 const DISCOVERY_PAGE_SIZE = 10
 
+// ── Filter usage analytics (in-memory, logged periodically) ──────────────
+// Tracks how often searches use >10 filters vs total searches.
+// Resets each time the counter is flushed (every LOG_INTERVAL searches).
+const filterStats = { total: 0, over10: 0 }
+const FILTER_STATS_LOG_INTERVAL = 50
+function recordFilterUsage(filterCount: number) {
+  filterStats.total++
+  if (filterCount > 10) filterStats.over10++
+  if (filterStats.total % FILTER_STATS_LOG_INTERVAL === 0) {
+    const pct = filterStats.total > 0
+      ? ((filterStats.over10 / filterStats.total) * 100).toFixed(1)
+      : '0.0'
+    console.log(`[discovery-filter-stats] ${filterStats.over10}/${filterStats.total} searches used >10 filters (${pct}%)`)
+    filterStats.total = 0
+    filterStats.over10 = 0
+  }
+}
+
 // TEMP: GET /api/discovery/club-search — influencers.club-backed creator
 // search, brand-only like /api/discovery/search. The API key never leaves
 // the server. Remove together with lib/influencers-club.ts and the
@@ -434,10 +452,12 @@ export async function GET(req: NextRequest) {
             creatorDbSortField,
             params.get('sort_order') !== 'asc',
           )
-        } catch {
+        } catch (validationErr) {
+          console.warn('[discovery-ai] AI filters failed validation, falling back to keyword search:', validationErr)
           // AI produced invalid filters — fall back to keyword search
           creatorDbFilters = undefined
           creatorDbSortField = undefined
+          aiParsed = null
         }
       }
     } catch (err) {
@@ -566,6 +586,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // When the search uses more than 10 CreatorDB filters, charge 2x credits
+  // (one extra discovery_search unit for the 11-20 filter tier).
+  const effectiveFilterCount = (creatorDbFilters?.length ?? 0)
+    + (creatorDbPreset ? (CREATORDB_PRESETS[creatorDbPreset]?.filters?.length ?? 0) : 0)
+  const filterCostMultiplier = effectiveFilterCount > 10 ? 2 : 1
+  recordFilterUsage(effectiveFilterCount)
+
   let searchCharge: { referenceId: string; refund: () => Promise<void> } | null = null
   let cachedResult: Awaited<ReturnType<typeof discoverySearchCacheProbe>> = null
   if (CREDIT_SYSTEM_ENABLED) {
@@ -573,7 +600,7 @@ export async function GET(req: NextRequest) {
     const [probe, charge] = await Promise.all([
       // The YouTube path has its own pool cache inside youtubeSearchCreators
       useYoutube ? Promise.resolve(null) : discoverySearchCacheProbe(searchOpts),
-      chargeCredits(userId, 'discovery_search', referenceId),
+      chargeCredits(userId, 'discovery_search', referenceId, { quantity: filterCostMultiplier }),
     ])
     if (!charge.ok) {
       return NextResponse.json(charge.body, { status: charge.status })

@@ -167,8 +167,19 @@ export function toCreatorDbFilters(
   if (parsed.niches) {
     filters.push({ field: 'niches', op: 'in', value: parsed.niches })
   }
+  // Only add hashtags when they contain terms NOT already covered by niches.
+  // Sending both niches AND overlapping hashtags over-constrains the search.
   if (parsed.keywords) {
-    filters.push({ field: 'hashtags', op: 'in', value: parsed.keywords })
+    const nicheTerms = new Set(
+      (parsed.niches || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
+    )
+    const extraKeywords = parsed.keywords
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => !nicheTerms.has(t.toLowerCase()))
+    if (extraKeywords.length > 0) {
+      filters.push({ field: 'hashtags', op: 'in', value: extraKeywords.join(', ') })
+    }
   }
   if (parsed.country) {
     filters.push({ field: 'country', op: '=', value: parsed.country })

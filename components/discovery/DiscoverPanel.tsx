@@ -491,8 +491,25 @@ export default function DiscoverPanel() {
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState('desc')
   const [creatorDbFilters, setCreatorDbFilters] = useState<CreatorDbFilterInput[]>([])
+  // Track whether current filters were set by AI parsing (vs manually by user)
+  // so we know to clear them when the search box text changes.
+  const aiFiltersActiveRef = useRef(false)
   const activeCreatorDbFilters = creatorDbFilters.filter((filter) => filter.value.trim() !== '')
-  const creatorDbFilterLimitExceeded = activeCreatorDbFilters.length > 10
+  // Count effective filters including basic filters that will be injected
+  // into cdb_filters (followers, country, engagement) when creatorDbFilters
+  // are active. This mirrors the injection logic in clubSearchWith.
+  const effectiveFilterCount = (() => {
+    if (activeCreatorDbFilters.length === 0) return 0
+    let count = activeCreatorDbFilters.length
+    const hasField = (f: string) => activeCreatorDbFilters.some((x) => x.field === f)
+    if (minFollowers && !hasField('followers')) count++
+    if (maxFollowers && !activeCreatorDbFilters.some((x) => x.field === 'followers' && x.op === '<')) count++
+    if (country.trim() && !hasField('country')) count++
+    if (minEngagement && !hasField('shortEngagementRate')) count++
+    return count
+  })()
+  const creatorDbFilterLimitExceeded = effectiveFilterCount > 20
+  const creatorDbFilterExtraCost = effectiveFilterCount > 10 && effectiveFilterCount <= 20
   const [openFilterSections, setOpenFilterSections] = useState<Record<string, boolean>>({ audience: true, creator: true, performance: true })
   const toggleFilterSection = (key: string) => setOpenFilterSections((prev) => ({ ...prev, [key]: !prev[key] }))
 
@@ -947,6 +964,7 @@ export default function DiscoverPanel() {
         }
         if (aiFilters.length > 0) {
           setCreatorDbFilters(aiFilters)
+          aiFiltersActiveRef.current = true
         }
       }
       // Persist so the results survive leaving and returning to the page
@@ -1009,10 +1027,24 @@ export default function DiscoverPanel() {
       return
     }
     if (platforms.length === 0) return
-    // Single Search button: the query goes straight to the search backend —
-    // the club API applies natural language natively (filters.ai_search) and
-    // the YouTube path searches the raw text, so no LLM pre-parse hop is
-    // needed (it used to add 3-8s of latency before every search).
+    // When there's a query in the search box, clear any AI-generated filters
+    // so the server re-parses the new text. User-set filters (from manually
+    // editing the filter panel) are kept.
+    if (query.trim() && aiFiltersActiveRef.current) {
+      setCreatorDbFilters([])
+      setCountry('')
+      setMinFollowers('')
+      setMaxFollowers('')
+      aiFiltersActiveRef.current = false
+      // Use a snapshot with cleared filters so the fetch doesn't include stale ones
+      const vals = currentFilterVals()
+      vals.creatorDbFilters = []
+      vals.country = ''
+      vals.minFollowers = ''
+      vals.maxFollowers = ''
+      await clubSearchWith(vals)
+      return
+    }
     await clubSearchWith(currentFilterVals())
   }
 
@@ -1039,6 +1071,28 @@ export default function DiscoverPanel() {
             : type === 'number' ? Number(filter.value) : type === 'boolean' ? filter.value === 'true' : filter.value.trim(),
         }
       })
+      // Inject basic filters (followers, country, engagement) directly into
+      // cdb_filters so they are first-class CreatorDB filters and won't be
+      // silently dropped by the 10-filter merge/trim in the backend.
+      const hasField = (f: string) => filters.some((x) => x.field === f)
+      if (v.minFollowers && !hasField('followers')) {
+        filters.push({ field: 'followers' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: Number(v.minFollowers) })
+      } else if (v.minFollowers && hasField('followers')) {
+        // Don't add duplicate; user-set cdb_filter takes precedence
+      }
+      if (v.maxFollowers) {
+        // For maxFollowers, add as a separate '<' entry (same field, different op is fine)
+        const hasMaxFollowers = filters.some((x) => x.field === 'followers' && x.op === '<')
+        if (!hasMaxFollowers) {
+          filters.push({ field: 'followers' as CreatorDbCanonicalField, op: '<' as CreatorDbFilterOp, value: Number(v.maxFollowers) })
+        }
+      }
+      if (v.country.trim() && !hasField('country')) {
+        filters.push({ field: 'country' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: v.country.trim().toUpperCase() })
+      }
+      if (v.minEngagement && !hasField('shortEngagementRate')) {
+        filters.push({ field: 'shortEngagementRate' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: Number(v.minEngagement) })
+      }
       qs.set('cdb_filters', JSON.stringify(filters))
     }
     if (v.country.trim()) qs.set('country', v.country.trim().toUpperCase())
@@ -1961,11 +2015,18 @@ export default function DiscoverPanel() {
             </div>
           )}
 
+          {creatorDbFilterExtraCost && (
+            <p className="mt-2 text-xs font-medium text-amber-600">
+              {zh
+                ? `使用了 ${effectiveFilterCount} 个筛选条件（超过 10 个），本次搜索将消耗 2 倍积分。`
+                : `Using ${effectiveFilterCount} filters (over 10) — this search costs 2× credits.`}
+            </p>
+          )}
           {creatorDbFilterLimitExceeded && (
             <p className="mt-2 text-xs font-semibold text-red-600">
               {zh
-                ? '筛选条件已超过 10 个。请清空至少一个条件后再提交。'
-                : 'Filter limit exceeded (10 max). Clear at least one before submitting.'}
+                ? '筛选条件已超过 20 个。请清空至少一个条件后再提交。'
+                : 'Filter limit exceeded (20 max). Clear at least one before submitting.'}
             </p>
           )}
         </div>
