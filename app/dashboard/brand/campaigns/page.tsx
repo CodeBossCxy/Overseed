@@ -25,7 +25,7 @@ async function CampaignsContent() {
   }
 
   const campaigns = await prisma.campaign.findMany({
-    where: { brandId: brandProfile.id },
+    where: {},
     include: {
       categories: {
         include: { category: true },
