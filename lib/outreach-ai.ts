@@ -321,7 +321,7 @@ export async function selectCreators(
         maxFollowers: criteria.maxFollowers,
         minEngagement: criteria.minEngagement,
         language: criteria.language,
-        limit: Math.min(100, Math.max(quantity, quantity * 2)),
+        limit: Math.min(100, Math.max(quantity, Math.ceil(quantity * 1.5))),
         logUserId,
       })
 
@@ -331,10 +331,43 @@ export async function selectCreators(
         ? searchResult.results
         : []
 
-      // Enrich top results to get emails
-      const toEnrich = providerCreators
+      // Enrich top results to get emails — but first check the
+      // CreatorProfile directory and enrichment cache to avoid
+      // redundant paid API calls across outreach campaigns.
+      const candidateHandles = providerCreators
         .filter((c) => c?.handle && !excludeSet.has(String(c.handle).toLowerCase()))
-        .slice(0, Math.min(100, Math.ceil(quantity * 2)))
+        .slice(0, Math.min(100, Math.ceil(quantity * 1.5)))
+        .map((c) => String(c.handle).toLowerCase())
+
+      // Batch-check CreatorProfile for creators that already have emails
+      const knownProfiles = candidateHandles.length > 0
+        ? await prisma.creatorProfile.findMany({
+            where: { platform: criteria.platform, handle: { in: candidateHandles }, email: { not: null } },
+          })
+        : []
+      const knownMap = new Map(knownProfiles.map((p) => [p.handle, p]))
+
+      // Add already-known creators directly (no API call)
+      for (const p of knownProfiles) {
+        if (filtered.length >= quantity) break
+        if (filtered.some((f) => f.handle === p.handle)) continue
+        if (excludeSet.has(p.handle)) continue
+        // Enforce follower range
+        if (typeof p.followerCount === 'number') {
+          if (criteria.minFollowers != null && p.followerCount < criteria.minFollowers) continue
+          if (criteria.maxFollowers != null && p.followerCount > criteria.maxFollowers) continue
+        }
+        filtered.push(p as any)
+      }
+
+      // Only enrich creators NOT already in the directory
+      const toEnrich = providerCreators
+        .filter((c) => {
+          if (!c?.handle) return false
+          const h = String(c.handle).toLowerCase()
+          return !excludeSet.has(h) && !knownMap.has(h) && !filtered.some((f) => f.handle === h)
+        })
+        .slice(0, Math.min(50, Math.ceil(quantity * 1.3)))
 
       // Keep paid enrichment traffic bounded and stop once the campaign has
       // enough contactable creators.

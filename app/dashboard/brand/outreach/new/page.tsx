@@ -82,8 +82,8 @@ const EXCLUSIVITY_OPTIONS = [
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'KRW', 'AUD', 'CAD']
 
-const STEPS_EN = ['Brief & Criteria', 'Quantity', 'Preview', 'Done']
-const STEPS_ZH = ['简介 & 条件', '数量', '预览', '完成']
+const STEPS_EN = ['Brief & Criteria', 'Search & Select', 'Review & Send', 'Done']
+const STEPS_ZH = ['简介 & 条件', '搜索 & 选择', '确认 & 发送', '完成']
 
 // ---------------------------------------------------------------------------
 // Types
@@ -123,24 +123,6 @@ interface CollabDetails {
   customNote: string
 }
 
-interface Recipient {
-  id: string
-  displayName: string | null
-  handle: string
-  avatarUrl: string | null
-  platform: string
-  followerCount: number | null
-  engagementRate: number | null
-  matchScore: number | null
-  matchReason: string | null
-}
-
-interface SendResult {
-  sent: number
-  failed: number
-  creditsUsed: number
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -173,12 +155,6 @@ function StepIndicator({ current, labels }: { current: number; labels: string[] 
       })}
     </div>
   )
-}
-
-function MatchScoreBadge({ score }: { score: number }) {
-  const cls =
-    score >= 70 ? 'bg-green-100 text-green-700' : score >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
-  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cls}`}>{score}</span>
 }
 
 function formatFollowers(n: number) {
@@ -283,13 +259,14 @@ export default function NewOutreachPage() {
   })
   const [showAdvCollab, setShowAdvCollab] = useState(false)
 
-  // Step 2
-  const [quantity, setQuantity] = useState(10)
+  // Step 2: Search results + selection
+  const [creators, setCreators] = useState<any[]>([])
+  const [selectedHandles, setSelectedHandles] = useState<Set<string>>(new Set())
+  const [searching, setSearching] = useState(false)
+  const [searchDone, setSearchDone] = useState(false)
 
   // Results
   const [campaignId, setCampaignId] = useState<string | null>(null)
-  const [recipients, setRecipients] = useState<Recipient[]>([])
-  const [sendResult, setSendResult] = useState<SendResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -381,66 +358,101 @@ export default function NewOutreachPage() {
     return Object.keys(c).length > 0 ? c : null
   }
 
-  const handleFindCreators = async () => {
+  const handleSearch = async () => {
+    setSearching(true)
+    setError(null)
+    setCreators([])
+    setSelectedHandles(new Set())
+    try {
+      // Build cdb_filters from criteria
+      const filters: any[] = []
+      if (criteria.niches.length) {
+        filters.push({ field: 'niches', op: 'in', value: criteria.niches })
+      }
+      if (criteria.countries.length) {
+        filters.push({ field: 'country', op: '=', value: criteria.countries[0] })
+      }
+      if (criteria.followerMin) {
+        filters.push({ field: 'followers', op: '>', value: Number(criteria.followerMin) })
+      }
+      if (criteria.followerMax) {
+        filters.push({ field: 'followers', op: '<', value: Number(criteria.followerMax) })
+      }
+      if (criteria.languages.length) {
+        filters.push({ field: 'mainLanguage', op: '=', value: criteria.languages[0] })
+      }
+      if (criteria.minEngagement) {
+        filters.push({ field: 'shortEngagementRate', op: '>', value: Number(criteria.minEngagement) / 100 })
+      }
+      if (criteria.keywords.trim()) {
+        filters.push({ field: 'hashtags', op: 'in', value: criteria.keywords.split(',').map(k => k.trim()).filter(Boolean) })
+      }
+      // Always add lastPublishTime for freshness
+      filters.push({ field: 'lastPublishTime', op: '>', value: 90 })
+
+      const qs = new URLSearchParams({
+        platform,
+        limit: '100',
+        offset: '0',
+        cdb_sort: 'followers',
+      })
+      if (filters.length > 0) {
+        qs.set('cdb_filters', JSON.stringify(filters))
+      }
+
+      const res = await fetch(`/api/discovery/club-search?${qs}`)
+      window.dispatchEvent(new Event('credits:refresh'))
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Creator search failed')
+      setCreators(data?.results || [])
+      setSearchDone(true)
+    } catch (err: any) {
+      setError(err.message || 'Search failed')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (selectedHandles.size === 0) return
     setLoading(true)
     setError(null)
     try {
-      const createRes = await fetch('/api/outreach', {
+      const selectedCreators = creators.filter(c => {
+        const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
+        return selectedHandles.has(handle)
+      })
+
+      const res = await fetch('/api/outreach/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
           briefMessage: buildBriefMessage(),
-          quantity,
           platform,
           criteria: buildCriteria(),
-          collaborationDetails: {
-            pitch,
-            ...collab,
-          },
+          collaborationDetails: { pitch, ...collab },
+          creators: selectedCreators.map(c => ({
+            platform: c.platform,
+            handle: (c.handle || '').replace(/^@/, '').toLowerCase(),
+            displayName: c.display_name || c.displayName || c.handle,
+            avatarUrl: c.avatar_url || c.avatarUrl || null,
+            followerCount: c.follower_count || c.followers || null,
+            engagementRate: c.engagement_rate != null ? Number(c.engagement_rate) : null,
+            country: c.country || null,
+            nicheTags: c.niche_tags || [],
+          })),
         }),
       })
-      if (!createRes.ok) {
-        const d = await createRes.json().catch(() => ({}))
-        throw new Error(d.message || 'Failed to create outreach')
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.message || 'Failed to submit outreach')
       }
-      const { campaign } = await createRes.json()
+      const { campaign } = await res.json()
       setCampaignId(campaign.id)
-
-      const selectRes = await fetch(`/api/outreach/${campaign.id}/select`, { method: 'POST' })
-      if (!selectRes.ok) {
-        const d = await selectRes.json().catch(() => ({}))
-        throw new Error(d.message || 'Failed to select creators')
-      }
-      const { recipients: selected } = await selectRes.json()
-      setRecipients(selected ?? [])
-      setStep(3)
-    } catch (err: any) {
-      setError(err.message ?? 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSend = async () => {
-    if (!campaignId) return
-    setLoading(true)
-    setError(null)
-    try {
-      const sendRes = await fetch(`/api/outreach/${campaignId}/send`, { method: 'POST' })
-      if (!sendRes.ok) {
-        const d = await sendRes.json().catch(() => ({}))
-        throw new Error(d.message || 'Failed to send outreach')
-      }
-      const result = await sendRes.json()
-      setSendResult({
-        sent: result.totalSent ?? 0,
-        failed: result.totalFailed ?? 0,
-        creditsUsed: result.creditsCost ?? 0,
-      })
       setStep(4)
     } catch (err: any) {
-      setError(err.message ?? 'Something went wrong')
+      setError(err.message || 'Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -1016,132 +1028,207 @@ export default function NewOutreachPage() {
         )}
 
         {/* ================================================================
-            Step 2: Quantity
+            Step 2: Search & Select
             ================================================================ */}
         {step === 2 && (
-          <div className="workspace-glass-card rounded-3xl p-7 space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {zh ? '需要多少达人？' : 'How many creators?'}
-            </h2>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">{zh ? '数量' : 'Quantity'}</label>
-                <span className="text-2xl font-bold text-primary-600">{quantity}</span>
-              </div>
-              <input
-                type="range"
-                min={1}
-                max={100}
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                className="w-full accent-primary-600"
-              />
-              <div className="flex justify-between text-xs text-gray-400">
-                <span>1</span>
-                <span>100</span>
-              </div>
-            </div>
-
-            <div className="workspace-glass-card rounded-2xl p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-700">{zh ? '预计消耗积分' : 'Estimated Credit Cost'}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{zh ? '每条触达消耗 12 积分' : '12 credits per outreach message'}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-primary-600">{quantity * 12}</p>
-                <p className="text-xs text-gray-400">{zh ? '积分' : 'credits'}</p>
-              </div>
-            </div>
-
-            {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
-                {error}
+          <div className="space-y-4">
+            {/* Search button */}
+            {!searchDone && (
+              <div className="workspace-glass-card rounded-3xl p-7 text-center space-y-4">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center text-2xl">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+                </div>
+                <h3 className="text-lg font-semibold">{zh ? '搜索匹配的达人' : 'Search for matching creators'}</h3>
+                <p className="text-sm text-gray-500 max-w-md mx-auto">
+                  {zh ? '根据您设置的筛选条件，搜索匹配的达人。搜索消耗 6 积分。' : 'Find creators matching your targeting criteria. Search costs 6 credits.'}
+                </p>
+                {error && (
+                  <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">{error}</div>
+                )}
+                <div className="flex gap-3 justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setStep(1); setError(null) }}
+                    className="border border-gray-200 text-gray-600 rounded-xl px-6 py-3 font-semibold hover:bg-gray-50 transition"
+                  >
+                    {zh ? '上一步' : 'Back'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={searching}
+                    onClick={handleSearch}
+                    className="bg-primary-600 text-white rounded-xl px-8 py-3 font-semibold hover:bg-primary-700 transition disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {searching ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        {zh ? '搜索中...' : 'Searching...'}
+                      </>
+                    ) : (
+                      <>🔍 {zh ? '搜索达人 · 6 积分' : 'Search Creators · 6 credits'}</>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
 
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => { setStep(1); setError(null) }}
-                className="flex-1 border border-gray-200 text-gray-600 rounded-xl px-6 py-3 font-semibold hover:bg-gray-50 transition"
-              >
-                {zh ? '上一步' : 'Back'}
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleFindCreators}
-                className="flex-1 bg-primary-600 text-white rounded-xl px-6 py-3 font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {zh ? 'AI 正在为您寻找最佳达人...' : 'AI is finding the best creators for you...'}
-                  </>
+            {/* Results with multi-select */}
+            {searchDone && (
+              <div className="workspace-glass-card rounded-3xl p-7 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">
+                    {zh ? `找到 ${creators.length} 位达人` : `Found ${creators.length} creators`}
+                  </h2>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-500">
+                      {zh ? `已选 ${selectedHandles.size} 位` : `${selectedHandles.size} selected`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedHandles.size === creators.length) {
+                          setSelectedHandles(new Set())
+                        } else {
+                          setSelectedHandles(new Set(creators.map(c => (c.handle || '').replace(/^@/, '').toLowerCase()).filter(Boolean)))
+                        }
+                      }}
+                      className="text-sm text-primary-600 font-medium hover:underline"
+                    >
+                      {selectedHandles.size === creators.length ? (zh ? '取消全选' : 'Deselect All') : (zh ? '全选' : 'Select All')}
+                    </button>
+                  </div>
+                </div>
+
+                {creators.length === 0 ? (
+                  <div className="text-center py-10 text-sm text-gray-500">
+                    {zh ? '未找到匹配的达人，请返回调整筛选条件。' : 'No creators found. Go back to adjust your criteria.'}
+                  </div>
                 ) : (
-                  zh ? '寻找达人' : 'Find Creators'
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                    {creators.map((c) => {
+                      const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
+                      const isSelected = selectedHandles.has(handle)
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedHandles(prev => {
+                              const next = new Set(prev)
+                              isSelected ? next.delete(handle) : next.add(handle)
+                              return next
+                            })
+                          }}
+                          className={`w-full flex items-center gap-4 p-3 rounded-2xl text-left transition ${
+                            isSelected ? 'bg-primary-50 ring-2 ring-primary-500' : 'bg-white/60 hover:bg-white/80'
+                          }`}
+                        >
+                          {/* Checkbox */}
+                          <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${
+                            isSelected ? 'bg-primary-600 border-primary-600' : 'border-gray-300'
+                          }`}>
+                            {isSelected && (
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                              </svg>
+                            )}
+                          </div>
+                          {/* Avatar */}
+                          {(c.avatar_url || c.avatarUrl) ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={c.avatar_url || c.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                              {(c.display_name || c.displayName || c.handle || '?').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-semibold text-gray-900 truncate block">{c.display_name || c.displayName || c.handle}</span>
+                            <span className="text-xs text-gray-400">@{(c.handle || '').replace(/^@/, '')}</span>
+                          </div>
+                          {/* Stats */}
+                          <div className="flex items-center gap-4 text-xs text-gray-500 flex-shrink-0">
+                            <span className="font-semibold text-gray-700">{formatFollowers(c.follower_count || c.followers || 0)}</span>
+                            {(c.engagement_rate != null) && (
+                              <span>{Number(c.engagement_rate).toFixed(1)}%</span>
+                            )}
+                            {c.country && <span>{c.country}</span>}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
                 )}
-              </button>
-            </div>
+
+                {error && (
+                  <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">{error}</div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setStep(1); setSearchDone(false); setCreators([]); setSelectedHandles(new Set()); setError(null) }}
+                    className="flex-1 border border-gray-200 text-gray-600 rounded-xl px-6 py-3 font-semibold hover:bg-gray-50 transition"
+                  >
+                    {zh ? '返回修改条件' : 'Back to Criteria'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={selectedHandles.size === 0}
+                    onClick={() => { setStep(3); setError(null) }}
+                    className="flex-1 bg-primary-600 text-white rounded-xl px-6 py-3 font-semibold hover:bg-primary-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {zh ? `确认选择 (${selectedHandles.size})` : `Confirm Selection (${selectedHandles.size})`}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* ================================================================
-            Step 3: Preview
+            Step 3: Review & Send
             ================================================================ */}
         {step === 3 && (
-          <div className="workspace-glass-card rounded-3xl p-7 space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {zh ? '已选达人' : 'Selected Creators'}
+          <div className="space-y-4">
+            {/* Selected creators summary */}
+            <div className="workspace-glass-card rounded-3xl p-7 space-y-4">
+              <h2 className="text-lg font-semibold">
+                {zh ? `确认触达 ${selectedHandles.size} 位达人` : `Confirm outreach to ${selectedHandles.size} creators`}
               </h2>
-              <span className="text-sm text-gray-500">
-                {recipients.length} {zh ? '位达人' : 'creators'} · {recipients.length * 12} {zh ? '积分' : 'credits'}
-              </span>
-            </div>
-
-            {recipients.length === 0 ? (
-              <div className="text-center py-10 text-sm text-gray-500">
-                {zh ? '未找到匹配的达人，请调整筛选条件。' : 'No creators were selected. Try adjusting your criteria.'}
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {recipients.map((r) => (
-                  <div key={r.id} className="flex items-center gap-4 p-3 rounded-2xl bg-white/60">
-                    {r.avatarUrl ? (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {creators.filter(c => selectedHandles.has((c.handle || '').replace(/^@/, '').toLowerCase())).map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 p-2 rounded-xl bg-white/60">
+                    {(c.avatar_url || c.avatarUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                      <img src={c.avatar_url || c.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                        {(r.displayName || r.handle || '?').charAt(0).toUpperCase()}
+                      <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                        {(c.display_name || c.handle || '?').charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-900 truncate">{r.displayName || r.handle}</span>
-                        <span className="text-xs text-gray-400">{r.handle}</span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5 flex gap-3">
-                        <span>{formatFollowers(r.followerCount ?? 0)} {zh ? '粉丝' : 'followers'}</span>
-                        {r.engagementRate != null && Number(r.engagementRate) > 0 && <span>{Number(r.engagementRate).toFixed(1)}% {zh ? '互动率' : 'eng.'}</span>}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <MatchScoreBadge score={Number(r.matchScore)} />
-                      {r.matchReason && (
-                        <span className="text-xs text-gray-400 max-w-28 text-right truncate">{r.matchReason}</span>
-                      )}
-                    </div>
+                    <span className="text-sm font-medium text-gray-900 truncate">{c.display_name || c.displayName || c.handle}</span>
+                    <span className="text-xs text-gray-400">@{(c.handle || '').replace(/^@/, '')}</span>
+                    <span className="text-xs text-gray-500 ml-auto">{formatFollowers(c.follower_count || c.followers || 0)}</span>
                   </div>
                 ))}
               </div>
-            )}
+            </div>
+
+            {/* Outreach message preview */}
+            <div className="workspace-glass-card rounded-3xl p-7 space-y-4">
+              <h3 className="text-sm font-semibold text-gray-900">{zh ? '触达信息预览' : 'Outreach Message Preview'}</h3>
+              <div className="rounded-xl border border-gray-100 bg-white/60 p-4 text-sm text-gray-700 whitespace-pre-wrap">
+                {buildBriefMessage()}
+              </div>
+              <p className="text-xs text-gray-400">
+                {zh ? '提交后，Overseed 将为您联系达人，达人回复后会通知您。' : 'After submission, Overseed will reach out to creators on your behalf and notify you when they respond.'}
+              </p>
+            </div>
 
             {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
-                {error}
-              </div>
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">{error}</div>
             )}
 
             <div className="flex gap-3 pt-2">
@@ -1154,17 +1241,17 @@ export default function NewOutreachPage() {
               </button>
               <button
                 type="button"
-                disabled={loading || recipients.length === 0}
-                onClick={handleSend}
-                className="flex-1 bg-primary-600 text-white rounded-xl px-6 py-3 font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                disabled={loading}
+                onClick={handleSubmit}
+                className="flex-1 bg-primary-600 text-white rounded-xl px-6 py-3 font-semibold hover:bg-primary-700 transition disabled:opacity-50 flex items-center gap-2 justify-center"
               >
                 {loading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {zh ? '发送中...' : 'Sending...'}
+                    {zh ? '提交中...' : 'Submitting...'}
                   </>
                 ) : (
-                  `${zh ? '全部发送' : 'Send All'} (${recipients.length})`
+                  zh ? `提交触达 (${selectedHandles.size} 位达人)` : `Submit Outreach (${selectedHandles.size} creators)`
                 )}
               </button>
             </div>
@@ -1174,48 +1261,32 @@ export default function NewOutreachPage() {
         {/* ================================================================
             Step 4: Done
             ================================================================ */}
-        {step === 4 && sendResult && (
+        {step === 4 && (
           <div className="workspace-glass-card rounded-3xl p-10 flex flex-col items-center text-center gap-5">
-            <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center text-3xl">
-              ✓
-            </div>
+            <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center text-3xl">✓</div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">{zh ? '触达已发送！' : 'Outreach Sent!'}</h2>
-              <p className="text-sm text-gray-500 mt-1">{zh ? '消息已成功发送给达人。' : 'Your messages have been delivered to creators.'}</p>
+              <h2 className="text-xl font-bold text-gray-900">{zh ? '触达已提交！' : 'Outreach Submitted!'}</h2>
+              <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
+                {zh
+                  ? `已选择 ${selectedHandles.size} 位达人。Overseed 将代表您联系达人，达人回复后会通知您。`
+                  : `${selectedHandles.size} creators selected. Overseed will reach out on your behalf and notify you when creators respond.`}
+              </p>
             </div>
-
-            <div className="flex gap-6 py-2">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">{sendResult.sent}</p>
-                <p className="text-xs text-gray-500">{zh ? '已发送' : 'Sent'}</p>
-              </div>
-              {sendResult.failed > 0 && (
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-red-500">{sendResult.failed}</p>
-                  <p className="text-xs text-gray-500">{zh ? '失败' : 'Failed'}</p>
-                </div>
-              )}
-              <div className="text-center">
-                <p className="text-2xl font-bold text-primary-600">{sendResult.creditsUsed}</p>
-                <p className="text-xs text-gray-500">{zh ? '消耗积分' : 'Credits used'}</p>
-              </div>
-            </div>
-
             <div className="flex flex-col gap-3 w-full max-w-xs pt-2">
-              <Link
-                href="/dashboard/messages"
-                className="bg-primary-600 text-white rounded-xl px-6 py-3 font-semibold hover:bg-primary-700 transition text-center"
-              >
-                {zh ? '查看消息' : 'View in Messages'}
-              </Link>
               {campaignId && (
                 <Link
                   href={`/dashboard/brand/outreach/${campaignId}`}
-                  className="border border-gray-200 text-gray-700 rounded-xl px-6 py-3 font-semibold hover:bg-gray-50 transition text-center"
+                  className="bg-primary-600 text-white rounded-xl px-6 py-3 font-semibold hover:bg-primary-700 transition text-center"
                 >
                   {zh ? '查看触达详情' : 'View Outreach Details'}
                 </Link>
               )}
+              <Link
+                href="/dashboard/brand/outreach"
+                className="border border-gray-200 text-gray-700 rounded-xl px-6 py-3 font-semibold hover:bg-gray-50 transition text-center"
+              >
+                {zh ? '返回触达列表' : 'Back to Outreach List'}
+              </Link>
               <Link
                 href="/dashboard/brand/outreach/new"
                 className="text-primary-600 text-sm font-medium hover:underline"
@@ -1228,8 +1299,8 @@ export default function NewOutreachPage() {
 
         </div>{/* end left column */}
 
-        {/* Right: Sidebar — visible on steps 1 & 2 */}
-        {step <= 2 && (
+        {/* Right: Sidebar — visible on step 1 */}
+        {step === 1 && (
           <div className="hidden lg:block w-80 flex-shrink-0 space-y-6">
             {/* Outreach Preview */}
             <div className="workspace-glass-card rounded-2xl p-5">
@@ -1270,7 +1341,7 @@ export default function NewOutreachPage() {
                   )}
                   <div className="flex items-center gap-2">
                     <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
-                    <span>{quantity} {zh ? '位达人' : 'creators'} · {quantity * 12} {zh ? '积分' : 'credits'}</span>
+                    <span>{zh ? '搜索消耗 6 积分' : 'Search costs 6 credits'}</span>
                   </div>
                 </div>
               </div>
