@@ -149,11 +149,15 @@ function NicheAutocomplete({
   }
 
   const selectNiche = (name: string) => {
-    const current = query.split(',').map((s) => s.trim()).filter(Boolean)
-    if (!current.some((c) => c.toLowerCase() === name.toLowerCase())) {
-      current.push(name)
+    // Replace the last segment (the partial search text) with the selected
+    // niche. E.g. "Beauty, ga" + select "Gaming" → "Beauty, Gaming".
+    const segments = query.split(',').map((s) => s.trim())
+    // Drop the last segment (the in-progress typing) and keep confirmed ones
+    const confirmed = segments.slice(0, -1).filter(Boolean)
+    if (!confirmed.some((c) => c.toLowerCase() === name.toLowerCase())) {
+      confirmed.push(name)
     }
-    const joined = current.join(', ')
+    const joined = confirmed.join(', ')
     setQuery(joined)
     onChange(joined)
     setOpen(false)
