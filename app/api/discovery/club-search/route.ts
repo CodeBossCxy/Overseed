@@ -26,9 +26,14 @@ import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
 import { chargeCredits } from '@/lib/metering'
 import { walletRefund, getCreditPrice } from '@/lib/wallet'
 
-// Pricing v4: discovery is charged per page of 10 results (fixed page size).
-// Zero results → full refund; fewer than 10 → proportional (ceil, min 1).
-const DISCOVERY_PAGE_SIZE = 10
+// Pricing v4: discovery is charged per page of results (fixed page size).
+// Zero results → full refund; fewer than DISPLAY_PAGE_SIZE → proportional
+// (ceil, min 1). The API always fetches API_PAGE_SIZE from the vendor and
+// saves the full set in the task log, but only returns DISPLAY_PAGE_SIZE to
+// the client per page.
+const API_PAGE_SIZE = 100
+const DISPLAY_PAGE_SIZE = 50
+const DISCOVERY_PAGE_SIZE = DISPLAY_PAGE_SIZE
 
 // ── Filter usage analytics (in-memory, logged periodically) ──────────────
 // Tracks how often searches use >10 filters vs total searches.
@@ -490,10 +495,9 @@ export async function GET(req: NextRequest) {
     audience,
     sortBy: sortBy as ClubSortBy | undefined,
     sortOrder: sortOrderRaw as 'asc' | 'desc' | undefined,
-    // v4: fixed page size of 10 (one billed page); legacy allows up to 25.
-    limit: creatorDbPreset || creatorDbFilters
-      ? Math.min(num('limit') ?? 100, 100)
-      : CREDIT_SYSTEM_ENABLED ? DISCOVERY_PAGE_SIZE : Math.min(num('limit') ?? 10, 25),
+    // Always fetch up to API_PAGE_SIZE from the vendor; the route slices to
+    // DISPLAY_PAGE_SIZE before responding. The full set is saved in the task log.
+    limit: CREDIT_SYSTEM_ENABLED ? API_PAGE_SIZE : Math.min(num('limit') ?? API_PAGE_SIZE, API_PAGE_SIZE),
     page: requestedPage,
     creatorDbPreset,
     creatorDbOverrides,
@@ -694,10 +698,17 @@ export async function GET(req: NextRequest) {
           })
         : cachedResult ?? (await discoverySearch(searchOpts))
     )
-    settleAfterResponse(result?.results?.length ?? 0)
+    const fullResults = result?.results ?? []
+    settleAfterResponse(fullResults.length)
+    // Save the FULL result set (up to API_PAGE_SIZE) in the task log
     const taskId = await persistTaskPage(result)
+    // Return only DISPLAY_PAGE_SIZE results to the client
+    const displayResults = fullResults.slice(0, DISPLAY_PAGE_SIZE)
     return NextResponse.json({
       ...result,
+      results: displayResults,
+      total: result?.total ?? displayResults.length,
+      has_next_page: displayResults.length === DISPLAY_PAGE_SIZE || (result?.has_next_page ?? false),
       task_id: taskId,
       page: requestedPage,
       ...(aiParsed ? {

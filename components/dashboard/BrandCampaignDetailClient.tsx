@@ -7,9 +7,10 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatNumber } from '@/lib/i18n/formatNumber'
 import {
   COUNTRY_FILTER_OPTIONS,
-  LANGUAGE_FILTER_OPTIONS,
-  AUDIENCE_AGE_OPTIONS,
 } from '@/components/discovery/DiscoverPanel'
+import {
+  CREATORDB_LANGUAGE_OPTIONS,
+} from '@/lib/creatordb-filter-fields'
 import Markdown from '@/components/Markdown'
 
 type Creator = {
@@ -148,7 +149,25 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     const p = (initialCampaign.platforms[0]?.platform.name || '').toLowerCase()
     return ['youtube', 'instagram', 'tiktok'].includes(p) ? p : 'youtube'
   })
-  const [country, setCountry] = useState('')
+  // CreatorDB canonical filters
+  type CdbFilter = { field: string; op: string; value: string }
+  const [cdbFilters, setCdbFilters] = useState<CdbFilter[]>([])
+  const cdbFilterFor = (field: string) => cdbFilters.find(f => f.field === field) || { field, op: '=', value: '' }
+  const updateCdbFilter = (field: string, updates: Partial<CdbFilter>) => {
+    setCdbFilters(prev => {
+      const exists = prev.find(f => f.field === field)
+      if (exists) {
+        const updated = prev.map(f => f.field === field ? { ...f, ...updates } : f)
+        // Remove if value cleared
+        return updated.filter(f => f.value.trim() !== '')
+      }
+      const newFilter = { field, op: '=', value: '', ...updates }
+      return newFilter.value.trim() ? [...prev, newFilter] : prev
+    })
+  }
+
+  // Keep these simple states for creator country + followers (injected into cdb_filters on search)
+  const [creatorCountry, setCreatorCountry] = useState('')
   const [minFollowers, setMinFollowers] = useState(() => {
     const min = initialCampaign.followerRequirements?.[0]?.minFollowers
     return min ? String(min) : ''
@@ -157,17 +176,6 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     const max = initialCampaign.followerRequirements?.[0]?.maxFollowers
     return max ? String(max) : ''
   })
-  const [minEngagement, setMinEngagement] = useState(() => {
-    const e = initialCampaign.followerRequirements?.[0]?.minEngagementRate
-    return e ? String(e) : ''
-  })
-  const [maxEngagement, setMaxEngagement] = useState('')
-  const [gender, setGender] = useState('')
-  const [language, setLanguage] = useState('')
-  const [bioKeywords, setBioKeywords] = useState('')
-  const [lastPost, setLastPost] = useState('')
-  const [audienceAge, setAudienceAge] = useState('')
-  const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [creators, setCreators] = useState<Creator[]>([])
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -192,16 +200,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       if (!Array.isArray(s?.creators) || s.creators.length === 0) return
       setQuery(s.query || '')
       if (s.platform) setPlatform(s.platform)
-      setCountry(s.country || '')
+      setCreatorCountry(s.creatorCountry || '')
       setMinFollowers(s.minFollowers || '')
       setMaxFollowers(s.maxFollowers || '')
-      setMinEngagement(s.minEngagement || '')
-      setMaxEngagement(s.maxEngagement || '')
-      setGender(s.gender || '')
-      setLanguage(s.language || '')
-      setBioKeywords(s.bioKeywords || '')
-      setLastPost(s.lastPost || '')
-      setAudienceAge(s.audienceAge || '')
+      setCdbFilters(s.cdbFilters || [])
       setCreators(s.creators)
       setMatched(true)
     } catch {}
@@ -211,81 +213,148 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     if (!matched || creators.length === 0) return
     try {
       sessionStorage.setItem(searchStateKey, JSON.stringify({
-        query, platform, country, minFollowers, maxFollowers, minEngagement,
-        maxEngagement, gender, language, bioKeywords, lastPost, audienceAge, creators,
+        query, platform, creatorCountry, minFollowers, maxFollowers, cdbFilters, creators,
       }))
     } catch {}
-  }, [matched, creators, query, platform, country, minFollowers, maxFollowers, minEngagement, maxEngagement, gender, language, bioKeywords, lastPost, audienceAge, searchStateKey])
+  }, [matched, creators, query, platform, creatorCountry, minFollowers, maxFollowers, cdbFilters, searchStateKey])
 
   const loadQueue = useCallback(async () => {
     const res = await fetch(`/api/campaigns/${campaign.id}/outreach`)
     if (res.ok) setQueue((await res.json()).queue || [])
   }, [campaign.id])
 
-  // Apply the visible filters (same set as creator discovery's basic +
-  // advanced-basics filters) to a club-search query string.
-  const applyFilters = useCallback((qs: URLSearchParams) => {
-    if (country.trim()) qs.set('country', country.trim().toUpperCase())
-    if (minFollowers) qs.set('min_followers', minFollowers)
-    if (maxFollowers) qs.set('max_followers', maxFollowers)
-    if (minEngagement) qs.set('min_engagement', minEngagement)
-    if (maxEngagement) qs.set('max_engagement', maxEngagement)
-    if (gender) qs.set('gender', gender)
-    if (language) qs.set('language', language)
-    if (bioKeywords.trim()) qs.set('bio_keywords', bioKeywords.trim())
-    if (lastPost) qs.set('last_post', lastPost)
-    // Audience demographics are an Instagram-only club filter
-    if (audienceAge && platform === 'instagram') qs.set('audience_age', audienceAge)
-  }, [country, minFollowers, maxFollowers, minEngagement, maxEngagement, gender, language, bioKeywords, lastPost, audienceAge, platform])
+  const buildCdbFiltersParam = useCallback(() => {
+    const filters: { field: string; op: string; value: string | number | boolean | string[] }[] = []
+
+    // Add all user-set CreatorDB filters
+    for (const f of cdbFilters) {
+      if (!f.value.trim()) continue
+      const field = f.field
+      // Array fields
+      if (['hashtags', 'niches', 'audienceAge'].includes(field)) {
+        filters.push({ field, op: 'in', value: f.value.split(',').map(v => v.trim()).filter(Boolean) })
+      } else if (field === 'audienceFemaleRatio') {
+        filters.push({ field, op: '>', value: Number(f.value) })
+      } else if (field === 'isAccountVerified') {
+        filters.push({ field, op: '=', value: f.value === 'true' })
+      } else if (['followers', 'shortEngagementRate', 'shortAvgViews', 'lastPublishTime'].includes(field)) {
+        filters.push({ field, op: f.op || '>', value: Number(f.value) })
+      } else {
+        filters.push({ field, op: f.op || '=', value: f.value })
+      }
+    }
+
+    // Inject basic filters
+    if (minFollowers && !filters.some(f => f.field === 'followers' && f.op === '>')) {
+      filters.push({ field: 'followers', op: '>', value: Number(minFollowers) })
+    }
+    if (maxFollowers && !filters.some(f => f.field === 'followers' && f.op === '<')) {
+      filters.push({ field: 'followers', op: '<', value: Number(maxFollowers) })
+    }
+    if (creatorCountry.trim() && !filters.some(f => f.field === 'country')) {
+      filters.push({ field: 'country', op: '=', value: creatorCountry.trim().toUpperCase() })
+    }
+
+    return filters
+  }, [cdbFilters, minFollowers, maxFollowers, creatorCountry])
 
   const discover = useCallback(async (search = '') => {
     setLoading(true); setError('')
-    // KOL/YouTube API search is paused — keyword searches use the club API,
-    // empty-query browsing stays on the local creator index (unmetered).
     const searching = Boolean(search.trim())
-    const qs = new URLSearchParams({ limit: searching ? '10' : '50' })
-    if (searching) {
-      qs.set('q', search.trim()); qs.set('platform', platform)
-      applyFilters(qs)
+    const qs = new URLSearchParams({ platform })
+    const filters = buildCdbFiltersParam()
+
+    if (filters.length > 0) {
+      qs.set('cdb_filters', JSON.stringify(filters))
+      qs.set('limit', '100')
+      qs.set('offset', '0')
+      qs.set('cdb_sort', 'followers')
+    } else if (searching) {
+      qs.set('q', search.trim())
+      qs.set('limit', '10')
     } else {
-      qs.set('platform', platform); qs.set('sort', 'followers')
-      if (country) qs.set('country', country.toUpperCase())
-      if (minFollowers) qs.set('min_followers', minFollowers)
+      qs.set('sort', 'followers')
+      qs.set('limit', '50')
     }
+    if (searching && !filters.length) {
+      qs.set('q', search.trim())
+    }
+
     try {
-      const endpoint = searching ? 'club-search' : 'creators'
+      const endpoint = (searching || filters.length > 0) ? 'club-search' : 'creators'
       const res = await fetch(`/api/discovery/${endpoint}?${qs}`)
+      window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Creator discovery is temporarily unavailable.')
       setCreators(data?.results || [])
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false); setMatched(true) }
-  }, [country, minFollowers, platform, applyFilters])
+  }, [platform, buildCdbFiltersParam])
 
-  // AI match: run one billed club search page from the campaign brief. The
-  // search backends handle natural language themselves (club: ai_search;
-  // YouTube: raw query), so no LLM pre-parse hop — it added 3-8s of latency
-  // for marginal gain since the visible filters already come from the
-  // campaign's own structured fields.
   const aiMatch = async () => {
     if (aiMatching) return
     setAiMatching(true); setError('')
     try {
+      // Auto-fill filters from campaign brief
+      const autoFilters: CdbFilter[] = []
+
+      // Map campaign categories to niches
       const catNames = campaign.categories.map(c => c.category.name).join(', ')
-      // A user-typed description refines/overrides the campaign-derived
-      // query; the search backends handle natural language natively.
-      const q = (query.trim() || `${catNames || campaign.title} creators`).slice(0, 150)
-      // The visible filters (pre-set from the campaign, adjustable by the
-      // user) drive the search.
-      const qs = new URLSearchParams({ limit: '10' })
-      applyFilters(qs)
-      qs.set('q', q); qs.set('platform', platform)
+      if (catNames) {
+        autoFilters.push({ field: 'niches', op: 'in', value: catNames })
+      }
+
+      // Map campaign platforms
+      const campPlatform = (campaign.platforms[0]?.platform.name || '').toLowerCase()
+      if (['youtube', 'instagram', 'tiktok'].includes(campPlatform)) {
+        setPlatform(campPlatform)
+      }
+
+      // Use query as hashtags if provided
+      if (query.trim()) {
+        autoFilters.push({ field: 'hashtags', op: 'in', value: query.trim() })
+      }
+
+      // Set last active to 3 months for freshness
+      autoFilters.push({ field: 'lastPublishTime', op: '>', value: '90' })
+
+      // Set the filters in state so they appear in the UI
+      setCdbFilters(autoFilters)
+
+      // Build the full filter set for the search
+      const filters: { field: string; op: string; value: string | number | boolean | string[] }[] = []
+
+      for (const f of autoFilters) {
+        if (!f.value.trim()) continue
+        if (['hashtags', 'niches', 'audienceAge'].includes(f.field)) {
+          filters.push({ field: f.field, op: 'in', value: f.value.split(',').map(v => v.trim()).filter(Boolean) })
+        } else if (['followers', 'shortEngagementRate', 'lastPublishTime'].includes(f.field)) {
+          filters.push({ field: f.field, op: f.op || '>', value: Number(f.value) })
+        } else {
+          filters.push({ field: f.field, op: f.op || '=', value: f.value })
+        }
+      }
+
+      // Inject follower requirements from campaign
+      if (minFollowers && !filters.some(f => f.field === 'followers')) {
+        filters.push({ field: 'followers', op: '>', value: Number(minFollowers) })
+      }
+      if (maxFollowers) {
+        filters.push({ field: 'followers', op: '<', value: Number(maxFollowers) })
+      }
+      if (creatorCountry.trim()) {
+        filters.push({ field: 'country', op: '=', value: creatorCountry.trim().toUpperCase() })
+      }
+
+      const activePlatform = campPlatform && ['youtube', 'instagram', 'tiktok'].includes(campPlatform) ? campPlatform : platform
+      const qs = new URLSearchParams({ platform: activePlatform, limit: '100', offset: '0', cdb_sort: 'followers' })
+      qs.set('cdb_filters', JSON.stringify(filters))
+
       const res = await fetch(`/api/discovery/club-search?${qs}`)
       window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Creator matching is temporarily unavailable.')
       setCreators(data?.results || [])
-      setQuery(q)
       setMatched(true)
     } catch (e: any) { setError(e.message) }
     finally { setAiMatching(false) }
@@ -350,46 +419,103 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     <button onClick={() => setTab('direct')} className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${tab === 'direct' ? 'bg-white/80 shadow-sm text-[#17255f]' : 'text-[#7180ad]'}`}>{m.tabDirect}</button>
   </div>
 
-  // Shared filter controls — same set as creator discovery's basic +
-  // advanced-basics filters. Used by both the AI-match card and the
-  // post-match search row.
   const fCls = 'workspace-glass-control px-3 py-2 text-sm'
-  const basicFilterControls = <>
-    <select value={platform} onChange={e => setPlatform(e.target.value)} className={fCls}><option value="youtube">YouTube</option><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select>
-    <select value={country} onChange={e => setCountry(e.target.value)} className={fCls}>
-      <option value="">{d.allCountries}</option>
-      {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>)}
-    </select>
-    <input type="number" min={0} value={minFollowers} onChange={e => setMinFollowers(e.target.value)} placeholder={d.minFollowers} className={`${fCls} w-36`}/>
-    <input type="number" min={0} value={maxFollowers} onChange={e => setMaxFollowers(e.target.value)} placeholder={d.maxFollowers} className={`${fCls} w-36`}/>
-    <button type="button" onClick={() => setShowMoreFilters(v => !v)} className="px-3 py-2 rounded-full text-sm font-medium bg-white/40 text-[#59678f] hover:bg-white/60 transition">
-      {showMoreFilters ? d.advancedFiltersHide : d.advancedFilters}
-    </button>
-  </>
-  const moreFilterControls = showMoreFilters && <>
-    <input type="number" min={0} max={100} step="0.1" value={minEngagement} onChange={e => setMinEngagement(e.target.value)} placeholder={d.minEngagement} className={`${fCls} w-32`}/>
-    <input type="number" min={0} max={100} step="0.1" value={maxEngagement} onChange={e => setMaxEngagement(e.target.value)} placeholder={d.maxEngagement} className={`${fCls} w-32`}/>
-    <select value={gender} onChange={e => setGender(e.target.value)} className={fCls}>
-      <option value="">{d.genderLabel}: {d.anyOption}</option>
-      <option value="FEMALE">{d.genderFemale}</option>
-      <option value="MALE">{d.genderMale}</option>
-    </select>
-    <select value={language} onChange={e => setLanguage(e.target.value)} className={fCls}>
-      <option value="">{d.allLanguages}</option>
-      {LANGUAGE_FILTER_OPTIONS.map(({ code, label }) => <option key={code} value={code}>{label}</option>)}
-    </select>
-    <input type="text" value={bioKeywords} onChange={e => setBioKeywords(e.target.value)} placeholder={d.bioKeywordsPlaceholder} className={`${fCls} w-48`}/>
-    <select value={lastPost} onChange={e => setLastPost(e.target.value)} className={fCls}>
-      <option value="">{d.lastPostLabel}: {d.anyOption}</option>
-      <option value="90">{d.lastPost90}</option>
-      <option value="365">{d.lastPost365}</option>
-    </select>
-    {platform === 'instagram' && (
-      <select value={audienceAge} onChange={e => setAudienceAge(e.target.value)} className={fCls}>
-        <option value="">{d.audienceAgeLabel}: {d.anyOption}</option>
-        {AUDIENCE_AGE_OPTIONS.map(range => <option key={range} value={range}>{range === '65-' ? '65+' : range}</option>)}
-      </select>
-    )}
+  const zh = locale === 'zh'
+  const filterSections = <>
+    {/* Section 1 — Audience */}
+    <div className="rounded-xl bg-gradient-to-r from-green-50/40 to-transparent border border-gray-100 p-3">
+      <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+        <span className="w-4 h-4 rounded-full bg-green-100 text-green-700 text-[9px] font-bold flex items-center justify-center">1</span>
+        {zh ? '受众' : 'Audience'}
+      </p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <select value={cdbFilterFor('audienceLocation').value} onChange={e => updateCdbFilter('audienceLocation', { value: e.target.value })} className={fCls}>
+          <option value="">{zh ? '受众所在地' : 'Audience location'}</option>
+          {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>)}
+        </select>
+        <select value={cdbFilterFor('mainLanguage').value} onChange={e => updateCdbFilter('mainLanguage', { value: e.target.value })} className={fCls}>
+          <option value="">{zh ? '语言' : 'Language'}</option>
+          {CREATORDB_LANGUAGE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <select value={cdbFilterFor('audienceAge').value} onChange={e => updateCdbFilter('audienceAge', { value: e.target.value })} className={fCls}>
+          <option value="">{zh ? '受众年龄' : 'Audience age'}</option>
+          {['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map(age => <option key={age} value={age}>{age}</option>)}
+        </select>
+        <select value={cdbFilterFor('audienceGender').value} onChange={e => updateCdbFilter('audienceGender', { value: e.target.value })} className={fCls}>
+          <option value="">{zh ? '受众性别' : 'Audience gender'}</option>
+          <option value="female">{zh ? '女性为主' : 'Mostly female'}</option>
+          <option value="male">{zh ? '男性为主' : 'Mostly male'}</option>
+        </select>
+      </div>
+    </div>
+
+    {/* Section 2 — Creator */}
+    <div className="rounded-xl bg-gradient-to-r from-blue-50/40 to-transparent border border-gray-100 p-3">
+      <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+        <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold flex items-center justify-center">2</span>
+        {zh ? '创作者' : 'Creator'}
+      </p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <select value={platform} onChange={e => setPlatform(e.target.value)} className={fCls}>
+          <option value="youtube">YouTube</option>
+          <option value="instagram">Instagram</option>
+          <option value="tiktok">TikTok</option>
+        </select>
+        <select value={creatorCountry} onChange={e => setCreatorCountry(e.target.value)} className={fCls}>
+          <option value="">{zh ? '创作者所在国' : "Creator's country"}</option>
+          {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>)}
+        </select>
+        <input type="text" value={cdbFilterFor('hashtags').value} onChange={e => updateCdbFilter('hashtags', { op: 'in', value: e.target.value })} placeholder={zh ? '标签（可选）' : 'Hashtags'} className={fCls} />
+        <input type="text" value={cdbFilterFor('niches').value} onChange={e => updateCdbFilter('niches', { op: 'in', value: e.target.value })} placeholder={zh ? '领域' : 'Niche'} className={fCls} />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+        <select value={minFollowers} onChange={e => setMinFollowers(e.target.value)} className={fCls}>
+          <option value="">{zh ? '最少粉丝' : 'Min followers'}</option>
+          <option value="1000">1,000</option>
+          <option value="5000">5,000</option>
+          <option value="10000">10,000</option>
+          <option value="25000">25,000</option>
+          <option value="50000">50,000</option>
+          <option value="100000">100,000</option>
+          <option value="500000">500,000</option>
+          <option value="1000000">1,000,000</option>
+        </select>
+        <select value={maxFollowers} onChange={e => setMaxFollowers(e.target.value)} className={fCls}>
+          <option value="">{zh ? '最多粉丝' : 'Max followers'}</option>
+          <option value="5000">5,000</option>
+          <option value="10000">10,000</option>
+          <option value="25000">25,000</option>
+          <option value="50000">50,000</option>
+          <option value="100000">100,000</option>
+          <option value="500000">500,000</option>
+          <option value="1000000">1,000,000</option>
+          <option value="10000000">10,000,000</option>
+        </select>
+        <select value={cdbFilterFor('lastPublishTime').value} onChange={e => updateCdbFilter('lastPublishTime', { op: '>', value: e.target.value })} className={fCls}>
+          <option value="">{zh ? '最近活跃' : 'Last active'}</option>
+          <option value="90">{zh ? '近3个月' : 'Last 3 months'}</option>
+          <option value="180">{zh ? '近6个月' : 'Last 6 months'}</option>
+          <option value="365">{zh ? '近1年' : 'Last year'}</option>
+        </select>
+        <select value={cdbFilterFor('isAccountVerified').value} onChange={e => updateCdbFilter('isAccountVerified', { value: e.target.value })} className={fCls}>
+          <option value="">{zh ? '认证账号' : 'Verified'}</option>
+          <option value="true">{zh ? '是' : 'Yes'}</option>
+          <option value="false">{zh ? '否' : 'No'}</option>
+        </select>
+      </div>
+    </div>
+
+    {/* Section 3 — Performance */}
+    <div className="rounded-xl bg-gradient-to-r from-amber-50/40 to-transparent border border-gray-100 p-3">
+      <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+        <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold flex items-center justify-center">3</span>
+        {zh ? '数据表现' : 'Performance'}
+      </p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <input type="number" min={0} step="0.1" value={cdbFilterFor('shortEngagementRate').value} onChange={e => updateCdbFilter('shortEngagementRate', { op: '>', value: e.target.value })} placeholder={zh ? '最低互动率 %' : 'Min engagement %'} className={fCls} />
+        <input type="number" min={0} value={cdbFilterFor('shortAvgViews').value} onChange={e => updateCdbFilter('shortAvgViews', { op: '>', value: e.target.value })} placeholder={zh ? '最低平均播放量' : 'Min avg views'} className={fCls} />
+      </div>
+    </div>
   </>
 
   if (tab === 'detail') {
@@ -511,10 +637,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           {matched && (
           <form onSubmit={e => { e.preventDefault(); discover(query) }} className="mb-4">
             <div className="flex gap-2"><div className="workspace-glass-control flex-1 flex items-center gap-3 px-4 py-3">{icon(searchIcon, 'w-4 h-4')}<input value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent outline-none w-full" placeholder={d.searchByNamePlaceholder}/></div><button className="px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold">{d.searchButton}</button></div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {basicFilterControls}
-              {moreFilterControls}
-              <button type="button" onClick={() => { setQuery(''); setCountry(''); setMinFollowers(''); setMaxFollowers(''); setMinEngagement(''); setMaxEngagement(''); setGender(''); setLanguage(''); setBioKeywords(''); setLastPost(''); setAudienceAge(''); setCreators([]); setMatched(false); try { sessionStorage.removeItem(searchStateKey) } catch {} }} className="px-3 text-sm text-[#65739e]">{d.clearAll}</button>
+            <div className="space-y-2 mt-3">
+              {filterSections}
+              <button type="button" onClick={() => { setQuery(''); setCreatorCountry(''); setMinFollowers(''); setMaxFollowers(''); setCdbFilters([]); setCreators([]); setMatched(false); try { sessionStorage.removeItem(searchStateKey) } catch {} }} className="px-3 py-1 text-sm text-[#65739e]">{d.clearAll}</button>
             </div>
           </form>
           )}
@@ -545,12 +670,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                   />
                 </div>
               </form>
-              <div className="mt-4 mx-auto max-w-xl">
+              <div className="mt-4 mx-auto max-w-2xl space-y-2">
                 <p className="text-xs text-[#7d88aa] mb-2">{m.aiMatchFiltersNote}</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {basicFilterControls}
-                  {moreFilterControls}
-                </div>
+                {filterSections}
               </div>
               <button
                 type="button"
@@ -574,7 +696,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           <div className="flex items-center justify-between mb-3"><b>{loading ? m.findingCreators : m.creatorsFound.replace('{count}', String(creators.length))}</b><span className="text-sm text-[#7180ad]">{m.sortBy}<b>{m.relevance}</b></span></div>
           <div className={`grid md:grid-cols-2 2xl:grid-cols-3 gap-3 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
             {creators.map(c => <article key={c.id} className="workspace-glass-card rounded-3xl p-5 min-h-64 flex flex-col">
-              <div className="flex gap-3 items-center">{avatar(c)}<div className="min-w-0"><button onClick={() => openCreator(c)} className="font-bold truncate block max-w-full text-left hover:text-indigo-600">{c.display_name || c.handle || 'Creator'} <span className="text-indigo-500">●</span></button><p className="text-xs text-[#7581a5] truncate">@{c.handle?.replace(/^@/, '') || 'creator'}</p><span className="text-xs mt-1 inline-block px-2 py-0.5 rounded bg-white/50">{PLATFORM_LABEL[c.platform] || c.platform}</span>{(c.country || c.language) && <p className="text-xs text-[#7581a5] mt-1 truncate">{[c.country, c.language ? (LANGUAGE_FILTER_OPTIONS.find(l => l.code === c.language)?.label || c.language) : null].filter(Boolean).join(' · ')}</p>}</div></div>
+              <div className="flex gap-3 items-center">{avatar(c)}<div className="min-w-0"><button onClick={() => openCreator(c)} className="font-bold truncate block max-w-full text-left hover:text-indigo-600">{c.display_name || c.handle || 'Creator'} <span className="text-indigo-500">●</span></button><p className="text-xs text-[#7581a5] truncate">@{c.handle?.replace(/^@/, '') || 'creator'}</p><span className="text-xs mt-1 inline-block px-2 py-0.5 rounded bg-white/50">{PLATFORM_LABEL[c.platform] || c.platform}</span>{(c.country || c.language) && <p className="text-xs text-[#7581a5] mt-1 truncate">{[c.country, c.language ? (CREATORDB_LANGUAGE_OPTIONS.find(([code]) => code === c.language)?.[1] || c.language) : null].filter(Boolean).join(' · ')}</p>}</div></div>
               <div className="grid grid-cols-2 gap-4 mt-5"><div><b className="text-xl">{compact(c.follower_count)}</b><p className="text-xs text-[#7d88aa]">{m.followers}</p></div><div><b className="text-xl">{c.engagement_rate == null ? '—' : `${Number(c.engagement_rate).toFixed(1)}%`}</b><p className="text-xs text-[#7d88aa]">{m.engRate}</p></div></div>
               <div className="flex flex-wrap gap-1 mt-4">{c.niche_tags.slice(0,3).map(t => <span key={t} className="text-xs bg-white/50 rounded-full px-2.5 py-1">{t}</span>)}</div>
               <div className="flex gap-2 mt-auto pt-5"><button onClick={() => openCreator(c)} className="flex-1 py-2 rounded-xl border border-white bg-white/25 text-sm font-semibold">{m.viewProfile}</button><button disabled={queuedIds.has(c.id) || queueBusy} onClick={() => addCreator(c)} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-semibold disabled:opacity-50">{queuedIds.has(c.id) ? m.added : m.addToCampaign}</button></div>

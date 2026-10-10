@@ -13,6 +13,7 @@ import StatusBadge from '@/components/StatusBadge'
 
 interface Campaign {
   id: string
+  brandId: string
   title: string
   description: string | null
   status: string
@@ -31,14 +32,16 @@ interface Campaign {
 const PAGE_SIZE = 10
 const STATUS_OPTIONS = ['DRAFT', 'PENDING_REVIEW', 'ACTIVE', 'COMPLETED', 'CANCELLED']
 
-export default function BrandCampaignsClient({ campaigns, isVerified }: { campaigns: Campaign[]; isVerified: boolean }) {
+export default function BrandCampaignsClient({ campaigns, isVerified, brandId }: { campaigns: Campaign[]; isVerified: boolean; brandId: string }) {
   const { t, locale } = useLanguage()
   const c = t.brand.campaigns
+  const zh = locale === 'zh'
 
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sort, setSort] = useState<'deadline' | 'newest'>('deadline')
+  const [mineOnly, setMineOnly] = useState(false)
   const [page, setPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -92,6 +95,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified }: { campai
 
   const visible = useMemo(() => {
     let list = [...campaigns]
+    if (mineOnly) list = list.filter((cp) => cp.brandId === brandId)
     const q = query.trim().toLowerCase()
     if (q) {
       list = list.filter(
@@ -109,7 +113,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified }: { campai
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     }
     return list
-  }, [campaigns, query, statusFilter, sort])
+  }, [campaigns, brandId, mineOnly, query, statusFilter, sort])
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -201,6 +205,17 @@ export default function BrandCampaignsClient({ campaigns, isVerified }: { campai
             <option value="deadline">{c.sortPrefix}{c.sortDeadlineSoonest}</option>
             <option value="newest">{c.sortPrefix}{c.sortNewest}</option>
           </select>
+          <button
+            type="button"
+            onClick={() => { setMineOnly(!mineOnly); setPage(1) }}
+            className={`h-11 px-5 rounded-full text-sm font-medium transition whitespace-nowrap ${
+              mineOnly
+                ? 'bg-primary-600 text-white hover:bg-primary-700'
+                : 'workspace-glass-control text-gray-700 hover:text-gray-900'
+            }`}
+          >
+            {zh ? '仅看我的' : 'My campaigns'}
+          </button>
         </div>
       </div>
 

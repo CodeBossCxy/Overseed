@@ -44,6 +44,7 @@ async function CampaignsContent() {
     <BrandCampaignsClient
       campaigns={JSON.parse(JSON.stringify(campaigns))}
       isVerified={brandProfile.brandVerificationStatus === 'APPROVED'}
+      brandId={brandProfile.id}
     />
   )
 }

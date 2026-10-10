@@ -48,8 +48,9 @@ interface SearchResult {
 /* TEMP: influencers.club data source — remove this block together with
    lib/influencers-club.ts and app/api/discovery/club-search/. */
 type DiscoverySource = 'kol' | 'club'
-// Club bills 0.01 credits per returned creator — keep pages small.
-const CLUB_PAGE_SIZE = 10
+// Display page size — the backend always fetches 100 from the vendor and
+// logs the full set, but only returns CLUB_PAGE_SIZE to the client.
+const CLUB_PAGE_SIZE = 50
 /* END TEMP */
 
 interface DiscoverySearchRequest {
@@ -1116,7 +1117,7 @@ export default function DiscoverPanel() {
     const populatedCreatorDbFilters = v.creatorDbFilters.filter((filter) => filter.value.trim() !== '')
     const qs = new URLSearchParams({
       platform: v.platform,
-      limit: String(populatedCreatorDbFilters.length ? 100 : CLUB_PAGE_SIZE),
+      limit: String(CLUB_PAGE_SIZE),
     })
     if (v.query.trim()) qs.set('q', v.query.trim())
     if (populatedCreatorDbFilters.length) {
@@ -1194,7 +1195,7 @@ export default function DiscoverPanel() {
     }
 
     await runSearchPage(
-      { endpoint: 'club-search', params: qs.toString(), pageSize: populatedCreatorDbFilters.length ? 100 : CLUB_PAGE_SIZE },
+      { endpoint: 'club-search', params: qs.toString(), pageSize: CLUB_PAGE_SIZE },
       0,
       false,
       persist ?? v
@@ -1400,11 +1401,10 @@ export default function DiscoverPanel() {
       setSortOrder(req.sortOrder === 'asc' ? 'asc' : 'desc')
       setCreatorDbFilters(restoreCreatorDbFilters(req.creatorDbFilters))
 
-      const presetPageSize = req.creatorDbPreset || req.creatorDbFilters ? Math.min(Number(req.limit) || 100, 100) : CLUB_PAGE_SIZE
       const request: DiscoverySearchRequest = {
         endpoint: 'club-search',
         params: new URLSearchParams({ task_id: id }).toString(),
-        pageSize: presetPageSize,
+        pageSize: CLUB_PAGE_SIZE,
       }
       const snapshot = data.data
       if (snapshot) {
@@ -1412,7 +1412,7 @@ export default function DiscoverPanel() {
         setSearchResult(snapshot)
         setActiveSearch(request)
         setSearchPage(data.page ?? 0)
-        setSearchHasMore(typeof snapshot.has_next_page === 'boolean' ? snapshot.has_next_page : results.length === presetPageSize)
+        setSearchHasMore(typeof snapshot.has_next_page === 'boolean' ? snapshot.has_next_page : results.length === CLUB_PAGE_SIZE)
         setSearchTaskId(id)
         try {
           const saved: SavedSearchState = {
@@ -1437,7 +1437,7 @@ export default function DiscoverPanel() {
             result: snapshot,
             request,
             page: data.page ?? 0,
-            hasMore: typeof snapshot.has_next_page === 'boolean' ? snapshot.has_next_page : results.length === presetPageSize,
+            hasMore: typeof snapshot.has_next_page === 'boolean' ? snapshot.has_next_page : results.length === CLUB_PAGE_SIZE,
             taskId: id,
           }
           sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(saved))
