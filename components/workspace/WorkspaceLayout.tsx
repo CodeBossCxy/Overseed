@@ -137,7 +137,7 @@ export default function WorkspaceLayout({
           { href: '/dashboard/brand/campaigns', label: w.myCampaigns, icon: ICONS.briefcase },
           { href: '/dashboard/brand/saved-creators', label: t.brand.savedCreators.title, icon: ICONS.bookmark },
           { href: '/dashboard/brand/discover', label: t.nav.findInfluencer, icon: ICONS.search },
-          { href: '/dashboard/brand/outreach', label: 'Mass Outreach', icon: ICONS.send },
+          { href: '/dashboard/brand/outreach', label: w.massOutreach, icon: ICONS.send },
           { href: '/dashboard/messages', label: w.messages, icon: ICONS.chat },
           { href: '/dashboard/brand/profile', label: w.brandProfile, icon: ICONS.user },
           { href: '/ai-assistant', label: w.aiAssistant, icon: ICONS.sparkles },

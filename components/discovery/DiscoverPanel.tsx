@@ -2199,9 +2199,21 @@ export default function DiscoverPanel() {
       {!unavailable && (searchResult || isLoading) && (
         <>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">
-              {isLoading ? d.loadingCreators : `${creators.length}${isBrowsing && hasMore ? '+' : ''} ${d.resultsCount}`}
-            </h2>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-white/60 transition"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+                {zh ? '搜索历史' : 'Search history'}
+              </button>
+              <h2 className="text-lg font-semibold">
+                {isLoading ? d.loadingCreators : `${creators.length}${isBrowsing && hasMore ? '+' : ''} ${d.resultsCount}`}
+              </h2>
+            </div>
             {searchResult && searchResult.credits_left == null && (
               <p className="text-xs text-gray-400">
                 {`${d.cacheHits}: ${searchResult.cache_hits} · ${d.liveCalls}: ${searchResult.live_calls}`}

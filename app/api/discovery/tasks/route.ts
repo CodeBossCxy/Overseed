@@ -17,7 +17,11 @@ export async function GET() {
   }
 
   const tasks = await prisma.discoverySearchTask.findMany({
-    where: { userId },
+    where: {
+      userId,
+      // Only show tasks that have at least one page of results
+      pages: { some: {} },
+    },
     orderBy: { updatedAt: 'desc' },
     take: 50,
     select: {
