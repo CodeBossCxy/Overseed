@@ -537,6 +537,62 @@ export default function DiscoverPanel() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [unavailable, setUnavailable] = useState(false)
+
+  // Saved discovery creators — track by "platform:handle" keys
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
+  const [savingKey, setSavingKey] = useState<string | null>(null)
+  useEffect(() => {
+    fetch('/api/saved-creators/discovery?keysOnly=1')
+      .then((res) => (res.ok ? res.json() : { keys: [] }))
+      .then((data) => setSavedKeys(new Set(data.keys || [])))
+      .catch(() => {})
+  }, [])
+  const toggleSaveCreator = async (creator: DiscoveredCreator) => {
+    const handle = (creator.handle || '').replace(/^@/, '').toLowerCase()
+    if (!handle) return
+    const key = `${creator.platform}:${handle}`
+    if (savingKey === key) return
+    setSavingKey(key)
+    const wasSaved = savedKeys.has(key)
+    setSavedKeys((prev) => {
+      const next = new Set(prev)
+      wasSaved ? next.delete(key) : next.add(key)
+      return next
+    })
+    try {
+      const res = wasSaved
+        ? await fetch(`/api/saved-creators/discovery?platform=${encodeURIComponent(creator.platform)}&handle=${encodeURIComponent(handle)}`, { method: 'DELETE' })
+        : await fetch('/api/saved-creators/discovery', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              platform: creator.platform,
+              handle,
+              displayName: creator.display_name,
+              avatarUrl: creator.avatar_url,
+              followerCount: creator.follower_count,
+              engagementRate: creator.engagement_rate != null ? Number(creator.engagement_rate) : null,
+              nicheTags: creator.niche_tags || [],
+            }),
+          })
+      if (!res.ok) {
+        // Revert on failure
+        setSavedKeys((prev) => {
+          const next = new Set(prev)
+          wasSaved ? next.add(key) : next.delete(key)
+          return next
+        })
+      }
+    } catch {
+      setSavedKeys((prev) => {
+        const next = new Set(prev)
+        wasSaved ? next.add(key) : next.delete(key)
+        return next
+      })
+    } finally {
+      setSavingKey(null)
+    }
+  }
   // Pricing v3: quota/credit exhaustion codes → show a plans/credits CTA
   const QUOTA_CODES = ['DISCOVERY_QUOTA_EXCEEDED', 'OUTREACH_QUOTA_EXCEEDED', 'INSUFFICIENT_CREDITS']
   const [searchBlocked, setSearchBlocked] = useState(false)
@@ -2268,16 +2324,24 @@ export default function DiscoverPanel() {
                         {d.viewDetails}
                       </a>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={(e) => e.stopPropagation()}
-                      className="p-2 workspace-glass-control rounded-xl text-gray-400 hover:text-primary-600 transition flex-shrink-0"
-                      title="Save"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
-                      </svg>
-                    </button>
+                    {(() => {
+                      const handle = (creator.handle || '').replace(/^@/, '').toLowerCase()
+                      const key = `${creator.platform}:${handle}`
+                      const isSaved = handle ? savedKeys.has(key) : false
+                      return (
+                        <button
+                          type="button"
+                          disabled={!handle || savingKey === key}
+                          onClick={(e) => { e.stopPropagation(); toggleSaveCreator(creator) }}
+                          className={`p-2 workspace-glass-control rounded-xl transition flex-shrink-0 disabled:opacity-50 ${isSaved ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'}`}
+                          title={isSaved ? (zh ? '取消收藏' : 'Unsave') : (zh ? '收藏' : 'Save')}
+                        >
+                          <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                          </svg>
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
               ))}

@@ -447,6 +447,7 @@ model BrandProfile {
   collaborations Collaboration[]
   savedCreators  SavedCreator[]
   savedCreatorFolders SavedCreatorFolder[]
+  savedDiscoveryCreators SavedDiscoveryCreator[]
 
   @@map("brand_profiles")
 }
@@ -1123,9 +1124,33 @@ model SavedCreatorFolder {
 
   brand    BrandProfile   @relation(fields: [brandId], references: [id], onDelete: Cascade)
   creators SavedCreator[]
+  discoveryCreators SavedDiscoveryCreator[]
 
   @@unique([brandId, name])
   @@map("saved_creator_folders")
+}
+
+// External (discovery) creators bookmarked by a brand — not linked to a User
+// account, identified by platform + handle from CreatorDB / influencers.club.
+model SavedDiscoveryCreator {
+  id             String   @id @default(cuid())
+  brandId        String
+  platform       String
+  handle         String
+  displayName    String?
+  avatarUrl      String?
+  followerCount  Int?
+  engagementRate Float?
+  nicheTags      String[] @default([])
+  savedAt        DateTime @default(now())
+  folderId       String?
+
+  brand  BrandProfile        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  folder SavedCreatorFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  @@unique([brandId, platform, handle])
+  @@index([folderId])
+  @@map("saved_discovery_creators")
 }
 
 model SavedCampaign {

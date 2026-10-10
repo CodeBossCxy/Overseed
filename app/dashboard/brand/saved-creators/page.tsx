@@ -49,8 +49,10 @@ const COUNTRY_LABELS: Record<string, { en: string; zh: string }> = {
 export default function SavedCreatorsPage() {
   const { t, locale, isUGCTranslated } = useLanguage()
   const s = t.brand.savedCreators
+  const zh = locale === 'zh'
 
   const [saved, setSaved] = useState<any[]>([])
+  const [discoverySaved, setDiscoverySaved] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   // Brand-defined subfolders; '' = All
   const [folders, setFolders] = useState<{ id: string; name: string; count: number }[]>([])
@@ -71,9 +73,14 @@ export default function SavedCreatorsPage() {
   useEffect(() => {
     setLoading(true)
     const url = isUGCTranslated ? `/api/saved-creators?lang=${locale}` : '/api/saved-creators'
-    fetch(url)
-      .then((res) => (res.ok ? res.json() : { saved: [] }))
-      .then((data) => setSaved(data.saved || []))
+    Promise.all([
+      fetch(url).then((res) => (res.ok ? res.json() : { saved: [] })),
+      fetch('/api/saved-creators/discovery').then((res) => (res.ok ? res.json() : { saved: [] })),
+    ])
+      .then(([data, disc]) => {
+        setSaved(data.saved || [])
+        setDiscoverySaved(disc.saved || [])
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [isUGCTranslated, locale])
@@ -161,8 +168,9 @@ export default function SavedCreatorsPage() {
     saved.forEach((row) =>
       (row.influencer?.socialAccounts || []).forEach((a: any) => a.platform?.name && set.add(a.platform.name))
     )
+    discoverySaved.forEach((row) => row.platform && set.add(row.platform))
     return [...set].sort()
-  }, [saved])
+  }, [saved, discoverySaved])
 
   const countries = useMemo(() => {
     const set = new Set<string>()
@@ -173,41 +181,82 @@ export default function SavedCreatorsPage() {
   const categories = useMemo(() => {
     const set = new Set<string>()
     saved.forEach((row) => row.influencer?.primaryNiche && set.add(row.influencer.primaryNiche))
+    discoverySaved.forEach((row) => (row.nicheTags || []).forEach((n: string) => set.add(n)))
     return [...set].sort()
-  }, [saved])
+  }, [saved, discoverySaved])
 
   const hasFilters = !!(query || platform || country || category || minFollowers)
 
   const visible = useMemo(() => {
-    let list = [...saved]
+    // Normalize platform-registered saves
+    const registered = saved.map((row) => ({
+      _type: 'registered' as const,
+      _id: row.influencerId,
+      name: row.influencer?.displayName || row.influencer?.user?.name || 'Creator',
+      handle: row.influencer?.socialAccounts?.[0]?.username || null,
+      avatarUrl: row.influencer?.avatarUrl || row.influencer?.user?.image || null,
+      followers: maxFollowers(row.influencer),
+      engagement: topEngagement(row.influencer),
+      country: row.influencer?.locationCountry || null,
+      niche: row.influencer?.primaryNiche || null,
+      platforms: (row.influencer?.socialAccounts || []).map((a: any) => a.platform?.name).filter(Boolean),
+      bio: row.influencer?.bio || null,
+      isVerified: row.influencer?.isVerified || false,
+      savedAt: row.savedAt,
+      folderId: row.folderId || null,
+      profileUrl: `/influencer/${row.influencerId}`,
+      influencerId: row.influencerId,
+      // discovery-specific fields (null for registered)
+      discoveryId: null as string | null,
+      discoveryPlatform: null as string | null,
+      discoveryHandle: null as string | null,
+    }))
+
+    // Normalize discovery saves
+    const discovery = discoverySaved.map((row) => ({
+      _type: 'discovery' as const,
+      _id: row.id,
+      name: row.displayName || row.handle || 'Creator',
+      handle: row.handle,
+      avatarUrl: row.avatarUrl || null,
+      followers: row.followerCount || 0,
+      engagement: row.engagementRate != null ? Number(row.engagementRate) : null,
+      country: null as string | null,
+      niche: row.nicheTags?.[0] || null,
+      platforms: [row.platform],
+      bio: null as string | null,
+      isVerified: false,
+      savedAt: row.savedAt,
+      folderId: row.folderId || null,
+      profileUrl: null as string | null,
+      influencerId: null as string | null,
+      discoveryId: row.id,
+      discoveryPlatform: row.platform,
+      discoveryHandle: row.handle,
+    }))
+
+    let list = [...registered, ...discovery]
     if (activeFolder) list = list.filter((row) => row.folderId === activeFolder)
     const q = query.trim().toLowerCase()
     if (q) {
-      list = list.filter((row) => {
-        const inf = row.influencer
-        const handle = inf?.socialAccounts?.[0]?.username || ''
-        return (
-          inf?.displayName?.toLowerCase().includes(q) ||
-          inf?.user?.name?.toLowerCase().includes(q) ||
-          handle.toLowerCase().includes(q)
-        )
-      })
-    }
-    if (platform) {
       list = list.filter((row) =>
-        (row.influencer?.socialAccounts || []).some((a: any) => a.platform?.name === platform)
+        row.name?.toLowerCase().includes(q) ||
+        row.handle?.toLowerCase().includes(q)
       )
     }
-    if (country) list = list.filter((row) => row.influencer?.locationCountry === country)
-    if (category) list = list.filter((row) => row.influencer?.primaryNiche === category)
-    if (minFollowers) list = list.filter((row) => maxFollowers(row.influencer) >= Number(minFollowers))
+    if (platform) {
+      list = list.filter((row) => row.platforms.includes(platform))
+    }
+    if (country) list = list.filter((row) => row.country === country)
+    if (category) list = list.filter((row) => row.niche === category)
+    if (minFollowers) list = list.filter((row) => row.followers >= Number(minFollowers))
     if (sort === 'followers') {
-      list.sort((a, b) => maxFollowers(b.influencer) - maxFollowers(a.influencer))
+      list.sort((a, b) => b.followers - a.followers)
     } else {
       list.sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime())
     }
     return list
-  }, [saved, activeFolder, query, platform, country, category, minFollowers, sort])
+  }, [saved, discoverySaved, activeFolder, query, platform, country, category, minFollowers, sort])
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -219,6 +268,19 @@ export default function SavedCreatorsPage() {
       const res = await fetch(`/api/saved-creators?influencerId=${influencerId}`, { method: 'DELETE' })
       if (res.ok) {
         setSaved((prev) => prev.filter((row) => row.influencerId !== influencerId))
+        loadFolders()
+      }
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const unsaveDiscovery = async (id: string, platform: string, handle: string) => {
+    setBusyId(id)
+    try {
+      const res = await fetch(`/api/saved-creators/discovery?platform=${encodeURIComponent(platform)}&handle=${encodeURIComponent(handle)}`, { method: 'DELETE' })
+      if (res.ok) {
+        setDiscoverySaved((prev) => prev.filter((row) => row.id !== id))
         loadFolders()
       }
     } finally {
@@ -265,7 +327,7 @@ export default function SavedCreatorsPage() {
               activeFolder === '' ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200' : 'bg-white/45 text-gray-600 hover:bg-white/70'
             }`}
           >
-            {s.all} <span className="text-gray-400 font-normal">({saved.length})</span>
+            {s.all} <span className="text-gray-400 font-normal">({saved.length + discoverySaved.length})</span>
           </button>
           {folders.map((f) => (
             <span key={f.id} className="inline-flex items-center">
@@ -361,7 +423,7 @@ export default function SavedCreatorsPage() {
         {/* Grid */}
         {loading ? (
           <div className="workspace-glass-card rounded-2xl p-10 text-center text-gray-400 text-sm">…</div>
-        ) : saved.length === 0 ? (
+        ) : saved.length === 0 && discoverySaved.length === 0 ? (
           <div className="workspace-glass-card rounded-2xl p-12 text-center">
             <p className="text-gray-500 text-lg mb-2">{s.empty}</p>
             <p className="text-gray-400">{s.emptyDesc}</p>
@@ -370,109 +432,111 @@ export default function SavedCreatorsPage() {
           <div className="workspace-glass-card rounded-2xl p-10 text-center text-gray-500">{s.noMatches}</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {paged.map((row) => {
-              const inf = row.influencer
-              const name = inf?.displayName || inf?.user?.name || 'Creator'
-              const handle = inf?.socialAccounts?.[0]?.username
-              const followers = maxFollowers(inf)
-              const eng = topEngagement(inf)
-              return (
-                <div key={row.influencerId} className="workspace-glass-card rounded-2xl p-5">
-                  <div className="flex items-center justify-between mb-3 gap-2">
-                    <span className="text-xs text-gray-400 flex-shrink-0">{savedAgo(row.savedAt)}</span>
-                    {folders.length > 0 && (
-                      <select
-                        value={row.folderId || ''}
-                        onChange={(e) => moveToFolder(row.influencerId, e.target.value)}
-                        disabled={busyId === row.influencerId}
-                        className="ml-auto max-w-[45%] truncate px-2 py-1 workspace-glass-control text-xs text-gray-600 focus:outline-none disabled:opacity-50"
-                        title={s.moveToFolder}
-                      >
-                        <option value="">{s.ungrouped}</option>
-                        {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                      </select>
-                    )}
-                    <button
-                      onClick={() => unsave(row.influencerId)}
-                      disabled={busyId === row.influencerId}
-                      className="text-primary-600 hover:text-red-500 transition disabled:opacity-50"
-                      title={s.savedState}
-                    >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                      {inf?.avatarUrl || inf?.user?.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={inf.avatarUrl || inf.user.image} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xl font-bold">
-                          {name.charAt(0)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-gray-900 flex items-center gap-1.5 truncate">
-                        {name}
-                        {inf?.isVerified && (
-                          <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
-                          </svg>
-                        )}
-                      </p>
-                      {handle && <p className="text-sm text-gray-500 truncate">@{handle}</p>}
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        {(inf?.socialAccounts || []).slice(0, 3).map((acc: any) => (
-                          <PlatformIcon key={acc.id} name={acc.platform?.name || ''} />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {inf?.primaryNiche && (
-                    <span className="inline-block mt-3 px-2.5 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
-                      {t.categoryNames[inf.primaryNiche] || inf.primaryNiche}
-                    </span>
+            {paged.map((row) => (
+              <div key={row._id} className="workspace-glass-card rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-3 gap-2">
+                  <span className="text-xs text-gray-400 flex-shrink-0">{savedAgo(row.savedAt)}</span>
+                  {row._type === 'discovery' && (
+                    <span className="text-[10px] px-2 py-0.5 bg-violet-50 text-violet-600 rounded-full font-medium">{zh ? '发现' : 'Discovery'}</span>
                   )}
+                  {folders.length > 0 && row._type === 'registered' && row.influencerId && (
+                    <select
+                      value={row.folderId || ''}
+                      onChange={(e) => moveToFolder(row.influencerId!, e.target.value)}
+                      disabled={busyId === row._id}
+                      className="ml-auto max-w-[45%] truncate px-2 py-1 workspace-glass-control text-xs text-gray-600 focus:outline-none disabled:opacity-50"
+                      title={s.moveToFolder}
+                    >
+                      <option value="">{s.ungrouped}</option>
+                      {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </select>
+                  )}
+                  <button
+                    onClick={() => row._type === 'discovery' ? unsaveDiscovery(row._id, row.discoveryPlatform!, row.discoveryHandle!) : unsave(row._id)}
+                    disabled={busyId === row._id}
+                    className="text-primary-600 hover:text-red-500 transition disabled:opacity-50"
+                    title={s.savedState}
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                  </button>
+                </div>
 
-                  <div className="grid grid-cols-3 divide-x divide-gray-100 mt-3 text-center">
-                    <div>
-                      <p className="text-sm font-bold text-gray-900 tabular-nums">{followers ? compact(followers) : '—'}</p>
-                      <p className="text-[11px] text-gray-400">{s.followers}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-900">{countryLabel(inf?.locationCountry)}</p>
-                      <p className="text-[11px] text-gray-400">{s.country}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-900 tabular-nums">{eng != null ? `${eng.toFixed(1)}%` : '—'}</p>
-                      <p className="text-[11px] text-gray-400">{s.engRate}</p>
+                <div className="flex items-start gap-4">
+                  <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                    {row.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={row.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xl font-bold">
+                        {row.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-900 flex items-center gap-1.5 truncate">
+                      {row.name}
+                      {row.isVerified && (
+                        <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
+                        </svg>
+                      )}
+                    </p>
+                    {row.handle && <p className="text-sm text-gray-500 truncate">@{row.handle}</p>}
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      {row.platforms.slice(0, 3).map((p: string) => (
+                        <PlatformIcon key={p} name={p} />
+                      ))}
                     </div>
                   </div>
+                </div>
 
-                  {inf?.bio && <p className="text-xs text-gray-500 mt-3 line-clamp-1">{inf.bio}</p>}
+                {row.niche && (
+                  <span className="inline-block mt-3 px-2.5 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
+                    {t.categoryNames[row.niche] || row.niche}
+                  </span>
+                )}
 
-                  <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="grid grid-cols-3 divide-x divide-gray-100 mt-3 text-center">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900 tabular-nums">{row.followers ? compact(row.followers) : '—'}</p>
+                    <p className="text-[11px] text-gray-400">{s.followers}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{countryLabel(row.country)}</p>
+                    <p className="text-[11px] text-gray-400">{s.country}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900 tabular-nums">{row.engagement != null ? `${row.engagement.toFixed(1)}%` : '—'}</p>
+                    <p className="text-[11px] text-gray-400">{s.engRate}</p>
+                  </div>
+                </div>
+
+                {row.bio && <p className="text-xs text-gray-500 mt-3 line-clamp-1">{row.bio}</p>}
+
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  {row.profileUrl ? (
                     <Link
-                      href={`/influencer/${row.influencerId}`}
+                      href={row.profileUrl}
                       className="prismatic-primary-button bg-primary-600 text-white text-center px-4 py-2 rounded-full text-sm font-bold transition"
                     >
                       <span className="relative z-10">{s.viewProfile}</span>
                     </Link>
-                    <Link
-                      href="/dashboard/messages"
-                      className="text-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full text-sm font-semibold hover:bg-gray-50 transition"
-                    >
-                      {s.message}
-                    </Link>
-                  </div>
+                  ) : (
+                    <span className="text-center px-4 py-2 bg-gray-100 text-gray-400 rounded-full text-sm font-medium cursor-not-allowed">
+                      {s.viewProfile}
+                    </span>
+                  )}
+                  <Link
+                    href="/dashboard/messages"
+                    className="text-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full text-sm font-semibold hover:bg-gray-50 transition"
+                  >
+                    {s.message}
+                  </Link>
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         )}
 
