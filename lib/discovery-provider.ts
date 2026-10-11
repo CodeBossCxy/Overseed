@@ -92,6 +92,24 @@ export async function discoveryAnalytics(
 }
 
 /**
+ * Fetch contact info for a creator on-demand. Separated from profile
+ * enrichment because CreatorDB charges 0-15 credits per contact lookup.
+ */
+export async function discoveryContact(
+  platform: string,
+  handle: string,
+  opts?: { logUserId?: string }
+): Promise<{ email: string | null; emails: string[] }> {
+  const p = getProvider()
+  if (p === 'creatordb') {
+    const { creatordbContact } = await import('@/lib/creatordb')
+    return creatordbContact(platform, handle, opts)
+  }
+  // Club provider doesn't have a separate contact endpoint — return empty
+  return { email: null, emails: [] }
+}
+
+/**
  * Fetch the normalized profile fields and server-only contact email needed by
  * mass outreach. The permanent enrichment cache is shared across providers so
  * repeat selections do not trigger another paid vendor lookup.
@@ -103,12 +121,27 @@ export async function discoveryEnrichForOutreach(
 ): Promise<{ detail: any; email: string | null }> {
   const normalizedHandle = handle.replace(/^@/, '').toLowerCase()
   const { prisma } = await import('@/lib/prisma')
+
+  // Check primary cache (creatorEnrichmentCache)
   const cached = await prisma.creatorEnrichmentCache
     .findUnique({ where: { platform_handle: { platform, handle: normalizedHandle } } })
     .catch(() => null)
   if (cached) {
     const data = cached.data as any
     return { detail: data?.detail ?? {}, email: data?.email ?? null }
+  }
+
+  // Check fallback cache (discoveryViewCache) — the profile-view route
+  // writes here, so we can avoid a vendor call if the user already viewed
+  // this creator's profile.
+  if (opts?.logUserId) {
+    const viewCached = await prisma.discoveryViewCache
+      .findFirst({ where: { userId: opts.logUserId, kind: 'profile', platform, handle: normalizedHandle } })
+      .catch(() => null)
+    if (viewCached) {
+      const d = viewCached.data as any
+      return { detail: d ?? {}, email: d?._email ?? null }
+    }
   }
 
   let result: { detail: any; email: string | null }
@@ -122,13 +155,16 @@ export async function discoveryEnrichForOutreach(
     result = { detail, email: email ?? null }
   }
 
+  // Sanitize before writing — strip undefined/NaN values that break Prisma JSON
+  const safeResult = JSON.parse(JSON.stringify(result))
+
   await prisma.creatorEnrichmentCache
     .upsert({
       where: { platform_handle: { platform, handle: normalizedHandle } },
-      create: { platform, handle: normalizedHandle, data: result },
-      update: { data: result, fetchedAt: new Date() },
+      create: { platform, handle: normalizedHandle, data: safeResult },
+      update: { data: safeResult, fetchedAt: new Date() },
     })
-    .catch((error) => console.error('Provider enrichment cache write failed:', error))
+    .catch((error) => console.error('[enrichForOutreach] cache write failed:', error))
   return result
 }
 
@@ -143,7 +179,7 @@ export async function discoveryGetContactEmail(
   const p = getProvider()
   if (p === 'creatordb') {
     try {
-      const result = await discoveryEnrichForOutreach(platform, handle)
+      const result = await discoveryContact(platform, handle)
       return result.email
     } catch {
       return null

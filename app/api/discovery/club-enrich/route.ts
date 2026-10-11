@@ -71,8 +71,66 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Serve from cache if this user already viewed this creator's profile.
+  // Check both discoveryViewCache (per-user) and creatorEnrichmentCache
+  // (shared outreach cache) to avoid redundant vendor calls.
+  const normalizedHandle = handle.toLowerCase()
+  const cacheKey = { userId, kind: 'profile', platform, handle: normalizedHandle }
+  try {
+    const cached = await prisma.discoveryViewCache.findUnique({
+      where: { userId_kind_platform_handle: cacheKey },
+    })
+    if (cached) {
+      return NextResponse.json(cached.data)
+    }
+  } catch (e) {
+    console.error('[club-enrich] discoveryViewCache read failed:', e)
+  }
+
+  // Fallback: check the shared enrichment cache (written by outreach flow)
+  try {
+    const enrichCached = await prisma.creatorEnrichmentCache.findUnique({
+      where: { platform_handle: { platform, handle: normalizedHandle } },
+    })
+    if (enrichCached) {
+      const d = enrichCached.data as any
+      const detail = d?.detail ?? d
+      // Back-fill the per-user view cache so future reads are fast
+      await prisma.discoveryViewCache.upsert({
+        where: { userId_kind_platform_handle: cacheKey },
+        create: { ...cacheKey, data: detail },
+        update: { data: detail, fetchedAt: new Date() },
+      }).catch((e) => console.error('[club-enrich] view cache back-fill failed:', e))
+      return NextResponse.json(detail)
+    }
+  } catch (e) {
+    console.error('[club-enrich] enrichmentCache read failed:', e)
+  }
+
   try {
     const detail = await discoveryEnrich(platform, handle, { logUserId: userId })
+    // Sanitize before caching — strip undefined/NaN that break Prisma JSON
+    const safeDetail = JSON.parse(JSON.stringify(detail))
+    // Cache the result for future free views
+    try {
+      await prisma.discoveryViewCache.upsert({
+        where: { userId_kind_platform_handle: cacheKey },
+        create: { ...cacheKey, data: safeDetail },
+        update: { data: safeDetail, fetchedAt: new Date() },
+      })
+    } catch (e) {
+      console.error('[club-enrich] discoveryViewCache write failed:', e)
+    }
+    // Also write to the shared enrichment cache so outreach doesn't re-fetch
+    try {
+      await prisma.creatorEnrichmentCache.upsert({
+        where: { platform_handle: { platform, handle: normalizedHandle } },
+        create: { platform, handle: normalizedHandle, data: safeDetail },
+        update: { data: safeDetail, fetchedAt: new Date() },
+      })
+    } catch (e) {
+      console.error('[club-enrich] enrichmentCache write failed:', e)
+    }
     return NextResponse.json(detail)
   } catch (err: any) {
     // Don't charge for a failed first view

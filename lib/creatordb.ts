@@ -531,8 +531,10 @@ async function fetchCreatorDbEnrichment(
   const cleanHandle = handle.replace(/^@/, '')
   const isYoutube = platform === 'youtube'
 
-  // Fetch profile + performance + contact in parallel
-  const [profileRes, perfRes, contactRes] = await Promise.all([
+  // Fetch profile + performance in parallel (contact is fetched on-demand
+  // via a separate endpoint to avoid the 0-15 credit contact lookup cost
+  // on every profile view).
+  const [profileRes, perfRes] = await Promise.all([
     creatorDbFetch(`${BASE}/${platformPath}/profile`, {
       method: 'POST',
       headers: authHeaders(),
@@ -547,18 +549,10 @@ async function fetchCreatorDbEnrichment(
       cache: 'no-store',
       signal: AbortSignal.timeout(30000),
     }, { userId: opts?.logUserId }),
-    creatorDbFetch(`${BASE}/${platformPath}/contact`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({ uniqueId: cleanHandle, fields: ['emails'] }),
-      cache: 'no-store',
-      signal: AbortSignal.timeout(30000),
-    }, { userId: opts?.logUserId }).catch(() => null), // contact may 404 for some creators
   ])
 
   const profileData = await profileRes.json().catch(() => null)
   const perfData = await perfRes.json().catch(() => null)
-  const contactData = contactRes ? await contactRes.json().catch(() => null) : null
 
   if (!profileRes.ok || !profileData?.success) {
     throw new Error(
@@ -569,8 +563,7 @@ async function fetchCreatorDbEnrichment(
 
   const p = profileData.data || {}
   const perf = perfData?.data || {}
-  const emails: string[] = contactData?.data?.emails || []
-  const email = emails.find((e: string) => e.includes('@')) || null
+  const email: string | null = null // Contact is fetched on-demand via creatordbContact()
 
   // Normalize country/language from alpha-3 to alpha-2
   const countryA3 = p.country || null
@@ -586,12 +579,13 @@ async function fetchCreatorDbEnrichment(
     (reelsPerf.avgEngagementRate ?? imgPerf.avgEngagementRate ?? videosPerf.avgEngagementRate ?? null)
   const engagementDisplay = engagementPercent != null ? Number(engagementPercent) * 100 : null
 
-  // Growth data
+  // Growth data — CreatorDB returns decimal ratios (0.01 = 1%), convert to percent
   const growth = p.subscriberGrowth || {}
+  const growthPct = (v: unknown) => typeof v === 'number' ? Math.round(v * 10000) / 100 : null
   const followerGrowth = {
-    '7d': growth.g7 ?? null,
-    '30d': growth.g30 ?? null,
-    '90d': growth.g90 ?? null,
+    '7d': growthPct(growth.g7),
+    '30d': growthPct(growth.g30),
+    '90d': growthPct(growth.g90),
   }
 
   // Avg views/likes from performance
@@ -695,6 +689,34 @@ export async function creatordbEnrichForOutreach(
   const enriched = await fetchCreatorDbEnrichment(platform, handle, opts)
   const { _email, ...detail } = enriched
   return { detail, email: _email }
+}
+
+/**
+ * Fetch contact info for a creator on-demand. Separated from profile
+ * enrichment because CreatorDB charges 0-15 credits per contact lookup.
+ */
+export async function creatordbContact(
+  platform: string,
+  handle: string,
+  opts?: { logUserId?: string }
+): Promise<{ email: string | null; emails: string[] }> {
+  const platformPath = PLATFORM_PATH[platform]
+  if (!platformPath) throw new Error(`CreatorDB does not support platform: ${platform}`)
+  if (!creatordbConfigured()) throw new Error('CreatorDB API not configured')
+
+  const cleanHandle = handle.replace(/^@/, '')
+  const res = await creatorDbFetch(`${BASE}/${platformPath}/contact`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ uniqueId: cleanHandle, fields: ['emails'] }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(30000),
+  }, { userId: opts?.logUserId }).catch(() => null)
+
+  const data = res ? await res.json().catch(() => null) : null
+  const emails: string[] = data?.data?.emails || []
+  const email = emails.find((e: string) => e.includes('@')) || null
+  return { email, emails }
 }
 
 // ---------------------------------------------------------------------------

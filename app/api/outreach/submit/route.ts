@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
-import { scrapeBioBatch } from '@/lib/scrape-bio'
 
 // Extract email addresses from a bio/text string
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
@@ -13,8 +12,7 @@ function extractEmailFromBio(bio: string | null | undefined): string | null {
   return matches?.[0] || null
 }
 
-// Allow up to 60s for scraping bios (default is 10s on Vercel hobby)
-export const maxDuration = 60
+export const maxDuration = 30
 
 // POST /api/outreach/submit — save outreach campaign with selected creators,
 // then asynchronously look up contact info and email results to the ops team.
@@ -179,37 +177,9 @@ async function lookupContactsAndNotify(
     results.push({ handle: r.handle, displayName: r.displayName, platform: r.platform, followers: r.followerCount, email, profileUrl })
   }
 
-  // Step 2: Scrape bios for recipients without email (free, no API credits)
-  const needsScraping = results.filter((r) => !r.email)
-  if (needsScraping.length > 0) {
-    try {
-      console.log(`[outreach-submit] Scraping ${needsScraping.length} bios...`)
-      const scraped = await scrapeBioBatch(
-        needsScraping.map((r) => ({ platform: r.platform, handle: r.handle })),
-        500, // 500ms delay between requests (faster for serverless)
-      )
-      for (const r of results) {
-        if (r.email) continue
-        const key = `${r.platform}:${r.handle}`
-        const bio = scraped.get(key)
-        if (bio?.emails?.length) {
-          r.email = bio.emails[0]
-          // Persist to DB for future lookups
-          await prisma.creatorProfile.update({
-            where: { platform_handle: { platform: r.platform, handle: r.handle } },
-            data: { email: r.email, bio: bio.bio },
-          }).catch(() => {})
-          await prisma.outreachRecipient.updateMany({
-            where: { outreachCampaignId: campaignId, handle: r.handle },
-            data: { email: r.email },
-          }).catch(() => {})
-        }
-      }
-      console.log(`[outreach-submit] Scraped ${needsScraping.length} bios, found ${results.filter(r => r.email).length} emails total`)
-    } catch (err) {
-      console.error('[outreach-submit] Bio scraping failed:', err)
-    }
-  }
+  // Note: Bio scraping from Instagram is blocked on datacenter IPs (Vercel).
+  // The notification email includes clickable profile links for manual lookup.
+  // TODO: Add optional CreatorDB Profile API enrichment (2 credits/creator) as a future toggle.
 
   // Update campaign status
   await prisma.outreachCampaign.update({

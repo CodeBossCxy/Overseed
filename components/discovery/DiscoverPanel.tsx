@@ -2256,10 +2256,10 @@ export default function DiscoverPanel() {
                 <div
                   key={`${searchTaskId ?? activeSearch?.params ?? 'browse'}:${searchPage}:${creator.id}:${creatorIndex}`}
                   onClick={
-                    creator.id.startsWith('club:') ? () => openDetail(creator) : undefined
+                    creator.id.startsWith('club:') || creator.id.startsWith('cdb:') ? () => openDetail(creator) : undefined
                   }
                   className={`workspace-glass-card rounded-2xl p-5 flex flex-col items-center text-center ${
-                    creator.id.startsWith('club:')
+                    creator.id.startsWith('club:') || creator.id.startsWith('cdb:')
                       ? 'cursor-pointer hover:shadow-md transition'
                       : ''
                   }`}
@@ -2316,7 +2316,7 @@ export default function DiscoverPanel() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 w-full mt-3">
-                    {creator.id.startsWith('club:') ? (
+                    {creator.id.startsWith('club:') || creator.id.startsWith('cdb:') ? (
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); openDetail(creator) }}
@@ -2480,7 +2480,7 @@ export default function DiscoverPanel() {
               {detail && (
                 <>
                   {/* Key stats */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     {[
                       {
                         label: 'Total followers',
@@ -2495,10 +2495,6 @@ export default function DiscoverPanel() {
                             : '—',
                       },
                       {
-                        label: 'Growth',
-                        value: formatGrowth(detail.follower_growth) || '—',
-                      },
-                      {
                         label: 'Posts / mo',
                         value:
                           detail.posting_frequency_recent_months != null
@@ -2510,11 +2506,43 @@ export default function DiscoverPanel() {
                         <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">
                           {s.label}
                         </p>
-                        <p className="text-base font-bold text-gray-900 mt-0.5 truncate">{s.value}</p>
+                        <p className="text-base font-bold text-gray-900 mt-0.5">{s.value}</p>
                         {s.caption && <p className="text-[10px] text-gray-400">{s.caption}</p>}
                       </div>
                     ))}
                   </div>
+                  {/* Growth — full width so all periods are readable */}
+                  {(() => {
+                    const g = detail.follower_growth
+                    if (g == null) return null
+                    const entries: { label: string; value: string }[] = []
+                    if (typeof g === 'number') {
+                      entries.push({ label: 'Growth', value: `${g > 0 ? '+' : ''}${g.toFixed(1)}%` })
+                    } else if (typeof g === 'object') {
+                      for (const [k, v] of Object.entries(g)) {
+                        if (typeof v !== 'number' && typeof v !== 'string') continue
+                        const label = k.replace(/_/g, ' ')
+                        const display = typeof v === 'number' ? `${v > 0 ? '+' : ''}${v}%` : String(v)
+                        entries.push({ label, value: display })
+                      }
+                    }
+                    if (entries.length === 0) return null
+                    return (
+                      <div className="mt-3 border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">
+                          Growth
+                        </p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {entries.map((e) => (
+                            <span key={e.label} className="text-sm text-gray-700">
+                              <span className="text-gray-400">{e.label}:</span>{' '}
+                              <span className="font-semibold text-gray-900">{e.value}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* About */}
                   {detail.bio && (
@@ -2529,23 +2557,39 @@ export default function DiscoverPanel() {
                   )}
 
                   {/* Categories */}
-                  {detail.niche?.length > 0 && (
-                    <div className="mt-6">
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
-                        Categories
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {dedupeTags(detail.niche).map((n) => (
-                          <span
-                            key={n}
-                            className="px-2.5 py-1 bg-gray-200 text-gray-700 rounded-full text-xs font-medium capitalize"
-                          >
-                            {n}
-                          </span>
-                        ))}
+                  {(() => {
+                    const cleanNiches = dedupeTags(detail.niche ?? [])
+                      .map((n) =>
+                        n.replace(/^[Ii]d_/, '').replace(/_[Aa]ll$/i, '').replace(/_/g, ' ').trim(),
+                      )
+                      .filter((label) => {
+                        if (!label) return false
+                        // Filter out platform/website entries that leak into niches
+                        const lower = label.toLowerCase()
+                        return !['website', 'http', 'https', 'www'].some((p) => lower.startsWith(p))
+                      })
+                    const uniqueNiches = [...new Set(cleanNiches.map((n) => n.toLowerCase()))].map(
+                      (lower) => cleanNiches.find((n) => n.toLowerCase() === lower)!,
+                    )
+                    if (uniqueNiches.length === 0) return null
+                    return (
+                      <div className="mt-6">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
+                          Categories
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {uniqueNiches.map((label) => (
+                            <span
+                              key={label}
+                              className="px-2.5 py-1 bg-gray-200 text-gray-700 rounded-full text-xs font-medium capitalize"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {/* Platform presence */}
                   {detail.accounts?.length > 0 && (
@@ -2705,17 +2749,10 @@ export default function DiscoverPanel() {
             {/* Footer actions */}
             {detail && (
               <div className="px-7 py-4 border-t border-gray-100 flex-shrink-0">
-                {!detail.contactable && (
-                  <p className="mb-2 text-xs text-gray-400 text-center">
-                    No verified contact channel for this creator yet — reach out via their profile instead.
-                  </p>
-                )}
                 <div className="flex items-center gap-3">
                 <button
                   onClick={openContact}
-                  disabled={!detail.contactable}
-                  title={detail.contactable ? undefined : 'This creator cannot be reached yet'}
-                  className="flex-1 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition"
                 >
                   Contact the creator
                 </button>

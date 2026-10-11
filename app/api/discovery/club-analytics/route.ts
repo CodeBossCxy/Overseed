@@ -68,8 +68,31 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Serve from cache if this user already viewed this creator's analytics
+  const cacheKey = { userId, kind: 'analytics', platform, handle: handle.toLowerCase() }
+  try {
+    const cached = await prisma.discoveryViewCache.findUnique({
+      where: { userId_kind_platform_handle: cacheKey },
+    })
+    if (cached) {
+      return NextResponse.json(cached.data)
+    }
+  } catch {
+    // Cache miss or DB error — proceed with live fetch
+  }
+
   try {
     const analytics = await discoveryAnalytics(platform, handle, { logUserId: userId })
+    // Cache the result for future free views
+    try {
+      await prisma.discoveryViewCache.upsert({
+        where: { userId_kind_platform_handle: cacheKey },
+        create: { ...cacheKey, data: analytics },
+        update: { data: analytics, fetchedAt: new Date() },
+      })
+    } catch {
+      // Caching is best-effort; don't fail the response
+    }
     return NextResponse.json(analytics)
   } catch (err: any) {
     // Don't charge for a failed first fetch

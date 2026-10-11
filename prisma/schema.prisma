@@ -926,6 +926,24 @@ model ClubSearchCache {
   @@map("club_search_cache")
 }
 
+// Cached creator profile views and analytics. Keyed by user + platform +
+// handle so each user's view history is preserved and repeat views never
+// hit the vendor API. Data is the full API response (JSON).
+model DiscoveryViewCache {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String   // "profile" or "analytics"
+  platform  String
+  handle    String
+  data      Json
+  fetchedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, kind, platform, handle])
+  @@index([userId, fetchedAt])
+  @@map("discovery_view_cache")
+}
+
 // Audit trail of Influencers Club vendor credit spend. One row per billed
 // live call: discovery (0.01 x results returned), enrichment or analytics
 // (1 credit each).
