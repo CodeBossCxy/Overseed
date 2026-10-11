@@ -146,24 +146,18 @@ async function lookupContactsAndNotify(
     tiktok: (h) => `https://www.tiktok.com/@${h}`,
   }
 
+  // Step 1: Check DB caches first (free, instant)
   for (const r of recipients) {
-    // Email may already be set from bio parsing during save
     let email: string | null = r.email || null
 
-    // Check CreatorProfile cache (may have email from bio or prior enrichment)
     if (!email) {
       const profile = await prisma.creatorProfile.findUnique({
         where: { platform_handle: { platform: r.platform, handle: r.handle } },
-        select: { email: true, bio: true },
+        select: { email: true },
       })
-      if (profile?.email) {
-        email = profile.email
-      } else if (profile?.bio) {
-        email = extractEmailFromBio(profile.bio)
-      }
+      if (profile?.email) email = profile.email
     }
 
-    // Check enrichment cache
     if (!email) {
       const cached = await prisma.creatorEnrichmentCache
         .findUnique({
@@ -173,31 +167,44 @@ async function lookupContactsAndNotify(
         .catch(() => null)
       if (cached?.data && typeof cached.data === 'object') {
         const data = cached.data as any
-        if (data.email) email = data.email
-        if (!email && data._email) email = data._email
-        if (!email && data.bio) email = extractEmailFromBio(data.bio)
+        email = data.email || data._email || null
       }
-    }
-    // For now, we skip paid enrichment — ops team will handle manually
-
-    // Update recipient with found email
-    if (email) {
-      await prisma.outreachRecipient.update({
-        where: { id: r.id },
-        data: { email },
-      }).catch(() => {})
     }
 
     const profileUrl = PROFILE_URL[r.platform]?.(r.handle) || null
+    results.push({ handle: r.handle, displayName: r.displayName, platform: r.platform, followers: r.followerCount, email, profileUrl })
+  }
 
-    results.push({
-      handle: r.handle,
-      displayName: r.displayName,
-      platform: r.platform,
-      followers: r.followerCount,
-      email,
-      profileUrl,
-    })
+  // Step 2: Scrape bios for recipients without email (free, no API credits)
+  const needsScraping = results.filter((r) => !r.email)
+  if (needsScraping.length > 0) {
+    try {
+      const { scrapeBioBatch } = await import('@/lib/scrape-bio')
+      const scraped = await scrapeBioBatch(
+        needsScraping.map((r) => ({ platform: r.platform, handle: r.handle })),
+        2000, // 2s delay between requests to avoid rate limiting
+      )
+      for (const r of results) {
+        if (r.email) continue
+        const key = `${r.platform}:${r.handle}`
+        const bio = scraped.get(key)
+        if (bio?.emails?.length) {
+          r.email = bio.emails[0]
+          // Persist to DB for future lookups
+          await prisma.creatorProfile.update({
+            where: { platform_handle: { platform: r.platform, handle: r.handle } },
+            data: { email: r.email, bio: bio.bio },
+          }).catch(() => {})
+          await prisma.outreachRecipient.updateMany({
+            where: { outreachCampaignId: campaignId, handle: r.handle },
+            data: { email: r.email },
+          }).catch(() => {})
+        }
+      }
+      console.log(`[outreach-submit] Scraped ${needsScraping.length} bios, found ${results.filter(r => r.email).length} emails total`)
+    } catch (err) {
+      console.error('[outreach-submit] Bio scraping failed:', err)
+    }
   }
 
   // Update campaign status
