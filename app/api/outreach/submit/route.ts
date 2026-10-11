@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse, after } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -12,6 +12,9 @@ function extractEmailFromBio(bio: string | null | undefined): string | null {
   const matches = bio.match(EMAIL_RE)
   return matches?.[0] || null
 }
+
+// Allow up to 60s for scraping bios (default is 10s on Vercel hobby)
+export const maxDuration = 60
 
 // POST /api/outreach/submit — save outreach campaign with selected creators,
 // then asynchronously look up contact info and email results to the ops team.
@@ -110,17 +113,17 @@ export async function POST(req: NextRequest) {
     })
   )
 
-  // Background: look up contact info and email results to ops team
+  // Look up contact info (scrape bios) and email results to ops team.
+  // Done synchronously so the notification email contains scraped emails.
+  // Adds ~5-10s to the response time but the user sees a spinner anyway.
   const campaignId = campaign.id
   const brandName = brand.companyName || 'Brand'
   const userEmail = (session.user as any).email || ''
-  after(async () => {
-    try {
-      await lookupContactsAndNotify(campaignId, brandName, userEmail, platform)
-    } catch (err) {
-      console.error('[outreach-submit] Background contact lookup failed:', err)
-    }
-  })
+  try {
+    await lookupContactsAndNotify(campaignId, brandName, userEmail, platform)
+  } catch (err) {
+    console.error('[outreach-submit] Contact lookup failed:', err)
+  }
 
   return NextResponse.json({ campaign: { id: campaign.id } })
 }
