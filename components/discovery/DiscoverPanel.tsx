@@ -2592,40 +2592,63 @@ export default function DiscoverPanel() {
                   })()}
 
                   {/* Platform presence */}
-                  {detail.accounts?.length > 0 && (
-                    <div className="mt-6">
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
-                        Platform presence
-                      </p>
-                      <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
-                        {detail.accounts.map((a: any) => (
-                          <div
-                            key={a.platform}
-                            className="flex items-center justify-between px-4 py-2.5 bg-white"
-                          >
-                            <span className="flex items-center gap-2 text-sm font-medium text-gray-700 capitalize">
-                              <span
-                                className={`w-2 h-2 rounded-full ${
-                                  { instagram: 'bg-pink-500', youtube: 'bg-red-500', tiktok: 'bg-gray-900', twitter: 'bg-sky-400', twitch: 'bg-purple-500' }[
-                                    a.platform as string
-                                  ] || 'bg-gray-300'
-                                }`}
-                              />
-                              {a.platform}
-                            </span>
-                            <span className="text-sm text-gray-600 tabular-nums">
-                              {formatFollowers(a.followers, locale)}
-                              {a.engagement_percent != null && (
-                                <span className="text-gray-400">
-                                  {' '}· {Number(a.engagement_percent).toFixed(1)}%
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        ))}
+                  {(() => {
+                    const visible = (detail.accounts ?? []).filter(
+                      (a: any) => a.platform !== 'website' && a.platform !== 'linktree',
+                    )
+                    if (visible.length === 0) return null
+                    const PLATFORM_COLORS: Record<string, string> = {
+                      instagram: 'bg-pink-500', youtube: 'bg-red-500', tiktok: 'bg-gray-900',
+                      twitter: 'bg-sky-400', twitch: 'bg-purple-500', snapchat: 'bg-yellow-400',
+                      discord: 'bg-indigo-500', threads: 'bg-gray-800', pinterest: 'bg-red-600',
+                      spotify: 'bg-green-500', facebook: 'bg-blue-600', linkedin: 'bg-blue-700',
+                    }
+                    const PLATFORM_LABELS: Record<string, string> = {
+                      twitter: 'X / Twitter', linkedin: 'LinkedIn', tiktok: 'TikTok',
+                      youtube: 'YouTube', instagram: 'Instagram', snapchat: 'Snapchat',
+                      discord: 'Discord', threads: 'Threads', pinterest: 'Pinterest',
+                      spotify: 'Spotify', facebook: 'Facebook', twitch: 'Twitch',
+                    }
+                    return (
+                      <div className="mt-6">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
+                          Platform presence
+                        </p>
+                        <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                          {visible.map((a: any, i: number) => (
+                            <div
+                              key={`${a.platform}-${i}`}
+                              className="flex items-center justify-between px-4 py-2.5 bg-white"
+                            >
+                              <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PLATFORM_COLORS[a.platform] || 'bg-gray-300'}`} />
+                                <span>{PLATFORM_LABELS[a.platform] || a.platform}</span>
+                                {a.username && (
+                                  <span className="text-gray-400 font-normal truncate max-w-[160px]">@{a.username}</span>
+                                )}
+                              </span>
+                              <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
+                                {a.followers != null ? (
+                                  <>
+                                    {formatFollowers(a.followers, locale)}
+                                    {a.engagement_percent != null && (
+                                      <span className="text-gray-400">
+                                        {' '}· {Number(a.engagement_percent).toFixed(1)}%
+                                      </span>
+                                    )}
+                                  </>
+                                ) : a.url ? (
+                                  <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-primary-500 hover:underline text-xs">
+                                    View ↗
+                                  </a>
+                                ) : null}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {/* Full audience analytics (separate paid fetch) */}
                   <div className="mt-6">

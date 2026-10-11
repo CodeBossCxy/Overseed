@@ -604,35 +604,74 @@ async function fetchCreatorDbEnrichment(
   // Niches
   const niches = Array.isArray(p.niches) ? p.niches : []
 
-  // Other links / cross-platform presence
+  // Other links / cross-platform presence.
+  // CreatorDB returns otherLinks: { title, url }[] — the links the creator
+  // listed on their channel/bio. We detect platforms by URL domain (titles
+  // are unreliable), extract handles where possible, and deduplicate.
   const otherLinks = Array.isArray(p.otherLinks) ? p.otherLinks : []
-  const accounts = otherLinks
+
+  // Domain → platform mapping with handle extraction regex
+  const PLATFORM_MATCHERS: { test: RegExp; platform: string; handle?: RegExp }[] = [
+    // youtu.be/xxx and youtube.com/watch are video links, not channel presence — skip
+    { test: /youtu\.be\/\w/, platform: '_skip' },
+    { test: /youtube\.com\/watch/, platform: '_skip' },
+    { test: /youtube\.com\/shorts\//, platform: '_skip' },
+    { test: /youtube\.com/, platform: 'youtube', handle: /youtube\.com\/(?:@|c\/|channel\/)([^/?&#]+)/ },
+    { test: /tiktok\.com/, platform: 'tiktok', handle: /tiktok\.com\/@?([^/?&#]+)/ },
+    { test: /instagram\.com/, platform: 'instagram', handle: /instagram\.com\/([^/?&#]+)/ },
+    { test: /(?:twitter\.com|x\.com)/, platform: 'twitter', handle: /(?:twitter|x)\.com\/([^/?&#]+)/ },
+    { test: /twitch\.tv/, platform: 'twitch', handle: /twitch\.tv\/([^/?&#]+)/ },
+    { test: /facebook\.com/, platform: 'facebook', handle: /facebook\.com\/([^/?&#]+)/ },
+    { test: /linkedin\.com/, platform: 'linkedin', handle: /linkedin\.com\/in\/([^/?&#]+)/ },
+    { test: /snapchat\.com/, platform: 'snapchat', handle: /snapchat\.com\/add\/([^/?&#]+)/ },
+    { test: /discord\.gg|discord\.com/, platform: 'discord' },
+    { test: /threads\.net/, platform: 'threads', handle: /threads\.net\/@?([^/?&#]+)/ },
+    { test: /pinterest\.com/, platform: 'pinterest', handle: /pinterest\.com\/([^/?&#]+)/ },
+    { test: /spotify\.com/, platform: 'spotify' },
+    // Link-in-bio pages — flag them but don't show as "website"
+    { test: /linktr\.ee|beacons\.ai|linkin\.bio|lnk\.to|bio\.link|campsite\.bio|hoo\.be|tap\.bio/, platform: 'linktree' },
+  ]
+  // URL path segments that aren't real handles (e.g. youtube.com/watch)
+  const IGNORE_PATHS = new Set(['watch', 'shorts', 'live', 'playlist', 'results', 'feed', 'explore', 'reels', 'stories', 'p', 'reel', 'tv'])
+
+  const otherAccounts = otherLinks
     .filter((l: any) => l.url)
     .map((l: any) => {
-      const url = l.url as string
+      const url = (l.url as string).trim()
       let plat = 'website'
-      if (url.includes('youtube.com') || url.includes('youtu.be')) plat = 'youtube'
-      else if (url.includes('tiktok.com')) plat = 'tiktok'
-      else if (url.includes('instagram.com')) plat = 'instagram'
-      else if (url.includes('twitter.com') || url.includes('x.com')) plat = 'twitter'
-      else if (url.includes('twitch.tv')) plat = 'twitch'
-      else if (url.includes('facebook.com')) plat = 'facebook'
-      else if (url.includes('linkedin.com')) plat = 'linkedin'
-      return {
-        platform: plat,
-        username: l.title || url,
-        followers: null,
-        engagement_percent: null,
-      }
-    })
+      let username = ''
 
-  // Add the primary platform account
-  accounts.unshift({
+      for (const m of PLATFORM_MATCHERS) {
+        if (m.test.test(url)) {
+          plat = m.platform
+          if (m.handle) {
+            const match = url.match(m.handle)
+            if (match && match[1] && !IGNORE_PATHS.has(match[1].toLowerCase())) {
+              username = match[1].replace(/^@/, '')
+            }
+          }
+          break
+        }
+      }
+      return { platform: plat, username, url, followers: null, engagement_percent: null }
+    })
+    // Drop non-presence entries: website, linktree, video links (_skip)
+    .filter((a: { platform: string }) => a.platform !== 'website' && a.platform !== 'linktree' && a.platform !== '_skip')
+
+  // Primary account first, then deduplicate cross-platform links
+  const primaryAccount = {
     platform,
     username: cleanHandle,
     followers: isYoutube ? (p.totalSubscribers ?? null) : (p.totalFollowers ?? null),
     engagement_percent: engagementDisplay,
-  })
+  }
+  const seenPlatforms = new Set([platform])
+  const accounts: typeof otherAccounts = [primaryAccount as any]
+  for (const a of otherAccounts) {
+    if (seenPlatforms.has(a.platform)) continue
+    seenPlatforms.add(a.platform)
+    accounts.push(a)
+  }
 
   const totalFollowers = isYoutube ? (p.totalSubscribers ?? 0) : (p.totalFollowers ?? 0)
 
