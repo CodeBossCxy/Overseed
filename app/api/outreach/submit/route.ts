@@ -4,6 +4,14 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 
+// Extract email addresses from a bio/text string
+const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
+function extractEmailFromBio(bio: string | null | undefined): string | null {
+  if (!bio) return null
+  const matches = bio.match(EMAIL_RE)
+  return matches?.[0] || null
+}
+
 // POST /api/outreach/submit — save outreach campaign with selected creators,
 // then asynchronously look up contact info and email results to the ops team.
 // No enrichment or automated emailing happens synchronously — just a fast save.
@@ -53,6 +61,9 @@ export async function POST(req: NextRequest) {
       const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
       if (!handle) return
 
+      // Extract email from bio if available
+      const bioEmail = extractEmailFromBio(c.bio)
+
       // Upsert CreatorProfile so we have a foreign key target
       const profile = await prisma.creatorProfile.upsert({
         where: { platform_handle: { platform: c.platform || platform, handle } },
@@ -61,6 +72,8 @@ export async function POST(req: NextRequest) {
           handle,
           displayName: c.displayName || null,
           avatarUrl: c.avatarUrl || null,
+          bio: c.bio || null,
+          email: bioEmail,
           followerCount: typeof c.followerCount === 'number' ? c.followerCount : null,
           engagementRate: typeof c.engagementRate === 'number' ? c.engagementRate : null,
           country: c.country || null,
@@ -69,6 +82,8 @@ export async function POST(req: NextRequest) {
         update: {
           displayName: c.displayName || undefined,
           avatarUrl: c.avatarUrl || undefined,
+          bio: c.bio || undefined,
+          email: bioEmail || undefined,
           followerCount: typeof c.followerCount === 'number' ? c.followerCount : undefined,
         },
       })
@@ -86,6 +101,7 @@ export async function POST(req: NextRequest) {
           avatarUrl: c.avatarUrl || null,
           followerCount: typeof c.followerCount === 'number' ? c.followerCount : null,
           engagementRate: typeof c.engagementRate === 'number' ? c.engagementRate : null,
+          email: bioEmail || profile.email,
           status: 'PENDING',
         },
         update: {},
@@ -118,22 +134,33 @@ async function lookupContactsAndNotify(
 ) {
   const recipients = await prisma.outreachRecipient.findMany({
     where: { outreachCampaignId: campaignId },
-    select: { id: true, handle: true, displayName: true, platform: true, followerCount: true },
+    select: { id: true, handle: true, displayName: true, platform: true, followerCount: true, email: true },
   })
 
-  // Try to find contact info from existing caches first
-  const results: { handle: string; displayName: string | null; platform: string; followers: number | null; email: string | null }[] = []
+  // Try to find contact info from existing caches
+  const results: { handle: string; displayName: string | null; platform: string; followers: number | null; email: string | null; profileUrl: string | null }[] = []
+
+  const PROFILE_URL: Record<string, (h: string) => string> = {
+    instagram: (h) => `https://www.instagram.com/${h}/`,
+    youtube: (h) => `https://www.youtube.com/@${h}`,
+    tiktok: (h) => `https://www.tiktok.com/@${h}`,
+  }
 
   for (const r of recipients) {
-    let email: string | null = null
+    // Email may already be set from bio parsing during save
+    let email: string | null = r.email || null
 
-    // Check CreatorProfile cache
-    const profile = await prisma.creatorProfile.findUnique({
-      where: { platform_handle: { platform: r.platform, handle: r.handle } },
-      select: { email: true },
-    })
-    if (profile?.email) {
-      email = profile.email
+    // Check CreatorProfile cache (may have email from bio or prior enrichment)
+    if (!email) {
+      const profile = await prisma.creatorProfile.findUnique({
+        where: { platform_handle: { platform: r.platform, handle: r.handle } },
+        select: { email: true, bio: true },
+      })
+      if (profile?.email) {
+        email = profile.email
+      } else if (profile?.bio) {
+        email = extractEmailFromBio(profile.bio)
+      }
     }
 
     // Check enrichment cache
@@ -148,10 +175,9 @@ async function lookupContactsAndNotify(
         const data = cached.data as any
         if (data.email) email = data.email
         if (!email && data._email) email = data._email
+        if (!email && data.bio) email = extractEmailFromBio(data.bio)
       }
     }
-
-    // Optionally: call CreatorDB Contact API here if you want to spend 15 credits
     // For now, we skip paid enrichment — ops team will handle manually
 
     // Update recipient with found email
@@ -162,12 +188,15 @@ async function lookupContactsAndNotify(
       }).catch(() => {})
     }
 
+    const profileUrl = PROFILE_URL[r.platform]?.(r.handle) || null
+
     results.push({
       handle: r.handle,
       displayName: r.displayName,
       platform: r.platform,
       followers: r.followerCount,
       email,
+      profileUrl,
     })
   }
 
@@ -192,9 +221,12 @@ async function lookupContactsAndNotify(
 
   const tableRows = results.map((r) => {
     const followers = r.followers ? (r.followers >= 1_000_000 ? `${(r.followers / 1_000_000).toFixed(1)}M` : r.followers >= 1_000 ? `${Math.round(r.followers / 1_000)}K` : String(r.followers)) : '—'
+    const handleCell = r.profileUrl
+      ? `<a href="${r.profileUrl}" style="color:#2563eb;text-decoration:none">@${r.handle}</a>`
+      : `@${r.handle}`
     return `<tr>
       <td style="padding:8px;border:1px solid #e5e7eb">${r.displayName || r.handle}</td>
-      <td style="padding:8px;border:1px solid #e5e7eb">@${r.handle}</td>
+      <td style="padding:8px;border:1px solid #e5e7eb">${handleCell}</td>
       <td style="padding:8px;border:1px solid #e5e7eb">${r.platform}</td>
       <td style="padding:8px;border:1px solid #e5e7eb">${followers}</td>
       <td style="padding:8px;border:1px solid #e5e7eb">${r.email || '<span style="color:#ef4444">N/A</span>'}</td>

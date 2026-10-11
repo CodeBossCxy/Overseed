@@ -441,6 +441,8 @@ export default function NewOutreachPage() {
             engagementRate: c.engagement_rate != null ? Number(c.engagement_rate) : null,
             country: c.country || null,
             nicheTags: c.niche_tags || [],
+            bio: c.bio || null,
+            profileUrl: c.profile_url || c.profileUrl || null,
           })),
         }),
       })
