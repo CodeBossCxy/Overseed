@@ -254,13 +254,18 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
               >
                 {/* Thumb + title */}
                 <div className="flex items-center gap-5 flex-1 min-w-0 lg:max-w-[440px]">
-                  <div className="w-28 h-20 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                  <div className="relative w-28 h-20 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
                     {cp.images?.[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={cp.images[0]} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold text-lg">
                         {cp.title.charAt(0)}
+                      </div>
+                    )}
+                    {isDraft && (
+                      <div className="absolute inset-0 bg-gray-900/30 flex items-center justify-center">
+                        <span className="text-[10px] font-semibold text-white bg-gray-900/50 px-2 py-0.5 rounded-full">{statusLabel('DRAFT')}</span>
                       </div>
                     )}
                   </div>
@@ -277,18 +282,25 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
                     {cp.description && (
                       <p className="text-xs text-gray-500 mt-1.5 leading-relaxed line-clamp-2 max-w-[300px]">{cp.description}</p>
                     )}
+                    {isDraft && (
+                      <p className="text-[11px] text-gray-400 mt-1 italic">{caption}</p>
+                    )}
                   </div>
                 </div>
 
                 {/* Status */}
                 <div className="lg:w-36 flex-shrink-0">
-                  <p className="text-xs font-semibold text-gray-600 mb-2">{t.brand.campaigns.thStatus}</p>
-                  <StatusBadge machine="campaign" status={cp.status} size="sm" />
-                  {caption && (
-                    <p className="text-[11px] text-gray-500 mt-2 flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${statusDotClass(cp.status)}`} />
-                      {caption}
-                    </p>
+                  {!isDraft && (
+                    <>
+                      <p className="text-xs font-semibold text-gray-600 mb-2">{t.brand.campaigns.thStatus}</p>
+                      <StatusBadge machine="campaign" status={cp.status} size="sm" />
+                      {caption && (
+                        <p className="text-[11px] text-gray-500 mt-2 flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusDotClass(cp.status)}`} />
+                          {caption}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 

@@ -5,24 +5,48 @@ import { useParams } from 'next/navigation'
 import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import Link from 'next/link'
+import CreatorAvatar from '@/components/ui/CreatorAvatar'
 
 const STATUS_BADGE: Record<string, { en: string; zh: string; cls: string }> = {
   DRAFT:     { en: 'Draft',      zh: '草稿',   cls: 'bg-gray-100 text-gray-600' },
   SELECTING: { en: 'Selecting',  zh: '筛选中', cls: 'bg-yellow-100 text-yellow-700' },
   READY:     { en: 'Ready',      zh: '就绪',   cls: 'bg-blue-100 text-blue-700' },
   SENDING:   { en: 'Sending',    zh: '发送中', cls: 'bg-orange-100 text-orange-700' },
-  COMPLETED: { en: 'Active',     zh: '进行中', cls: 'bg-green-100 text-green-700' },
-  FAILED:    { en: 'Failed',     zh: '失败',   cls: 'bg-red-100 text-red-700' },
+  COMPLETED: { en: 'Active',     zh: '进行中', cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+  FAILED:    { en: 'Failed',     zh: '失败',   cls: 'bg-red-50 text-red-700 ring-1 ring-red-200' },
   CANCELLED: { en: 'Cancelled',  zh: '已取消', cls: 'bg-gray-100 text-gray-500' },
-  PENDING:   { en: 'Pending',    zh: '待发送', cls: 'bg-gray-100 text-gray-600' },
-  SENT:      { en: 'Sent',       zh: '已发送', cls: 'bg-green-100 text-green-700' },
-  DELIVERED: { en: 'Delivered',  zh: '已送达', cls: 'bg-green-100 text-green-700' },
+  PENDING:   { en: 'Pending',    zh: '待发送', cls: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
+  SENT:      { en: 'Sent',       zh: '已发送', cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+  DELIVERED: { en: 'Delivered',  zh: '已送达', cls: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+}
+
+const PLATFORM_ICON: Record<string, string> = {
+  instagram: 'https://cdn.simpleicons.org/instagram/E4405F',
+  tiktok: 'https://cdn.simpleicons.org/tiktok/000000',
+  youtube: 'https://cdn.simpleicons.org/youtube/FF0000',
+  twitter: 'https://cdn.simpleicons.org/x/000000',
 }
 
 function formatFollowers(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
   return String(n)
+}
+
+function formatDate(iso: string, locale: string) {
+  return new Date(iso).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+  })
+}
+
+function profileUrl(platform: string, handle: string) {
+  switch (platform) {
+    case 'instagram': return `https://instagram.com/${handle}`
+    case 'tiktok': return `https://tiktok.com/@${handle}`
+    case 'youtube': return `https://youtube.com/@${handle}`
+    case 'twitter': return `https://x.com/${handle}`
+    default: return null
+  }
 }
 
 interface Recipient {
@@ -100,112 +124,180 @@ export default function OutreachDetailPage() {
   }
 
   const badge = STATUS_BADGE[campaign.status] || STATUS_BADGE.DRAFT
+  const platformIcon = PLATFORM_ICON[campaign.platform]
+  const sentCount = campaign.totalSent
+  const failedCount = campaign.totalFailed
+  const pendingCount = campaign.quantity - sentCount - failedCount
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
         {/* Back link */}
-        <Link href="/dashboard/brand/outreach" className="text-sm text-gray-500 hover:text-primary-600 flex items-center gap-1 mb-4">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <Link href="/dashboard/brand/outreach" className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-primary-600 transition group">
+          <svg className="w-4 h-4 transition group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
-          {zh ? '返回' : 'Back'}
+          {zh ? '所有外联' : 'All Outreach'}
         </Link>
 
-        {/* Header */}
-        <div className="workspace-glass-card rounded-3xl p-6 mb-6">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{campaign.title}</h1>
-              <p className="text-sm text-gray-500 mt-1">
-                {campaign.platform} &middot; {new Date(campaign.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${badge.cls}`}>
-              {zh ? badge.zh : badge.en}
-            </span>
-          </div>
+        {/* ── Header card ── */}
+        <div className="workspace-glass-card rounded-3xl overflow-hidden">
+          {/* Top banner gradient */}
+          <div className="h-2 bg-gradient-to-r from-primary-500 via-rose-400 to-orange-400" />
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/60 rounded-2xl p-4 text-center">
-              <p className="text-2xl font-bold text-gray-900">{campaign.quantity}</p>
-              <p className="text-xs text-gray-500">{zh ? '目标数量' : 'Target'}</p>
+          <div className="p-6 pb-5">
+            {/* Title row */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                {platformIcon && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={platformIcon} alt={campaign.platform} className="w-8 h-8 flex-shrink-0 opacity-80" />
+                )}
+                <div className="min-w-0">
+                  <h1 className="text-xl font-bold text-gray-900 truncate">{campaign.title}</h1>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {zh ? '创建于' : 'Created'} {formatDate(campaign.createdAt, locale)}
+                    {campaign.completedAt && (
+                      <> &middot; {zh ? '完成于' : 'Completed'} {formatDate(campaign.completedAt, locale)}</>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap ${badge.cls}`}>
+                {zh ? badge.zh : badge.en}
+              </span>
             </div>
-            <div className="bg-white/60 rounded-2xl p-4 text-center">
-              <p className="text-2xl font-bold text-green-600">{campaign.totalSent}</p>
-              <p className="text-xs text-gray-500">{zh ? '已发送' : 'Sent'}</p>
-            </div>
-            <div className="bg-white/60 rounded-2xl p-4 text-center">
-              <p className="text-2xl font-bold text-red-500">{campaign.totalFailed}</p>
-              <p className="text-xs text-gray-500">{zh ? '失败' : 'Failed'}</p>
-            </div>
-            <div className="bg-white/60 rounded-2xl p-4 text-center">
-              <p className="text-2xl font-bold text-primary-600">{campaign.creditsCost}</p>
-              <p className="text-xs text-gray-500">{zh ? '消耗积分' : 'Credits used'}</p>
-            </div>
-          </div>
 
-          {/* Brief */}
-          <div className="bg-white/50 rounded-2xl p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">{zh ? '外联内容' : 'Outreach Brief'}</h3>
-            <p className="text-sm text-gray-600 whitespace-pre-wrap">{campaign.briefMessage}</p>
+            {/* Stats strip */}
+            <div className="mt-5 flex items-center gap-2 flex-wrap">
+              <StatPill label={zh ? '目标' : 'Target'} value={campaign.quantity} color="text-gray-700" bg="bg-gray-100" />
+              <StatPill label={zh ? '已发送' : 'Sent'} value={sentCount} color="text-emerald-700" bg="bg-emerald-50" />
+              {failedCount > 0 && (
+                <StatPill label={zh ? '失败' : 'Failed'} value={failedCount} color="text-red-600" bg="bg-red-50" />
+              )}
+              {pendingCount > 0 && (
+                <StatPill label={zh ? '待处理' : 'Pending'} value={pendingCount} color="text-amber-700" bg="bg-amber-50" />
+              )}
+              {campaign.creditsCost > 0 && (
+                <StatPill label={zh ? '积分' : 'Credits'} value={campaign.creditsCost} color="text-primary-700" bg="bg-primary-50" icon="⚡" />
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Recipients */}
-        <div className="workspace-glass-card rounded-3xl p-6">
+        {/* ── Two-column: Brief + Actions ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Brief — spans 2 cols */}
+          <div className="lg:col-span-2 workspace-glass-card rounded-3xl p-5">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+              {zh ? '外联内容' : 'Outreach Brief'}
+            </h3>
+            <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {campaign.briefMessage}
+            </div>
+          </div>
+
+          {/* Quick actions */}
+          <div className="workspace-glass-card rounded-3xl p-5 flex flex-col gap-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+              {zh ? '操作' : 'Actions'}
+            </h3>
+            <Link
+              href="/dashboard/messages"
+              className="flex items-center gap-2.5 px-4 py-3 bg-white/70 border border-white/80 rounded-xl text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition"
+            >
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+              {zh ? '查看消息' : 'View Messages'}
+            </Link>
+            <Link
+              href="/dashboard/brand/outreach/new"
+              className="flex items-center gap-2.5 px-4 py-3 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              {zh ? '创建新外联' : 'New Outreach'}
+            </Link>
+          </div>
+        </div>
+
+        {/* ── Recipients ── */}
+        <div className="workspace-glass-card rounded-3xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
               {zh ? '创作者列表' : 'Recipients'}
             </h2>
-            <span className="text-sm text-gray-500">
+            <span className="text-xs font-medium text-gray-400 bg-white/60 px-2.5 py-1 rounded-full">
               {campaign.recipients.length} {zh ? '位创作者' : 'creators'}
             </span>
           </div>
 
           {campaign.recipients.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">{zh ? '暂无创作者' : 'No recipients yet'}</p>
+            <p className="text-center text-gray-400 py-12 text-sm">{zh ? '暂无创作者' : 'No recipients yet'}</p>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-gray-100/80">
               {campaign.recipients.map((r) => {
                 const rBadge = STATUS_BADGE[r.status] || STATUS_BADGE.PENDING
+                const url = profileUrl(r.platform, r.handle)
+                const rPlatformIcon = PLATFORM_ICON[r.platform]
                 return (
-                  <div key={r.id} className="flex items-center gap-4 p-3 rounded-2xl bg-white/60">
-                    {r.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                        {(r.displayName || r.handle || '?').charAt(0).toUpperCase()}
-                      </div>
-                    )}
+                  <div key={r.id} className="flex items-center gap-3.5 py-3.5 first:pt-0 last:pb-0">
+                    {/* Avatar */}
+                    <div className="relative flex-shrink-0">
+                      <CreatorAvatar url={r.avatarUrl} name={r.displayName || r.handle || '?'} size="w-11 h-11" textSize="text-sm" className="ring-2 ring-white shadow-sm" />
+                      {rPlatformIcon && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={rPlatformIcon}
+                          alt=""
+                          className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white p-[2px]"
+                        />
+                      )}
+                    </div>
+
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-900 truncate">{r.displayName || r.handle}</span>
-                        <span className="text-xs text-gray-400">@{r.handle}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-gray-900 truncate">
+                          {r.displayName || r.handle}
+                        </span>
+                        {url ? (
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-primary-500 transition truncate">
+                            @{r.handle}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-400 truncate">@{r.handle}</span>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5 flex gap-3">
-                        <span>{r.followerCount ? formatFollowers(r.followerCount) : '—'} {zh ? '粉丝' : 'followers'}</span>
+                      <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                        {r.followerCount ? (
+                          <span>{formatFollowers(r.followerCount)} {zh ? '粉丝' : 'followers'}</span>
+                        ) : null}
                         {r.engagementRate != null && Number(r.engagementRate) > 0 && (
-                          <span>{Number(r.engagementRate).toFixed(1)}% {zh ? '互动率' : 'eng.'}</span>
+                          <span>{Number(r.engagementRate).toFixed(1)}% {zh ? '互动' : 'eng.'}</span>
                         )}
                         {r.matchScore != null && (
-                          <span className="text-primary-600 font-semibold">{zh ? '匹配' : 'Match'}: {Number(r.matchScore)}</span>
+                          <span className="text-primary-500 font-medium">{zh ? '匹配' : 'Match'} {Number(r.matchScore)}%</span>
                         )}
                       </div>
                     </div>
+
+                    {/* Status */}
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${rBadge.cls}`}>
+                      <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${rBadge.cls}`}>
                         {zh ? rBadge.zh : rBadge.en}
                       </span>
                       {r.sentAt && (
                         <span className="text-[10px] text-gray-400">
-                          {new Date(r.sentAt).toLocaleString()}
+                          {formatDate(r.sentAt, locale)}
                         </span>
                       )}
                       {r.errorMessage && (
-                        <span className="text-[10px] text-red-400 truncate max-w-32">{r.errorMessage}</span>
+                        <span className="text-[10px] text-red-400 truncate max-w-36" title={r.errorMessage}>
+                          {r.errorMessage}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -214,23 +306,18 @@ export default function OutreachDetailPage() {
             </div>
           )}
         </div>
-
-        {/* Actions */}
-        <div className="flex justify-center gap-4 mt-6">
-          <Link
-            href="/dashboard/messages"
-            className="px-6 py-3 bg-white/60 border border-white/80 rounded-xl text-sm font-semibold text-gray-700 hover:bg-white/80 transition"
-          >
-            {zh ? '查看消息' : 'View Messages'}
-          </Link>
-          <Link
-            href="/dashboard/brand/outreach/new"
-            className="px-6 py-3 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition"
-          >
-            {zh ? '创建新外联' : 'New Outreach'}
-          </Link>
-        </div>
       </div>
     </BrandWorkspaceLayout>
+  )
+}
+
+/* ── Stat pill sub-component ── */
+function StatPill({ label, value, color, bg, icon }: { label: string; value: number; color: string; bg: string; icon?: string }) {
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm ${bg}`}>
+      {icon && <span className="text-xs">{icon}</span>}
+      <span className={`font-bold ${color}`}>{value}</span>
+      <span className="text-gray-500 text-xs">{label}</span>
+    </div>
   )
 }

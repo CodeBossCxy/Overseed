@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatCompactNumber } from '@/lib/i18n/formatNumber'
+import CreatorAvatar from '@/components/ui/CreatorAvatar'
 
 interface InfluencerCardProps {
   influencer: {
@@ -58,15 +59,7 @@ export default function InfluencerCard({ influencer }: InfluencerCardProps) {
       <div className="p-4">
         <div className="flex items-start gap-4">
           {/* Avatar */}
-          <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-            {avatar ? (
-              <img src={avatar} alt={displayName} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">
-                {displayName.charAt(0)}
-              </div>
-            )}
-          </div>
+          <CreatorAvatar url={avatar} name={displayName} size="w-16 h-16" textSize="text-2xl" />
 
           {/* Info */}
           <div className="flex-1 min-w-0">

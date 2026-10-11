@@ -5,6 +5,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatCompactNumber } from '@/lib/i18n/formatNumber'
 import { formatMonthYear } from '@/lib/i18n/formatDate'
 import { formatNumber } from '@/lib/i18n/formatNumber'
+import CreatorAvatar from '@/components/ui/CreatorAvatar'
 
 // Default scenic cover shown when the creator hasn't set their own.
 const DEFAULT_COVER_IMAGE = '/creator-cover-default.jpg'
@@ -165,16 +166,7 @@ export default function InfluencerProfile({ influencer }: InfluencerProfileProps
         <div className="px-6 pb-6">
           {/* Avatar straddling the cover, name beside it on the white area */}
           <div className="flex items-end gap-5 -mt-14 mb-4">
-            <div className="w-28 h-28 rounded-full border-4 border-white bg-gray-200 overflow-hidden shadow-lg flex-shrink-0">
-              {avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatar} alt={displayName} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">
-                  {displayName.charAt(0)}
-                </div>
-              )}
-            </div>
+            <CreatorAvatar url={avatar} name={displayName} size="w-28 h-28" textSize="text-4xl" className="border-4 border-white shadow-lg" />
             <div className="min-w-0 -mb-2">
               <div className="flex items-center gap-2">
                 {/* h2, not h1: the workspace shell absolutely-positions every

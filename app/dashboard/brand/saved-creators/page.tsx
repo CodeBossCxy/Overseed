@@ -6,6 +6,7 @@ import BrandWorkspaceLayout from '@/components/workspace/BrandWorkspaceLayout'
 import { PlatformIcon } from '@/components/campaigns/CampaignRowCard'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import UGCTranslateToggle from '@/components/UGCTranslateToggle'
+import CreatorAvatar from '@/components/ui/CreatorAvatar'
 
 // Saved Creators: the brand's bookmarked platform creators, as a filterable
 // card grid. Bookmarks come from the applications table and creator profiles.
@@ -464,16 +465,7 @@ export default function SavedCreatorsPage() {
                 </div>
 
                 <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                    {row.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={row.avatarUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xl font-bold">
-                        {row.name.charAt(0)}
-                      </div>
-                    )}
-                  </div>
+                  <CreatorAvatar url={row.avatarUrl} name={row.name} size="w-16 h-16" textSize="text-xl" />
                   <div className="min-w-0">
                     <p className="font-bold text-gray-900 flex items-center gap-1.5 truncate">
                       {row.name}

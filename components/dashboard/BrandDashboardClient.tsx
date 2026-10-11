@@ -5,6 +5,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 import StatusBadge from '@/components/StatusBadge'
 import { deriveVerificationStatus, VERIFICATION_META } from '@/lib/status'
+import CreatorAvatar from '@/components/ui/CreatorAvatar'
 
 interface Stats {
   liveCampaigns: number
@@ -46,16 +47,6 @@ interface BrandDashboardClientProps {
   userName: string
 }
 
-function Avatar({ src, name, className }: { src?: string | null; name: string; className: string }) {
-  return src ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" className={`${className} object-cover`} />
-  ) : (
-    <div className={`${className} bg-gray-900 text-white flex items-center justify-center font-semibold`}>
-      {name.charAt(0).toUpperCase()}
-    </div>
-  )
-}
 
 export default function BrandDashboardClient({
   stats,
@@ -353,13 +344,14 @@ export default function BrandDashboardClient({
                           ) : (
                             <div className="flex items-center">
                               {collabs.slice(0, 3).map((col: any, i: number) => (
-                                <div key={col.id} className={`w-7 h-7 rounded-full ring-2 ring-white overflow-hidden ${i > 0 ? '-ml-2' : ''}`}>
-                                  <Avatar
-                                    src={col.influencer?.avatarUrl || col.influencer?.user?.image}
-                                    name={col.influencer?.displayName || col.influencer?.user?.name || 'C'}
-                                    className="w-full h-full text-[10px]"
-                                  />
-                                </div>
+                                <CreatorAvatar
+                                  key={col.id}
+                                  url={col.influencer?.avatarUrl || col.influencer?.user?.image}
+                                  name={col.influencer?.displayName || col.influencer?.user?.name || 'C'}
+                                  size="w-7 h-7"
+                                  textSize="text-[10px]"
+                                  className={`ring-2 ring-white ${i > 0 ? '-ml-2' : ''}`}
+                                />
                               ))}
                               {collabs.length > 3 && (
                                 <span className="ml-1.5 text-xs text-gray-500 font-medium">+{collabs.length - 3}</span>
@@ -397,9 +389,7 @@ export default function BrandDashboardClient({
               <div className="space-y-4">
                 {recentMessages.map((m) => (
                   <Link key={m.conversationId} href="/dashboard/messages" className="flex items-start gap-3 group">
-                    <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0">
-                      <Avatar src={m.avatarUrl} name={m.name} className="w-full h-full text-xs" />
-                    </div>
+                    <CreatorAvatar url={m.avatarUrl} name={m.name} size="w-9 h-9" textSize="text-xs" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-700 transition">{m.name}</p>
                       <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{m.snippet}</p>

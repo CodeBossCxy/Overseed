@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatNumber } from '@/lib/i18n/formatNumber'
 import { formatDate } from '@/lib/i18n/formatDate'
+import CreatorAvatar from '@/components/ui/CreatorAvatar'
 
 // Creator dashboard per the July 2026 workspace mockup: welcome header with
 // verified chip, 4-step onboarding banner (auto-hides when complete), stat
@@ -288,14 +289,7 @@ export default function InfluencerDashboardClient({
             <div className="space-y-4">
               {recentMessages.map((m) => (
                 <Link key={m.conversationId} href="/dashboard/messages" className="flex items-start gap-3 group">
-                  <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-500 overflow-hidden flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {m.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.avatarUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      m.name.slice(0, 2).toUpperCase()
-                    )}
-                  </div>
+                  <CreatorAvatar url={m.avatarUrl} name={m.name} size="w-10 h-10" textSize="text-xs" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 group-hover:text-primary-700 transition truncate">{m.name}</p>
                     <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{m.snippet}</p>
