@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
+import { scrapeBioBatch } from '@/lib/scrape-bio'
 
 // Extract email addresses from a bio/text string
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
@@ -179,10 +180,10 @@ async function lookupContactsAndNotify(
   const needsScraping = results.filter((r) => !r.email)
   if (needsScraping.length > 0) {
     try {
-      const { scrapeBioBatch } = await import('@/lib/scrape-bio')
+      console.log(`[outreach-submit] Scraping ${needsScraping.length} bios...`)
       const scraped = await scrapeBioBatch(
         needsScraping.map((r) => ({ platform: r.platform, handle: r.handle })),
-        2000, // 2s delay between requests to avoid rate limiting
+        500, // 500ms delay between requests (faster for serverless)
       )
       for (const r of results) {
         if (r.email) continue

@@ -66,13 +66,16 @@ export async function scrapeBioBatch(
 async function scrapeInstagram(handle: string): Promise<ScrapedBio> {
   // Instagram embeds profile info in meta tags and JSON-LD
   const url = `https://www.instagram.com/${handle}/`
+  console.log(`[scrape-bio] Fetching ${url}`)
   const res = await fetch(url, {
     headers: HEADERS,
     redirect: 'follow',
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(15000),
   })
+  console.log(`[scrape-bio] ${url} -> status ${res.status}, size ~${res.headers.get('content-length') || '?'}`)
   if (!res.ok) return { bio: null, emails: [] }
   const html = await res.text()
+  console.log(`[scrape-bio] HTML length: ${html.length}, has biography: ${html.includes('"biography"')}`)
 
   let bio: string | null = null
 
