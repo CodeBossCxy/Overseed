@@ -655,8 +655,8 @@ async function fetchCreatorDbEnrichment(
       }
       return { platform: plat, username, url, followers: null, engagement_percent: null }
     })
-    // Drop non-presence entries: website, linktree, video links (_skip)
-    .filter((a: { platform: string }) => a.platform !== 'website' && a.platform !== 'linktree' && a.platform !== '_skip')
+    // Only drop YouTube video/shorts links that aren't channel presence
+    .filter((a: { platform: string }) => a.platform !== '_skip')
 
   // Primary account first, then deduplicate cross-platform links
   const primaryAccount = {
@@ -668,7 +668,8 @@ async function fetchCreatorDbEnrichment(
   const seenPlatforms = new Set([platform])
   const accounts: typeof otherAccounts = [primaryAccount as any]
   for (const a of otherAccounts) {
-    if (seenPlatforms.has(a.platform)) continue
+    // Allow multiple website/linktree entries; deduplicate social platforms
+    if (a.platform !== 'website' && a.platform !== 'linktree' && seenPlatforms.has(a.platform)) continue
     seenPlatforms.add(a.platform)
     accounts.push(a)
   }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import {
   CLUB_FILTER_DEFS,
@@ -538,6 +538,11 @@ export default function DiscoverPanel() {
     | null
   >(null)
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [viewedProfiles, setViewedProfiles] = useState<
+    | { platform: string; handle: string; name: string; avatar_url: string | null; followers: number | null; country: string | null; viewed_at: string }[]
+    | null
+  >(null)
+  const [viewedProfilesExpanded, setViewedProfilesExpanded] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -868,12 +873,16 @@ export default function DiscoverPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Load search history on mount so the tasks table is visible immediately
+  // Load search history and viewed profiles on mount
   useEffect(() => {
     fetch('/api/discovery/tasks')
       .then((r) => r.json())
       .then((data) => setHistoryTasks(Array.isArray(data?.tasks) ? data.tasks : []))
       .catch(() => setHistoryTasks([]))
+    fetch('/api/discovery/viewed-profiles')
+      .then((r) => r.json())
+      .then((data) => setViewedProfiles(Array.isArray(data?.profiles) ? data.profiles : []))
+      .catch(() => setViewedProfiles([]))
   }, [])
 
   // Initial load and re-browse when the sort changes (other filters apply
@@ -1240,6 +1249,10 @@ export default function DiscoverPanel() {
       .then((r) => r.json())
       .then((data) => setHistoryTasks(Array.isArray(data?.tasks) ? data.tasks : []))
       .catch(() => {})
+    fetch('/api/discovery/viewed-profiles')
+      .then((r) => r.json())
+      .then((data) => setViewedProfiles(Array.isArray(data?.profiles) ? data.profiles : []))
+      .catch(() => {})
   }
 
   const clearSearch = () => {
@@ -1255,7 +1268,7 @@ export default function DiscoverPanel() {
   }
 
   // ---- Platform logos (inline SVGs) --------------------------------------
-  const igGradId = useRef(`ig-grad-${Math.random().toString(36).slice(2, 8)}`).current
+  const igGradId = useId()
   const PlatformLogo = ({ platform, size = 20 }: { platform: string; size?: number }) => {
     switch (platform) {
       case 'instagram':
@@ -2127,11 +2140,32 @@ export default function DiscoverPanel() {
           </div>
         )}
 
-      {/* Search history table — shown when no search results are active */}
+      {/* Search history table — shows 3 by default, expandable */}
       {!unavailable && !searchResult && !isLoading && (
         <div className="workspace-glass-card rounded-2xl p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-1">{d.mySearchTasks}</h2>
-          <p className="text-sm text-gray-400 mb-4">{d.mySearchTasksHint}</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold">{d.mySearchTasks}</h2>
+              <p className="text-sm text-gray-400 mt-0.5">{d.mySearchTasksHint}</p>
+            </div>
+            {(historyTasks?.length ?? 0) > 3 && (
+              <button
+                type="button"
+                onClick={() => setHistoryOpen((v) => !v)}
+                className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1"
+              >
+                {historyOpen
+                  ? (zh ? '收起' : 'Show less')
+                  : (zh ? `查看全部 ${historyTasks!.length} 条` : `View all ${historyTasks!.length}`)}
+                <svg
+                  className={`w-3.5 h-3.5 transition-transform ${historyOpen ? 'rotate-180' : ''}`}
+                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+          </div>
           {!historyTasks ? (
             <div className="py-8 flex justify-center text-gray-400"><Spinner /></div>
           ) : historyTasks.length === 0 ? (
@@ -2149,7 +2183,7 @@ export default function DiscoverPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {historyTasks.map((task) => {
+                  {(historyOpen ? historyTasks : historyTasks.slice(0, 3)).map((task) => {
                     const tags = taskFilterTags(task.request, task.platform)
                     const visibleTags = tags.slice(0, 3)
                     const extraCount = tags.length - visibleTags.length
@@ -2195,6 +2229,73 @@ export default function DiscoverPanel() {
           )}
         </div>
       )}
+
+      {/* Viewed profiles — shows 5 by default, expandable */}
+      {!unavailable && !searchResult && !isLoading && viewedProfiles && viewedProfiles.length > 0 && (() => {
+        const PREVIEW_COUNT = 5
+        const expanded = historyOpen // reuse same toggle for simplicity? No, use a separate one.
+        return (
+          <div className="workspace-glass-card rounded-2xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold">{zh ? '浏览过的达人' : 'Viewed profiles'}</h2>
+                <p className="text-sm text-gray-400 mt-0.5">{zh ? '点击可免费再次查看达人资料' : 'Click to view again for free'}</p>
+              </div>
+              {viewedProfiles.length > PREVIEW_COUNT && (
+                <button
+                  type="button"
+                  onClick={() => setViewedProfilesExpanded((v) => !v)}
+                  className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1"
+                >
+                  {viewedProfilesExpanded
+                    ? (zh ? '收起' : 'Show less')
+                    : (zh ? `查看全部 ${viewedProfiles.length} 位` : `View all ${viewedProfiles.length}`)}
+                  <svg
+                    className={`w-3.5 h-3.5 transition-transform ${viewedProfilesExpanded ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {(viewedProfilesExpanded ? viewedProfiles : viewedProfiles.slice(0, PREVIEW_COUNT)).map((vp) => (
+                <button
+                  key={`${vp.platform}:${vp.handle}`}
+                  type="button"
+                  onClick={() => openDetail({
+                    id: `cdb:${vp.platform}:${vp.handle}`,
+                    platform: vp.platform,
+                    handle: vp.handle,
+                    display_name: vp.name,
+                    avatar_url: vp.avatar_url,
+                    follower_count: vp.followers,
+                    profile_url: null,
+                    engagement_rate: null,
+                    niche_tags: [],
+                    bio: null,
+                    country: vp.country,
+                    score: null,
+                  } as DiscoveredCreator)}
+                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50/80 transition text-left"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden flex-shrink-0">
+                    <CreatorAvatar url={vp.avatar_url} name={vp.name} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800 truncate">{vp.name}</p>
+                    <p className="text-xs text-gray-400 truncate">@{vp.handle} · {PLATFORM_LABELS[vp.platform] || vp.platform}</p>
+                    {vp.followers != null && (
+                      <p className="text-xs text-gray-500">{formatFollowers(vp.followers, locale)}</p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {!unavailable && (searchResult || isLoading) && (
         <>
@@ -2340,6 +2441,20 @@ export default function DiscoverPanel() {
                         {d.viewDetails}
                       </a>
                     ) : null}
+                    {creator.profile_url && (
+                      <a
+                        href={creator.profile_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-2 workspace-glass-control rounded-xl transition flex-shrink-0 text-gray-400 hover:text-gray-700"
+                        title={zh ? `前往 ${PLATFORM_LABELS[creator.platform] || creator.platform}` : `Open on ${PLATFORM_LABELS[creator.platform] || creator.platform}`}
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                      </a>
+                    )}
                     {(() => {
                       const handle = (creator.handle || '').replace(/^@/, '').toLowerCase()
                       const key = `${creator.platform}:${handle}`
@@ -2591,60 +2706,66 @@ export default function DiscoverPanel() {
                     )
                   })()}
 
-                  {/* Platform presence */}
+                  {/* Platform presence & links */}
                   {(() => {
-                    const visible = (detail.accounts ?? []).filter(
-                      (a: any) => a.platform !== 'website' && a.platform !== 'linktree',
-                    )
-                    if (visible.length === 0) return null
+                    const allAccounts = detail.accounts ?? []
+                    if (allAccounts.length === 0) return null
                     const PLATFORM_COLORS: Record<string, string> = {
                       instagram: 'bg-pink-500', youtube: 'bg-red-500', tiktok: 'bg-gray-900',
                       twitter: 'bg-sky-400', twitch: 'bg-purple-500', snapchat: 'bg-yellow-400',
                       discord: 'bg-indigo-500', threads: 'bg-gray-800', pinterest: 'bg-red-600',
                       spotify: 'bg-green-500', facebook: 'bg-blue-600', linkedin: 'bg-blue-700',
+                      website: 'bg-emerald-500', linktree: 'bg-lime-500',
                     }
                     const PLATFORM_LABELS: Record<string, string> = {
                       twitter: 'X / Twitter', linkedin: 'LinkedIn', tiktok: 'TikTok',
                       youtube: 'YouTube', instagram: 'Instagram', snapchat: 'Snapchat',
                       discord: 'Discord', threads: 'Threads', pinterest: 'Pinterest',
                       spotify: 'Spotify', facebook: 'Facebook', twitch: 'Twitch',
+                      website: 'Website', linktree: 'Linktree',
                     }
                     return (
                       <div className="mt-6">
                         <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
-                          Platform presence
+                          Platform presence & links
                         </p>
                         <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
-                          {visible.map((a: any, i: number) => (
-                            <div
-                              key={`${a.platform}-${i}`}
-                              className="flex items-center justify-between px-4 py-2.5 bg-white"
-                            >
-                              <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PLATFORM_COLORS[a.platform] || 'bg-gray-300'}`} />
-                                <span>{PLATFORM_LABELS[a.platform] || a.platform}</span>
-                                {a.username && (
-                                  <span className="text-gray-400 font-normal truncate max-w-[160px]">@{a.username}</span>
-                                )}
-                              </span>
-                              <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
-                                {a.followers != null ? (
-                                  <>
-                                    {formatFollowers(a.followers, locale)}
-                                    {a.engagement_percent != null && (
-                                      <span className="text-gray-400">
-                                        {' '}· {Number(a.engagement_percent).toFixed(1)}%
-                                      </span>
-                                    )}
-                                  </>
-                                ) : a.url ? (
-                                  <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-primary-500 hover:underline text-xs">
-                                    View ↗
-                                  </a>
-                                ) : null}
-                              </span>
-                            </div>
-                          ))}
+                          {allAccounts.map((a: any, i: number) => {
+                            // For website/linktree, show the URL domain or title as label
+                            const displayName = a.platform === 'website' || a.platform === 'linktree'
+                              ? (a.username || (a.url ? new URL(a.url).hostname.replace(/^www\./, '') : ''))
+                              : (a.username ? `@${a.username}` : '')
+                            return (
+                              <div
+                                key={`${a.platform}-${i}`}
+                                className="flex items-center justify-between px-4 py-2.5 bg-white"
+                              >
+                                <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PLATFORM_COLORS[a.platform] || 'bg-gray-300'}`} />
+                                  <span className="capitalize">{PLATFORM_LABELS[a.platform] || a.platform}</span>
+                                  {displayName && (
+                                    <span className="text-gray-400 font-normal truncate max-w-[200px]">{displayName}</span>
+                                  )}
+                                </span>
+                                <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
+                                  {a.followers != null ? (
+                                    <>
+                                      {formatFollowers(a.followers, locale)}
+                                      {a.engagement_percent != null && (
+                                        <span className="text-gray-400">
+                                          {' '}· {Number(a.engagement_percent).toFixed(1)}%
+                                        </span>
+                                      )}
+                                    </>
+                                  ) : a.url ? (
+                                    <a href={a.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary-500 hover:underline text-xs">
+                                      View ↗
+                                    </a>
+                                  ) : null}
+                                </span>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )
