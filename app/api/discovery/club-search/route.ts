@@ -32,7 +32,7 @@ import { walletRefund, getCreditPrice } from '@/lib/wallet'
 // saves the full set in the task log, but only returns DISPLAY_PAGE_SIZE to
 // the client per page.
 const API_PAGE_SIZE = 100
-const DISPLAY_PAGE_SIZE = 50
+const DISPLAY_PAGE_SIZE = 20
 const DISCOVERY_PAGE_SIZE = DISPLAY_PAGE_SIZE
 
 // ── Filter usage analytics (in-memory, logged periodically) ──────────────

@@ -82,8 +82,11 @@ function validateValue(
   } else if (def.type === 'boolean' && typeof value !== 'boolean') {
     throw new Error(`${field} requires a boolean`)
   }
-  if ((field === 'country' || field === 'audienceLocation') && (typeof value !== 'string' || !/^[A-Z]{3}$/.test(value))) {
-    throw new Error(`${field} must be an ISO 3166-1 alpha-3 code such as USA`)
+  if (field === 'country' || field === 'audienceLocation') {
+    const codes = Array.isArray(value) ? value : [value]
+    if (codes.some((v) => typeof v !== 'string' || !/^[A-Z]{2,3}$/.test(v))) {
+      throw new Error(`${field} must be ISO 3166-1 alpha-2 or alpha-3 codes such as US or USA`)
+    }
   }
   if (field === 'audienceGender') {
     const vals = Array.isArray(value) ? value : [value]
@@ -186,8 +189,11 @@ export function buildCustomSearchRequest(
     }
 
     // Country / language code normalization
-    const normalized = (field === 'country' || field === 'audienceLocation') && typeof value === 'string'
+    const isCountryField = field === 'country' || field === 'audienceLocation'
+    const normalized = isCountryField && typeof value === 'string'
       ? creatorDbCountryCode(value)
+      : isCountryField && op === 'in' && Array.isArray(value)
+        ? [...new Set(value.map((item: string) => creatorDbCountryCode(item.trim())).filter(Boolean))]
       : field === 'mainLanguage' && typeof value === 'string'
         ? creatorDbLanguageCode(value)
       : op === 'in' && Array.isArray(value)

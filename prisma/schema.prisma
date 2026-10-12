@@ -944,6 +944,20 @@ model DiscoveryViewCache {
   @@map("discovery_view_cache")
 }
 
+// Cached creator niches from CreatorDB /profile endpoint (0.1 credits per
+// call with Fractional Calls enabled). Keyed by platform + handle so we
+// never pay twice for the same creator.
+model CreatorNicheCache {
+  id        String   @id @default(cuid())
+  platform  String
+  handle    String
+  niches    String[] // niche ID strings, e.g. ["id_smartphone_ScienceTechnology"]
+  fetchedAt DateTime @default(now())
+
+  @@unique([platform, handle])
+  @@map("creator_niche_cache")
+}
+
 // Audit trail of Influencers Club vendor credit spend. One row per billed
 // live call: discovery (0.01 x results returned), enrichment or analytics
 // (1 credit each).

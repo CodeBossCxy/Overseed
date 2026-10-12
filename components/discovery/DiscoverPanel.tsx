@@ -50,7 +50,7 @@ interface SearchResult {
 type DiscoverySource = 'kol' | 'club'
 // Display page size — the backend always fetches 100 from the vendor and
 // logs the full set, but only returns CLUB_PAGE_SIZE to the client.
-const CLUB_PAGE_SIZE = 50
+const CLUB_PAGE_SIZE = 20
 /* END TEMP */
 
 interface DiscoverySearchRequest {
@@ -111,6 +111,118 @@ const NICHE_LIST: { name: string; channelCount: number }[] = [
   { name: 'Nail Art', channelCount: 800 },
   { name: 'Tattoo', channelCount: 700 },
 ]
+
+// Build a lookup from the NICHE_LIST for fast matching of niche IDs.
+// Niche IDs from CreatorDB look like "id_fashion_All" or "id_smartphone_ScienceTechnology".
+// We extract the name part, title-case it, and try to match against NICHE_LIST.
+const NICHE_NAME_MAP: Record<string, string> = {}
+for (const n of NICHE_LIST) {
+  NICHE_NAME_MAP[n.name.toLowerCase()] = n.name
+}
+
+function nicheIdToLabel(id: string): string {
+  // Format: "id_<name>_<category>" — extract the name portion
+  const match = id.match(/^id_(.+?)_[A-Z]/)
+  const raw = match ? match[1] : id.replace(/^id_/, '')
+  // Check known names first
+  const known = NICHE_NAME_MAP[raw.toLowerCase()]
+  if (known) return known
+  // Clean up: replace underscores, title-case
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function MultiSelectFilter({
+  value, onChange, options, placeholder, inputCls,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  placeholder: string
+  inputCls: string
+}) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const selected = useMemo(() => value.split(',').map((s) => s.trim()).filter(Boolean), [value])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const toggle = (val: string) => {
+    const next = selected.includes(val)
+      ? selected.filter((s) => s !== val)
+      : [...selected, val]
+    onChange(next.join(', '))
+  }
+
+  const getLabel = (val: string) => options.find((o) => o.value === val)?.label || val
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full text-left ${inputCls} flex items-center justify-between gap-1`}
+      >
+        {selected.length === 0 ? (
+          <span className="text-gray-400 truncate">{placeholder}</span>
+        ) : (
+          <span className="truncate text-gray-700">{selected.map(getLabel).join(', ')}</span>
+        )}
+        <svg className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {selected.map((val) => (
+            <span key={val} className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[11px] font-medium">
+              {getLabel(val)}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); toggle(val) }}
+                className="hover:text-primary-900"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onChange('') }}
+            className="text-[11px] text-gray-400 hover:text-gray-600 px-1"
+          >
+            clear
+          </button>
+        </div>
+      )}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-52 overflow-y-auto" style={{ background: '#ffffff' }}>
+          {options.map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(opt.value)}
+                onChange={() => toggle(opt.value)}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="truncate">{opt.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function NicheAutocomplete({
   value, onChange, labelCls, inputCls, zh,
@@ -213,7 +325,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   twitch: 'Twitch',
   onlyfans: 'OnlyFans',
 }
-const PAGE_SIZE = 50
+const PAGE_SIZE = 20
 
 // Country filter options — ISO codes sent to the discovery APIs, labels from
 // the shared t.signupBusiness.countries map.
@@ -380,10 +492,20 @@ const COVERAGE_OK = new Set(['ok', 'cache', 'live'])
 
 // Avatar with referrerPolicy (Google's image CDN rejects some localhost/hotlink
 // referrers) and a fallback to the creator's initial if the URL has rotted.
+// Proxy external avatar URLs through /api/avatar to survive signed URL expiration.
+// Firebase/Google URLs are permanent and don't need proxying.
+function proxyAvatarUrl(url: string | null): string | null {
+  if (!url) return null
+  // Firebase and Google URLs are permanent — no proxy needed
+  if (url.includes('firebasestorage.googleapis.com') || url.includes('googleusercontent.com')) return url
+  return `/api/avatar?url=${encodeURIComponent(url)}`
+}
+
 function CreatorAvatar({ url, name, textSize = '' }: { url: string | null; name: string; textSize?: string }) {
   const [failed, setFailed] = useState(false)
+  const proxied = useMemo(() => proxyAvatarUrl(url), [url])
   useEffect(() => setFailed(false), [url])
-  if (!url || failed) {
+  if (!proxied || failed) {
     return (
       <div className={`w-full h-full flex items-center justify-center text-gray-400 font-bold ${textSize}`}>
         {(name || '?').charAt(0)}
@@ -393,12 +515,62 @@ function CreatorAvatar({ url, name, textSize = '' }: { url: string | null; name:
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={url}
+      src={proxied}
       alt=""
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
       className="w-full h-full object-cover"
     />
+  )
+}
+
+function NicheTags({
+  creatorKey,
+  nicheMap,
+  loading,
+}: {
+  creatorKey: string | null
+  nicheMap: Record<string, string[]>
+  loading: boolean
+}) {
+  const [expanded, setExpanded] = useState(false)
+  if (!creatorKey) return null
+
+  const niches = nicheMap[creatorKey]
+
+  // Loading placeholder
+  if (niches === undefined && loading) {
+    return (
+      <div className="flex gap-1.5 flex-wrap w-full mt-2">
+        <div className="h-5 w-14 rounded-full bg-gray-100 animate-pulse" />
+        <div className="h-5 w-18 rounded-full bg-gray-100 animate-pulse" />
+      </div>
+    )
+  }
+
+  if (!niches || niches.length === 0) return null
+
+  const labels = niches.map(nicheIdToLabel)
+  const shown = expanded ? labels : labels.slice(0, 3)
+  const remaining = labels.length - 3
+
+  return (
+    <div className="flex gap-1.5 flex-wrap w-full mt-2">
+      {shown.map((label) => (
+        <span key={label} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[10px] font-medium">
+          {label}
+        </span>
+      ))}
+      {!expanded && remaining > 0 && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
+          className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-[10px] font-medium hover:bg-gray-200 transition"
+        >
+          +{remaining}
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -546,7 +718,18 @@ export default function DiscoverPanel() {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // ── Creator niches (fetched per-creator via /profile, cached server-side) ──
+  // Keyed by "platform:handle" → niche ID strings.
+  const [nicheMap, setNicheMap] = useState<Record<string, string[]>>({})
+  const [nichesLoading, setNichesLoading] = useState(false)
+  const nicheFetchRef = useRef(0) // dedup concurrent fetches
   const [unavailable, setUnavailable] = useState(false)
+
+  // Ref to the current nicheMap — used inside effects to check cache without
+  // creating a dependency that would re-trigger the effect.
+  const nicheMapRef = useRef(nicheMap)
+  nicheMapRef.current = nicheMap
 
   // Saved discovery creators — track by "platform:handle" keys
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
@@ -686,6 +869,19 @@ export default function DiscoverPanel() {
         throw new Error(data?.message || 'Failed to load creator details')
       }
       setDetail(data)
+      // Back-patch the permanent avatar URL from the profile response into
+      // the creator card so it survives TikTok CDN URL expiration.
+      if (data?.avatar_url && data.avatar_url !== creator.avatar_url) {
+        setDetailFor((prev) => prev ? { ...prev, avatar_url: data.avatar_url } : prev)
+        // Also update the search results list so the card shows the avatar
+        setSearchResult((prev: any) => {
+          if (!prev?.results) return prev
+          const updated = prev.results.map((r: any) =>
+            r.id === creator.id ? { ...r, avatar_url: data.avatar_url } : r
+          )
+          return { ...prev, results: updated }
+        })
+      }
     } catch (err: any) {
       setDetailError(err.message || 'Failed to load creator details')
     } finally {
@@ -1158,14 +1354,19 @@ export default function DiscoverPanel() {
         }
       }
       if (v.country.trim() && !hasField('country')) {
-        filters.push({ field: 'country' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: v.country.trim().toUpperCase() })
+        const countries = v.country.split(',').map((c) => c.trim().toUpperCase()).filter(Boolean)
+        if (countries.length === 1) {
+          filters.push({ field: 'country' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: countries[0] })
+        } else if (countries.length > 1) {
+          filters.push({ field: 'country' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: countries })
+        }
       }
       if (v.minEngagement && !hasField('shortEngagementRate')) {
         filters.push({ field: 'shortEngagementRate' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: Number(v.minEngagement) })
       }
       qs.set('cdb_filters', JSON.stringify(filters))
     }
-    if (v.country.trim()) qs.set('country', v.country.trim().toUpperCase())
+    if (v.country.trim()) qs.set('country', v.country.split(',')[0].trim().toUpperCase())
     if (v.minFollowers) qs.set('min_followers', v.minFollowers)
     if (v.maxFollowers) qs.set('max_followers', v.maxFollowers)
     if (v.minEngagement) qs.set('min_engagement', v.minEngagement)
@@ -1467,8 +1668,46 @@ export default function DiscoverPanel() {
     }
   }
 
-  const creators = searchResult ? searchResult.results : browseList || []
+  const creators = useMemo(
+    () => (searchResult ? searchResult.results : browseList || []),
+    [searchResult, browseList],
+  )
   const isBrowsing = !searchResult
+
+  // Fetch niches whenever displayed creators change
+  const prevCreatorKeyRef = useRef('')
+  const creatorsKey = useMemo(() => creators.map((c) => c.id).join(','), [creators])
+  useEffect(() => {
+    if (!creatorsKey || creatorsKey === prevCreatorKeyRef.current) return
+    prevCreatorKeyRef.current = creatorsKey
+    // Inline the fetch to avoid stale-closure issues with the callback
+    const batch = creators
+      .filter((c) => c.handle && ['instagram', 'youtube', 'tiktok'].includes(c.platform))
+      .map((c) => ({ platform: c.platform, handle: c.handle!.replace(/^@/, '').toLowerCase() }))
+      .filter((c) => !((c.platform + ':' + c.handle) in nicheMapRef.current))
+    if (batch.length === 0) return
+    const seq = ++nicheFetchRef.current
+    setNichesLoading(true)
+    fetch('/api/discovery/creator-niches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creators: batch }),
+    })
+      .then((res) => {
+        if (seq !== nicheFetchRef.current) return
+        if (!res.ok) { console.warn('[niches] API error:', res.status); return }
+        return res.json()
+      })
+      .then((data) => {
+        if (!data || seq !== nicheFetchRef.current) return
+        if (data.niches && typeof data.niches === 'object') {
+          setNicheMap((prev) => ({ ...prev, ...data.niches }))
+        }
+      })
+      .catch((err) => console.warn('[niches] fetch failed:', err))
+      .finally(() => { if (seq === nicheFetchRef.current) setNichesLoading(false) })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creatorsKey])
   const matchedFollowerTier = FOLLOWER_TIER_OPTIONS.find(
     (tier) => tier.min === minFollowers && tier.max === maxFollowers
   )
@@ -1695,25 +1934,16 @@ export default function DiscoverPanel() {
                       {zh ? '受众所在地' : 'Audience location'}
                     </span>
                   </label>
-                  {['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? (
-                    <select
-                      value={creatorDbFilterFor('audienceLocation').value}
-                      onChange={(e) => updateCreatorDbFilter('audienceLocation', { value: e.target.value })}
-                      className={`w-full ${inputCls}`}
-                    >
-                      <option value="">{zh ? '全部地区' : 'Anywhere'}</option>
-                      {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
-                        <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <select value={country} onChange={(e) => setCountry(e.target.value)} className={`w-full ${inputCls}`}>
-                      <option value="">{d.allCountries}</option>
-                      {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
-                        <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>
-                      ))}
-                    </select>
-                  )}
+                  <MultiSelectFilter
+                    value={creatorDbFilterFor('audienceLocation').value}
+                    onChange={(v) => updateCreatorDbFilter('audienceLocation', { op: 'in', value: v })}
+                    options={COUNTRY_FILTER_OPTIONS.map(({ code, key }) => ({
+                      value: code,
+                      label: (t.signupBusiness.countries as Record<string, string>)[key] || code,
+                    }))}
+                    placeholder={zh ? '全部地区' : 'Anywhere'}
+                    inputCls={inputCls}
+                  />
                 </div>
                 {/* Language */}
                 <div>
@@ -1723,25 +1953,16 @@ export default function DiscoverPanel() {
                       {zh ? '语言' : 'Language'}
                     </span>
                   </label>
-                  {['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? (
-                    <select
-                      value={creatorDbFilterFor('mainLanguage').value}
-                      onChange={(e) => updateCreatorDbFilter('mainLanguage', { value: e.target.value })}
-                      className={`w-full ${inputCls}`}
-                    >
-                      <option value="">{zh ? '全部语言' : 'All languages'}</option>
-                      {CREATORDB_LANGUAGE_OPTIONS.map(([value, langLabel]) => (
-                        <option key={value} value={value}>{langLabel}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <select value={language} onChange={(e) => setLanguage(e.target.value)} className={`w-full ${inputCls}`}>
-                      <option value="">{d.allLanguages}</option>
-                      {LANGUAGE_FILTER_OPTIONS.map(({ code, label: langLabel }) => (
-                        <option key={code} value={code}>{langLabel}</option>
-                      ))}
-                    </select>
-                  )}
+                  <MultiSelectFilter
+                    value={creatorDbFilterFor('mainLanguage').value}
+                    onChange={(v) => updateCreatorDbFilter('mainLanguage', { op: 'in', value: v })}
+                    options={CREATORDB_LANGUAGE_OPTIONS.map(([value, langLabel]) => ({
+                      value,
+                      label: langLabel,
+                    }))}
+                    placeholder={zh ? '全部语言' : 'All languages'}
+                    inputCls={inputCls}
+                  />
                 </div>
                 {/* Audience age */}
                 <div>
@@ -1751,20 +1972,23 @@ export default function DiscoverPanel() {
                       {zh ? '受众年龄' : 'Audience age'}
                     </span>
                   </label>
-                  <select
-                    value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('audienceAge').value : audienceAge}
-                    onChange={(e) => {
-                      if (['instagram', 'tiktok', 'youtube'].includes(activePlatform)) {
-                        updateCreatorDbFilter('audienceAge', { value: e.target.value })
-                      } else {
-                        setAudienceAge(e.target.value)
-                      }
-                    }}
-                    className={`w-full ${inputCls}`}
-                  >
-                    <option value="">{d.anyOption}</option>
-                    {['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map((age) => <option key={age} value={age}>{age}</option>)}
-                  </select>
+                  {['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? (
+                    <MultiSelectFilter
+                      value={creatorDbFilterFor('audienceAge').value}
+                      onChange={(v) => updateCreatorDbFilter('audienceAge', { op: 'in', value: v })}
+                      options={['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map((age) => ({
+                        value: age,
+                        label: age,
+                      }))}
+                      placeholder={d.anyOption}
+                      inputCls={inputCls}
+                    />
+                  ) : (
+                    <select value={audienceAge} onChange={(e) => setAudienceAge(e.target.value)} className={`w-full ${inputCls}`}>
+                      <option value="">{d.anyOption}</option>
+                      {['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map((age) => <option key={age} value={age}>{age}</option>)}
+                    </select>
+                  )}
                 </div>
                 {/* Gender composition */}
                 <div>
@@ -1857,12 +2081,16 @@ export default function DiscoverPanel() {
                       {zh ? '创作者所在国' : "Creator's country"}
                     </span>
                   </label>
-                  <select value={country} onChange={(e) => setCountry(e.target.value)} className={`w-full ${inputCls}`}>
-                    <option value="">{zh ? '全部国家' : 'Any country'}</option>
-                    {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => (
-                      <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>
-                    ))}
-                  </select>
+                  <MultiSelectFilter
+                    value={country}
+                    onChange={setCountry}
+                    options={COUNTRY_FILTER_OPTIONS.map(({ code, key }) => ({
+                      value: code,
+                      label: (t.signupBusiness.countries as Record<string, string>)[key] || code,
+                    }))}
+                    placeholder={zh ? '全部国家' : 'Any country'}
+                    inputCls={inputCls}
+                  />
                 </div>
                 {/* Verified account */}
                 <div>
@@ -2324,14 +2552,14 @@ export default function DiscoverPanel() {
 
           {isLoading && creators.length === 0 ? (
             /* Skeleton cards while the first page loads */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="workspace-glass-card rounded-2xl p-5 flex gap-4 animate-pulse">
-                  <div className="w-12 h-12 rounded-full bg-gray-200/70 flex-shrink-0" />
+                  <div className="w-[72px] h-[72px] rounded-full bg-gray-200/70 flex-shrink-0" />
                   <div className="flex-1 space-y-3 py-1">
-                    <div className="h-4 bg-gray-200/70 rounded w-1/3" />
-                    <div className="h-3 bg-gray-200/60 rounded w-1/2" />
-                    <div className="h-3 bg-gray-200/50 rounded w-2/3" />
+                    <div className="h-5 bg-gray-200/70 rounded w-1/3" />
+                    <div className="h-3 bg-gray-200/60 rounded w-1/4" />
+                    <div className="h-3 bg-gray-200/50 rounded w-1/2" />
                   </div>
                 </div>
               ))}
@@ -2349,133 +2577,148 @@ export default function DiscoverPanel() {
               </div>
             )}
             <div
-              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 transition-opacity ${
+              className={`grid grid-cols-1 lg:grid-cols-2 gap-4 transition-opacity ${
                 isLoading ? 'opacity-40 pointer-events-none' : ''
               }`}
             >
-              {creators.map((creator, creatorIndex) => (
+              {creators.map((creator, creatorIndex) => {
+                const handle = (creator.handle || '').replace(/^@/, '').toLowerCase()
+                const saveKey = `${creator.platform}:${handle}`
+                const isSaved = handle ? savedKeys.has(saveKey) : false
+                const isClickable = creator.id.startsWith('club:') || creator.id.startsWith('cdb:')
+                const NICHE_COLORS = ['bg-green-100 text-green-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700', 'bg-blue-100 text-blue-700', 'bg-orange-100 text-orange-700']
+                return (
                 <div
                   key={`${searchTaskId ?? activeSearch?.params ?? 'browse'}:${searchPage}:${creator.id}:${creatorIndex}`}
-                  onClick={
-                    creator.id.startsWith('club:') || creator.id.startsWith('cdb:') ? () => openDetail(creator) : undefined
-                  }
-                  className={`workspace-glass-card rounded-2xl p-5 flex flex-col items-center text-center ${
-                    creator.id.startsWith('club:') || creator.id.startsWith('cdb:')
-                      ? 'cursor-pointer hover:shadow-md transition'
-                      : ''
+                  onClick={isClickable ? () => openDetail(creator) : undefined}
+                  className={`workspace-glass-card rounded-2xl p-5 ${
+                    isClickable ? 'cursor-pointer hover:shadow-md transition' : ''
                   }`}
                 >
-                  {/* Avatar + Name */}
-                  <div className="flex items-center gap-3 w-full mb-3">
-                    <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 ring-2 ring-white">
-                      <CreatorAvatar
-                        url={creator.avatar_url}
-                        name={creator.display_name || creator.handle || '?'}
-                        textSize="text-xl"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <p className="font-bold text-[15px] text-gray-900 truncate">
-                        {creator.display_name || creator.handle || creator.id}
-                      </p>
-                      {creator.handle && (
-                        <p className="text-xs text-gray-400 truncate">
-                          @{creator.handle.replace(/^@/, '')}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[11px] font-medium">
-                          {PLATFORM_LABELS[creator.platform] || creator.platform}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="flex items-center justify-center gap-6 w-full py-3 border-t border-gray-100">
-                    <div className="flex items-center gap-1.5">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">{formatFollowers(creator.follower_count, locale)}</p>
-                        <p className="text-[10px] text-gray-400">{d.followers}</p>
-                      </div>
-                    </div>
-                    {creator.engagement_rate != null && (
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-                        </svg>
-                        <div>
-                          <p className="text-sm font-bold text-gray-900">{Number(creator.engagement_rate).toFixed(1)}%</p>
-                          <p className="text-[10px] text-gray-400">{d.engagement}</p>
+                  {/* Top section: avatar + info + platform link */}
+                  <div className="flex gap-4">
+                    {/* Avatar with gradient ring */}
+                    <div className="flex-shrink-0">
+                      <div className="w-[80px] h-[80px] rounded-full p-[3px] bg-gradient-to-br from-yellow-400 via-pink-500 to-purple-600">
+                        <div className="w-full h-full rounded-full bg-white p-[2px]">
+                          <div className="w-full h-full rounded-full bg-gray-100 overflow-hidden">
+                            <CreatorAvatar
+                              url={creator.avatar_url}
+                              name={creator.display_name || creator.handle || '?'}
+                              textSize="text-xl"
+                            />
+                          </div>
                         </div>
                       </div>
-                    )}
+                    </div>
+                    {/* Name, handle, niche tags */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-lg text-gray-900 truncate leading-tight uppercase tracking-wide">
+                            {creator.display_name || creator.handle || creator.id}
+                          </p>
+                          {creator.handle && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <p className="text-sm text-gray-400">@{creator.handle.replace(/^@/, '')}</p>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(creator.handle?.replace(/^@/, '') || '') }}
+                                className="text-gray-300 hover:text-gray-500 flex-shrink-0"
+                                title={zh ? '复制' : 'Copy handle'}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {/* "View on Platform ↗" link */}
+                        {creator.profile_url && (
+                          <a
+                            href={creator.profile_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-50 transition flex-shrink-0"
+                          >
+                            <PlatformLogo platform={creator.platform} size={16} />
+                            {zh ? `${PLATFORM_LABELS[creator.platform] || creator.platform}` : `View on ${PLATFORM_LABELS[creator.platform] || creator.platform}`}
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
+                            </svg>
+                          </a>
+                        )}
+                      </div>
+                      {/* Niche tags with colors */}
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <NicheTags
+                          creatorKey={creator.handle ? `${creator.platform}:${creator.handle.replace(/^@/, '').toLowerCase()}` : null}
+                          nicheMap={nicheMap}
+                          loading={nichesLoading}
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 w-full mt-3">
-                    {creator.id.startsWith('club:') || creator.id.startsWith('cdb:') ? (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); openDetail(creator) }}
-                        className="flex-1 px-3 py-2 workspace-glass-control rounded-xl text-sm font-medium text-gray-700 hover:brightness-105 transition text-center"
-                      >
-                        {d.viewDetails}
-                        {creditPrices?.profile != null && (
-                          <span className="text-[10px] text-gray-400 font-normal ml-1">
-                            {d.creditsN.replace('{n}', String(creditPrices.profile))}
-                          </span>
-                        )}
-                      </button>
-                    ) : creator.profile_url ? (
-                      <a
-                        href={creator.profile_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-1 px-3 py-2 workspace-glass-control rounded-xl text-sm font-medium text-gray-700 hover:brightness-105 transition text-center"
-                      >
-                        {d.viewDetails}
-                      </a>
-                    ) : null}
-                    {creator.profile_url && (
-                      <a
-                        href={creator.profile_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-2 workspace-glass-control rounded-xl transition flex-shrink-0 text-gray-400 hover:text-gray-700"
-                        title={zh ? `前往 ${PLATFORM_LABELS[creator.platform] || creator.platform}` : `Open on ${PLATFORM_LABELS[creator.platform] || creator.platform}`}
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                        </svg>
-                      </a>
-                    )}
-                    {(() => {
-                      const handle = (creator.handle || '').replace(/^@/, '').toLowerCase()
-                      const key = `${creator.platform}:${handle}`
-                      const isSaved = handle ? savedKeys.has(key) : false
-                      return (
+                  {/* Bottom row: followers + actions */}
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100/80">
+                    {/* Followers */}
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                      </svg>
+                      <span className="text-lg font-bold text-gray-900">{formatFollowers(creator.follower_count, locale)}</span>
+                      <span className="text-sm text-gray-400">{d.followers}</span>
+                    </div>
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-2.5">
+                      {isClickable ? (
                         <button
                           type="button"
-                          disabled={!handle || savingKey === key}
-                          onClick={(e) => { e.stopPropagation(); toggleSaveCreator(creator) }}
-                          className={`p-2 workspace-glass-control rounded-xl transition flex-shrink-0 disabled:opacity-50 ${isSaved ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'}`}
-                          title={isSaved ? (zh ? '取消收藏' : 'Unsave') : (zh ? '收藏' : 'Save')}
+                          onClick={(e) => { e.stopPropagation(); openDetail(creator) }}
+                          className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-400 to-slate-400 text-white rounded-full text-sm font-semibold hover:from-indigo-500 hover:to-slate-500 transition shadow-sm"
                         >
-                          <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                           </svg>
+                          {zh ? '查看资料' : 'View Profile'}
                         </button>
-                      )
-                    })()}
+                      ) : creator.profile_url ? (
+                        <a
+                          href={creator.profile_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-400 to-slate-400 text-white rounded-full text-sm font-semibold hover:from-indigo-500 hover:to-slate-500 transition shadow-sm"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                          </svg>
+                          {zh ? '查看资料' : 'View Profile'}
+                        </a>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={!handle || savingKey === saveKey}
+                        onClick={(e) => { e.stopPropagation(); toggleSaveCreator(creator) }}
+                        className={`w-10 h-10 flex items-center justify-center rounded-full border transition flex-shrink-0 disabled:opacity-50 ${
+                          isSaved
+                            ? 'bg-amber-50 border-amber-200 text-amber-600'
+                            : 'bg-orange-50/50 border-gray-200 text-gray-400 hover:text-amber-600 hover:border-amber-200'
+                        }`}
+                        title={isSaved ? (zh ? '取消收藏' : 'Unsave') : (zh ? '收藏' : 'Save')}
+                      >
+                        <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
             </div>
           )}

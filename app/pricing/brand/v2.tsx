@@ -118,7 +118,7 @@ export default function BrandPricingBetaPage() {
     {
       icon: ICONS.search,
       label: m.creditFeatureDiscoverySearch || 'Discovery Search',
-      hint: zh ? '每页 10 位达人' : 'per page of 10 creators',
+      hint: zh ? '每页 20 位达人' : 'per page of 20 creators',
       price: prices.discovery_search,
     },
     {
