@@ -677,27 +677,20 @@ function RelatedCreatorChip({
         onClick={(e) => {
           e.stopPropagation()
           setTooltip(null)
-          const rcCreator: DiscoveredCreator = {
+          onOpen({
             id: `cdb:${platform}:${handle}`,
             platform,
             handle,
             display_name: handle,
-            uniqueId: handle,
-            displayName: null,
-            avatarUrl: null,
-            followers: null,
-            sortMetric: null,
             bio: null,
             country: null,
-            language: null,
             follower_count: null,
             engagement_rate: null,
             niche_tags: [],
             profile_url: null,
             avatar_url: null,
             score: null,
-          }
-          onOpen(rcCreator)
+          })
         }}
       >
         @{handle}
@@ -977,6 +970,119 @@ export default function DiscoverPanel() {
   const [analyticsError, setAnalyticsError] = useState<string | null>(null)
   const [analyticsBlocked, setAnalyticsBlocked] = useState(false)
 
+  // ── Per-feature paid unlocks (audience gender/age/country, brand collab) ──
+  const [featureUnlocks, setFeatureUnlocks] = useState<Record<string, any>>({})
+  const [featureUnlocked, setFeatureUnlocked] = useState<Set<string>>(new Set())
+  const [featureLoading, setFeatureLoading] = useState<string | null>(null)
+  const [featureError, setFeatureError] = useState<string | null>(null)
+  const [featureConfirm, setFeatureConfirm] = useState<string | null>(null)
+
+  // Load existing unlocks when detail opens
+  const loadExistingUnlocks = async (platform: string, handle: string) => {
+    try {
+      const qs = new URLSearchParams({ platform, handle })
+      const res = await fetch(`/api/discovery/creator-unlock?${qs}`)
+      if (res.ok) {
+        const data = await res.json()
+        setFeatureUnlocked(new Set(data.unlocked || []))
+        setFeatureUnlocks(data.data || {})
+      }
+    } catch { /* best effort */ }
+  }
+
+  const unlockFeature = async (feature: string) => {
+    if (!detailFor?.handle || featureLoading) return
+    setFeatureConfirm(null)
+    setFeatureError(null)
+    setFeatureLoading(feature)
+    try {
+      const res = await fetch('/api/discovery/creator-unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: detailFor.platform,
+          handle: detailFor.handle,
+          feature,
+        }),
+      })
+      window.dispatchEvent(new Event('credits:refresh'))
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        if (data?.code === 'NO_DATA') {
+          setFeatureError(zh ? '该达人暂无此数据' : 'Data not available for this creator')
+        } else {
+          throw new Error(data?.message || 'Unlock failed')
+        }
+        return
+      }
+      setFeatureUnlocked((prev) => new Set([...prev, feature]))
+      setFeatureUnlocks((prev) => ({ ...prev, [feature]: data.data }))
+    } catch (err: any) {
+      setFeatureError(err.message || 'Unlock failed')
+    } finally {
+      setFeatureLoading(null)
+    }
+  }
+
+  const FEATURE_COSTS: Record<string, number> = {
+    audience_gender: 12,
+    audience_age: 12,
+    audience_country: 12,
+    audience_bundle: 30,
+    brand_collaborations: 10,
+  }
+
+  const FEATURE_LABELS: Record<string, [string, string]> = {
+    audience_gender: ['受众性别', 'Audience Gender'],
+    audience_age: ['受众年龄', 'Audience Age'],
+    audience_country: ['受众地区', 'Audience Country'],
+    audience_bundle: ['全部受众洞察（性别+年龄+地区）', 'All Audience Insights (Gender + Age + Country)'],
+    brand_collaborations: ['品牌合作', 'Brand Collaborations'],
+  }
+
+  const AUDIENCE_BUNDLE_FEATURES = ['audience_gender', 'audience_age', 'audience_country'] as const
+  const AUDIENCE_BUNDLE_COST = 30
+
+  const unlockAudienceBundle = async () => {
+    if (!detailFor?.handle || featureLoading) return
+    setFeatureConfirm(null)
+    setFeatureError(null)
+    setFeatureLoading('audience_bundle')
+    try {
+      const toUnlock = AUDIENCE_BUNDLE_FEATURES.filter((f) => !featureUnlocked.has(f))
+      // Distribute cost: e.g. 10 credits / 3 features → 3, 3, 4
+      const perFeature = Math.floor(AUDIENCE_BUNDLE_COST / toUnlock.length)
+      const remainder = AUDIENCE_BUNDLE_COST - perFeature * toUnlock.length
+
+      for (let i = 0; i < toUnlock.length; i++) {
+        const feature = toUnlock[i]
+        const cost = perFeature + (i === toUnlock.length - 1 ? remainder : 0)
+        const res = await fetch('/api/discovery/creator-unlock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            platform: detailFor.platform,
+            handle: detailFor.handle,
+            feature,
+            costOverride: cost,
+          }),
+        })
+        window.dispatchEvent(new Event('credits:refresh'))
+        const data = await res.json().catch(() => null)
+        if (!res.ok) {
+          if (data?.code !== 'NO_DATA') throw new Error(data?.message || 'Unlock failed')
+          continue
+        }
+        setFeatureUnlocked((prev) => new Set([...prev, feature]))
+        setFeatureUnlocks((prev) => ({ ...prev, [feature]: data.data }))
+      }
+    } catch (err: any) {
+      setFeatureError(err.message || 'Bundle unlock failed')
+    } finally {
+      setFeatureLoading(null)
+    }
+  }
+
   const loadAnalytics = async () => {
     if (!detailFor?.handle || analyticsLoading) return
     setAnalyticsError(null)
@@ -1011,7 +1117,13 @@ export default function DiscoverPanel() {
     setAnalytics(null)
     setAnalyticsError(null)
     setAnalyticsBlocked(false)
+    setFeatureUnlocks({})
+    setFeatureUnlocked(new Set())
+    setFeatureLoading(null)
+    setFeatureError(null)
+    setFeatureConfirm(null)
     setDetailLoading(true)
+    loadExistingUnlocks(creator.platform, creator.handle)
     try {
       const qs = new URLSearchParams({
         platform: creator.platform,
@@ -3210,7 +3322,7 @@ export default function DiscoverPanel() {
                   {detailBlocked && <> <PlansCta /></>}
                 </div>
               )}
-              {detail && (
+              {detail && (<>
               <div className="flex min-h-0">
                 {/* ── Left column: Key Metrics + About ── */}
                 <div className="w-[380px] flex-shrink-0 border-r border-gray-100 p-5 overflow-y-auto">
@@ -3315,6 +3427,33 @@ export default function DiscoverPanel() {
                         {zh ? '有赞助内容' : 'Has Sponsored Content'}
                       </span>
                     )}
+                    {/* Brand Collaborations unlock — only on YT/IG when hasSponsors */}
+                    {detail.has_brand_deals && detailFor.platform !== 'tiktok' && (
+                      featureUnlocked.has('brand_collaborations') && featureUnlocks.brand_collaborations ? (
+                        <div className="w-full mt-2">
+                          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">{zh ? '品牌合作' : 'Brand Collaborations'}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(featureUnlocks.brand_collaborations.sponsors || []).map((s: any, i: number) => (
+                              <span key={s.name || i} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-800 rounded-full text-xs font-medium">
+                                {s.logo && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={s.logo} alt="" className="w-4 h-4 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                )}
+                                {s.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => featureLoading ? null : setFeatureConfirm('brand_collaborations')}
+                          disabled={featureLoading != null}
+                          className="px-2.5 py-1 border border-dashed border-amber-200 text-amber-600 rounded-full text-xs font-medium hover:bg-amber-50 transition disabled:opacity-50"
+                        >
+                          🔒 {zh ? '查看品牌合作' : 'Brand Collaborations'} · {FEATURE_COSTS.brand_collaborations} {zh ? '积分' : 'credits'}
+                        </button>
+                      )
+                    )}
                     {detail.is_agency_represented && (
                       <span className="px-2.5 py-1 bg-rose-50 text-rose-700 rounded-full text-xs font-medium">
                         {zh ? '经纪公司代理' : 'Agency Represented'}
@@ -3388,83 +3527,222 @@ export default function DiscoverPanel() {
                     </div>
                   )}
 
-                  {/* ── Full audience analytics (separate paid fetch) ── */}
-                  <div className="mt-6">
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
-                      {zh ? '受众分析' : 'Audience Analytics'}
-                    </p>
-                    {!analytics && (
-                      <>
-                        <button
-                          onClick={loadAnalytics}
-                          disabled={analyticsLoading}
-                          className="w-full px-4 py-2.5 border border-primary-200 bg-primary-50 text-primary-700 rounded-xl text-sm font-semibold hover:bg-primary-100 transition disabled:opacity-50"
-                        >
-                          {analyticsLoading
-                            ? (zh ? '加载中…' : 'Loading analytics…')
-                            : `${zh ? '查看受众分析' : 'View full analytics'}${
-                                creditPrices?.analytics != null
-                                  ? ` · ${d.creditsN.replace('{n}', String(creditPrices.analytics))}`
-                                  : ''
-                              }`}
-                        </button>
-                        {creditPrices?.analytics != null && (
-                          <p className="mt-1.5 text-[11px] text-gray-400 text-center">{d.chargedOncePerCreator}</p>
-                        )}
-                        {analyticsError && (
-                          <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                            {analyticsError}
-                            {analyticsBlocked && <> <PlansCta /></>}
-                          </div>
-                        )}
-                      </>
-                    )}
-                    {analytics && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-2.5">
-                          {[
-                            { label: zh ? '平均观看' : 'Avg Views', value: analytics.avg_views },
-                            { label: zh ? '平均点赞' : 'Avg Likes', value: analytics.avg_likes },
-                            { label: zh ? '平均评论' : 'Avg Comments', value: analytics.avg_comments },
-                          ].filter((s) => s.value != null).map((s) => (
-                            <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2">
-                              <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
-                              <p className="text-sm font-bold text-gray-900 mt-0.5">{formatFollowers(Math.round(Number(s.value)), locale)}</p>
-                            </div>
-                          ))}
-                        </div>
-                        {analytics.audience ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {[
-                              { title: zh ? '性别' : 'Gender', rows: (analytics.audience.genders || []).map((g: any) => ({ label: g.code === 'MALE' ? (zh ? '男' : 'Male') : g.code === 'FEMALE' ? (zh ? '女' : 'Female') : g.code, weight: g.weight })) },
-                              { title: zh ? '年龄' : 'Age', rows: (analytics.audience.ages || []).map((a: any) => ({ label: a.code, weight: a.weight })) },
-                              { title: zh ? '国家' : 'Top Countries', rows: (analytics.audience.countries || []).map((c: any) => ({ label: c.name || c.code, weight: c.weight })) },
-                              { title: zh ? '语言' : 'Languages', rows: (analytics.audience.languages || []).map((l: any) => ({ label: l.name || l.code, weight: l.weight })) },
-                            ].filter((sec) => sec.rows.length > 0).map((sec) => (
-                              <div key={sec.title} className="border border-gray-100 rounded-xl p-3">
-                                <p className="text-xs font-semibold text-gray-500 mb-2">{sec.title}</p>
-                                <div className="space-y-1.5">
-                                  {sec.rows.map((row: any, ri: number) => (
-                                    <div key={`${row.label}-${ri}`} className="flex items-center gap-2 text-xs">
-                                      <span className="w-20 truncate text-gray-600">{row.label}</span>
-                                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                        <div className="h-full bg-gradient-to-r from-primary-500 to-rose-400" style={{ width: `${Math.min(100, Math.round((row.weight || 0) * 100))}%` }} />
-                                      </div>
-                                      <span className="w-10 text-right tabular-nums text-gray-500">{((row.weight || 0) * 100).toFixed(1)}%</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-400">{zh ? '暂无受众数据' : 'Audience demographics not available for this creator.'}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
                 </div>{/* end right column */}
-              </div>)}
+              </div>
+
+              {/* ── Audience Insights — full-width section below both columns ── */}
+              <div className="mx-4 mb-4 rounded-2xl bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/60 border border-indigo-100/80 px-5 py-4 shadow-sm">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4.5 h-4.5 text-indigo-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-bold text-gray-900">{zh ? '受众洞察' : 'Audience Insights'}</h4>
+                    <p className="text-[11px] text-gray-400">
+                      {zh ? '获取详细受众分析。每项解锁需 12 积分。' : 'Unlock detailed audience demographics per section.'}
+                    </p>
+                  </div>
+                  {/* Unlock All bundle button — hidden when all 3 are already unlocked */}
+                  {!AUDIENCE_BUNDLE_FEATURES.every((f) => featureUnlocked.has(f)) && (
+                    <button
+                      type="button"
+                      onClick={() => featureLoading ? null : setFeatureConfirm('audience_bundle')}
+                      disabled={featureLoading != null}
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50 shadow-sm"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                      {zh ? `全部解锁 · ${AUDIENCE_BUNDLE_COST} 积分` : `Unlock All · ${AUDIENCE_BUNDLE_COST} credits`}
+                    </button>
+                  )}
+                </div>
+
+                {/* Confirmation dialog */}
+                {featureConfirm && FEATURE_LABELS[featureConfirm] && (
+                  <div className="mb-3 bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between">
+                    <p className="text-sm text-indigo-800 font-medium">
+                      {zh
+                        ? `解锁${FEATURE_LABELS[featureConfirm][0]}需要 ${FEATURE_COSTS[featureConfirm]} 积分？`
+                        : `Unlock ${FEATURE_LABELS[featureConfirm][1]} for ${FEATURE_COSTS[featureConfirm]} credits?`}
+                    </p>
+                    <div className="flex gap-2 ml-4">
+                      <button
+                        onClick={() => featureConfirm === 'audience_bundle' ? unlockAudienceBundle() : unlockFeature(featureConfirm)}
+                        disabled={featureLoading != null}
+                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+                      >
+                        {(featureLoading === featureConfirm || featureLoading === 'audience_bundle') ? (zh ? '解锁中…' : 'Unlocking…') : (zh ? '确认' : 'Confirm')}
+                      </button>
+                      <button
+                        onClick={() => setFeatureConfirm(null)}
+                        className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50 transition"
+                      >
+                        {zh ? '取消' : 'Cancel'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {featureError && (
+                  <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-700">
+                    {featureError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-3">
+                  {/* ── Gender ── */}
+                  {featureUnlocked.has('audience_gender') && featureUnlocks.audience_gender ? (
+                    <div className="bg-white/80 border border-white rounded-xl p-3 shadow-sm">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '性别' : 'Gender'}</p>
+                      {(() => {
+                        const g = featureUnlocks.audience_gender
+                        const male = Math.round((g.maleRatio ?? 0) * 100)
+                        const female = Math.round((g.femaleRatio ?? 0) * 100)
+                        return (
+                          <div>
+                            <div className="flex h-5 rounded-full overflow-hidden">
+                              <div className="bg-blue-500 flex items-center justify-center text-[10px] text-white font-medium" style={{ width: `${male}%` }}>
+                                {male > 12 && `${male}%`}
+                              </div>
+                              <div className="bg-pink-400 flex items-center justify-center text-[10px] text-white font-medium" style={{ width: `${female}%` }}>
+                                {female > 12 && `${female}%`}
+                              </div>
+                            </div>
+                            <div className="flex justify-between mt-1.5 text-[10px] text-gray-500">
+                              <span>♂ {zh ? '男' : 'Male'} {male}%</span>
+                              <span>♀ {zh ? '女' : 'Female'} {female}%</span>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '性别' : 'Gender'}</p>
+                      {/* Blurred preview donut */}
+                      <div className="flex items-center justify-center h-16 opacity-40 blur-[2px] select-none pointer-events-none">
+                        <svg viewBox="0 0 80 80" className="w-16 h-16">
+                          <circle cx="40" cy="40" r="30" fill="none" stroke="#c7d2fe" strokeWidth="12" strokeDasharray="120 69" />
+                          <circle cx="40" cy="40" r="30" fill="none" stroke="#e9d5ff" strokeWidth="12" strokeDasharray="69 120" strokeDashoffset="-120" />
+                        </svg>
+                      </div>
+                      {/* Lock overlay */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
+                        <svg className="w-5 h-5 text-gray-400 mb-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                      </div>
+                      <button
+                        onClick={() => featureLoading ? null : setFeatureConfirm('audience_gender')}
+                        disabled={featureLoading != null}
+                        className="relative z-10 w-full mt-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                      >
+                        {zh ? `解锁 · ${FEATURE_COSTS.audience_gender} 积分` : `Unlock for ${FEATURE_COSTS.audience_gender} credits`}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ── Age ── */}
+                  {featureUnlocked.has('audience_age') && featureUnlocks.audience_age ? (
+                    <div className="bg-white/80 border border-white rounded-xl p-3 shadow-sm">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '年龄' : 'Age'}</p>
+                      <div className="space-y-1">
+                        {(featureUnlocks.audience_age.ages || []).map((a: any, i: number) => {
+                          const pct = Math.round((a.share ?? 0) * 100)
+                          return (
+                            <div key={a.ageRange || i} className="flex items-center gap-1.5 text-[10px]">
+                              <span className="w-10 text-gray-500 tabular-nums">{a.ageRange}</span>
+                              <div className="flex-1 h-3 bg-gray-100 rounded overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-indigo-400 to-indigo-500 rounded" style={{ width: `${Math.min(100, pct)}%` }} />
+                              </div>
+                              <span className="w-7 text-right tabular-nums text-gray-500">{pct}%</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '年龄' : 'Age'}</p>
+                      {/* Blurred preview bars */}
+                      <div className="space-y-1.5 opacity-40 blur-[2px] select-none pointer-events-none">
+                        {[65, 45, 80, 30, 20].map((w, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            <div className="w-10 h-2 bg-gray-200 rounded" />
+                            <div className="flex-1 h-3 bg-gray-100 rounded overflow-hidden">
+                              <div className="h-full bg-indigo-200 rounded" style={{ width: `${w}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
+                        <svg className="w-5 h-5 text-gray-400 mb-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                      </div>
+                      <button
+                        onClick={() => featureLoading ? null : setFeatureConfirm('audience_age')}
+                        disabled={featureLoading != null}
+                        className="relative z-10 w-full mt-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                      >
+                        {zh ? `解锁 · ${FEATURE_COSTS.audience_age} 积分` : `Unlock for ${FEATURE_COSTS.audience_age} credits`}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ── Top Countries ── */}
+                  {featureUnlocked.has('audience_country') && featureUnlocks.audience_country ? (
+                    <div className="bg-white/80 border border-white rounded-xl p-3 shadow-sm">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '受众地区' : 'Top Countries'}</p>
+                      <div className="space-y-1">
+                        {(featureUnlocks.audience_country.countries || []).map((c: any, i: number) => {
+                          const pct = Math.round((c.share ?? 0) * 100)
+                          return (
+                            <div key={c.country || i} className="flex items-center gap-1.5 text-[10px]">
+                              <span className="w-8 text-gray-600 font-medium">{c.country}</span>
+                              <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-primary-500 to-rose-400" style={{ width: `${Math.min(100, pct)}%` }} />
+                              </div>
+                              <span className="w-7 text-right tabular-nums text-gray-500">{pct}%</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '受众地区' : 'Top Countries'}</p>
+                      {/* Blurred preview with flag-like blocks */}
+                      <div className="space-y-1.5 opacity-40 blur-[2px] select-none pointer-events-none">
+                        {[70, 50, 35, 20].map((w, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            <div className="w-5 h-3 bg-gray-200 rounded-sm" />
+                            <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-primary-200 rounded-full" style={{ width: `${w}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
+                        <svg className="w-5 h-5 text-gray-400 mb-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                      </div>
+                      <button
+                        onClick={() => featureLoading ? null : setFeatureConfirm('audience_country')}
+                        disabled={featureLoading != null}
+                        className="relative z-10 w-full mt-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                      >
+                        {zh ? `解锁 · ${FEATURE_COSTS.audience_country} 积分` : `Unlock for ${FEATURE_COSTS.audience_country} credits`}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              </>)}
             </div>{/* end overflow wrapper */}
 
             {/* Footer actions */}

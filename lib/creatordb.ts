@@ -414,11 +414,6 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
   }
 
   const creatorList = Array.isArray(data?.data?.creatorList) ? data.data.creatorList : []
-  // DEBUG: log first creator's keys to check for avatar fields
-  if (creatorList[0]) {
-    const c0 = creatorList[0]
-    console.log('[CreatorDB search] first creator keys:', Object.keys(c0), '| avatarUrl:', c0.avatarUrl, '| avatar-like keys:', Object.keys(c0).filter((k: string) => /avatar|image|photo|pic|thumb/i.test(k)))
-  }
   const followerField = FOLLOWER_FIELD[opts.platform] || 'totalFollowers'
   const bodyAny = body as any
   const sortMetricField = bodyAny.sortBy
@@ -594,8 +589,6 @@ async function fetchCreatorDbEnrichment(
   const perf = perfData?.data || {}
   const content = contentData?.data || {}
 
-  // DEBUG: log avatar-related fields from profile response
-  console.log('[CreatorDB enrich] avatarUrl:', p.avatarUrl, '| profilePicture:', p.profilePicture, '| keys with avatar/image:', Object.keys(p).filter(k => /avatar|image|photo|pic|thumb/i.test(k)))
 
   // Normalize country/language from alpha-3 to alpha-2
   const countryA3 = p.country || null
@@ -849,4 +842,161 @@ export async function creatordbAnalytics(
     follower_growth: null,
     posting_frequency_recent_months: null,
   }
+}
+
+// ── Fractional audience unlock (single field) ──────────────────────────
+// Requests exactly ONE audience field to keep CreatorDB costs at 4 credits.
+// Never call without `fields` — the full bundle costs 10 CreatorDB credits.
+
+const AUDIENCE_FIELD_MAP: Record<string, string> = {
+  audience_gender: 'audienceGender',
+  audience_age: 'audienceAgeBreakdown',
+  audience_country: 'audienceLocations',
+}
+
+const RETRY_429_DELAYS = [500, 1500, 3000]
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  userId?: string,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await creatorDbFetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(30000),
+    }, { userId })
+    if (res.status !== 429 || attempt >= RETRY_429_DELAYS.length) return res
+    await new Promise((r) => setTimeout(r, RETRY_429_DELAYS[attempt]))
+  }
+}
+
+export async function creatordbAudienceFeature(
+  platform: string,
+  handle: string,
+  feature: 'audience_gender' | 'audience_age' | 'audience_country',
+  opts?: { logUserId?: string },
+) {
+  const platformPath = PLATFORM_PATH[platform]
+  if (!platformPath) throw new Error(`CreatorDB does not support platform: ${platform}`)
+  if (!creatordbConfigured()) throw new Error('CreatorDB API not configured')
+
+  const cleanHandle = handle.replace(/^@/, '')
+  const field = AUDIENCE_FIELD_MAP[feature]
+
+  const res = await fetchWithRetry(`${BASE}/${platformPath}/audience`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ uniqueId: cleanHandle, fields: [field] }),
+    cache: 'no-store',
+  }, opts?.logUserId)
+
+  const data = await res.json().catch(() => null)
+
+  // Detect FractionalCallsNotEnabled — log and rethrow, don't fall back
+  if (data?.errorCode === 'FractionalCallsNotEnabled') {
+    console.error('[CreatorDB] FractionalCallsNotEnabled for audience feature:', feature)
+    throw new CreatorDbApiError(
+      'Fractional calls not enabled on this API key',
+      'FractionalCallsNotEnabled',
+      data?.traceId ?? null,
+      res.status,
+    )
+  }
+
+  if (!res.ok || !data?.success) {
+    throw new Error(
+      data?.errorDescription || data?.message || data?.error ||
+        `CreatorDB audience feature fetch failed (${res.status})`,
+    )
+  }
+
+  const d = data.data || {}
+
+  // Normalize per feature
+  if (feature === 'audience_gender') {
+    const g = d.audienceGender || {}
+    return {
+      feature,
+      data: {
+        maleRatio: g.maleRatio ?? null,
+        femaleRatio: g.femaleRatio ?? null,
+      },
+    }
+  }
+
+  if (feature === 'audience_age') {
+    const ages = Array.isArray(d.audienceAgeBreakdown)
+      ? d.audienceAgeBreakdown.map((a: any) => ({
+          ageRange: a.ageRange || '',
+          share: a.share ?? 0,
+        }))
+      : []
+    if (ages.length === 0) return null // no data available
+    return { feature, data: { ages } }
+  }
+
+  // audience_country
+  const countries = Array.isArray(d.audienceLocations)
+    ? d.audienceLocations.slice(0, 5).map((loc: any) => ({
+        country: COUNTRY_A3_TO_A2[loc.country] || loc.country,
+        share: loc.share ?? 0,
+      }))
+    : []
+  if (countries.length === 0) return null
+  return { feature, data: { countries } }
+}
+
+// ── Brand collaborations (sponsorship) ─────────────────────────────────
+// Only works on YouTube and Instagram. TikTok has no sponsorship endpoint.
+
+export async function creatordbSponsorship(
+  platform: string,
+  handle: string,
+  opts?: { logUserId?: string },
+) {
+  if (platform === 'tiktok') {
+    throw new Error('CreatorDB sponsorship endpoint is not available for TikTok')
+  }
+  const platformPath = PLATFORM_PATH[platform]
+  if (!platformPath) throw new Error(`CreatorDB does not support platform: ${platform}`)
+  if (!creatordbConfigured()) throw new Error('CreatorDB API not configured')
+
+  const cleanHandle = handle.replace(/^@/, '')
+
+  const res = await fetchWithRetry(`${BASE}/${platformPath}/sponsorship`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ uniqueId: cleanHandle, sponsorList: 5 }),
+    cache: 'no-store',
+  }, opts?.logUserId)
+
+  const data = await res.json().catch(() => null)
+
+  if (data?.errorCode === 'FractionalCallsNotEnabled') {
+    console.error('[CreatorDB] FractionalCallsNotEnabled for sponsorship')
+    throw new CreatorDbApiError(
+      'Fractional calls not enabled on this API key',
+      'FractionalCallsNotEnabled',
+      data?.traceId ?? null,
+      res.status,
+    )
+  }
+
+  if (!res.ok || !data?.success) {
+    throw new Error(
+      data?.errorDescription || data?.message || data?.error ||
+        `CreatorDB sponsorship fetch failed (${res.status})`,
+    )
+  }
+
+  const sponsors = Array.isArray(data.data?.sponsorList)
+    ? data.data.sponsorList.slice(0, 5).map((s: any) => ({
+        name: s.sponsorName || s.name || 'Unknown',
+        logo: s.sponsorLogo || s.logo || null,
+        url: s.sponsorUrl || s.url || null,
+      }))
+    : []
+  if (sponsors.length === 0) return null
+  return { feature: 'brand_collaborations' as const, data: { sponsors } }
 }

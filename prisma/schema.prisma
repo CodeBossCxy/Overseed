@@ -254,6 +254,7 @@ model User {
   creditLedger       CreditLedgerEntry[]
   discoveryTasks     DiscoverySearchTask[]
   outreachCampaigns  OutreachCampaign[]
+  featureUnlocks     CreatorFeatureUnlock[]
 
   @@map("users")
 }
@@ -969,6 +970,39 @@ model CreatorContentCache {
 
   @@unique([platform, handle])
   @@map("creator_content_cache")
+}
+
+// Shared cache of per-feature CreatorDB responses (audience gender, audience
+// age, audience country, brand collaborations).  Keyed by platform+handle+feature.
+// Entries expire after 30 days; a cron or read-time check enforces staleness.
+model CreatorFeatureCache {
+  id        String   @id @default(cuid())
+  platform  String
+  handle    String   // lowercase, no leading @
+  feature   String   // audience_gender | audience_age | audience_country | brand_collaborations
+  data      Json
+  fetchedAt DateTime @default(now())
+
+  @@unique([platform, handle, feature])
+  @@map("creator_feature_cache")
+}
+
+// Per-user record that a paid feature was unlocked for a specific creator.
+// Once a row exists the user sees the data for free on subsequent views.
+model CreatorFeatureUnlock {
+  id        String   @id @default(cuid())
+  userId    String
+  platform  String
+  handle    String   // lowercase, no leading @
+  feature   String   // same enum as CreatorFeatureCache.feature
+  credits   Int      // Overseed credits charged
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, handle, feature])
+  @@index([userId, createdAt])
+  @@map("creator_feature_unlock")
 }
 
 // Audit trail of Influencers Club vendor credit spend. One row per billed

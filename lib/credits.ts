@@ -32,6 +32,9 @@ export const CREDIT_COSTS = {
   analytics: 45,
   // Discovery search beyond the monthly quota (quota itself is free).
   discovery_search_extra: 6,
+  // Paid feature unlock (audience gender/age/country, brand collaborations).
+  // Actual cost varies — callers pass costOverride to deductCredits.
+  feature_unlock: 12,
 } as const
 
 export type CreditFeature = keyof typeof CREDIT_COSTS
@@ -103,8 +106,9 @@ export async function deductCredits(
   tier: SubscriptionTier,
   feature: CreditFeature,
   reference?: string,
+  costOverride?: number,
 ): Promise<DeductResult> {
-  const cost = CREDIT_COSTS[feature]
+  const cost = costOverride ?? CREDIT_COSTS[feature]
   return prisma.$transaction(async (tx) => {
     const before = await summarize(tx, userId, tier)
     if (before.total < cost) {
