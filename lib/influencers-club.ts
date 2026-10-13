@@ -315,7 +315,10 @@ export async function clubSearchCacheProbe(opts: ClubSearchOptions) {
     const cacheKey = await hashRequest(buildCacheRequest(opts).request)
     const { prisma } = await import('@/lib/prisma')
     const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
-    return hit ? cachedSearchResult(hit.data) : null
+    if (hit && (!hit.expiresAt || hit.expiresAt > new Date())) {
+      return cachedSearchResult(hit.data)
+    }
+    return null
   } catch {
     return null
   }
@@ -332,7 +335,7 @@ export async function clubSearch(opts: ClubSearchOptions) {
   try {
     const { prisma } = await import('@/lib/prisma')
     const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
-    if (hit) return cachedSearchResult(hit.data)
+    if (hit && (!hit.expiresAt || hit.expiresAt > new Date())) return cachedSearchResult(hit.data)
   } catch {
     // Cache is best-effort; a database issue may still fall through to live.
   }
@@ -569,11 +572,20 @@ export async function clubSearch(opts: ClubSearchOptions) {
 
   try {
     const { prisma } = await import('@/lib/prisma')
+    const { getCacheExpiresAt, rehostSearchImages } = await import('@/lib/discovery-cache-rehost')
+    const expiresAt = getCacheExpiresAt()
     await prisma.clubSearchCache.upsert({
       where: { key: cacheKey },
-      create: { key: cacheKey, request, data: shaped },
-      update: { request, data: shaped, fetchedAt: new Date() },
+      create: { key: cacheKey, request, data: shaped, expiresAt },
+      update: { request, data: shaped, fetchedAt: new Date(), expiresAt },
     })
+    // Background: rehost expiring CDN URLs to S3
+    rehostSearchImages(structuredClone(shaped)).then(async (rehosted) => {
+      await prisma.clubSearchCache.update({
+        where: { key: cacheKey },
+        data: { data: rehosted, rehosted: true },
+      })
+    }).catch(() => {})
   } catch (error) {
     // Persistence is best-effort: a cache write must never hide valid live
     // results from the user, but log failures so production can alert on them.

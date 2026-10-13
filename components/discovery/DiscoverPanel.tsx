@@ -862,6 +862,10 @@ export default function DiscoverPanel() {
   const [nicheMap, setNicheMap] = useState<Record<string, string[]>>({})
   const [nichesLoading, setNichesLoading] = useState(false)
   const nicheFetchRef = useRef(0) // dedup concurrent fetches
+  // Stable avatar URLs from CreatorDB /profile (Firebase Storage).
+  // Search results return expiring Instagram CDN URLs that 403; the niche
+  // fetch piggybacks avatarUrl to get the permanent Firebase version.
+  const [avatarOverrides, setAvatarOverrides] = useState<Record<string, string>>({})
 
   // ── Latest post per creator (fetched via /content-detail when toggle is on) ──
   const [contentMap, setContentMap] = useState<Record<string, {
@@ -1972,6 +1976,9 @@ export default function DiscoverPanel() {
         if (data.niches && typeof data.niches === 'object') {
           setNicheMap((prev) => ({ ...prev, ...data.niches }))
         }
+        if (data.avatars && typeof data.avatars === 'object') {
+          setAvatarOverrides((prev) => ({ ...prev, ...data.avatars }))
+        }
       })
       .catch((err) => console.warn('[niches] fetch failed:', err))
       .finally(() => { if (seq === nicheFetchRef.current) setNichesLoading(false) })
@@ -2972,7 +2979,7 @@ export default function DiscoverPanel() {
                         <div className="w-full h-full rounded-full bg-white p-[2px]">
                           <div className="w-full h-full rounded-full bg-gray-100 overflow-hidden">
                             <CreatorAvatar
-                              url={creator.avatar_url}
+                              url={avatarOverrides[`${creator.platform}:${(creator.handle || '').replace(/^@/, '').toLowerCase()}`] || creator.avatar_url}
                               name={creator.display_name || creator.handle || '?'}
                               textSize="text-xl"
                             />

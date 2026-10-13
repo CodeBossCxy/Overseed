@@ -428,7 +428,6 @@ export async function GET(req: NextRequest) {
   const rawQuery = params.get('q')?.trim() || ''
   if (
     rawQuery &&
-    !creatorDbFilters &&
     !creatorDbPreset &&
     !taskIdParam &&
     getProvider() === 'creatordb' &&
@@ -438,12 +437,40 @@ export async function GET(req: NextRequest) {
       aiParsed = await parseDiscoveryQuery(rawQuery)
       const converted = toCreatorDbFilters(aiParsed)
       if (converted.filters.length > 0) {
-        creatorDbFilters = converted.filters.map((f) => ({
-          field: f.field,
-          op: f.op,
-          value: f.value as CreatorDbFilterValue,
-        }))
-        creatorDbSortField = 'followers'
+        if (creatorDbFilters) {
+          // User has existing cdb_filters. AI only contributes niches (broad
+          // category) — strip old niches/hashtags AND any numeric filters that
+          // duplicate what the user set via the basic UI params (followers,
+          // engagement, country, etc.), since the basic params are the user's
+          // most recent intent and should take priority.
+          const basicParamFields = new Set<string>()
+          if (num('min_followers') != null || num('max_followers') != null) basicParamFields.add('followers')
+          if (num('min_engagement') != null || num('max_engagement') != null) basicParamFields.add('shortEngagementRate')
+          if (params.get('country')?.trim()) basicParamFields.add('country')
+          if (params.get('language')?.trim()) basicParamFields.add('mainLanguage')
+
+          creatorDbFilters = creatorDbFilters.filter((f) => {
+            // Always remove old niches/hashtags — AI will replace
+            if (f.field === 'niches' || f.field === 'hashtags') return false
+            // Remove cdb_filter entries that conflict with basic UI params
+            if (basicParamFields.has(f.field)) return false
+            return true
+          })
+          // Add only AI niches (no hashtags — they over-constrain)
+          for (const f of converted.filters) {
+            if (f.field === 'niches') {
+              creatorDbFilters.push({ field: f.field, op: f.op, value: f.value as CreatorDbFilterValue })
+            }
+          }
+        } else {
+          // No user filters — use AI filters wholesale
+          creatorDbFilters = converted.filters.map((f) => ({
+            field: f.field,
+            op: f.op,
+            value: f.value as CreatorDbFilterValue,
+          }))
+        }
+        if (!creatorDbSortField) creatorDbSortField = 'followers'
         // If the AI detected a different platform, override the URL param
         if (aiParsed.platform && CLUB_PLATFORMS.includes(aiParsed.platform as ClubPlatform)) {
           platform = aiParsed.platform as ClubPlatform
@@ -707,6 +734,49 @@ export async function GET(req: NextRequest) {
     const taskId = await persistTaskPage(result)
     // Return only DISPLAY_PAGE_SIZE results to the client
     const displayResults = fullResults.slice(0, DISPLAY_PAGE_SIZE)
+
+    // Replace expiring Instagram CDN avatar URLs with stable Firebase URLs.
+    // The /profile endpoint returns Firebase URLs for 0.1 credits per call —
+    // we already make these calls for niches, so piggyback avatarUrl here to
+    // avoid broken images on the initial render.
+    if (getProvider() === 'creatordb' && displayResults.length > 0) {
+      try {
+        const { creatorDbFetch: cdbFetch } = await import('@/lib/creatordb-usage')
+        const apiKey = process.env.CREATORDB_API_KEY
+        const PLAT_PATH: Record<string, string> = { instagram: 'instagram', youtube: 'youtube', tiktok: 'tiktok' }
+        await Promise.allSettled(
+          displayResults.map(async (r: any) => {
+            if (!r.handle || !r.avatar_url) return
+            // Skip already-stable URLs (Firebase, YouTube thumbnails)
+            try {
+              const host = new URL(r.avatar_url).hostname
+              if (host.endsWith('firebasestorage.googleapis.com') || host.endsWith('ggpht.com') || host.endsWith('ytimg.com')) return
+            } catch { return }
+            const pp = PLAT_PATH[r.platform]
+            if (!pp || !apiKey) return
+            try {
+              const res = await cdbFetch(
+                `https://apiv3.creatordb.app/${pp}/profile`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'api-key': apiKey },
+                  body: JSON.stringify({ uniqueId: r.handle, fields: ['avatarUrl'] }),
+                  cache: 'no-store',
+                  signal: AbortSignal.timeout(5000),
+                },
+                { userId },
+              )
+              const d = await res.clone().json().catch(() => null)
+              if (d?.data?.avatarUrl) {
+                r.avatar_url = d.data.avatarUrl
+                r.avatarUrl = d.data.avatarUrl
+              }
+            } catch { /* non-critical */ }
+          }),
+        )
+      } catch { /* non-critical */ }
+    }
+
     return NextResponse.json({
       ...result,
       results: displayResults,

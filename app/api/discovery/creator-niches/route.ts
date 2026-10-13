@@ -29,16 +29,22 @@ function authHeaders() {
   }
 }
 
-async function fetchNichesForCreator(
+interface ProfileResult {
+  niches: string[]
+  avatarUrl: string | null
+}
+
+async function fetchProfileForCreator(
   platform: string,
   handle: string,
   userId: string | undefined,
-): Promise<string[]> {
+): Promise<ProfileResult> {
+  const empty: ProfileResult = { niches: [], avatarUrl: null }
   const platformPath = PLATFORM_PATH[platform]
-  if (!platformPath) return []
+  if (!platformPath) return empty
 
-  // CreatorDB /profile accepts uniqueId for all platforms (including YouTube)
-  const body = { uniqueId: handle, fields: ['niches'] }
+  // Request both niches and avatarUrl — same 0.1 credit cost
+  const body = { uniqueId: handle, fields: ['niches', 'avatarUrl'] }
 
   let lastError: Error | null = null
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -55,7 +61,7 @@ async function fetchNichesForCreator(
         { userId },
       )
 
-      const data = await res.json().catch(() => null)
+      const data = await res.clone().json().catch(() => null)
 
       // Handle FractionalCallsNotEnabled — log clearly and don't retry
       if (data?.errorCode === 'FractionalCallsNotEnabled' || data?.error === 'FractionalCallsNotEnabled') {
@@ -63,7 +69,7 @@ async function fetchNichesForCreator(
           `[creator-niches] FractionalCallsNotEnabled — each /profile call costs 2 credits instead of 0.1. ` +
           `Enable Fractional Calls on the CreatorDB API key to reduce costs.`,
         )
-        return []
+        return empty
       }
 
       // Handle rate limit — retry with exponential backoff
@@ -74,16 +80,17 @@ async function fetchNichesForCreator(
           continue
         }
         console.warn(`[creator-niches] 429 RATE_LIMIT_EXCEEDED for ${platform}:${handle} after ${MAX_RETRIES} retries`)
-        return []
+        return empty
       }
 
       if (!res.ok || !data?.success) {
         console.warn(`[creator-niches] /profile failed for ${platform}:${handle}: ${res.status} ${data?.errorDescription || data?.error || ''}`)
-        return []
+        return empty
       }
 
       const niches: string[] = Array.isArray(data.data?.niches) ? data.data.niches : []
-      return niches
+      const avatarUrl: string | null = typeof data.data?.avatarUrl === 'string' ? data.data.avatarUrl : null
+      return { niches, avatarUrl }
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       if (attempt < MAX_RETRIES) {
@@ -95,7 +102,7 @@ async function fetchNichesForCreator(
   }
 
   console.warn(`[creator-niches] All retries failed for ${platform}:${handle}:`, lastError?.message)
-  return []
+  return empty
 }
 
 export async function POST(req: NextRequest) {
@@ -139,32 +146,36 @@ export async function POST(req: NextRequest) {
   const toFetch = unique.filter((c) => !cachedMap.has(`${c.platform}:${c.handle}`))
 
   // Fetch all uncached in parallel
+  const avatars: Record<string, string> = {}
   const fetchResults = await Promise.allSettled(
     toFetch.map(async (c) => {
-      const niches = await fetchNichesForCreator(c.platform, c.handle, userId)
+      const profile = await fetchProfileForCreator(c.platform, c.handle, userId)
       // Cache even empty results to avoid re-fetching creators with no niches
       await prisma.creatorNicheCache.upsert({
         where: { platform_handle: { platform: c.platform, handle: c.handle } },
-        create: { platform: c.platform, handle: c.handle, niches },
-        update: { niches, fetchedAt: new Date() },
+        create: { platform: c.platform, handle: c.handle, niches: profile.niches },
+        update: { niches: profile.niches, fetchedAt: new Date() },
       }).catch((e) => console.error(`[creator-niches] cache write failed for ${c.platform}:${c.handle}:`, e))
-      return { key: `${c.platform}:${c.handle}`, niches }
+      const key = `${c.platform}:${c.handle}`
+      if (profile.avatarUrl) avatars[key] = profile.avatarUrl
+      return { key, niches: profile.niches }
     }),
   )
 
   // Build response map
-  const result: Record<string, string[]> = {}
+  const nicheResult: Record<string, string[]> = {}
   for (const [key, niches] of cachedMap) {
-    result[key] = niches
+    nicheResult[key] = niches
   }
   for (const r of fetchResults) {
     if (r.status === 'fulfilled') {
-      result[r.value.key] = r.value.niches
+      nicheResult[r.value.key] = r.value.niches
     }
   }
 
   return NextResponse.json({
-    niches: result,
+    niches: nicheResult,
+    avatars,
     cached: cached.length,
     fetched: toFetch.length,
   })

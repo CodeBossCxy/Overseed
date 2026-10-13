@@ -377,7 +377,7 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
     const { prisma } = await import('@/lib/prisma')
     const cacheKey = cdbCacheKey(body)
     const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
-    if (hit) {
+    if (hit && (!hit.expiresAt || hit.expiresAt > new Date())) {
       return { ...(hit.data as object), cached: true }
     }
   } catch {
@@ -396,7 +396,9 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
     cache: 'no-store',
   }, opts?.logUserId)
 
-  const data = await res.json().catch(() => null)
+  // Read from clone — the original body stream may already be consumed by
+  // creatorDbFetch's logging layer in some Node.js/undici versions.
+  const data = await res.clone().json().catch(() => null)
   if (!res.ok || !data?.success) {
     console.error('[CreatorDB] Search failed', {
       status: res.status,
@@ -487,20 +489,46 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
     niche_resolution: nicheResolution ?? null,
   }
 
-  // Save to cache for future requests
+  // Save to cache for future requests, then rehost images in background
+  const cacheKey = cdbCacheKey(body)
   try {
     const { prisma } = await import('@/lib/prisma')
-    const cacheKey = cdbCacheKey(body)
+    const { getCacheExpiresAt } = await import('@/lib/discovery-cache-rehost')
     await prisma.clubSearchCache.upsert({
       where: { key: cacheKey },
-      create: { key: cacheKey, request: body as any, data: result as any },
-      update: { request: body as any, data: result as any, fetchedAt: new Date() },
+      create: { key: cacheKey, request: body as any, data: result as any, expiresAt: getCacheExpiresAt() },
+      update: { request: body as any, data: result as any, fetchedAt: new Date(), expiresAt: getCacheExpiresAt() },
     })
   } catch {
     // Cache write failure is non-fatal
   }
 
+  // Rehost expiring CDN image URLs to S3 in background (non-blocking).
+  // The first user gets live CDN URLs; subsequent cache hits get stable S3 URLs.
+  rehostCacheImages(cacheKey).catch(() => {})
+
   return result
+}
+
+/**
+ * Background: read a cache row, rehost all expiring image URLs to S3,
+ * and update the row with the stable URLs.
+ */
+async function rehostCacheImages(cacheKey: string): Promise<void> {
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const row = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
+    if (!row || row.rehosted) return
+    const { rehostSearchImages } = await import('@/lib/discovery-cache-rehost')
+    const data = row.data as any
+    const updated = await rehostSearchImages(structuredClone(data))
+    await prisma.clubSearchCache.update({
+      where: { key: cacheKey },
+      data: { data: updated, rehosted: true },
+    })
+  } catch (e) {
+    console.warn('[creatordb] rehostCacheImages failed:', e)
+  }
 }
 
 // Cache probe — checks club_search_cache for a matching CreatorDB request.
@@ -511,7 +539,10 @@ export async function creatordbSearchCacheProbe(opts: ClubSearchOptions) {
     const { prisma } = await import('@/lib/prisma')
     const cacheKey = cdbCacheKey(built.body)
     const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
-    return hit ? { ...(hit.data as object), cached: true } : null
+    if (hit && (!hit.expiresAt || hit.expiresAt > new Date())) {
+      return { ...(hit.data as object), cached: true }
+    }
+    return null
   } catch {
     return null
   }
@@ -753,7 +784,7 @@ export async function creatordbContact(
     signal: AbortSignal.timeout(30000),
   }, { userId: opts?.logUserId }).catch(() => null)
 
-  const data = res ? await res.json().catch(() => null) : null
+  const data = res ? await res.clone().json().catch(() => null) : null
   const emails: string[] = data?.data?.emails || []
   const email = emails.find((e: string) => e.includes('@')) || null
   return { email, emails }
@@ -784,7 +815,7 @@ export async function creatordbAnalytics(
     signal: AbortSignal.timeout(30000),
   }, { userId: opts?.logUserId })
 
-  const data = await res.json().catch(() => null)
+  const data = await res.clone().json().catch(() => null)
   if (!res.ok || !data?.success) {
     throw new Error(
       data?.errorDescription || data?.message || data?.error ||
@@ -891,7 +922,7 @@ export async function creatordbAudienceFeature(
     cache: 'no-store',
   }, opts?.logUserId)
 
-  const data = await res.json().catch(() => null)
+  const data = await res.clone().json().catch(() => null)
 
   // Detect FractionalCallsNotEnabled — log and rethrow, don't fall back
   if (data?.errorCode === 'FractionalCallsNotEnabled') {
@@ -971,7 +1002,7 @@ export async function creatordbSponsorship(
     cache: 'no-store',
   }, opts?.logUserId)
 
-  const data = await res.json().catch(() => null)
+  const data = await res.clone().json().catch(() => null)
 
   if (data?.errorCode === 'FractionalCallsNotEnabled') {
     console.error('[CreatorDB] FractionalCallsNotEnabled for sponsorship')

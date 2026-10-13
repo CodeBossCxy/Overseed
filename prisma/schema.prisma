@@ -919,11 +919,14 @@ model CreatorEnrichmentCache {
 // platform+query+filters+page). Identical searches never call the vendor
 // twice; request stores the normalized parameters for inspection/export.
 model ClubSearchCache {
-  key       String   @id
+  key       String    @id
   request   Json?
   data      Json
-  fetchedAt DateTime @default(now())
+  fetchedAt DateTime  @default(now())
+  expiresAt DateTime? // null = never expires; set via DISCOVERY_CACHE_TTL_DAYS
+  rehosted  Boolean   @default(false) // true after images have been rehosted to S3
 
+  @@index([expiresAt])
   @@map("club_search_cache")
 }
 

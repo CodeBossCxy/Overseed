@@ -78,10 +78,15 @@ export function sanitizeParsedQuery(raw: any): ParsedDiscoveryQuery {
   }
 }
 
-export const PARSE_SYSTEM_PROMPT = `You extract creator-search filters from a brand's free-form request (English, Chinese, or any language). Reply with ONLY a JSON object, no prose, using exactly these keys (use null when the request doesn't mention it):
+export const PARSE_SYSTEM_PROMPT = `You help brands find the right creators to promote their products. The user may describe:
+1. What kind of creator they want (e.g. "US beauty YouTubers with 100k+ followers")
+2. Their product or campaign (e.g. "I want to promote a corn silk face mask") — in this case, YOU decide what creator niches, keywords, and audience would be the best fit
+3. A mix of both
+
+Reply with ONLY a JSON object, no prose, using exactly these keys (use null when not applicable):
 {
-  "keywords": "short English hashtag/topic terms for creator search, comma-separated, 1-4 words each, translated to English if input is in another language. E.g. 'skincare, beauty tips'",
-  "niches": "English niche/category names, comma-separated, translated to English. E.g. 'Beauty, Skincare, Fashion'. Use broad category names.",
+  "keywords": "short English hashtag/topic terms for creator search, comma-separated, 1-4 words each. E.g. 'skincare, beauty tips'. Choose terms creators in this space actually use.",
+  "niches": "English niche/category names, comma-separated. E.g. 'Beauty, Skincare'. Pick the 1-3 most relevant broad categories for this product/request.",
   "platform": "youtube" | "instagram" | "tiktok" | null,
   "country": "ISO 3166-1 alpha-2 code of the CREATOR's country, e.g. US" | null,
   "audience_location": "ISO 3166-1 alpha-2 of the target AUDIENCE's country" | null,
@@ -97,6 +102,7 @@ export const PARSE_SYSTEM_PROMPT = `You extract creator-search filters from a br
   "min_avg_views": number | null
 }
 Notes:
+- When the user describes a PRODUCT, infer the best creator niches and keywords for promoting it. A skincare product → niches: "Skincare, Beauty", keywords: "skincare routine, skincare review". A gaming headset → niches: "Gaming, Tech". Do NOT use product-specific terms as niches.
 - "10万" = 100000, "1万" = 10000, "1M" = 1000000, "1k" = 1000
 - "粉丝1-2万" → min_followers: 10000, max_followers: 20000
 - "美妆" → niches: "Beauty, Makeup", keywords: "beauty, makeup"
@@ -105,7 +111,8 @@ Notes:
 - Only set audience_age when the AUDIENCE (viewers) age is specified, not the creator's age
 - Only set audience_location when the target audience location is specified (not the creator's country)
 - Always translate non-English terms to English for keywords and niches
-- Never invent filters that were not asked for — only extract what's explicitly mentioned`
+- Only set filters the user mentions or that are clearly implied by the product. Do NOT invent follower ranges, engagement thresholds, or audience demographics unless stated.
+- Keep filters broad enough to return results. 2-3 filters is better than 8 overly specific ones.`
 
 // ── LLM call ───────────────────────────────────────────────────────────────────
 
