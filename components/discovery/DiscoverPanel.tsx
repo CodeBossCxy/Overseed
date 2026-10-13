@@ -1053,7 +1053,7 @@ export default function DiscoverPanel() {
     setFeatureError(null)
     setFeatureLoading('audience_bundle')
     try {
-      const toUnlock = LE_FEATURES.filter((f) => !featureUnlocked.has(f))
+      const toUnlock = AUDIENCE_BUNDLE_FEATURES.filter((f) => !featureUnlocked.has(f))
       // Distribute cost: e.g. 10 credits / 3 features → 3, 3, 4
       const perFeature = Math.floor(AUDIENCE_BUNDLE_COST / toUnlock.length)
       const remainder = AUDIENCE_BUNDLE_COST - perFeature * toUnlock.length
