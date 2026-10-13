@@ -493,12 +493,19 @@ const COVERAGE_OK = new Set(['ok', 'cache', 'live'])
 // Avatar with referrerPolicy (Google's image CDN rejects some localhost/hotlink
 // referrers) and a fallback to the creator's initial if the URL has rotted.
 // Proxy external avatar URLs through /api/avatar to survive signed URL expiration.
-// Firebase/Google URLs are permanent and don't need proxying.
+// Only proxy hosts the avatar route allows; use all other URLs directly so we
+// don't 403 avatar URLs from CreatorDB or other CDNs.
 function proxyAvatarUrl(url: string | null): string | null {
   if (!url) return null
-  // Firebase and Google URLs are permanent — no proxy needed
   if (url.includes('firebasestorage.googleapis.com') || url.includes('googleusercontent.com')) return url
-  return `/api/avatar?url=${encodeURIComponent(url)}`
+  try {
+    const hostname = new URL(url).hostname
+    const PROXY_HOSTS = ['tiktokcdn.com', 'instagram.com', 'cdninstagram.com', 'fbcdn.net', 'ggpht.com', 'ytimg.com']
+    if (PROXY_HOSTS.some((h) => hostname.endsWith(h))) {
+      return `/api/avatar?url=${encodeURIComponent(url)}`
+    }
+  } catch { /* invalid URL — use directly */ }
+  return url
 }
 
 // Autoplay video embed — swaps thumbnail for an iframe when scrolled into view.
@@ -539,7 +546,7 @@ function AutoplayEmbed({
   }, [platform, contentId])
 
   return (
-    <div ref={containerRef} className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-gray-100">
+    <div ref={containerRef} className="relative w-full h-full rounded-xl overflow-hidden bg-gray-100">
       {inView && embedUrl ? (
         <iframe
           src={embedUrl}
@@ -641,6 +648,69 @@ function NicheTags({
         </button>
       )}
     </div>
+  )
+}
+
+function RelatedCreatorChip({
+  handle,
+  platform,
+  zh,
+  onOpen,
+}: {
+  handle: string
+  platform: string
+  zh: boolean
+  onOpen: (creator: DiscoveredCreator) => void
+}) {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
+
+  return (
+    <span className="relative inline-block">
+      <button
+        type="button"
+        className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium hover:bg-primary-50 hover:text-primary-700 transition cursor-pointer"
+        onMouseEnter={(e) => {
+          const rect = (e.target as HTMLElement).getBoundingClientRect()
+          setTooltip({ x: rect.left + rect.width / 2, y: rect.top })
+        }}
+        onMouseLeave={() => setTooltip(null)}
+        onClick={(e) => {
+          e.stopPropagation()
+          setTooltip(null)
+          const rcCreator: DiscoveredCreator = {
+            id: `cdb:${platform}:${handle}`,
+            platform,
+            handle,
+            display_name: handle,
+            uniqueId: handle,
+            displayName: null,
+            avatarUrl: null,
+            followers: null,
+            sortMetric: null,
+            bio: null,
+            country: null,
+            language: null,
+            follower_count: null,
+            engagement_rate: null,
+            niche_tags: [],
+            profile_url: null,
+            avatar_url: null,
+            score: null,
+          }
+          onOpen(rcCreator)
+        }}
+      >
+        @{handle}
+      </button>
+      {tooltip && (
+        <span
+          className="fixed z-[100] px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] font-medium shadow-lg whitespace-nowrap pointer-events-none -translate-x-1/2 -translate-y-full"
+          style={{ left: tooltip.x, top: tooltip.y - 6 }}
+        >
+          {zh ? '点击查看 · 15 积分' : 'Click to view · 15 credits'}
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -2873,12 +2943,14 @@ export default function DiscoverPanel() {
                         className="block mt-4 group"
                       >
                         {/* Video embed (autoplay when scrolled into view) or thumbnail fallback */}
-                        <AutoplayEmbed
-                          platform={creator.platform}
-                          contentId={post.contentId}
-                          coverImageUrl={post.coverImageUrl}
-                          contentUrl={post.contentUrl}
-                        />
+                        <div className="aspect-[4/3]">
+                          <AutoplayEmbed
+                            platform={creator.platform}
+                            contentId={post.contentId}
+                            coverImageUrl={post.coverImageUrl}
+                            contentUrl={post.contentUrl}
+                          />
+                        </div>
                         {/* Label */}
                         <p className="mt-2 text-[11px] font-semibold text-indigo-600 uppercase tracking-wide">{post.label}</p>
                         {/* Title / description */}
@@ -3035,247 +3107,291 @@ export default function DiscoverPanel() {
           onClick={closeDetail}
         >
           <div
-            className="bg-white rounded-3xl shadow-2xl max-w-xl w-full max-h-[88vh] flex flex-col overflow-hidden"
+            className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header band */}
-            <div className="relative h-24 bg-gradient-to-r from-primary-600 via-rose-500 to-orange-400 flex-shrink-0">
+            {/* ── Top header: banner + avatar overlapping boundary + name/bio/actions ── */}
+            <div className="relative flex-shrink-0">
+              <div className="h-16 bg-gradient-to-r from-primary-600 via-rose-500 to-orange-400" />
               <button
                 onClick={closeDetail}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white text-lg leading-none transition"
+                className="absolute top-3 right-4 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-gray-600 text-lg leading-none transition z-10 shadow"
                 aria-label="Close"
               >
                 ×
               </button>
-            </div>
-            <div className="px-7 flex items-start gap-4 flex-shrink-0">
-              <div className="relative z-10 w-20 h-20 -mt-10 rounded-full ring-4 ring-white bg-gray-200 overflow-hidden shadow-md flex-shrink-0">
-                <CreatorAvatar
-                  // Prefer the fresh search-result picture: enrich-cache
-                  // avatar URLs are often expired club links (~24h lifetime).
-                  key={detailFor.id}
-                  url={detailFor.avatar_url || detail?.avatar_url || null}
-                  name={detailFor.display_name || detailFor.handle || '?'}
-                  textSize="text-2xl"
-                />
-              </div>
-              <div className="flex-1 min-w-0 pt-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-gray-900 truncate">
-                    {detail?.name || detailFor.display_name || detailFor.handle}
-                  </h3>
-                  <span className="px-2 py-0.5 bg-gray-900 text-white rounded-full text-[11px] font-medium flex-shrink-0">
-                    {PLATFORM_LABELS[detailFor.platform] || detailFor.platform}
-                  </span>
+              <div className="px-6 pb-4 flex items-start gap-5">
+                {/* Avatar: half above banner boundary, half below */}
+                <div className="-mt-14 w-[112px] h-[112px] rounded-full ring-4 ring-white bg-gray-200 overflow-hidden shadow-md flex-shrink-0">
+                  <CreatorAvatar
+                    key={detailFor.id}
+                    url={detailFor.avatar_url || detail?.avatar_url || null}
+                    name={detailFor.display_name || detailFor.handle || '?'}
+                    textSize="text-3xl"
+                  />
                 </div>
-                <p className="text-sm text-gray-500 truncate">
-                  @{detailFor.handle?.replace(/^@+/, '')}
-                  {detail && (detail.location || detail.language) && (
-                    <span className="text-gray-400">
-                      {' '}· {[detail.location, detail.language].filter(Boolean).join(' · ')}
+                <div className="flex-1 min-w-0 pt-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-bold text-gray-900 truncate">
+                      {detailFor.handle?.replace(/^@+/, '') || detailFor.display_name}
+                    </h3>
+                    <span className="px-2.5 py-0.5 bg-gray-900 text-white rounded-full text-[11px] font-medium flex-shrink-0 inline-flex items-center gap-1">
+                      <PlatformLogo platform={detailFor.platform} size={14} />
+                      {PLATFORM_LABELS[detailFor.platform] || detailFor.platform}
                     </span>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    @{detailFor.handle?.replace(/^@+/, '')}
+                    {detail && (detail.location || detail.language) && (
+                      <span className="text-gray-400"> · {[detail.location, detail.language].filter(Boolean).join(' · ')}</span>
+                    )}
+                  </p>
+                  {detail?.bio && (
+                    <p className="mt-1.5 text-sm text-gray-600 line-clamp-2">{detail.bio}</p>
                   )}
-                </p>
+                  {/* Category badges */}
+                  {detail?.category && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      <span className="px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">{detail.category}</span>
+                      {/* Niche tags from discovery */}
+                      {(() => {
+                        const key = detailFor.handle ? `${detailFor.platform}:${detailFor.handle.replace(/^@/, '').toLowerCase()}` : null
+                        const niches = key ? nicheMap[key] : null
+                        if (!niches) return null
+                        return niches.slice(0, 4).map((n, i) => {
+                          const label = n.replace(/^[Ii]d_/, '').replace(/_[Aa]ll$/i, '').replace(/_/g, ' ').trim()
+                          if (!label) return null
+                          return <span key={`${label}-${i}`} className="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium capitalize">{label}</span>
+                        })
+                      })()}
+                    </div>
+                  )}
+                </div>
+                {/* Top-right actions */}
+                <div className="flex items-center gap-2 pt-3 flex-shrink-0">
+                  <button
+                    onClick={openContact}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                    </svg>
+                    {zh ? '联系达人' : 'Contact the creator'}
+                  </button>
+                  {(() => {
+                    const h = (detailFor.handle || '').replace(/^@/, '').toLowerCase()
+                    const k = `${detailFor.platform}:${h}`
+                    const saved = h ? savedKeys.has(k) : false
+                    return (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleSaveCreator(detailFor) }}
+                        className={`w-10 h-10 flex items-center justify-center rounded-xl border transition ${saved ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-white border-gray-200 text-gray-400 hover:text-amber-600'}`}
+                      >
+                        <svg className="w-5 h-5" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                        </svg>
+                      </button>
+                    )
+                  })()}
+                </div>
               </div>
             </div>
 
-            {/* Scrollable body */}
-            <div className="overflow-y-auto px-7 py-5 flex-1">
+            {/* ── Body ── */}
+            <div className="flex-1 overflow-y-auto">
               {detailLoading && (
                 <p className="py-10 text-center text-sm text-gray-500">
-                  Loading creator details…
+                  {zh ? '加载中…' : 'Loading creator details…'}
                 </p>
               )}
               {detailError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                <div className="mx-6 my-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
                   {detailError}
                   {detailBlocked && <> <PlansCta /></>}
                 </div>
               )}
-
               {detail && (
-                <>
-                  {/* Key stats */}
-                  <div className="grid grid-cols-3 gap-3">
+              <div className="flex min-h-0">
+                {/* ── Left column: Key Metrics + About ── */}
+                <div className="w-[380px] flex-shrink-0 border-r border-gray-100 p-5 overflow-y-auto">
+                  {/* ── Key stats grid ── */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {[
-                      {
-                        label: 'Total followers',
-                        value: formatFollowers(detail.total_followers, locale),
-                        caption: 'all platforms',
-                      },
-                      {
-                        label: 'Engagement',
-                        value:
-                          detail.engagement_percent != null
-                            ? `${Number(detail.engagement_percent).toFixed(1)}%`
-                            : '—',
-                      },
-                      {
-                        label: 'Posts / mo',
-                        value:
-                          detail.posting_frequency_recent_months != null
-                            ? Number(detail.posting_frequency_recent_months).toFixed(1)
-                            : '—',
-                      },
+                      { label: zh ? '粉丝' : 'Followers', value: formatFollowers(detail.total_followers ?? detailFor.follower_count, locale) },
+                      { label: zh ? '互动率' : 'Engagement', value: detail.engagement_percent != null ? `${Number(detail.engagement_percent).toFixed(2)}%` : '—' },
+                      { label: zh ? '总内容数' : 'Total Posts', value: detail.total_contents != null ? Number(detail.total_contents).toLocaleString() : '—' },
+                      { label: zh ? '每月发帖' : 'Posts / 30d', value: detail.posting_frequency_recent_months != null ? String(detail.posting_frequency_recent_months) : '—' },
                     ].map((s) => (
-                      <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">
-                          {s.label}
-                        </p>
-                        <p className="text-base font-bold text-gray-900 mt-0.5">{s.value}</p>
-                        {s.caption && <p className="text-[10px] text-gray-400">{s.caption}</p>}
+                      <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
+                        <p className="text-sm font-bold text-gray-900 mt-0.5">{s.value}</p>
                       </div>
                     ))}
                   </div>
-                  {/* Growth — full width so all periods are readable */}
-                  {(() => {
-                    const g = detail.follower_growth
-                    if (g == null) return null
-                    const entries: { label: string; value: string }[] = []
-                    if (typeof g === 'number') {
-                      entries.push({ label: 'Growth', value: `${g > 0 ? '+' : ''}${g.toFixed(1)}%` })
-                    } else if (typeof g === 'object') {
-                      for (const [k, v] of Object.entries(g)) {
-                        if (typeof v !== 'number' && typeof v !== 'string') continue
-                        const label = k.replace(/_/g, ' ')
-                        const display = typeof v === 'number' ? `${v > 0 ? '+' : ''}${v}%` : String(v)
-                        entries.push({ label, value: display })
-                      }
-                    }
-                    if (entries.length === 0) return null
-                    return (
-                      <div className="mt-3 border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">
-                          Growth
-                        </p>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1">
-                          {entries.map((e) => (
-                            <span key={e.label} className="text-sm text-gray-700">
-                              <span className="text-gray-400">{e.label}:</span>{' '}
-                              <span className="font-semibold text-gray-900">{e.value}</span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })()}
 
-                  {/* About */}
-                  {detail.bio && (
-                    <div className="mt-6">
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-1.5">
-                        About
-                      </p>
-                      <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed line-clamp-6">
-                        {detail.bio}
-                      </p>
+                  {/* ── Follower Growth 7/30/90d ── */}
+                  {detail.follower_growth && typeof detail.follower_growth === 'object' && (
+                    <div className="mt-3 border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2.5">
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">{zh ? '粉丝增长' : 'Follower Growth'}</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {Object.entries(detail.follower_growth).map(([k, v]) => (
+                          typeof v === 'number' && (
+                            <span key={k} className="text-sm text-gray-700">
+                              <span className="text-gray-400">{k}:</span>{' '}
+                              <span className={`font-semibold ${v > 0 ? 'text-green-600' : v < 0 ? 'text-red-500' : 'text-gray-900'}`}>
+                                {v > 0 ? '+' : ''}{v}%
+                              </span>
+                            </span>
+                          )
+                        ))}
+                      </div>
                     </div>
                   )}
 
-                  {/* Categories */}
-                  {(() => {
-                    const cleanNiches = dedupeTags(detail.niche ?? [])
-                      .map((n) =>
-                        n.replace(/^[Ii]d_/, '').replace(/_[Aa]ll$/i, '').replace(/_/g, ' ').trim(),
-                      )
-                      .filter((label) => {
-                        if (!label) return false
-                        // Filter out platform/website entries that leak into niches
-                        const lower = label.toLowerCase()
-                        return !['website', 'http', 'https', 'www'].some((p) => lower.startsWith(p))
-                      })
-                    const uniqueNiches = [...new Set(cleanNiches.map((n) => n.toLowerCase()))].map(
-                      (lower) => cleanNiches.find((n) => n.toLowerCase() === lower)!,
-                    )
-                    if (uniqueNiches.length === 0) return null
-                    return (
-                      <div className="mt-6">
-                        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
-                          Categories
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {uniqueNiches.map((label) => (
-                            <span
-                              key={label}
-                              className="px-2.5 py-1 bg-gray-200 text-gray-700 rounded-full text-xs font-medium capitalize"
+                  {/* ── Performance metrics ── */}
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {[
+                      { label: zh ? '平均观看' : 'Avg Views', value: detail.avg_views },
+                      { label: zh ? '中位观看' : 'Median Views', value: detail.median_views },
+                      { label: zh ? '平均点赞' : 'Avg Likes', value: detail.avg_likes },
+                      { label: zh ? '中位点赞' : 'Median Likes', value: detail.median_likes },
+                    ].filter((s) => s.value != null).map((s) => (
+                      <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
+                        <p className="text-sm font-bold text-gray-900 mt-0.5">{formatFollowers(Math.round(Number(s.value)), locale)}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ── 30d/90d views ── */}
+                  {(detail.views_30d || detail.views_90d) && (
+                    <div className="mt-3 grid grid-cols-2 gap-2.5">
+                      {[
+                        { label: zh ? '30天观看' : '30d Views', data: detail.views_30d },
+                        { label: zh ? '90天观看' : '90d Views', data: detail.views_90d },
+                      ].filter((s) => s.data).map((s) => (
+                        <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
+                          <p className="text-sm font-bold text-gray-900 mt-0.5">
+                            {s.data?.views?.all != null ? formatFollowers(s.data.views.all, locale) : s.data?.totalViews != null ? formatFollowers(s.data.totalViews, locale) : '—'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ── About / Bio ── */}
+                  {detail.bio && (
+                    <div className="mt-5">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-1.5">{zh ? '简介' : 'About'}</p>
+                      <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed line-clamp-6">{detail.bio}</p>
+                    </div>
+                  )}
+
+                  {/* ── Creator info badges ── */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {detail.category && (
+                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
+                        {detail.category}
+                      </span>
+                    )}
+                    {detail.location && (
+                      <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                        {detail.location}
+                      </span>
+                    )}
+                    {detail.language && (
+                      <span className="px-2.5 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium">
+                        {detail.language}
+                      </span>
+                    )}
+                    {detail.has_email && (
+                      <span className="px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium">
+                        {zh ? '可通过 Overseed 联系' : 'Reachable from Overseed'}
+                      </span>
+                    )}
+                    {detail.has_brand_deals && (
+                      <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
+                        {zh ? '有赞助内容' : 'Has Sponsored Content'}
+                      </span>
+                    )}
+                    {detail.is_agency_represented && (
+                      <span className="px-2.5 py-1 bg-rose-50 text-rose-700 rounded-full text-xs font-medium">
+                        {zh ? '经纪公司代理' : 'Agency Represented'}
+                      </span>
+                    )}
+                    {detail.last_publish_time && (
+                      <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                        {zh ? '最后发帖' : 'Last post'}: {new Date(Number(detail.last_publish_time)).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+
+                </div>{/* end left column */}
+
+                {/* ── Right column: Recent Content + Audience ── */}
+                <div className="flex-1 p-5 overflow-y-auto">
+                  {/* ── Recent posts (3 reels/shorts/videos) ── */}
+                  {detail.recent_posts?.length > 0 && (
+                    <div className="mt-5">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
+                        {detail.recent_posts[0]?.label ? detail.recent_posts[0].label.replace('Latest ', zh ? '最近的' : 'Recent ') + 's' : (zh ? '最近内容' : 'Recent Content')}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {detail.recent_posts.map((post: any, i: number) => (
+                          <div key={post.contentId || i} className="group">
+                            <div className="aspect-[9/16] rounded-lg overflow-hidden">
+                              <AutoplayEmbed
+                                platform={detail.platform || detailFor.platform}
+                                contentId={post.contentId}
+                                coverImageUrl={post.coverImageUrl}
+                                contentUrl={post.contentUrl}
+                              />
+                            </div>
+                            <a
+                              href={post.contentUrl || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block"
                             >
-                              {label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })()}
-
-                  {/* Platform presence & links */}
-                  {(() => {
-                    const allAccounts = detail.accounts ?? []
-                    if (allAccounts.length === 0) return null
-                    const PLATFORM_COLORS: Record<string, string> = {
-                      instagram: 'bg-pink-500', youtube: 'bg-red-500', tiktok: 'bg-gray-900',
-                      twitter: 'bg-sky-400', twitch: 'bg-purple-500', snapchat: 'bg-yellow-400',
-                      discord: 'bg-indigo-500', threads: 'bg-gray-800', pinterest: 'bg-red-600',
-                      spotify: 'bg-green-500', facebook: 'bg-blue-600', linkedin: 'bg-blue-700',
-                      website: 'bg-emerald-500', linktree: 'bg-lime-500',
-                    }
-                    const PLATFORM_LABELS: Record<string, string> = {
-                      twitter: 'X / Twitter', linkedin: 'LinkedIn', tiktok: 'TikTok',
-                      youtube: 'YouTube', instagram: 'Instagram', snapchat: 'Snapchat',
-                      discord: 'Discord', threads: 'Threads', pinterest: 'Pinterest',
-                      spotify: 'Spotify', facebook: 'Facebook', twitch: 'Twitch',
-                      website: 'Website', linktree: 'Linktree',
-                    }
-                    return (
-                      <div className="mt-6">
-                        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
-                          Platform presence & links
-                        </p>
-                        <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
-                          {allAccounts.map((a: any, i: number) => {
-                            // For website/linktree, show the URL domain or title as label
-                            const displayName = a.platform === 'website' || a.platform === 'linktree'
-                              ? (a.username || (a.url ? new URL(a.url).hostname.replace(/^www\./, '') : ''))
-                              : (a.username ? `@${a.username}` : '')
-                            return (
-                              <div
-                                key={`${a.platform}-${i}`}
-                                className="flex items-center justify-between px-4 py-2.5 bg-white"
-                              >
-                                <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PLATFORM_COLORS[a.platform] || 'bg-gray-300'}`} />
-                                  <span className="capitalize">{PLATFORM_LABELS[a.platform] || a.platform}</span>
-                                  {displayName && (
-                                    <span className="text-gray-400 font-normal truncate max-w-[200px]">{displayName}</span>
-                                  )}
-                                </span>
-                                <span className="text-sm text-gray-600 tabular-nums flex-shrink-0">
-                                  {a.followers != null ? (
-                                    <>
-                                      {formatFollowers(a.followers, locale)}
-                                      {a.engagement_percent != null && (
-                                        <span className="text-gray-400">
-                                          {' '}· {Number(a.engagement_percent).toFixed(1)}%
-                                        </span>
-                                      )}
-                                    </>
-                                  ) : a.url ? (
-                                    <a href={a.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary-500 hover:underline text-xs">
-                                      View ↗
-                                    </a>
-                                  ) : null}
-                                </span>
+                              <p className="mt-1 text-[11px] text-gray-600 line-clamp-2 leading-tight">{post.description || ''}</p>
+                              <div className="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400">
+                                {post.views != null && <span>{Number(post.views).toLocaleString()} views</span>}
+                                {post.likes != null && <span>♡ {Number(post.likes).toLocaleString()}</span>}
                               </div>
-                            )
-                          })}
-                        </div>
+                            </a>
+                          </div>
+                        ))}
                       </div>
-                    )
-                  })()}
+                    </div>
+                  )}
 
-                  {/* Full audience analytics (separate paid fetch) */}
+                  {/* ── Related Creators ── */}
+                  {detail.related_creators?.length > 0 && (
+                    <div className="mt-5">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">{zh ? '相关达人' : 'Related Creators'}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {detail.related_creators.map((rc: any, i: number) => {
+                          const rcHandle = typeof rc === 'string' ? rc : (rc.uniqueId || rc.channelId || rc.handle || '')
+                          if (!rcHandle) return null
+                          return (
+                            <RelatedCreatorChip
+                              key={`${rcHandle}-${i}`}
+                              handle={rcHandle}
+                              platform={detailFor!.platform}
+                              zh={zh}
+                              onOpen={openDetail}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Full audience analytics (separate paid fetch) ── */}
                   <div className="mt-6">
                     <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
-                      Audience analytics
+                      {zh ? '受众分析' : 'Audience Analytics'}
                     </p>
                     {!analytics && (
                       <>
@@ -3285,17 +3401,15 @@ export default function DiscoverPanel() {
                           className="w-full px-4 py-2.5 border border-primary-200 bg-primary-50 text-primary-700 rounded-xl text-sm font-semibold hover:bg-primary-100 transition disabled:opacity-50"
                         >
                           {analyticsLoading
-                            ? 'Loading analytics…'
-                            : `View full analytics${
+                            ? (zh ? '加载中…' : 'Loading analytics…')
+                            : `${zh ? '查看受众分析' : 'View full analytics'}${
                                 creditPrices?.analytics != null
                                   ? ` · ${d.creditsN.replace('{n}', String(creditPrices.analytics))}`
                                   : ''
                               }`}
                         </button>
                         {creditPrices?.analytics != null && (
-                          <p className="mt-1.5 text-[11px] text-gray-400 text-center">
-                            {d.chargedOncePerCreator}
-                          </p>
+                          <p className="mt-1.5 text-[11px] text-gray-400 text-center">{d.chargedOncePerCreator}</p>
                         )}
                         {analyticsError && (
                           <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
@@ -3307,113 +3421,73 @@ export default function DiscoverPanel() {
                     )}
                     {analytics && (
                       <div className="space-y-4">
-                        {/* Averages */}
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-3 gap-2.5">
                           {[
-                            { label: 'Avg views', value: analytics.avg_views },
-                            { label: 'Avg likes', value: analytics.avg_likes },
-                            { label: 'Avg comments', value: analytics.avg_comments },
-                          ]
-                            .filter((s) => s.value != null)
-                            .map((s) => (
-                              <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2.5">
-                                <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
-                                <p className="text-base font-bold text-gray-900 mt-0.5">
-                                  {formatFollowers(Math.round(Number(s.value)), locale)}
-                                </p>
-                              </div>
-                            ))}
+                            { label: zh ? '平均观看' : 'Avg Views', value: analytics.avg_views },
+                            { label: zh ? '平均点赞' : 'Avg Likes', value: analytics.avg_likes },
+                            { label: zh ? '平均评论' : 'Avg Comments', value: analytics.avg_comments },
+                          ].filter((s) => s.value != null).map((s) => (
+                            <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2">
+                              <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
+                              <p className="text-sm font-bold text-gray-900 mt-0.5">{formatFollowers(Math.round(Number(s.value)), locale)}</p>
+                            </div>
+                          ))}
                         </div>
                         {analytics.audience ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {[
-                              {
-                                title: 'Gender',
-                                rows: (analytics.audience.genders || []).map((g: any) => ({
-                                  label: g.code === 'MALE' ? 'Male' : g.code === 'FEMALE' ? 'Female' : g.code,
-                                  weight: g.weight,
-                                })),
-                              },
-                              {
-                                title: 'Age',
-                                rows: (analytics.audience.ages || []).map((a: any) => ({
-                                  label: a.code,
-                                  weight: a.weight,
-                                })),
-                              },
-                              {
-                                title: 'Top countries',
-                                rows: (analytics.audience.countries || []).map((c: any) => ({
-                                  label: c.name || c.code,
-                                  weight: c.weight,
-                                })),
-                              },
-                              {
-                                title: 'Languages',
-                                rows: (analytics.audience.languages || []).map((l: any) => ({
-                                  label: l.name || l.code,
-                                  weight: l.weight,
-                                })),
-                              },
-                            ]
-                              .filter((sec) => sec.rows.length > 0)
-                              .map((sec) => (
-                                <div key={sec.title} className="border border-gray-100 rounded-xl p-3">
-                                  <p className="text-xs font-semibold text-gray-500 mb-2">{sec.title}</p>
-                                  <div className="space-y-1.5">
-                                    {sec.rows.map((row: any) => (
-                                      <div key={row.label} className="flex items-center gap-2 text-xs">
-                                        <span className="w-20 truncate text-gray-600">{row.label}</span>
-                                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                          <div
-                                            className="h-full bg-gradient-to-r from-primary-500 to-rose-400"
-                                            style={{ width: `${Math.min(100, Math.round((row.weight || 0) * 100))}%` }}
-                                          />
-                                        </div>
-                                        <span className="w-10 text-right tabular-nums text-gray-500">
-                                          {((row.weight || 0) * 100).toFixed(1)}%
-                                        </span>
+                              { title: zh ? '性别' : 'Gender', rows: (analytics.audience.genders || []).map((g: any) => ({ label: g.code === 'MALE' ? (zh ? '男' : 'Male') : g.code === 'FEMALE' ? (zh ? '女' : 'Female') : g.code, weight: g.weight })) },
+                              { title: zh ? '年龄' : 'Age', rows: (analytics.audience.ages || []).map((a: any) => ({ label: a.code, weight: a.weight })) },
+                              { title: zh ? '国家' : 'Top Countries', rows: (analytics.audience.countries || []).map((c: any) => ({ label: c.name || c.code, weight: c.weight })) },
+                              { title: zh ? '语言' : 'Languages', rows: (analytics.audience.languages || []).map((l: any) => ({ label: l.name || l.code, weight: l.weight })) },
+                            ].filter((sec) => sec.rows.length > 0).map((sec) => (
+                              <div key={sec.title} className="border border-gray-100 rounded-xl p-3">
+                                <p className="text-xs font-semibold text-gray-500 mb-2">{sec.title}</p>
+                                <div className="space-y-1.5">
+                                  {sec.rows.map((row: any, ri: number) => (
+                                    <div key={`${row.label}-${ri}`} className="flex items-center gap-2 text-xs">
+                                      <span className="w-20 truncate text-gray-600">{row.label}</span>
+                                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-gradient-to-r from-primary-500 to-rose-400" style={{ width: `${Math.min(100, Math.round((row.weight || 0) * 100))}%` }} />
                                       </div>
-                                    ))}
-                                  </div>
+                                      <span className="w-10 text-right tabular-nums text-gray-500">{((row.weight || 0) * 100).toFixed(1)}%</span>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              </div>
+                            ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-400">
-                            Audience demographics are not available for this creator.
-                          </p>
+                          <p className="text-sm text-gray-400">{zh ? '暂无受众数据' : 'Audience demographics not available for this creator.'}</p>
                         )}
                       </div>
                     )}
                   </div>
-                </>
-              )}
-            </div>
+                </div>{/* end right column */}
+              </div>)}
+            </div>{/* end overflow wrapper */}
 
             {/* Footer actions */}
             {detail && (
-              <div className="px-7 py-4 border-t border-gray-100 flex-shrink-0">
-                <div className="flex items-center gap-3">
+              <div className="px-6 py-3.5 border-t border-gray-100 flex-shrink-0 flex items-center gap-3">
                 <button
                   onClick={openContact}
-                  className="flex-1 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition"
                 >
-                  Contact the creator
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                  {zh ? '联系达人' : 'Contact the creator'}
                 </button>
                 {detailFor.profile_url && (
                   <a
                     href={detailFor.profile_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-gray-200 bg-white text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition"
                   >
                     {d.openOnPlatform.replace('{platform}', PLATFORM_LABELS[detailFor.platform] || detailFor.platform)} ↗
                   </a>
-                )}
-                </div>
-                {detail.contactable && creditPrices?.profile != null && (
-                  <p className="mt-2 text-[11px] text-gray-400 text-center">{d.outreachIncluded}</p>
                 )}
               </div>
             )}

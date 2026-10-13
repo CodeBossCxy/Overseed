@@ -94,9 +94,13 @@ async function fetchContentForCreator(
       if (posts.length === 0) return null
 
       const post = posts[0]
+      const postId = post.contentId || post.id || null
+      // YouTube doesn't return coverImageUrl — construct from contentId
+      const coverImage = post.coverImageUrl || post.thumbnailUrl || post.thumbnail
+        || (platform === 'youtube' && postId ? `https://img.youtube.com/vi/${postId}/hqdefault.jpg` : null)
       return {
-        contentId: post.contentId || post.id || null,
-        coverImageUrl: post.coverImageUrl || post.thumbnailUrl || post.thumbnail || null,
+        contentId: postId,
+        coverImageUrl: coverImage,
         description: post.description || post.title || post.caption || null,
         publishTime: post.publishTime || post.createdAt || post.timestamp || null,
         likes: post.likes ?? post.likeCount ?? null,
@@ -180,6 +184,18 @@ export async function POST(req: NextRequest) {
     if (result.status === 'fulfilled' && result.value.content) {
       contentMap[result.value.key] = result.value.content
     }
+  }
+
+  // Pre-warm the image cache for TikTok cover images (signed URLs expire).
+  // This runs in the background — don't block the response.
+  const tiktokCovers = Object.values(contentMap)
+    .filter((c: any) => c?.coverImageUrl?.includes('tiktokcdn.com'))
+    .map((c: any) => c.coverImageUrl as string)
+  if (tiktokCovers.length > 0) {
+    import('@/lib/avatar-cache').then(({ warmCache }) => {
+      Promise.allSettled(tiktokCovers.map((url) => warmCache(url)))
+        .catch(() => {})
+    })
   }
 
   return NextResponse.json({

@@ -83,30 +83,46 @@ const ENGAGEMENT_FIELD: Record<string, string> = {
   tiktok: 'avgRecentVideosEngagementRate',
 }
 
+// Fractional profile fields (Call 1): ~1.2 credits per creator
 const PROFILE_FIELDS: Record<string, string[]> = {
   instagram: [
-    'displayName', 'category', 'avatarUrl', 'bio', 'isBusinessAccount', 'isPrivateAccount',
-    'isVerified', 'hasSponsors', 'country', 'mainLanguage', 'totalContents', 'totalFollowers',
-    'totalFollowing', 'subscriberGrowth', 'hashtags', 'niches', 'otherLinks', 'lastPublishTime',
-    'lastDbUpdateTime',
+    'bio', 'category', 'country', 'mainLanguage', 'totalContents',
+    'isAgencyRepresented', 'hasEmail', 'hasSponsors', 'relatedCreators',
+    'subscriberGrowth', 'lastPublishTime', 'avatarUrl',
   ],
   tiktok: [
-    'displayName', 'category', 'avatarUrl', 'bio', 'isBusinessAccount', 'isPrivateAccount',
-    'isVerified', 'hasSponsors', 'country', 'mainLanguage', 'totalContents', 'totalFollowers',
-    'totalFollowing', 'subscriberGrowth', 'hashtags', 'niches', 'otherLinks', 'lastPublishTime',
-    'lastDbUpdateTime',
+    'bio', 'category', 'country', 'mainLanguage', 'totalContents',
+    'isAgencyRepresented', 'hasEmail', 'hasSponsors', 'relatedCreators',
+    'subscriberGrowth', 'lastPublishTime', 'avatarUrl',
   ],
   youtube: [
-    'displayName', 'categoryBreakdown', 'avatarUrl', 'bio', 'isVerified', 'hasSponsors',
-    'country', 'mainLanguage', 'totalContents', 'totalSubscribers', 'subscriberGrowth',
-    'hashtags', 'niches', 'otherLinks', 'lastPublishTime', 'lastDbUpdateTime',
+    'bio', 'categoryBreakdown', 'country', 'mainLanguage', 'totalContents',
+    'isAgencyRepresented', 'hasEmail', 'hasSponsors', 'relatedCreators',
+    'subscriberGrowth', 'lastPublishTime', 'avatarUrl',
   ],
 }
 
+// Fractional performance fields (Call 2): YT ~1.4, IG ~2, TT ~1.4 credits
 const PERFORMANCE_FIELDS: Record<string, string[]> = {
-  instagram: ['contentCountByDays', 'ranking', 'imagesPerformanceRecent', 'reelsPerformanceRecent'],
-  tiktok: ['contentCountByDays', 'ranking', 'videosPerformanceRecent'],
-  youtube: ['contentCountByDays', 'ranking', 'videosPerformanceRecent', 'shortsPerformanceRecent'],
+  instagram: [
+    'contentsPerformanceRecent', 'reelsPerformanceRecent',
+    'contentCountByDays', 'reelsPerformance30d', 'reelsPerformance90d',
+  ],
+  tiktok: [
+    'videosPerformanceRecent', 'contentCountByDays',
+    'videosPerformance30d', 'videosPerformance90d',
+  ],
+  youtube: [
+    'contentsPerformanceRecent', 'shortsPerformanceRecent',
+    'contentCountByDays', 'shortsPerformance30d', 'shortsPerformance90d',
+  ],
+}
+
+// Fractional content-detail fields (Call 3): 0.3 credits per creator
+const CONTENT_DETAIL_FIELDS: Record<string, Record<string, number>> = {
+  instagram: { recentReels: 3 },
+  tiktok: { recentVideos: 3 },
+  youtube: { recentShorts: 3 },
 }
 
 const AUDIENCE_FIELDS = [
@@ -398,6 +414,11 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
   }
 
   const creatorList = Array.isArray(data?.data?.creatorList) ? data.data.creatorList : []
+  // DEBUG: log first creator's keys to check for avatar fields
+  if (creatorList[0]) {
+    const c0 = creatorList[0]
+    console.log('[CreatorDB search] first creator keys:', Object.keys(c0), '| avatarUrl:', c0.avatarUrl, '| avatar-like keys:', Object.keys(c0).filter((k: string) => /avatar|image|photo|pic|thumb/i.test(k)))
+  }
   const followerField = FOLLOWER_FIELD[opts.platform] || 'totalFollowers'
   const bodyAny = body as any
   const sortMetricField = bodyAny.sortBy
@@ -515,8 +536,8 @@ const LANG_3_TO_2: Record<string, string> = Object.fromEntries(
 
 // ---------------------------------------------------------------------------
 // Layer 2: Profile Enrichment
-// Calls /profile + /performance + /contact for the given creator.
-// Returns the same shape as clubEnrich() so the detail popup works unchanged.
+// Calls /profile + /performance + /content-detail for the given creator.
+// All 3 use Fractional Calls for cost efficiency (total ~2.9-3.5 CDB credits).
 // ---------------------------------------------------------------------------
 
 async function fetchCreatorDbEnrichment(
@@ -530,29 +551,37 @@ async function fetchCreatorDbEnrichment(
 
   const cleanHandle = handle.replace(/^@/, '')
   const isYoutube = platform === 'youtube'
+  // Always use uniqueId — works for all platforms including YouTube handles
+  const idField = { uniqueId: cleanHandle }
 
-  // Fetch profile + performance in parallel (contact is fetched on-demand
-  // via a separate endpoint to avoid the 0-15 credit contact lookup cost
-  // on every profile view).
-  const [profileRes, perfRes] = await Promise.all([
+  // 3 parallel fractional calls: profile (~1.2) + performance (~1.4-2) + content-detail (0.3)
+  const [profileRes, perfRes, contentRes] = await Promise.all([
     creatorDbFetch(`${BASE}/${platformPath}/profile`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ uniqueId: cleanHandle, fields: PROFILE_FIELDS[platform] }),
+      body: JSON.stringify({ ...idField, fields: PROFILE_FIELDS[platform] }),
       cache: 'no-store',
       signal: AbortSignal.timeout(30000),
     }, { userId: opts?.logUserId }),
     creatorDbFetch(`${BASE}/${platformPath}/performance`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ uniqueId: cleanHandle, fields: PERFORMANCE_FIELDS[platform] }),
+      body: JSON.stringify({ ...idField, fields: PERFORMANCE_FIELDS[platform] }),
       cache: 'no-store',
       signal: AbortSignal.timeout(30000),
     }, { userId: opts?.logUserId }),
+    creatorDbFetch(`${BASE}/${platformPath}/content-detail`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ ...idField, fields: CONTENT_DETAIL_FIELDS[platform] }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(30000),
+    }, { userId: opts?.logUserId }).catch(() => null),
   ])
 
   const profileData = await profileRes.json().catch(() => null)
   const perfData = await perfRes.json().catch(() => null)
+  const contentData = contentRes ? await contentRes.json().catch(() => null) : null
 
   if (!profileRes.ok || !profileData?.success) {
     throw new Error(
@@ -563,7 +592,10 @@ async function fetchCreatorDbEnrichment(
 
   const p = profileData.data || {}
   const perf = perfData?.data || {}
-  const email: string | null = null // Contact is fetched on-demand via creatordbContact()
+  const content = contentData?.data || {}
+
+  // DEBUG: log avatar-related fields from profile response
+  console.log('[CreatorDB enrich] avatarUrl:', p.avatarUrl, '| profilePicture:', p.profilePicture, '| keys with avatar/image:', Object.keys(p).filter(k => /avatar|image|photo|pic|thumb/i.test(k)))
 
   // Normalize country/language from alpha-3 to alpha-2
   const countryA3 = p.country || null
@@ -571,15 +603,18 @@ async function fetchCreatorDbEnrichment(
   const langA3 = p.mainLanguage || null
   const language = langA3 ? (LANG_3_TO_2[langA3] || langA3) : null
 
-  // Engagement rate from performance data
-  const imgPerf = perf.imagesPerformanceRecent || {}
+  // Performance data per content type
+  const contentsPerf = perf.contentsPerformanceRecent || {}
   const reelsPerf = perf.reelsPerformanceRecent || {}
-  const videosPerf = perf.videosPerformanceRecent || perf.recentVideosPerformance || {}
-  const engagementPercent =
-    (reelsPerf.avgEngagementRate ?? imgPerf.avgEngagementRate ?? videosPerf.avgEngagementRate ?? null)
-  const engagementDisplay = engagementPercent != null ? Number(engagementPercent) * 100 : null
+  const videosPerf = perf.videosPerformanceRecent || {}
+  const shortsPerf = perf.shortsPerformanceRecent || {}
 
-  // Growth data — CreatorDB returns decimal ratios (0.01 = 1%), convert to percent
+  // Engagement rate — nested as { engagement: { avgEngagementRate } }
+  const engagementRaw =
+    contentsPerf.engagement?.avgEngagementRate ?? reelsPerf.engagement?.avgEngagementRate ?? videosPerf.engagement?.avgEngagementRate ?? shortsPerf.engagement?.avgEngagementRate ?? null
+  const engagementDisplay = engagementRaw != null ? Number(engagementRaw) * 100 : null
+
+  // Growth data — decimal ratios → percent
   const growth = p.subscriberGrowth || {}
   const growthPct = (v: unknown) => typeof v === 'number' ? Math.round(v * 10000) / 100 : null
   const followerGrowth = {
@@ -588,127 +623,99 @@ async function fetchCreatorDbEnrichment(
     '90d': growthPct(growth.g90),
   }
 
-  // Avg views/likes from performance
-  const avgViews = reelsPerf.avgViews ?? videosPerf.avgViews ?? null
-  const avgLikes = reelsPerf.avgLikes ?? imgPerf.avgLikes ?? videosPerf.avgLikes ?? null
+  // Avg/median views and likes — nested as { views: { avg, median }, likes: { avg, median } }
+  const primaryPerf = isYoutube ? shortsPerf : (platform === 'tiktok' ? videosPerf : reelsPerf)
+  const avgViews = primaryPerf.views?.avg ?? null
+  const medianViews = primaryPerf.views?.median ?? null
+  const avgLikes = contentsPerf.likes?.avg ?? primaryPerf.likes?.avg ?? null
+  const medianLikes = contentsPerf.likes?.median ?? primaryPerf.likes?.median ?? null
 
-  // Posting frequency from content count
-  const contentIn30 = perf.contentCountByDays?.d30 ?? null
-  const postingFrequency = contentIn30 != null ? contentIn30 : null
+  // Posting frequency from content count (field uses "30d" not "d30")
+  const contentIn30 = perf.contentCountByDays?.['30d'] ?? perf.contentCountByDays?.d30 ?? null
 
-  // Hashtags
-  const hashtags = Array.isArray(p.hashtags)
-    ? p.hashtags.map((h: any) => h.name || h).filter(Boolean).slice(0, 8)
-    : []
+  // 30d/90d views
+  const views30d = isYoutube ? perf.shortsPerformance30d : (platform === 'tiktok' ? perf.videosPerformance30d : perf.reelsPerformance30d)
+  const views90d = isYoutube ? perf.shortsPerformance90d : (platform === 'tiktok' ? perf.videosPerformance90d : perf.reelsPerformance90d)
 
-  // Niches
-  const niches = Array.isArray(p.niches) ? p.niches : []
+  // Recent content (3 reels/shorts/videos)
+  const contentKey = isYoutube ? 'recentShorts' : (platform === 'tiktok' ? 'recentVideos' : 'recentReels')
+  const contentLabel = isYoutube ? 'Short' : (platform === 'tiktok' ? 'Video' : 'Reel')
+  const recentPosts = (Array.isArray(content[contentKey]) ? content[contentKey] : []).slice(0, 3).map((post: any) => {
+    const postId = post.contentId || post.id || null
+    const coverImage = post.coverImageUrl || post.thumbnailUrl
+      || (isYoutube && postId ? `https://img.youtube.com/vi/${postId}/hqdefault.jpg` : null)
+    return {
+      contentId: postId,
+      coverImageUrl: coverImage,
+      description: post.description || post.title || null,
+      publishTime: post.publishTime || null,
+      likes: post.likes ?? null,
+      comments: post.comments ?? null,
+      views: post.views ?? null,
+      label: `Latest ${contentLabel}`,
+      contentUrl: postId ? (
+        isYoutube ? `https://www.youtube.com/shorts/${postId}` :
+        platform === 'tiktok' ? `https://www.tiktok.com/@${cleanHandle}/video/${postId}` :
+        `https://www.instagram.com/reel/${postId}/`
+      ) : null,
+    }
+  })
 
-  // Other links / cross-platform presence.
-  // CreatorDB returns otherLinks: { title, url }[] — the links the creator
-  // listed on their channel/bio. We detect platforms by URL domain (titles
-  // are unreliable), extract handles where possible, and deduplicate.
-  const otherLinks = Array.isArray(p.otherLinks) ? p.otherLinks : []
+  // Category
+  const category = p.category ?? (Array.isArray(p.categoryBreakdown) ? p.categoryBreakdown[0]?.category ?? null : null)
 
-  // Domain → platform mapping with handle extraction regex
-  const PLATFORM_MATCHERS: { test: RegExp; platform: string; handle?: RegExp }[] = [
-    // youtu.be/xxx and youtube.com/watch are video links, not channel presence — skip
-    { test: /youtu\.be\/\w/, platform: '_skip' },
-    { test: /youtube\.com\/watch/, platform: '_skip' },
-    { test: /youtube\.com\/shorts\//, platform: '_skip' },
-    { test: /youtube\.com/, platform: 'youtube', handle: /youtube\.com\/(?:@|c\/|channel\/)([^/?&#]+)/ },
-    { test: /tiktok\.com/, platform: 'tiktok', handle: /tiktok\.com\/@?([^/?&#]+)/ },
-    { test: /instagram\.com/, platform: 'instagram', handle: /instagram\.com\/([^/?&#]+)/ },
-    { test: /(?:twitter\.com|x\.com)/, platform: 'twitter', handle: /(?:twitter|x)\.com\/([^/?&#]+)/ },
-    { test: /twitch\.tv/, platform: 'twitch', handle: /twitch\.tv\/([^/?&#]+)/ },
-    { test: /facebook\.com/, platform: 'facebook', handle: /facebook\.com\/([^/?&#]+)/ },
-    { test: /linkedin\.com/, platform: 'linkedin', handle: /linkedin\.com\/in\/([^/?&#]+)/ },
-    { test: /snapchat\.com/, platform: 'snapchat', handle: /snapchat\.com\/add\/([^/?&#]+)/ },
-    { test: /discord\.gg|discord\.com/, platform: 'discord' },
-    { test: /threads\.net/, platform: 'threads', handle: /threads\.net\/@?([^/?&#]+)/ },
-    { test: /pinterest\.com/, platform: 'pinterest', handle: /pinterest\.com\/([^/?&#]+)/ },
-    { test: /spotify\.com/, platform: 'spotify' },
-    // Link-in-bio pages — flag them but don't show as "website"
-    { test: /linktr\.ee|beacons\.ai|linkin\.bio|lnk\.to|bio\.link|campsite\.bio|hoo\.be|tap\.bio/, platform: 'linktree' },
-  ]
-  // URL path segments that aren't real handles (e.g. youtube.com/watch)
-  const IGNORE_PATHS = new Set(['watch', 'shorts', 'live', 'playlist', 'results', 'feed', 'explore', 'reels', 'stories', 'p', 'reel', 'tv'])
-
-  const otherAccounts = otherLinks
-    .filter((l: any) => l.url)
-    .map((l: any) => {
-      const url = (l.url as string).trim()
-      let plat = 'website'
-      let username = ''
-
-      for (const m of PLATFORM_MATCHERS) {
-        if (m.test.test(url)) {
-          plat = m.platform
-          if (m.handle) {
-            const match = url.match(m.handle)
-            if (match && match[1] && !IGNORE_PATHS.has(match[1].toLowerCase())) {
-              username = match[1].replace(/^@/, '')
-            }
-          }
-          break
-        }
-      }
-      return { platform: plat, username, url, followers: null, engagement_percent: null }
-    })
-    // Only drop YouTube video/shorts links that aren't channel presence
-    .filter((a: { platform: string }) => a.platform !== '_skip')
-
-  // Primary account first, then deduplicate cross-platform links
-  const primaryAccount = {
-    platform,
-    username: cleanHandle,
-    followers: isYoutube ? (p.totalSubscribers ?? null) : (p.totalFollowers ?? null),
-    engagement_percent: engagementDisplay,
-  }
-  const seenPlatforms = new Set([platform])
-  const accounts: typeof otherAccounts = [primaryAccount as any]
-  for (const a of otherAccounts) {
-    // Allow multiple website/linktree entries; deduplicate social platforms
-    if (a.platform !== 'website' && a.platform !== 'linktree' && seenPlatforms.has(a.platform)) continue
-    seenPlatforms.add(a.platform)
-    accounts.push(a)
-  }
-
-  const totalFollowers = isYoutube ? (p.totalSubscribers ?? 0) : (p.totalFollowers ?? 0)
+  // Related creators
+  const relatedCreators = Array.isArray(p.relatedCreators) ? p.relatedCreators.slice(0, 10) : []
 
   return {
     platform,
     handle: cleanHandle,
-    name: p.displayName || cleanHandle,
+    name: cleanHandle, // display name comes from discovery, not this call
     avatar_url: p.avatarUrl || null,
     bio: p.bio || null,
     location: country,
     language,
-    gender: null, // CreatorDB doesn't provide creator gender in profile
-    is_business: p.isBusinessAccount ?? null,
-    is_private: p.isPrivateAccount ?? null,
-    is_verified: p.isVerified ?? null,
+    gender: null,
+    is_business: null,
+    is_private: null,
+    is_verified: null,
     has_brand_deals: p.hasSponsors ?? null,
-    niche: niches,
-    hashtags,
-    followers: totalFollowers,
+    niche: [],
+    hashtags: [],
+    followers: null, // comes from discovery
     engagement_percent: engagementDisplay,
-    posting_frequency_recent_months: postingFrequency,
+    posting_frequency_recent_months: contentIn30,
     avg_views: avgViews,
     avg_likes: avgLikes,
     follower_growth: followerGrowth,
-    income: null, // CreatorDB has pricing info but not income estimates
-    total_followers: totalFollowers,
-    accounts,
-    contactable: Boolean(email),
+    income: null,
+    total_followers: null, // comes from discovery
+    accounts: [],
+    contactable: false,
+    // New fields from fractional calls
+    category,
+    total_contents: p.totalContents ?? null,
+    is_agency_represented: p.isAgencyRepresented ?? null,
+    has_email: p.hasEmail ?? null, // UI label: "Reachable from Overseed"
+    related_creators: relatedCreators,
+    last_publish_time: p.lastPublishTime ?? null,
+    median_views: medianViews,
+    median_likes: medianLikes,
+    views_30d: views30d ?? null,
+    views_90d: views90d ?? null,
+    recent_posts: recentPosts,
+    // Raw performance for detailed display
+    _contentsPerf: contentsPerf,
+    _primaryPerf: primaryPerf,
+    _contentCountByDays: perf.contentCountByDays ?? null,
     // Internal — not sent to client
-    _email: email,
-    _category: p.category ?? (Array.isArray(p.categoryBreakdown) ? p.categoryBreakdown[0]?.category ?? null : null),
+    _email: null,
+    _category: category,
     _totalContents: p.totalContents ?? null,
-    _totalFollowing: p.totalFollowing ?? null,
+    _totalFollowing: null,
     _lastPublishTime: p.lastPublishTime ?? null,
-    _lastDbUpdateTime: p.lastDbUpdateTime ?? null,
-    _ranking: perf.ranking ?? null,
+    _lastDbUpdateTime: null,
+    _ranking: null,
   }
 }
 

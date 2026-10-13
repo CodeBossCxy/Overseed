@@ -81,7 +81,27 @@ export async function GET(req: NextRequest) {
       where: { userId_kind_platform_handle: cacheKey },
     })
     if (cached) {
-      return NextResponse.json(cached.data)
+      const cachedData = cached.data as any
+      // Self-heal: if avatar_url is missing, re-enrich to fetch it and patch the cache.
+      if (!cachedData?.avatar_url) {
+        try {
+          const fresh = await discoveryEnrich(platform, handle, { logUserId: userId })
+          if (fresh?.avatar_url) {
+            const patched = { ...cachedData, avatar_url: fresh.avatar_url }
+            await prisma.discoveryViewCache.update({
+              where: { userId_kind_platform_handle: cacheKey },
+              data: { data: patched, fetchedAt: new Date() },
+            }).catch(() => {})
+            await prisma.creatorEnrichmentCache.upsert({
+              where: { platform_handle: { platform, handle: normalizedHandle } },
+              create: { platform, handle: normalizedHandle, data: patched },
+              update: { data: patched, fetchedAt: new Date() },
+            }).catch(() => {})
+            return NextResponse.json(patched)
+          }
+        } catch { /* fall through to return cached data */ }
+      }
+      return NextResponse.json(cachedData)
     }
   } catch (e) {
     console.error('[club-enrich] discoveryViewCache read failed:', e)
