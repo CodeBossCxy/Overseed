@@ -501,6 +501,76 @@ function proxyAvatarUrl(url: string | null): string | null {
   return `/api/avatar?url=${encodeURIComponent(url)}`
 }
 
+// Autoplay video embed — swaps thumbnail for an iframe when scrolled into view.
+// Muted autoplay is required by browsers. Falls back to thumbnail on unsupported platforms.
+function AutoplayEmbed({
+  platform, contentId, coverImageUrl, contentUrl,
+}: {
+  platform: string; contentId: string | null; coverImageUrl: string | null; contentUrl: string | null
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [inView, setInView] = useState(false)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || !contentId) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { threshold: 0.5 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [contentId])
+
+  // Build embed URL per platform
+  const embedUrl = useMemo(() => {
+    if (!contentId) return null
+    switch (platform) {
+      case 'youtube':
+        return `https://www.youtube.com/embed/${contentId}?autoplay=1&mute=1&loop=1&playlist=${contentId}&controls=0&modestbranding=1&rel=0&showinfo=0`
+      case 'tiktok':
+        return `https://www.tiktok.com/player/v1/${contentId}?autoplay=1&mute=1&music_info=0&description=0&rel=0&loop=1`
+      case 'instagram':
+        // Instagram oEmbed doesn't reliably autoplay; show thumbnail with link instead
+        return null
+      default:
+        return null
+    }
+  }, [platform, contentId])
+
+  return (
+    <div ref={containerRef} className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-gray-100">
+      {inView && embedUrl ? (
+        <iframe
+          src={embedUrl}
+          className="w-full h-full border-0"
+          allow="autoplay; encrypted-media"
+          allowFullScreen
+          loading="lazy"
+        />
+      ) : (
+        <>
+          {coverImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={proxyAvatarUrl(coverImageUrl) || coverImageUrl}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+          )}
+          {/* Play button overlay */}
+          <div className="absolute bottom-3 left-3 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+            <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function CreatorAvatar({ url, name, textSize = '' }: { url: string | null; name: string; textSize?: string }) {
   const [failed, setFailed] = useState(false)
   const proxied = useMemo(() => proxyAvatarUrl(url), [url])
@@ -556,8 +626,8 @@ function NicheTags({
 
   return (
     <div className="flex gap-1.5 flex-wrap w-full mt-2">
-      {shown.map((label) => (
-        <span key={label} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[10px] font-medium">
+      {shown.map((label, i) => (
+        <span key={`${label}-${i}`} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[10px] font-medium">
           {label}
         </span>
       ))}
@@ -633,7 +703,9 @@ export default function DiscoverPanel() {
       })
       .catch(() => {})
   }, [])
+  const [showLatestPost, setShowLatestPost] = useState(false)
   const searchPrice = creditPrices?.search ?? null
+  // effectiveSearchPrice is computed after effectiveFilterCount (below)
 
   // Advanced filters (keyword search via the club API only — the local
   // browse index doesn't support them)
@@ -687,6 +759,9 @@ export default function DiscoverPanel() {
   })()
   const creatorDbFilterLimitExceeded = effectiveFilterCount > 20
   const creatorDbFilterExtraCost = effectiveFilterCount > 10 && effectiveFilterCount <= 20
+  const effectiveSearchPrice = searchPrice != null
+    ? searchPrice * ((showLatestPost ? 3 : 1) + (effectiveFilterCount > 10 ? 1 : 0))
+    : null
   const [openFilterSections, setOpenFilterSections] = useState<Record<string, boolean>>({ audience: true, creator: true, performance: true })
   const toggleFilterSection = (key: string) => setOpenFilterSections((prev) => ({ ...prev, [key]: !prev[key] }))
 
@@ -724,6 +799,17 @@ export default function DiscoverPanel() {
   const [nicheMap, setNicheMap] = useState<Record<string, string[]>>({})
   const [nichesLoading, setNichesLoading] = useState(false)
   const nicheFetchRef = useRef(0) // dedup concurrent fetches
+
+  // ── Latest post per creator (fetched via /content-detail when toggle is on) ──
+  const [contentMap, setContentMap] = useState<Record<string, {
+    contentId: string | null; coverImageUrl: string | null; description: string | null
+    publishTime: string | null; likes: number | null; comments: number | null
+    views: number | null; contentUrl: string | null; label: string
+  }>>({})
+  const [contentLoading, setContentLoading] = useState(false)
+  const contentFetchRef = useRef(0)
+  const contentMapRef = useRef(contentMap)
+  contentMapRef.current = contentMap
   const [unavailable, setUnavailable] = useState(false)
 
   // Ref to the current nicheMap — used inside effects to check cache without
@@ -1403,6 +1489,7 @@ export default function DiscoverPanel() {
       qs.set('sort_by', v.sortBy)
       qs.set('sort_order', v.sortOrder === 'asc' ? 'asc' : 'desc')
     }
+    if (showLatestPost) qs.set('show_latest_post', '1')
 
     await runSearchPage(
       { endpoint: 'club-search', params: qs.toString(), pageSize: CLUB_PAGE_SIZE },
@@ -1708,6 +1795,36 @@ export default function DiscoverPanel() {
       .finally(() => { if (seq === nicheFetchRef.current) setNichesLoading(false) })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [creatorsKey])
+
+  // Fetch latest posts when toggle is on and displayed creators change.
+  const prevContentKeyRef = useRef('')
+  useEffect(() => {
+    if (!showLatestPost || creators.length === 0) return
+    const batch = creators
+      .filter((c: DiscoveredCreator) => c.handle && ['instagram', 'youtube', 'tiktok'].includes(c.platform))
+      .map((c: DiscoveredCreator) => ({ platform: c.platform, handle: c.handle!.replace(/^@/, '').toLowerCase() }))
+      .filter((c) => !contentMapRef.current[c.platform + ':' + c.handle])
+    if (batch.length === 0) return
+    // Dedup: skip if we already fetched for this exact set of creators
+    const batchKey = batch.map((c) => c.platform + ':' + c.handle).sort().join(',')
+    if (batchKey === prevContentKeyRef.current) return
+    prevContentKeyRef.current = batchKey
+    setContentLoading(true)
+    fetch('/api/discovery/creator-content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creators: batch }),
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.content && typeof data.content === 'object') {
+          setContentMap((prev) => ({ ...prev, ...data.content }))
+        }
+      })
+      .catch((err) => console.warn('[content] fetch failed:', err))
+      .finally(() => setContentLoading(false))
+  }, [creators, showLatestPost])
+
   const matchedFollowerTier = FOLLOWER_TIER_OPTIONS.find(
     (tier) => tier.min === minFollowers && tier.max === maxFollowers
   )
@@ -1883,11 +2000,11 @@ export default function DiscoverPanel() {
         </div>
 
         {/* Live credit-cost estimate: updates as the user types/filters */}
-        {searchPrice != null && (
+        {effectiveSearchPrice != null && (
           <p className="mt-2 text-xs text-gray-400">
             {query.trim() || activeCreatorDbFilters.length > 0
-              ? d.searchCostEstimate.replace('{n}', String(searchPrice))
-              : d.browseFreeNote.replace('{n}', String(searchPrice))}
+              ? d.searchCostEstimate.replace('{n}', String(effectiveSearchPrice))
+              : d.browseFreeNote.replace('{n}', String(effectiveSearchPrice))}
           </p>
         )}
 
@@ -2144,27 +2261,73 @@ export default function DiscoverPanel() {
                     </span>
                   </label>
                   <div className="flex items-center gap-1.5">
-                    <select
-                      value={minFollowers}
-                      onChange={(e) => { setMinFollowers(e.target.value); setFollowerTier('custom') }}
-                      className={`w-1/2 ${inputCls}`}
-                    >
-                      <option value="">Min</option>
-                      {[1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000].map((n) => (
-                        <option key={n} value={String(n)}>{n.toLocaleString()}</option>
-                      ))}
-                    </select>
+                    {minFollowers === 'custom' ? (
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder={zh ? '最少粉丝' : 'Min followers'}
+                        autoFocus
+                        onBlur={(e) => {
+                          const v = e.target.value.trim()
+                          setMinFollowers(v && Number(v) > 0 ? v : '')
+                          setFollowerTier('custom')
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const v = (e.target as HTMLInputElement).value.trim()
+                            setMinFollowers(v && Number(v) > 0 ? v : '')
+                            setFollowerTier('custom')
+                          }
+                        }}
+                        className={`w-1/2 ${inputCls}`}
+                      />
+                    ) : (
+                      <select
+                        value={minFollowers}
+                        onChange={(e) => { setMinFollowers(e.target.value); setFollowerTier('custom') }}
+                        className={`w-1/2 ${inputCls}`}
+                      >
+                        <option value="">Min</option>
+                        {[1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000].map((n) => (
+                          <option key={n} value={String(n)}>{n.toLocaleString()}</option>
+                        ))}
+                        <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
+                      </select>
+                    )}
                     <span className="text-gray-400 font-medium text-sm">–</span>
-                    <select
-                      value={maxFollowers}
-                      onChange={(e) => { setMaxFollowers(e.target.value); setFollowerTier('custom') }}
-                      className={`w-1/2 ${inputCls}`}
-                    >
-                      <option value="">Max</option>
-                      {[5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 5000000, 10000000].map((n) => (
-                        <option key={n} value={String(n)}>{n.toLocaleString()}</option>
-                      ))}
-                    </select>
+                    {maxFollowers === 'custom' ? (
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder={zh ? '最多粉丝' : 'Max followers'}
+                        autoFocus
+                        onBlur={(e) => {
+                          const v = e.target.value.trim()
+                          setMaxFollowers(v && Number(v) > 0 ? v : '')
+                          setFollowerTier('custom')
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const v = (e.target as HTMLInputElement).value.trim()
+                            setMaxFollowers(v && Number(v) > 0 ? v : '')
+                            setFollowerTier('custom')
+                          }
+                        }}
+                        className={`w-1/2 ${inputCls}`}
+                      />
+                    ) : (
+                      <select
+                        value={maxFollowers}
+                        onChange={(e) => { setMaxFollowers(e.target.value); setFollowerTier('custom') }}
+                        className={`w-1/2 ${inputCls}`}
+                      >
+                        <option value="">Max</option>
+                        {[5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 5000000, 10000000].map((n) => (
+                          <option key={n} value={String(n)}>{n.toLocaleString()}</option>
+                        ))}
+                        <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
+                      </select>
+                    )}
                   </div>
                 </div>
                 {/* Last active */}
@@ -2330,6 +2493,30 @@ export default function DiscoverPanel() {
                 : 'Filter limit exceeded (20 max). Clear at least one before submitting.'}
             </p>
           )}
+
+          {/* Show latest post toggle */}
+          <div className="mt-3 flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={showLatestPost}
+                  onChange={(e) => setShowLatestPost(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`w-9 h-5 rounded-full transition ${showLatestPost ? 'bg-primary-600' : 'bg-gray-300'}`} />
+                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${showLatestPost ? 'translate-x-4' : ''}`} />
+              </div>
+              <span className="text-xs font-medium text-gray-600">
+                {zh ? '显示最新帖子' : 'Show latest post'}
+              </span>
+            </label>
+            {effectiveSearchPrice != null && showLatestPost && (
+              <span className="text-[11px] text-amber-600 font-medium">
+                {zh ? `${effectiveSearchPrice} 积分/次搜索` : `${effectiveSearchPrice} credits/search`}
+              </span>
+            )}
+          </div>
         </div>
       </form>
 
@@ -2661,6 +2848,77 @@ export default function DiscoverPanel() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Latest post preview (when toggle is on) */}
+                  {showLatestPost && (() => {
+                    const key = handle ? `${creator.platform}:${handle}` : null
+                    const post = key ? contentMap[key] : null
+                    if (contentLoading && !post && key && !(key in contentMapRef.current)) {
+                      return (
+                        <div className="mt-4 animate-pulse">
+                          <div className="w-full aspect-[4/3] rounded-xl bg-gray-200/70" />
+                          <div className="mt-2 h-3 bg-gray-200/60 rounded w-1/4" />
+                          <div className="mt-1.5 h-4 bg-gray-200/60 rounded w-3/4" />
+                          <div className="mt-1.5 h-3 bg-gray-200/50 rounded w-1/2" />
+                        </div>
+                      )
+                    }
+                    if (!post) return null
+                    return (
+                      <a
+                        href={post.contentUrl || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="block mt-4 group"
+                      >
+                        {/* Video embed (autoplay when scrolled into view) or thumbnail fallback */}
+                        <AutoplayEmbed
+                          platform={creator.platform}
+                          contentId={post.contentId}
+                          coverImageUrl={post.coverImageUrl}
+                          contentUrl={post.contentUrl}
+                        />
+                        {/* Label */}
+                        <p className="mt-2 text-[11px] font-semibold text-indigo-600 uppercase tracking-wide">{post.label}</p>
+                        {/* Title / description */}
+                        {post.description && (
+                          <p className="mt-0.5 text-sm font-semibold text-gray-900 line-clamp-2 leading-snug">{post.description}</p>
+                        )}
+                        {/* Date + views */}
+                        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-gray-400">
+                          {post.publishTime && (
+                            <span>{new Date(Number(post.publishTime)).toLocaleDateString()}</span>
+                          )}
+                          {post.views != null && (
+                            <>
+                              <span>·</span>
+                              <span>{Number(post.views).toLocaleString()} views</span>
+                            </>
+                          )}
+                        </div>
+                        {/* Likes + comments */}
+                        <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                          {post.likes != null && (
+                            <span className="flex items-center gap-1">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                              </svg>
+                              {Number(post.likes).toLocaleString()} likes
+                            </span>
+                          )}
+                          {post.comments != null && (
+                            <span className="flex items-center gap-1">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z" />
+                              </svg>
+                              {Number(post.comments).toLocaleString()} comments
+                            </span>
+                          )}
+                        </div>
+                      </a>
+                    )
+                  })()}
 
                   {/* Bottom row: followers + actions */}
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100/80">

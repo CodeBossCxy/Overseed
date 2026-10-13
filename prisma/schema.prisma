@@ -958,6 +958,19 @@ model CreatorNicheCache {
   @@map("creator_niche_cache")
 }
 
+// Cached latest post from CreatorDB /content-detail endpoint (0.1 credits
+// per call with Fractional Calls). Expires after 24 hours since posts change.
+model CreatorContentCache {
+  id        String   @id @default(cuid())
+  platform  String
+  handle    String
+  data      Json     // { contentId, coverImageUrl, description, publishTime, likes, comments, views, contentUrl }
+  fetchedAt DateTime @default(now())
+
+  @@unique([platform, handle])
+  @@map("creator_content_cache")
+}
+
 // Audit trail of Influencers Club vendor credit spend. One row per billed
 // live call: discovery (0.01 x results returned), enrichment or analytics
 // (1 credit each).

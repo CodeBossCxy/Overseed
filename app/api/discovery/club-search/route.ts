@@ -592,9 +592,12 @@ export async function GET(req: NextRequest) {
 
   // When the search uses more than 10 CreatorDB filters, charge 2x credits
   // (one extra discovery_search unit for the 11-20 filter tier).
+  // When "show latest post" is on, charge 3x (posts cost extra CreatorDB credits).
   const effectiveFilterCount = (creatorDbFilters?.length ?? 0)
     + (creatorDbPreset ? (CREATORDB_PRESETS[creatorDbPreset]?.filters?.length ?? 0) : 0)
-  const filterCostMultiplier = effectiveFilterCount > 10 ? 2 : 1
+  const showLatestPost = params.get('show_latest_post') === '1'
+  // Post toggle: 3x base. Filter >10: +1x base. These are additive, not multiplicative.
+  const filterCostMultiplier = (showLatestPost ? 3 : 1) + (effectiveFilterCount > 10 ? 1 : 0)
   recordFilterUsage(effectiveFilterCount)
 
   let searchCharge: { referenceId: string; refund: () => Promise<void> } | null = null
