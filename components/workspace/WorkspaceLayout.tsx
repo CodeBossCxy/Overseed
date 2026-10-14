@@ -196,6 +196,20 @@ export default function WorkspaceLayout({
     return () => window.clearTimeout(timeout)
   }, [pendingHref, router])
 
+  // Record invite code usage for OAuth signups (code was stored in
+  // sessionStorage before the OAuth redirect but never sent to the server).
+  useEffect(() => {
+    if (!session?.user) return
+    const code = typeof window !== 'undefined' ? sessionStorage.getItem('betaInviteCode') : null
+    if (!code) return
+    sessionStorage.removeItem('betaInviteCode')
+    fetch('/api/auth/record-invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inviteCode: code }),
+    }).catch(() => {})
+  }, [session?.user])
+
   const userName = session?.user?.name || roleLabel
   const initials = userName
     .split(' ')

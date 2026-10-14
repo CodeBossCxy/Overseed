@@ -33,6 +33,7 @@ interface ProfileResult {
   niches: string[]
   avatarUrl: string | null
   hasEmail: boolean | null
+  hasSponsors: boolean | null
 }
 
 async function fetchProfileForCreator(
@@ -40,12 +41,12 @@ async function fetchProfileForCreator(
   handle: string,
   userId: string | undefined,
 ): Promise<ProfileResult> {
-  const empty: ProfileResult = { niches: [], avatarUrl: null, hasEmail: null }
+  const empty: ProfileResult = { niches: [], avatarUrl: null, hasEmail: null, hasSponsors: null }
   const platformPath = PLATFORM_PATH[platform]
   if (!platformPath) return empty
 
-  // Request niches, avatarUrl, and hasEmail — same 0.1 credit cost
-  const body = { uniqueId: handle, fields: ['niches', 'avatarUrl', 'hasEmail'] }
+  // Request niches, avatarUrl, hasEmail, hasSponsors — same 0.1 credit cost
+  const body = { uniqueId: handle, fields: ['niches', 'avatarUrl', 'hasEmail', 'hasSponsors'] }
 
   let lastError: Error | null = null
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -92,7 +93,8 @@ async function fetchProfileForCreator(
       const niches: string[] = Array.isArray(data.data?.niches) ? data.data.niches : []
       const avatarUrl: string | null = typeof data.data?.avatarUrl === 'string' ? data.data.avatarUrl : null
       const hasEmail: boolean | null = typeof data.data?.hasEmail === 'boolean' ? data.data.hasEmail : null
-      return { niches, avatarUrl, hasEmail }
+      const hasSponsors: boolean | null = typeof data.data?.hasSponsors === 'boolean' ? data.data.hasSponsors : null
+      return { niches, avatarUrl, hasEmail, hasSponsors }
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       if (attempt < MAX_RETRIES) {
@@ -169,24 +171,27 @@ export async function POST(req: NextRequest) {
       }
       const key = `${c.platform}:${c.handle}`
       if (profile.avatarUrl) avatars[key] = profile.avatarUrl
-      return { key, niches: profile.niches }
+      return { key, niches: profile.niches, hasSponsors: profile.hasSponsors }
     }),
   )
 
-  // Build response map
+  // Build response maps
   const nicheResult: Record<string, string[]> = {}
+  const sponsorFlags: Record<string, boolean> = {}
   for (const [key, niches] of cachedMap) {
     nicheResult[key] = niches
   }
   for (const r of fetchResults) {
     if (r.status === 'fulfilled') {
       nicheResult[r.value.key] = r.value.niches
+      if (r.value.hasSponsors != null) sponsorFlags[r.value.key] = r.value.hasSponsors
     }
   }
 
   return NextResponse.json({
     niches: nicheResult,
     avatars,
+    hasSponsors: sponsorFlags,
     cached: cached.length,
     fetched: toFetch.length,
   })

@@ -337,28 +337,51 @@ export default function AdminDashboard() {
   return (
     <MainLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-        <p className="text-sm text-gray-500 mb-8">Platform overview and monitoring</p>
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="text-sm text-gray-400">Platform overview and monitoring</p>
+          </div>
+        </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
-          {(['overview', 'users', 'ai-usage', 'credits', 'brand-verification', 'campaign-review', 'beta-codes', 'beta-feedback'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => {
-                setActiveTab(tab)
-                if (tab === 'brand-verification') fetchBrandVerifications()
-                if (tab === 'campaign-review') fetchCampaignReviews()
-              }}
-              className={`px-4 py-2 rounded-md text-sm transition ${
-                activeTab === tab
-                  ? 'bg-white text-gray-900 font-bold shadow-sm'
-                  : 'text-gray-600 font-medium hover:text-gray-900'
-              }`}
-            >
-              {tab === 'overview' ? 'Overview' : tab === 'users' ? 'Users' : tab === 'ai-usage' ? 'AI Usage' : tab === 'credits' ? 'Credits' : tab === 'brand-verification' ? 'Brand Verification' : tab === 'campaign-review' ? `Campaign Review${reviewCampaigns.length ? ` (${reviewCampaigns.length})` : ''}` : tab === 'beta-codes' ? 'Beta Codes' : 'Beta Feedback'}
-            </button>
-          ))}
+        <div className="flex gap-1 mb-6 bg-white/50 border border-white/60 rounded-2xl p-1.5 w-fit flex-wrap">
+          {(['overview', 'users', 'ai-usage', 'credits', 'brand-verification', 'campaign-review', 'beta-codes', 'beta-feedback'] as const).map((tab) => {
+            const labels: Record<string, string> = {
+              overview: 'Overview',
+              users: 'Users',
+              'ai-usage': 'AI Usage',
+              credits: 'Credits',
+              'brand-verification': 'Verification',
+              'campaign-review': `Review${reviewCampaigns.length ? ` (${reviewCampaigns.length})` : ''}`,
+              'beta-codes': 'Beta Codes',
+              'beta-feedback': 'Feedback',
+            }
+            return (
+              <button
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab)
+                  if (tab === 'brand-verification') fetchBrandVerifications()
+                  if (tab === 'campaign-review') fetchCampaignReviews()
+                }}
+                className={`px-4 py-2 rounded-xl text-sm transition ${
+                  activeTab === tab
+                    ? 'bg-gray-900 text-white font-semibold shadow-sm'
+                    : 'text-gray-500 font-medium hover:text-gray-900 hover:bg-white/60'
+                }`}
+              >
+                {labels[tab]}
+              </button>
+            )
+          })}
         </div>
 
         {/* Overview Tab */}
@@ -515,22 +538,28 @@ export default function AdminDashboard() {
 
         {/* Users Tab */}
         {activeTab === 'users' && (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-gray-900">All Users</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{users.length} users registered</p>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left">
-                  <tr>
-                    <th className="px-4 py-3 font-medium text-gray-600">Email</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Name</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Type</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Origin</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Tier</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Active</th>
-                    <th className="px-4 py-3 font-medium text-gray-600 text-right">Credits Left</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">AI Requests (Month)</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Tokens (Month)</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Invite Code</th>
-                    <th className="px-4 py-3 font-medium text-gray-600">Joined</th>
+                <thead>
+                  <tr className="text-left text-[11px] text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                    <th className="px-5 py-3 font-medium">Email</th>
+                    <th className="px-4 py-3 font-medium">Name</th>
+                    <th className="px-4 py-3 font-medium">Type</th>
+                    <th className="px-4 py-3 font-medium">Origin</th>
+                    <th className="px-4 py-3 font-medium">Tier</th>
+                    <th className="px-4 py-3 font-medium">Active</th>
+                    <th className="px-4 py-3 font-medium text-right">Credits</th>
+                    <th className="px-4 py-3 font-medium text-center">AI Req.</th>
+                    <th className="px-4 py-3 font-medium text-right">Tokens</th>
+                    <th className="px-4 py-3 font-medium">Code</th>
+                    <th className="px-4 py-3 font-medium">Joined</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -1255,9 +1284,9 @@ function StatCard({
   accent?: string
 }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-xl font-bold ${accent || 'text-gray-900'}`}>{value}</p>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <p className="text-[11px] text-gray-400 uppercase tracking-wider font-medium mb-2">{label}</p>
+      <p className={`text-2xl font-bold ${accent || 'text-gray-900'}`}>{value}</p>
     </div>
   )
 }

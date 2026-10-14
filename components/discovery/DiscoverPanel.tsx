@@ -3748,7 +3748,6 @@ export default function DiscoverPanel() {
               </div>
 
               {/* ── Brand Collaborations — full-width, below Audience Insights ── */}
-              {detailFor.platform !== 'tiktok' && (
               <div className="border-t border-gray-100 px-5 py-4">
                 <div className="flex items-center gap-2 mb-1">
                   <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
@@ -3758,9 +3757,18 @@ export default function DiscoverPanel() {
                   <span className="text-xs text-gray-400 ml-1">
                     {zh ? '查看赞助品牌、合作内容和表现数据。' : 'Sponsoring brands, sponsored content & performance data.'}
                   </span>
+                  {detail.has_brand_deals && (
+                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full ml-auto">
+                      {zh ? '有赞助内容 ✓' : 'Has Sponsored Content ✓'}
+                    </span>
+                  )}
                 </div>
 
-                {featureUnlocked.has('brand_collaborations') && featureUnlocks.brand_collaborations ? (
+                {!detail.has_brand_deals ? (
+                  <p className="mt-3 text-sm text-gray-400 italic">{zh ? '未检测到赞助内容。' : 'No sponsored content found.'}</p>
+                ) : detailFor.platform === 'tiktok' ? (
+                  <p className="mt-3 text-sm text-gray-400 italic">{zh ? '该达人有赞助内容，但 TikTok 平台暂不支持查看品牌详情。' : 'This creator has sponsored content, but brand details are not available for TikTok.'}</p>
+                ) : featureUnlocked.has('brand_collaborations') && featureUnlocks.brand_collaborations ? (
                   featureUnlocks.brand_collaborations._empty || !(featureUnlocks.brand_collaborations.sponsors?.length) ? (
                     <p className="mt-3 text-sm text-gray-400 italic">{zh ? '该达人暂无品牌合作数据。' : 'No brand collaboration data available for this creator.'}</p>
                   ) : (
@@ -3871,7 +3879,6 @@ export default function DiscoverPanel() {
                   </div>
                 )}
               </div>
-              )}
               </>)}
             </div>{/* end overflow wrapper */}
 
