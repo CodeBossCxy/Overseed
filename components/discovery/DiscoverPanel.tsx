@@ -3634,7 +3634,7 @@ export default function DiscoverPanel() {
                       <button
                         onClick={() => promptUnlock('audience_gender')}
                         disabled={featureLoading != null}
-                        className="relative z-10 w-full mt-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                        className="relative z-10 w-full mt-1 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                       >
                         {zh ? `解锁 · ${FEATURE_COSTS.audience_gender} 积分` : `Unlock for ${FEATURE_COSTS.audience_gender} credits`}
                       </button>
@@ -3686,7 +3686,7 @@ export default function DiscoverPanel() {
                       <button
                         onClick={() => promptUnlock('audience_age')}
                         disabled={featureLoading != null}
-                        className="relative z-10 w-full mt-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                        className="relative z-10 w-full mt-1 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                       >
                         {zh ? `解锁 · ${FEATURE_COSTS.audience_age} 积分` : `Unlock for ${FEATURE_COSTS.audience_age} credits`}
                       </button>
@@ -3738,7 +3738,7 @@ export default function DiscoverPanel() {
                       <button
                         onClick={() => promptUnlock('audience_country')}
                         disabled={featureLoading != null}
-                        className="relative z-10 w-full mt-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                        className="relative z-10 w-full mt-1 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                       >
                         {zh ? `解锁 · ${FEATURE_COSTS.audience_country} 积分` : `Unlock for ${FEATURE_COSTS.audience_country} credits`}
                       </button>
@@ -3863,7 +3863,7 @@ export default function DiscoverPanel() {
                       <button
                         onClick={() => promptUnlock('brand_collaborations')}
                         disabled={featureLoading != null}
-                        className="px-5 py-2 border border-indigo-200 text-indigo-600 rounded-full text-sm font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                        className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                       >
                         {zh ? `解锁品牌合作 · ${FEATURE_COSTS.brand_collaborations} 积分` : `Unlock for ${FEATURE_COSTS.brand_collaborations} credits`}
                       </button>
