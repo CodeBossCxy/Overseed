@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
           select: { id: true, name: true, email: true, createdAt: true },
         },
       },
-      orderBy: { verificationSubmittedAt: 'asc' },
+      orderBy: { verificationSubmittedAt: 'desc' },
     })
 
     return NextResponse.json({ brands })

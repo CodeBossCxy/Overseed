@@ -589,36 +589,46 @@ export default function AIAssistantPage() {
 
   return (
     <RoleShell noFooter>
-      <div className="h-full min-h-0 flex flex-col">
-        <h1 className="text-3xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
-        {/* Chat / Image Generation tabs */}
-        <div className="flex items-center gap-2 mt-3 mb-4 flex-shrink-0">
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm transition ${
-              activeTab === 'chat'
-                ? 'selected-option-glass text-gray-900 font-bold'
-                : 'bg-gray-100/70 text-gray-600 font-semibold hover:bg-white/55'
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            {t.aiAssistant.tabChat}
-          </button>
-          <button
-            onClick={() => setActiveTab('image')}
-            className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm transition ${
-              activeTab === 'image'
-                ? 'selected-option-glass text-gray-900 font-bold'
-                : 'bg-gray-100/70 text-gray-600 font-semibold hover:bg-white/55'
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
-            </svg>
-            {t.aiAssistant.tabImage}
-          </button>
+      <div className="min-h-0 flex flex-col -mb-10"
+        style={{
+          /* Fill the viewport minus WorkspaceLayout chrome:
+             top-bar (~64px) + main pb-10 (40px) = ~104px.
+             100dvh for accurate viewport on all devices.
+             -mb-10 cancels main's pb-10. */
+          height: 'calc(100dvh - 5.5rem)',
+        }}
+      >
+        <div className="flex items-center gap-6 mb-1 flex-shrink-0">
+          <h1 className="text-xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
+          {/* Chat / Image Generation tabs */}
+          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+                activeTab === 'chat'
+                  ? 'bg-white shadow-sm text-gray-900 font-bold'
+                  : 'text-gray-500 font-medium hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              {t.aiAssistant.tabChat}
+            </button>
+            <button
+              onClick={() => setActiveTab('image')}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+                activeTab === 'image'
+                  ? 'bg-white shadow-sm text-gray-900 font-bold'
+                  : 'text-gray-500 font-medium hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
+              </svg>
+              {t.aiAssistant.tabImage}
+            </button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 flex overflow-hidden rounded-3xl workspace-glass-card">
         {/* Image Generation tab */}
@@ -626,7 +636,7 @@ export default function AIAssistantPage() {
 
         {/* Sidebar */}
         {activeTab === 'chat' && isProUser && sidebarOpen && (
-          <div className="w-72 flex-shrink-0 bg-white/25 border-r border-white/60 flex flex-col overflow-hidden">
+          <div className="w-72 flex-shrink-0 bg-white/25 border-r border-white/60 flex flex-col min-h-0">
             {/* Sidebar header */}
             <div className="p-4 flex items-center justify-between">
               <button
@@ -649,7 +659,7 @@ export default function AIAssistantPage() {
             </div>
 
             {/* Chat list */}
-            <div className="flex-1 overflow-y-auto px-2 pb-4">
+            <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
               {chatList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-32 text-gray-400">
                   <svg className="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -768,7 +778,7 @@ export default function AIAssistantPage() {
         )}
 
         {/* Main chat area (kept mounted so chat state survives tab switches) */}
-        <div className={`flex-1 ${activeTab === 'chat' ? 'flex' : 'hidden'} flex-col min-w-0 border-l border-white/50`}>
+        <div className={`flex-1 ${activeTab === 'chat' ? 'flex' : 'hidden'} flex-col min-w-0 min-h-0 border-l border-white/50`}>
           {/* Top bar */}
           <div className="h-14 flex items-center justify-between px-4 border-b border-white/55 bg-white/35 backdrop-blur flex-shrink-0">
             <div className="flex items-center gap-3">
@@ -827,11 +837,11 @@ export default function AIAssistantPage() {
           )}
 
           {/* Messages */}
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+          <div ref={messagesContainerRef} className={`flex-1 min-h-0 ${messages.length > 0 ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+            <div className={`max-w-3xl mx-auto px-4 ${messages.length > 0 ? 'py-6 space-y-6' : 'h-full flex flex-col'}`}>
               {/* Welcome */}
               {messages.length === 0 && isProUser && (
-                <div className="flex justify-center items-center min-h-[60vh]">
+                <div className="flex-1 flex justify-center items-center">
                   <div className="text-center max-w-md">
                     <div className="w-14 h-14 bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl flex items-center justify-center mx-auto mb-5">
                       <svg className="w-7 h-7 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
