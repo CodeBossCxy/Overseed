@@ -1008,6 +1008,22 @@ model CreatorFeatureUnlock {
   @@map("creator_feature_unlock")
 }
 
+// Cached creator contact emails from CreatorDB /contact endpoint. Shared
+// across all users — if one user reveals a creator's email, subsequent
+// users pay Overseed credits but skip the CreatorDB call.
+model CreatorContactCache {
+  id        String   @id @default(cuid())
+  platform  String
+  handle    String
+  hasEmail  Boolean  // from /profile hasEmail field (0.1 credits)
+  email     String?  // from /contact endpoint (0-15 credits)
+  emails    String[] // all emails returned
+  fetchedAt DateTime @default(now())
+
+  @@unique([platform, handle])
+  @@map("creator_contact_cache")
+}
+
 // Audit trail of Influencers Club vendor credit spend. One row per billed
 // live call: discovery (0.01 x results returned), enrichment or analytics
 // (1 credit each).

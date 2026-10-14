@@ -1013,7 +1013,10 @@ export default function DiscoverPanel() {
       const data = await res.json().catch(() => null)
       if (!res.ok) {
         if (data?.code === 'NO_DATA') {
-          setFeatureError(zh ? '该达人暂无此数据' : 'Data not available for this creator')
+          // Mark as unlocked with empty data so the UI shows "no data" inline
+          // instead of a global error banner
+          setFeatureUnlocked((prev) => new Set([...prev, feature]))
+          setFeatureUnlocks((prev) => ({ ...prev, [feature]: { _empty: true } }))
         } else {
           throw new Error(data?.message || 'Unlock failed')
         }
@@ -1023,6 +1026,7 @@ export default function DiscoverPanel() {
       setFeatureUnlocks((prev) => ({ ...prev, [feature]: data.data }))
     } catch (err: any) {
       setFeatureError(err.message || 'Unlock failed')
+      setTimeout(() => setFeatureError(null), 5000)
     } finally {
       setFeatureLoading(null)
     }
@@ -1033,7 +1037,7 @@ export default function DiscoverPanel() {
     audience_age: 12,
     audience_country: 12,
     audience_bundle: 30,
-    brand_collaborations: 10,
+    brand_collaborations: 6,
   }
 
   const FEATURE_LABELS: Record<string, [string, string]> = {
@@ -1169,12 +1173,19 @@ export default function DiscoverPanel() {
   const [contactSent, setContactSent] = useState(false)
   const [contactError, setContactError] = useState<string | null>(null)
 
-  const openContact = () => {
+  const openContact = (creator?: DiscoveredCreator) => {
+    if (creator) setDetailFor(creator)
     setContactMsg('')
     setContactFiles([])
     setContactSent(false)
     setContactError(null)
     setContactOpen(true)
+  }
+
+  const promptUnlock = (feature: string) => {
+    if (featureLoading) return
+    setFeatureError(null)
+    setFeatureConfirm(feature)
   }
 
   const addContactFiles = (list: FileList | null) => {
@@ -2966,10 +2977,7 @@ export default function DiscoverPanel() {
                 return (
                 <div
                   key={`${searchTaskId ?? activeSearch?.params ?? 'browse'}:${searchPage}:${creator.id}:${creatorIndex}`}
-                  onClick={isClickable ? () => openDetail(creator) : undefined}
-                  className={`workspace-glass-card rounded-2xl p-5 ${
-                    isClickable ? 'cursor-pointer hover:shadow-md transition' : ''
-                  }`}
+                  className="workspace-glass-card rounded-2xl p-5"
                 >
                   {/* Top section: avatar + info + platform link */}
                   <div className="flex gap-4">
@@ -3150,6 +3158,16 @@ export default function DiscoverPanel() {
                       ) : null}
                       <button
                         type="button"
+                        onClick={(e) => { e.stopPropagation(); openContact(creator) }}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 border border-indigo-200 text-indigo-600 rounded-full text-sm font-semibold hover:bg-indigo-50 transition"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                        </svg>
+                        {zh ? '联系' : 'Contact'}
+                      </button>
+                      <button
+                        type="button"
                         disabled={!handle || savingKey === saveKey}
                         onClick={(e) => { e.stopPropagation(); toggleSaveCreator(creator) }}
                         className={`w-10 h-10 flex items-center justify-center rounded-full border transition flex-shrink-0 disabled:opacity-50 ${
@@ -3265,9 +3283,6 @@ export default function DiscoverPanel() {
                       <span className="text-gray-400"> · {[detail.location, detail.language].filter(Boolean).join(' · ')}</span>
                     )}
                   </p>
-                  {detail?.bio && (
-                    <p className="mt-1.5 text-sm text-gray-600 line-clamp-2">{detail.bio}</p>
-                  )}
                   {/* Category badges */}
                   {detail?.category && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
@@ -3289,7 +3304,7 @@ export default function DiscoverPanel() {
                 {/* Top-right actions */}
                 <div className="flex items-center gap-2 pt-3 flex-shrink-0">
                   <button
-                    onClick={openContact}
+                    onClick={() => openContact()}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -3434,33 +3449,6 @@ export default function DiscoverPanel() {
                         {zh ? '有赞助内容' : 'Has Sponsored Content'}
                       </span>
                     )}
-                    {/* Brand Collaborations unlock — only on YT/IG when hasSponsors */}
-                    {detail.has_brand_deals && detailFor.platform !== 'tiktok' && (
-                      featureUnlocked.has('brand_collaborations') && featureUnlocks.brand_collaborations ? (
-                        <div className="w-full mt-2">
-                          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">{zh ? '品牌合作' : 'Brand Collaborations'}</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {(featureUnlocks.brand_collaborations.sponsors || []).map((s: any, i: number) => (
-                              <span key={s.name || i} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-800 rounded-full text-xs font-medium">
-                                {s.logo && (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={s.logo} alt="" className="w-4 h-4 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                                )}
-                                {s.name}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => featureLoading ? null : setFeatureConfirm('brand_collaborations')}
-                          disabled={featureLoading != null}
-                          className="px-2.5 py-1 border border-dashed border-amber-200 text-amber-600 rounded-full text-xs font-medium hover:bg-amber-50 transition disabled:opacity-50"
-                        >
-                          🔒 {zh ? '查看品牌合作' : 'Brand Collaborations'} · {FEATURE_COSTS.brand_collaborations} {zh ? '积分' : 'credits'}
-                        </button>
-                      )
-                    )}
                     {detail.is_agency_represented && (
                       <span className="px-2.5 py-1 bg-rose-50 text-rose-700 rounded-full text-xs font-medium">
                         {zh ? '经纪公司代理' : 'Agency Represented'}
@@ -3537,6 +3525,14 @@ export default function DiscoverPanel() {
                 </div>{/* end right column */}
               </div>
 
+              {/* ── Feature error (inline) ── */}
+              {featureError && (
+                <div className="mx-5 mb-2 bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-700 flex items-center justify-between">
+                  <span>{featureError}</span>
+                  <button onClick={() => setFeatureError(null)} className="ml-2 text-red-400 hover:text-red-600 flex-shrink-0">✕</button>
+                </div>
+              )}
+
               {/* ── Audience Insights — full-width section below both columns ── */}
               <div className="mx-4 mb-4 rounded-2xl bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/60 border border-indigo-100/80 px-5 py-4 shadow-sm">
                 <div className="flex items-center gap-2.5 mb-3">
@@ -3555,7 +3551,7 @@ export default function DiscoverPanel() {
                   {!AUDIENCE_BUNDLE_FEATURES.every((f) => featureUnlocked.has(f)) && (
                     <button
                       type="button"
-                      onClick={() => featureLoading ? null : setFeatureConfirm('audience_bundle')}
+                      onClick={() => promptUnlock('audience_bundle')}
                       disabled={featureLoading != null}
                       className="flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50 shadow-sm"
                     >
@@ -3567,60 +3563,48 @@ export default function DiscoverPanel() {
                   )}
                 </div>
 
-                {/* Confirmation dialog */}
-                {featureConfirm && FEATURE_LABELS[featureConfirm] && (
-                  <div className="mb-3 bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between">
-                    <p className="text-sm text-indigo-800 font-medium">
-                      {zh
-                        ? `解锁${FEATURE_LABELS[featureConfirm][0]}需要 ${FEATURE_COSTS[featureConfirm]} 积分？`
-                        : `Unlock ${FEATURE_LABELS[featureConfirm][1]} for ${FEATURE_COSTS[featureConfirm]} credits?`}
-                    </p>
-                    <div className="flex gap-2 ml-4">
-                      <button
-                        onClick={() => featureConfirm === 'audience_bundle' ? unlockAudienceBundle() : unlockFeature(featureConfirm)}
-                        disabled={featureLoading != null}
-                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
-                      >
-                        {(featureLoading === featureConfirm || featureLoading === 'audience_bundle') ? (zh ? '解锁中…' : 'Unlocking…') : (zh ? '确认' : 'Confirm')}
-                      </button>
-                      <button
-                        onClick={() => setFeatureConfirm(null)}
-                        className="px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50 transition"
-                      >
-                        {zh ? '取消' : 'Cancel'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {featureError && (
-                  <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-700">
-                    {featureError}
-                  </div>
-                )}
-
                 <div className="grid grid-cols-3 gap-3">
                   {/* ── Gender ── */}
                   {featureUnlocked.has('audience_gender') && featureUnlocks.audience_gender ? (
                     <div className="bg-white/80 border border-white rounded-xl p-3 shadow-sm">
                       <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '性别' : 'Gender'}</p>
-                      {(() => {
+                      {featureUnlocks.audience_gender._empty ? (
+                        <p className="text-[11px] text-gray-400 italic">{zh ? '暂无数据' : 'No data'}</p>
+                      ) : (() => {
                         const g = featureUnlocks.audience_gender
                         const male = Math.round((g.maleRatio ?? 0) * 100)
                         const female = Math.round((g.femaleRatio ?? 0) * 100)
+                        // SVG pie chart — two arcs for male/female
+                        const femaleAngle = (female / 100) * 360
+                        const largeArc = femaleAngle > 180 ? 1 : 0
+                        const rad = (deg: number) => (deg - 90) * (Math.PI / 180)
+                        const fx = 50 + 40 * Math.cos(rad(femaleAngle))
+                        const fy = 50 + 40 * Math.sin(rad(femaleAngle))
                         return (
-                          <div>
-                            <div className="flex h-5 rounded-full overflow-hidden">
-                              <div className="bg-blue-500 flex items-center justify-center text-[10px] text-white font-medium" style={{ width: `${male}%` }}>
-                                {male > 12 && `${male}%`}
-                              </div>
-                              <div className="bg-pink-400 flex items-center justify-center text-[10px] text-white font-medium" style={{ width: `${female}%` }}>
-                                {female > 12 && `${female}%`}
-                              </div>
-                            </div>
-                            <div className="flex justify-between mt-1.5 text-[10px] text-gray-500">
-                              <span>♂ {zh ? '男' : 'Male'} {male}%</span>
-                              <span>♀ {zh ? '女' : 'Female'} {female}%</span>
+                          <div className="flex flex-col items-center">
+                            <svg viewBox="0 0 100 100" className="w-20 h-20">
+                              {/* Male full circle as background */}
+                              <circle cx="50" cy="50" r="40" fill="#3b82f6" />
+                              {/* Female arc overlay */}
+                              {female > 0 && female < 100 && (
+                                <path
+                                  d={`M50,10 A40,40 0 ${largeArc},1 ${fx},${fy} L50,50 Z`}
+                                  fill="#f472b6"
+                                />
+                              )}
+                              {female >= 100 && <circle cx="50" cy="50" r="40" fill="#f472b6" />}
+                              {/* Center white circle for donut effect */}
+                              <circle cx="50" cy="50" r="24" fill="white" />
+                            </svg>
+                            <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-600">
+                              <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                {zh ? '男' : 'Male'} {male}%
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-pink-400" />
+                                {zh ? '女' : 'Female'} {female}%
+                              </span>
                             </div>
                           </div>
                         )
@@ -3643,7 +3627,7 @@ export default function DiscoverPanel() {
                         </svg>
                       </div>
                       <button
-                        onClick={() => featureLoading ? null : setFeatureConfirm('audience_gender')}
+                        onClick={() => promptUnlock('audience_gender')}
                         disabled={featureLoading != null}
                         className="relative z-10 w-full mt-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
                       >
@@ -3656,6 +3640,9 @@ export default function DiscoverPanel() {
                   {featureUnlocked.has('audience_age') && featureUnlocks.audience_age ? (
                     <div className="bg-white/80 border border-white rounded-xl p-3 shadow-sm">
                       <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '年龄' : 'Age'}</p>
+                      {featureUnlocks.audience_age._empty ? (
+                        <p className="text-[11px] text-gray-400 italic">{zh ? '暂无数据' : 'No data'}</p>
+                      ) : (
                       <div className="space-y-1">
                         {(featureUnlocks.audience_age.ages || []).map((a: any, i: number) => {
                           const pct = Math.round((a.share ?? 0) * 100)
@@ -3670,6 +3657,7 @@ export default function DiscoverPanel() {
                           )
                         })}
                       </div>
+                      )}
                     </div>
                   ) : (
                     <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
@@ -3691,7 +3679,7 @@ export default function DiscoverPanel() {
                         </svg>
                       </div>
                       <button
-                        onClick={() => featureLoading ? null : setFeatureConfirm('audience_age')}
+                        onClick={() => promptUnlock('audience_age')}
                         disabled={featureLoading != null}
                         className="relative z-10 w-full mt-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
                       >
@@ -3704,6 +3692,9 @@ export default function DiscoverPanel() {
                   {featureUnlocked.has('audience_country') && featureUnlocks.audience_country ? (
                     <div className="bg-white/80 border border-white rounded-xl p-3 shadow-sm">
                       <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '受众地区' : 'Top Countries'}</p>
+                      {featureUnlocks.audience_country._empty ? (
+                        <p className="text-[11px] text-gray-400 italic">{zh ? '暂无数据' : 'No data'}</p>
+                      ) : (
                       <div className="space-y-1">
                         {(featureUnlocks.audience_country.countries || []).map((c: any, i: number) => {
                           const pct = Math.round((c.share ?? 0) * 100)
@@ -3718,6 +3709,7 @@ export default function DiscoverPanel() {
                           )
                         })}
                       </div>
+                      )}
                     </div>
                   ) : (
                     <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
@@ -3739,7 +3731,7 @@ export default function DiscoverPanel() {
                         </svg>
                       </div>
                       <button
-                        onClick={() => featureLoading ? null : setFeatureConfirm('audience_country')}
+                        onClick={() => promptUnlock('audience_country')}
                         disabled={featureLoading != null}
                         className="relative z-10 w-full mt-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
                       >
@@ -3749,6 +3741,132 @@ export default function DiscoverPanel() {
                   )}
                 </div>
               </div>
+
+              {/* ── Brand Collaborations — full-width, below Audience Insights ── */}
+              {detailFor.platform !== 'tiktok' && (
+              <div className="border-t border-gray-100 px-5 py-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" />
+                  </svg>
+                  <h4 className="text-sm font-bold text-gray-900">{zh ? '品牌合作记录' : 'Brand Collaborations'}</h4>
+                  <span className="text-xs text-gray-400 ml-1">
+                    {zh ? '查看赞助品牌、合作内容和表现数据。' : 'Sponsoring brands, sponsored content & performance data.'}
+                  </span>
+                </div>
+
+                {featureUnlocked.has('brand_collaborations') && featureUnlocks.brand_collaborations ? (
+                  featureUnlocks.brand_collaborations._empty || !(featureUnlocks.brand_collaborations.sponsors?.length) ? (
+                    <p className="mt-3 text-sm text-gray-400 italic">{zh ? '该达人暂无品牌合作数据。' : 'No brand collaboration data available for this creator.'}</p>
+                  ) : (
+                  <div className="space-y-4 mt-3">
+                    {(featureUnlocks.brand_collaborations.sponsors || []).map((sponsor: any, si: number) => (
+                      <div key={sponsor.name || si} className="border border-gray-100 rounded-xl overflow-hidden">
+                        {/* Sponsor header */}
+                        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50/60">
+                          {sponsor.logo && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={sponsor.logo} alt="" className="w-8 h-8 rounded-full object-cover bg-white" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-gray-900">{sponsor.name}</p>
+                            {sponsor.socialId && <p className="text-[10px] text-gray-400">ID: {sponsor.socialId}</p>}
+                          </div>
+                          {sponsor.url && (
+                            <a href={sponsor.url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-500 hover:underline flex-shrink-0">
+                              {zh ? '查看' : 'View'} ↗
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Sponsored content posts */}
+                        {sponsor.posts?.length > 0 && (
+                          <div className="px-4 py-3 border-t border-gray-100">
+                            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-2">{zh ? '赞助内容' : 'Sponsored Content'}</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              {sponsor.posts.slice(0, 3).map((post: any, pi: number) => (
+                                <a
+                                  key={post.contentId || pi}
+                                  href={post.contentUrl || '#'}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block group"
+                                >
+                                  {post.coverImageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={proxyAvatarUrl(post.coverImageUrl) || post.coverImageUrl} alt="" className="w-full aspect-square rounded-lg object-cover bg-gray-100" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                  ) : (
+                                    <div className="w-full aspect-square rounded-lg bg-gray-100 flex items-center justify-center text-gray-300 text-xs">No image</div>
+                                  )}
+                                  <p className="mt-1 text-[10px] text-gray-500 line-clamp-1">{post.description || ''}</p>
+                                  <div className="flex gap-2 text-[9px] text-gray-400 mt-0.5">
+                                    {post.likes != null && <span>♡ {Number(post.likes).toLocaleString()}</span>}
+                                    {post.views != null && <span>▶ {Number(post.views).toLocaleString()}</span>}
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Brand performance summary */}
+                        {sponsor.performance && (sponsor.performance.avgLikes != null || sponsor.performance.avgViews != null) && (
+                          <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
+                            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-2">{zh ? '品牌表现' : 'Performance Summary'}</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              {[
+                                { label: zh ? '平均点赞' : 'Avg Likes', value: sponsor.performance.avgLikes },
+                                { label: zh ? '平均评论' : 'Avg Comments', value: sponsor.performance.avgComments },
+                                { label: zh ? '平均观看' : 'Avg Views', value: sponsor.performance.avgViews },
+                                { label: zh ? '平均互动率' : 'Avg Eng. Rate', value: sponsor.performance.avgEngagementRate, pct: true },
+                                { label: zh ? '中位点赞' : 'Median Likes', value: sponsor.performance.medianLikes },
+                                { label: zh ? '中位观看' : 'Median Views', value: sponsor.performance.medianViews },
+                              ].filter((s) => s.value != null).map((s) => (
+                                <div key={s.label} className="text-center">
+                                  <p className="text-[9px] text-gray-400 uppercase">{s.label}</p>
+                                  <p className="text-xs font-bold text-gray-800">
+                                    {s.pct ? `${(Number(s.value) * 100).toFixed(2)}%` : formatFollowers(Math.round(Number(s.value)), locale)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  )
+                ) : (
+                  <div className="relative border border-gray-100 rounded-xl p-4 mt-2 overflow-hidden">
+                    {/* Blurred preview */}
+                    <div className="opacity-40 blur-[2px] select-none pointer-events-none space-y-3">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-amber-100" />
+                          <div className="flex-1 space-y-1">
+                            <div className="h-3 w-24 bg-gray-200 rounded" />
+                            <div className="h-2 w-40 bg-gray-100 rounded" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Lock overlay */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
+                      <svg className="w-6 h-6 text-gray-400 mb-2" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                      <button
+                        onClick={() => promptUnlock('brand_collaborations')}
+                        disabled={featureLoading != null}
+                        className="px-5 py-2 border border-indigo-200 text-indigo-600 rounded-full text-sm font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                      >
+                        {zh ? `解锁品牌合作 · ${FEATURE_COSTS.brand_collaborations} 积分` : `Unlock for ${FEATURE_COSTS.brand_collaborations} credits`}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              )}
               </>)}
             </div>{/* end overflow wrapper */}
 
@@ -3756,7 +3874,7 @@ export default function DiscoverPanel() {
             {detail && (
               <div className="px-6 py-3.5 border-t border-gray-100 flex-shrink-0 flex items-center gap-3">
                 <button
-                  onClick={openContact}
+                  onClick={() => openContact()}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -3781,6 +3899,52 @@ export default function DiscoverPanel() {
       )}
 
       {/* TEMP: contact-the-creator compose modal */}
+      {/* ── Feature unlock confirmation popup ── */}
+      {featureConfirm && FEATURE_LABELS[featureConfirm] && (
+        <div
+          data-solid
+          className="fixed inset-0 bg-black/50 z-[55] flex items-center justify-center p-4"
+          onClick={() => !featureLoading && setFeatureConfirm(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">
+              {zh ? '解锁' : 'Unlock'} {FEATURE_LABELS[featureConfirm][zh ? 0 : 1]}
+            </h3>
+            <p className="text-sm text-gray-500 mb-5">
+              {zh
+                ? `此操作将扣除 ${FEATURE_COSTS[featureConfirm]} 积分。解锁后可永久查看该达人的此项数据。`
+                : `This will use ${FEATURE_COSTS[featureConfirm]} credits. Once unlocked, you can view this data for this creator anytime.`}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setFeatureConfirm(null)}
+                disabled={featureLoading != null}
+                className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition disabled:opacity-50"
+              >
+                {zh ? '取消' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => featureConfirm === 'audience_bundle' ? unlockAudienceBundle() : unlockFeature(featureConfirm)}
+                disabled={featureLoading != null}
+                className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+              >
+                {featureLoading
+                  ? (zh ? '解锁中…' : 'Unlocking…')
+                  : (zh ? `确认 · ${FEATURE_COSTS[featureConfirm]} 积分` : `Confirm · ${FEATURE_COSTS[featureConfirm]} credits`)}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {contactOpen && detailFor && (
         <div
           data-solid
@@ -3796,11 +3960,13 @@ export default function DiscoverPanel() {
                 <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl">
                   ✓
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mt-4">Message sent</h3>
+                <h3 className="text-lg font-bold text-gray-900 mt-4">
+                  {zh ? '消息已发送' : 'Message sent'}
+                </h3>
                 <p className="text-sm text-gray-500 mt-1.5">
-                  Your message is on its way to{' '}
-                  {detail?.name || detailFor.display_name || detailFor.handle}. Replies will
-                  arrive at your account email.
+                  {zh
+                    ? `您的消息已提交。我们的团队将代您联系 ${detail?.name || detailFor.display_name || detailFor.handle}，回复将出现在您的 Overseed 消息中心。`
+                    : `Your request has been submitted. Our team will reach out to ${detail?.name || detailFor.display_name || detailFor.handle} on your behalf. Replies will appear in your Overseed Messages.`}
                 </p>
                 <button
                   onClick={() => setContactOpen(false)}

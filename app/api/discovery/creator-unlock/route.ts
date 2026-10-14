@@ -27,7 +27,7 @@ const FEATURE_CREDITS: Record<Feature, number> = {
   audience_gender: 12,
   audience_age: 12,
   audience_country: 12,
-  brand_collaborations: 10,
+  brand_collaborations: 6,
 }
 
 const VALID_PLATFORMS = ['instagram', 'youtube', 'tiktok']

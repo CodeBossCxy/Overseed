@@ -32,6 +32,7 @@ function authHeaders() {
 interface ProfileResult {
   niches: string[]
   avatarUrl: string | null
+  hasEmail: boolean | null
 }
 
 async function fetchProfileForCreator(
@@ -39,12 +40,12 @@ async function fetchProfileForCreator(
   handle: string,
   userId: string | undefined,
 ): Promise<ProfileResult> {
-  const empty: ProfileResult = { niches: [], avatarUrl: null }
+  const empty: ProfileResult = { niches: [], avatarUrl: null, hasEmail: null }
   const platformPath = PLATFORM_PATH[platform]
   if (!platformPath) return empty
 
-  // Request both niches and avatarUrl — same 0.1 credit cost
-  const body = { uniqueId: handle, fields: ['niches', 'avatarUrl'] }
+  // Request niches, avatarUrl, and hasEmail — same 0.1 credit cost
+  const body = { uniqueId: handle, fields: ['niches', 'avatarUrl', 'hasEmail'] }
 
   let lastError: Error | null = null
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -90,7 +91,8 @@ async function fetchProfileForCreator(
 
       const niches: string[] = Array.isArray(data.data?.niches) ? data.data.niches : []
       const avatarUrl: string | null = typeof data.data?.avatarUrl === 'string' ? data.data.avatarUrl : null
-      return { niches, avatarUrl }
+      const hasEmail: boolean | null = typeof data.data?.hasEmail === 'boolean' ? data.data.hasEmail : null
+      return { niches, avatarUrl, hasEmail }
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       if (attempt < MAX_RETRIES) {
@@ -156,6 +158,15 @@ export async function POST(req: NextRequest) {
         create: { platform: c.platform, handle: c.handle, niches: profile.niches },
         update: { niches: profile.niches, fetchedAt: new Date() },
       }).catch((e) => console.error(`[creator-niches] cache write failed for ${c.platform}:${c.handle}:`, e))
+      // Seed the contact cache with hasEmail from the profile call (0.1 credits)
+      // so the outreach route knows whether to call /contact (0-15 credits).
+      if (profile.hasEmail !== null) {
+        await prisma.creatorContactCache.upsert({
+          where: { platform_handle: { platform: c.platform, handle: c.handle } },
+          create: { platform: c.platform, handle: c.handle, hasEmail: profile.hasEmail },
+          update: { hasEmail: profile.hasEmail },
+        }).catch(() => {})
+      }
       const key = `${c.platform}:${c.handle}`
       if (profile.avatarUrl) avatars[key] = profile.avatarUrl
       return { key, niches: profile.niches }

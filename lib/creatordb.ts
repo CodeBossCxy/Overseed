@@ -1021,13 +1021,55 @@ export async function creatordbSponsorship(
     )
   }
 
-  const sponsors = Array.isArray(data.data?.sponsorList)
-    ? data.data.sponsorList.slice(0, 5).map((s: any) => ({
-        name: s.sponsorName || s.name || 'Unknown',
-        logo: s.sponsorLogo || s.logo || null,
-        url: s.sponsorUrl || s.url || null,
-      }))
-    : []
-  if (sponsors.length === 0) return null
+  const rawSponsors = Array.isArray(data.data?.sponsorList) ? data.data.sponsorList.slice(0, 5) : []
+  if (rawSponsors.length === 0) return null
+
+  const sponsors = rawSponsors.map((s: any) => {
+    // Sponsored content posts
+    const posts = Array.isArray(s.sponsoredContents)
+      ? s.sponsoredContents.map((p: any) => ({
+          contentId: p.contentId || p.id || null,
+          publishTime: p.publishTime || null,
+          description: p.description || p.caption || null,
+          coverImageUrl: p.coverImageUrl || p.thumbnailUrl || null,
+          contentUrl: p.contentUrl || p.url || null,
+          isSponsored: p.isSponsored ?? true,
+          hashtags: Array.isArray(p.hashtags) ? p.hashtags : [],
+          likes: p.likes ?? null,
+          comments: p.comments ?? null,
+          views: p.views ?? null,
+          engagementRate: p.engagementRate ?? null,
+        }))
+      : []
+
+    // Brand performance summary
+    const perf = s.performance || s.brandPerformance || {}
+
+    return {
+      name: s.sponsorName || s.name || 'Unknown',
+      brandId: s.sponsorId || s.brandId || null,
+      logo: s.sponsorLogo || s.logo || null,
+      url: s.sponsorUrl || s.url || null,
+      socialId: s.sponsorSocialId || s.socialId || null,
+      posts,
+      performance: {
+        totalLikes: perf.totalLikes ?? null,
+        avgLikes: perf.avgLikes ?? null,
+        medianLikes: perf.medianLikes ?? null,
+        minLikes: perf.minLikes ?? null,
+        maxLikes: perf.maxLikes ?? null,
+        totalComments: perf.totalComments ?? null,
+        avgComments: perf.avgComments ?? null,
+        totalViews: perf.totalViews ?? null,
+        avgViews: perf.avgViews ?? null,
+        medianViews: perf.medianViews ?? null,
+        minViews: perf.minViews ?? null,
+        maxViews: perf.maxViews ?? null,
+        avgEngagementRate: perf.avgEngagementRate ?? null,
+        engagementConsistency: perf.engagementConsistency ?? null,
+      },
+    }
+  })
+
   return { feature: 'brand_collaborations' as const, data: { sponsors } }
 }
