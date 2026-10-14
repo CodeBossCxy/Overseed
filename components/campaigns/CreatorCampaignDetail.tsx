@@ -133,7 +133,7 @@ export default function CreatorCampaignDetail({
 
   const primaryAction = () => {
     if (isOwner) return <Link href={`/dashboard/brand/campaigns/${campaign.id}`} className="block rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 py-4 text-center font-semibold text-white">{t.campaign.manageCampaignLink}</Link>
-    if (userType === 'BRAND' || userType === 'ADMIN') return <p className="py-3 text-center text-sm text-[#7180ad]">{t.campaign.onlyCreatorsCanApply}</p>
+    if (userType === 'BRAND' || userType === 'ADMIN') return <p className="py-3 text-center text-sm text-[#7180ad]">{locale === 'zh' ? '仅限达人申请此活动' : 'Viewing as brand — only creators can apply'}</p>
     if (isDeadlinePassed) return <p className="py-3 text-center font-semibold text-red-600">{t.campaign.deadlinePassed}</p>
     if (spotsLeft === 0) return <p className="py-3 text-center font-semibold text-orange-600">{t.campaign.allSpotsFilled}</p>
     if (hasApplied) return <button disabled className="w-full rounded-xl bg-slate-200 py-4 font-semibold text-slate-500">{t.campaign.alreadyApplied}</button>

@@ -179,7 +179,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     <RoleShell>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-8">
         <CampaignDetailWrapper
-          initialCampaign={campaign as any}
+          initialCampaign={JSON.parse(JSON.stringify(campaign))}
           isOwner={isOwner}
           hasApplied={hasApplied}
           isSaved={isSaved}
@@ -189,7 +189,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         />
 
         {/* Similar Campaigns */}
-        <SimilarCampaigns campaignId={id} initialCampaigns={similarCampaigns as any} />
+        <SimilarCampaigns campaignId={id} initialCampaigns={JSON.parse(JSON.stringify(similarCampaigns))} />
       </div>
     </RoleShell>
   )

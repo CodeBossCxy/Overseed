@@ -46,9 +46,9 @@ export default async function BrandCampaignDetailPage({ params }: { params: Prom
     notFound()
   }
 
-  // Check if user owns this campaign
+  // Non-owner brands can view the public campaign page (read-only)
   if (campaign.brand.userId !== userId) {
-    redirect('/dashboard/brand')
+    redirect(`/campaign/${id}`)
   }
 
   // Get application stats

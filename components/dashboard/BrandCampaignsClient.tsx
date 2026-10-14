@@ -69,9 +69,11 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
     }
   }
 
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const removeCampaign = async (mode: 'delete' | 'cancel') => {
     if (!deleteTarget) return
     setDeleting(true)
+    setDeleteError(null)
     try {
       const res = await fetch(
         `/api/campaigns/${deleteTarget.id}${mode === 'cancel' ? '?mode=cancel' : ''}`,
@@ -80,7 +82,12 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
       if (res.ok) {
         setDeleteTarget(null)
         router.refresh()
+      } else {
+        const data = await res.json().catch(() => null)
+        setDeleteError(data?.message || `Delete failed (${res.status})`)
       }
+    } catch (err: any) {
+      setDeleteError(err.message || 'Network error')
     } finally {
       setDeleting(false)
     }
@@ -156,11 +163,37 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
   return (
     <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
       {/* Header */}
-      <div className="mb-7">
+      <div className="mb-5">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{c.title}</h1>
           <p className="text-gray-500 mt-1">{c.subtitle}</p>
         </div>
+      </div>
+
+      {/* View toggle */}
+      <div className="mb-4 flex items-center gap-1 p-1 w-fit rounded-2xl bg-white/40 border border-white/60">
+        <button
+          type="button"
+          onClick={() => { setMineOnly(false); setPage(1) }}
+          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
+            !mineOnly
+              ? 'bg-white shadow-sm text-gray-900'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          {zh ? '全部活动' : 'All Campaigns'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMineOnly(true); setPage(1) }}
+          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
+            mineOnly
+              ? 'bg-primary-600 text-white shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          {zh ? '我的活动' : 'My Campaigns'}
+        </button>
       </div>
 
       {/* Filters */}
@@ -205,17 +238,6 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
             <option value="deadline">{c.sortPrefix}{c.sortDeadlineSoonest}</option>
             <option value="newest">{c.sortPrefix}{c.sortNewest}</option>
           </select>
-          <button
-            type="button"
-            onClick={() => { setMineOnly(!mineOnly); setPage(1) }}
-            className={`h-11 px-5 rounded-full text-sm font-medium transition whitespace-nowrap ${
-              mineOnly
-                ? 'bg-primary-600 text-white hover:bg-primary-700'
-                : 'workspace-glass-control text-gray-700 hover:text-gray-900'
-            }`}
-          >
-            {zh ? '仅看我的' : 'My campaigns'}
-          </button>
         </div>
       </div>
 
@@ -361,17 +383,19 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
                     {c.manageCampaign}
                     <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(cp) }}
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
-                    aria-label={`${c.deleteCampaign}: ${cp.title}`}
-                    title={c.deleteCampaign}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  {cp.brandId === brandId && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteError(null); setDeleteTarget(cp) }}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                      aria-label={`${c.deleteCampaign}: ${cp.title}`}
+                      title={c.deleteCampaign}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </Link>
             )
@@ -422,6 +446,9 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
               <p className="text-sm text-gray-600 mt-2">{c.cancelConfirmDesc}</p>
             )}
             <p className="text-sm font-semibold text-gray-900 mt-3 truncate">{deleteTarget.title}</p>
+            {deleteError && (
+              <p className="text-sm text-red-600 mt-3 bg-red-50 rounded-lg px-3 py-2">{deleteError}</p>
+            )}
             <div className="flex flex-wrap justify-end gap-2 mt-6">
               <button
                 onClick={() => setDeleteTarget(null)}
