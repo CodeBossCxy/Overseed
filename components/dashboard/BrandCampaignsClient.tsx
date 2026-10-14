@@ -41,7 +41,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sort, setSort] = useState<'deadline' | 'newest'>('deadline')
-  const [mineOnly, setMineOnly] = useState(false)
+  const [mineOnly, setMineOnly] = useState(true)
   const [page, setPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -102,7 +102,12 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
 
   const visible = useMemo(() => {
     let list = [...campaigns]
-    if (mineOnly) list = list.filter((cp) => cp.brandId === brandId)
+    if (mineOnly) {
+      list = list.filter((cp) => cp.brandId === brandId)
+    } else {
+      // When viewing all, show own campaigns + only published/active campaigns from others
+      list = list.filter((cp) => cp.brandId === brandId || cp.status === 'ACTIVE' || cp.status === 'COMPLETED')
+    }
     const q = query.trim().toLowerCase()
     if (q) {
       list = list.filter(
@@ -174,17 +179,6 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
       <div className="mb-4 flex items-center gap-1 p-1 w-fit rounded-2xl bg-white/40 border border-white/60">
         <button
           type="button"
-          onClick={() => { setMineOnly(false); setPage(1) }}
-          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
-            !mineOnly
-              ? 'bg-white shadow-sm text-gray-900'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          {zh ? '全部活动' : 'All Campaigns'}
-        </button>
-        <button
-          type="button"
           onClick={() => { setMineOnly(true); setPage(1) }}
           className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
             mineOnly
@@ -193,6 +187,17 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
           }`}
         >
           {zh ? '我的活动' : 'My Campaigns'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMineOnly(false); setPage(1) }}
+          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
+            !mineOnly
+              ? 'bg-white shadow-sm text-gray-900'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          {zh ? '全部活动' : 'All Campaigns'}
         </button>
       </div>
 
@@ -268,8 +273,8 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
             return (
               <Link
                 key={cp.id}
-                href={`/dashboard/brand/campaigns/${cp.id}`}
-                aria-label={`${c.manageCampaign}: ${cp.title}`}
+                href={cp.brandId === brandId ? `/dashboard/brand/campaigns/${cp.id}` : `/campaign/${cp.id}`}
+                aria-label={`${cp.brandId === brandId ? c.manageCampaign : (zh ? '查看' : 'View')}: ${cp.title}`}
                 className={`group workspace-glass-card workspace-glass-option rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8 min-h-[108px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
                   isDraft ? 'border-2 border-dashed border-gray-300 bg-gray-50/50 saturate-[.85]' : ''
                 }`}
