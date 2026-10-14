@@ -49,6 +49,7 @@ interface UserData {
   isActive: boolean
   createdAt: string
   creditsRemaining: number
+  inviteCode: { code: string; note: string | null } | null
   _count: { aiTokenUsage: number }
   aiUsage: {
     monthlyTokens: number
@@ -528,6 +529,7 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 font-medium text-gray-600 text-right">Credits Left</th>
                     <th className="px-4 py-3 font-medium text-gray-600">AI Requests (Month)</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Tokens (Month)</th>
+                    <th className="px-4 py-3 font-medium text-gray-600">Invite Code</th>
                     <th className="px-4 py-3 font-medium text-gray-600">Joined</th>
                   </tr>
                 </thead>
@@ -592,6 +594,15 @@ export default function AdminDashboard() {
                           </span>
                         ) : (
                           '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {u.inviteCode ? (
+                          <span className="inline-block px-2 py-0.5 bg-violet-50 text-violet-700 rounded font-mono font-medium" title={u.inviteCode.note || ''}>
+                            {u.inviteCode.code}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">

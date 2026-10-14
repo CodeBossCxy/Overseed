@@ -162,6 +162,7 @@ export interface NewUserSignupInfo {
   // 'credentials' or the OAuth provider name (google / facebook)
   method: string
   inviteCode?: string | null
+  inviteCodeNote?: string | null
   companyName?: string | null
   tier?: string | null
 }
@@ -171,12 +172,40 @@ export interface NewUserSignupInfo {
 export async function sendNewUserSignupEmail(info: NewUserSignupInfo) {
   try {
     const baseUrl = process.env.NEXTAUTH_URL || 'https://overseed.net'
+
+    // Count total registered users for seat number
+    let seatLabel: string | null = null
+    try {
+      const { prisma } = await import('@/lib/prisma')
+      const totalUsers = await prisma.user.count()
+      seatLabel = `#${totalUsers} of ${totalUsers} total`
+
+      // If invite code provided, also count how many used that specific code
+      if (info.inviteCode) {
+        const code = await prisma.betaInviteCode.findUnique({
+          where: { code: info.inviteCode },
+          select: { usedCount: true, maxUses: true, note: true },
+        })
+        if (code) {
+          seatLabel = `#${totalUsers} total · Code seat ${code.usedCount}/${code.maxUses}`
+          if (!info.inviteCodeNote && code.note) info.inviteCodeNote = code.note
+        }
+      }
+    } catch { /* non-critical */ }
+
+    const inviteDisplay = info.inviteCode
+      ? info.inviteCodeNote
+        ? `${info.inviteCode} (${info.inviteCodeNote})`
+        : info.inviteCode
+      : null
+
     const rows: [string, string | null | undefined][] = [
       ['Name', info.name],
       ['Email', info.email],
       ['Account type', info.userType],
       ['Signup method', info.method],
-      ['Invite code', info.inviteCode],
+      ['Invite code', inviteDisplay],
+      ['Seat', seatLabel],
       ['Company', info.companyName],
       ['Subscription tier', info.tier],
     ]
@@ -194,7 +223,7 @@ export async function sendNewUserSignupEmail(info: NewUserSignupInfo) {
     const { error } = await getResend().emails.send({
       from: `Overseed <${process.env.EMAIL_FROM}>`,
       to: SIGNUP_NOTIFY_EMAIL,
-      subject: `[New user] ${info.userType}: ${info.name || info.email} (${info.email})`,
+      subject: `[New user] ${info.userType}: ${info.name || info.email}${info.inviteCode ? ` [${info.inviteCode}]` : ''} (${info.email})`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
           <h1 style="color: #4F46E5; font-size: 24px; margin-bottom: 8px;">Overseed</h1>

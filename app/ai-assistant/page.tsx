@@ -626,7 +626,7 @@ export default function AIAssistantPage() {
 
         {/* Sidebar */}
         {activeTab === 'chat' && isProUser && sidebarOpen && (
-          <div className="w-72 flex-shrink-0 bg-white/25 border-r border-white/60 flex flex-col">
+          <div className="w-72 flex-shrink-0 bg-white/25 border-r border-white/60 flex flex-col overflow-hidden">
             {/* Sidebar header */}
             <div className="p-4 flex items-center justify-between">
               <button

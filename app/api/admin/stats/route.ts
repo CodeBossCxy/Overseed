@@ -15,6 +15,7 @@ export async function GET() {
 
   const [
     users,
+    inviteUsages,
     totalUsers,
     proUsers,
     totalCampaigns,
@@ -42,6 +43,13 @@ export async function GET() {
         },
       },
       orderBy: { createdAt: 'desc' },
+    }),
+    // Invite code usage — which code each user registered with
+    prisma.betaInviteUsage.findMany({
+      select: {
+        userId: true,
+        inviteCode: { select: { code: true, note: true } },
+      },
     }),
     prisma.user.count(),
     prisma.user.count({ where: { subscriptionTier: 'PRO' } }),
@@ -105,9 +113,13 @@ export async function GET() {
   const creditBalanceMap = new Map(
     creditBalances.map((row) => [row.userId, row._sum.remaining || 0])
   )
+  const inviteCodeMap = new Map(
+    inviteUsages.map((iu: any) => [iu.userId, { code: iu.inviteCode.code, note: iu.inviteCode.note }])
+  )
 
   const usersWithUsage = users.map((u) => ({
     ...u,
+    inviteCode: inviteCodeMap.get(u.id) || null,
     creditsRemaining: creditBalanceMap.get(u.id) || 0,
     aiUsage: usageMap.get(u.id) || {
       monthlyTokens: 0,

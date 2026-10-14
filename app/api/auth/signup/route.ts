@@ -131,6 +131,7 @@ export async function POST(request: Request) {
       userType: newUser.userType,
       method: 'credentials',
       inviteCode: betaCode.code,
+      inviteCodeNote: betaCode.note,
       companyName: userType === 'brand' ? businessLegalName || name : null,
       tier: subscriptionTier,
     })
