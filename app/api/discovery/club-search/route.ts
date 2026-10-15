@@ -154,8 +154,15 @@ export async function GET(req: NextRequest) {
           .update({ where: { id: taskId }, data: { updatedAt: new Date() } })
           .catch(() => {})
       })
+      const snapshotData = snapshot.data as any
+      const fullResults: any[] = snapshotData?.results ?? []
+      const displayResults = fullResults.slice(0, DISPLAY_PAGE_SIZE)
       return NextResponse.json({
-        ...(snapshot.data as any),
+        ...snapshotData,
+        results: displayResults,
+        has_next_page:
+          displayResults.length === DISPLAY_PAGE_SIZE ||
+          (snapshotData?.has_next_page ?? false),
         task_id: taskId,
         page: requestedPage,
         from_task: true,
