@@ -730,8 +730,6 @@ export async function GET(req: NextRequest) {
     )
     const fullResults = result?.results ?? []
     settleAfterResponse(fullResults.length)
-    // Save the FULL result set (up to API_PAGE_SIZE) in the task log
-    const taskId = await persistTaskPage(result)
     // Return only DISPLAY_PAGE_SIZE results to the client
     const displayResults = fullResults.slice(0, DISPLAY_PAGE_SIZE)
 
@@ -777,13 +775,21 @@ export async function GET(req: NextRequest) {
       } catch { /* non-critical */ }
     }
 
-    return NextResponse.json({
+    const displayResponse = {
       ...result,
       results: displayResults,
       total: result?.total ?? displayResults.length,
       has_next_page: displayResults.length === DISPLAY_PAGE_SIZE || (result?.has_next_page ?? false),
-      task_id: taskId,
+      next_offset: result?.next_offset ?? null,
       page: requestedPage,
+    }
+    // Save the DISPLAY-READY response (not the raw 100-item result) so cached
+    // pages return the same 20-item page the client originally received.
+    const taskId = await persistTaskPage(displayResponse)
+
+    return NextResponse.json({
+      ...displayResponse,
+      task_id: taskId,
       ...(aiParsed ? {
         ai_parsed: {
           niches: aiParsed.niches,
