@@ -570,6 +570,31 @@ select {
   }
 }
 
+/* AI Assistant: full-height layout that aligns with the sidebar bottom.
+   The sidebar uses h-screen py-4 → bottom is viewport - 1rem.
+   The content column sits beside it with the same min-h-screen flex parent.
+   We make <main> a flex container so .ai-chat-root fills remaining space,
+   then remove pb-10 so the chat bottom aligns with the sidebar bottom (py-4 = 1rem). */
+.ws-themed-bg main:has(.ai-chat-root) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Small top gap between header row and chat container */
+  padding-top: clamp(0.5rem, 1vw, 0.875rem);
+  /* Breathing room below the chat — sits slightly above sidebar bottom */
+  padding-bottom: clamp(1.25rem, 1.5vw, 1.5rem);
+  flex: 1;
+}
+/* Make the content column height-constrained like the sidebar when AI chat is present */
+.ws-themed-bg .flex.min-h-screen:has(.ai-chat-root) > .flex-1.flex.flex-col {
+  height: 100vh;
+  max-height: 100vh;
+}
+.ai-chat-root {
+  flex: 1;
+  min-height: 0;
+}
+
 .workspace-glass-card {
   background: rgba(255, 255, 255, 0.30);
   border: 1px solid rgba(255, 255, 255, 0.46);

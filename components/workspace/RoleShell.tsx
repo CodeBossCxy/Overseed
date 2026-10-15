@@ -12,22 +12,23 @@ import BrandWorkspaceLayout from './BrandWorkspaceLayout'
 export default function RoleShell({
   children,
   noFooter,
+  topBarLeft,
 }: {
   children: React.ReactNode
   noFooter?: boolean
+  topBarLeft?: React.ReactNode
 }) {
   const { data: session, status } = useSession()
   const { isBrand } = useViewMode()
 
   if (status === 'loading') {
-    // Avoid a public-header flash while the session resolves
     return <div className="min-h-screen ws-themed-bg" />
   }
   if (!session?.user) {
     return <MainLayout noFooter={noFooter}>{children}</MainLayout>
   }
   return isBrand ? (
-    <BrandWorkspaceLayout>{children}</BrandWorkspaceLayout>
+    <BrandWorkspaceLayout topBarLeft={topBarLeft}>{children}</BrandWorkspaceLayout>
   ) : (
     <CreatorWorkspaceLayout>{children}</CreatorWorkspaceLayout>
   )

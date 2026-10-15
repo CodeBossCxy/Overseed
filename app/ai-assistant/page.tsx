@@ -587,49 +587,43 @@ export default function AIAssistantPage() {
     )
   }
 
+  const topBarLeft = (
+    <div className="flex items-center gap-4">
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
+      <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60">
+        <button
+          onClick={() => setActiveTab('chat')}
+          className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+            activeTab === 'chat'
+              ? 'bg-white shadow-sm text-gray-900 font-bold'
+              : 'text-gray-500 font-medium hover:text-gray-700'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          {t.aiAssistant.tabChat}
+        </button>
+        <button
+          onClick={() => setActiveTab('image')}
+          className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+            activeTab === 'image'
+              ? 'bg-white shadow-sm text-gray-900 font-bold'
+              : 'text-gray-500 font-medium hover:text-gray-700'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
+          </svg>
+          {t.aiAssistant.tabImage}
+        </button>
+      </div>
+    </div>
+  )
+
   return (
-    <RoleShell noFooter>
-      <div className="min-h-0 flex flex-col -mb-10"
-        style={{
-          /* Fill the viewport minus WorkspaceLayout chrome:
-             top-bar (~64px) + main pb-10 (40px) = ~104px.
-             100dvh for accurate viewport on all devices.
-             -mb-10 cancels main's pb-10. */
-          height: 'calc(100dvh - 5.5rem)',
-        }}
-      >
-        <div className="flex items-center gap-6 mb-1 flex-shrink-0">
-          <h1 className="text-xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
-          {/* Chat / Image Generation tabs */}
-          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60">
-            <button
-              onClick={() => setActiveTab('chat')}
-              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
-                activeTab === 'chat'
-                  ? 'bg-white shadow-sm text-gray-900 font-bold'
-                  : 'text-gray-500 font-medium hover:text-gray-700'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              {t.aiAssistant.tabChat}
-            </button>
-            <button
-              onClick={() => setActiveTab('image')}
-              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
-                activeTab === 'image'
-                  ? 'bg-white shadow-sm text-gray-900 font-bold'
-                  : 'text-gray-500 font-medium hover:text-gray-700'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
-              </svg>
-              {t.aiAssistant.tabImage}
-            </button>
-          </div>
-        </div>
+    <RoleShell noFooter topBarLeft={topBarLeft}>
+      <div className="ai-chat-root flex flex-col min-h-0">
         <div className="min-h-0 flex-1 flex overflow-hidden rounded-3xl workspace-glass-card">
         {/* Image Generation tab */}
         {activeTab === 'image' && <ImageGenerationPanel isProUser={isProUser} />}

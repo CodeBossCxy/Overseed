@@ -52,9 +52,11 @@ function NavIcon({ d }: { d: string }) {
 export default function WorkspaceLayout({
   role,
   children,
+  topBarLeft,
 }: {
   role: WorkspaceRole
   children: React.ReactNode
+  topBarLeft?: React.ReactNode
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -370,6 +372,7 @@ export default function WorkspaceLayout({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
+            {topBarLeft && <div className="flex items-center">{topBarLeft}</div>}
             <div className="flex items-center gap-3 ml-auto">
               {role === 'brand' && (
                 <Link
