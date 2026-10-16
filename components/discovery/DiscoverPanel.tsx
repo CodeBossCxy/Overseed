@@ -742,7 +742,7 @@ export default function DiscoverPanel() {
   const [minFollowers, setMinFollowers] = useState('')
   const [maxFollowers, setMaxFollowers] = useState('')
   const [followerTierMode, setFollowerTierMode] = useState('')
-  const [sort, setSort] = useState<'followers' | 'recent'>('followers')
+  const [sort, setSort] = useState<'relevance' | 'followers' | 'recent'>('relevance')
 
   // Pricing v4 credit prices for the cost hints (search bar estimate, profile
   // view, full analytics). null = credit system off / not loaded.
@@ -1686,6 +1686,10 @@ export default function DiscoverPanel() {
       qs.set('sort_by', v.sortBy)
       qs.set('sort_order', v.sortOrder === 'asc' ? 'asc' : 'desc')
     }
+    // Map the simple sort dropdown to cdb_sort for CreatorDB searches
+    if (sort === 'followers') qs.set('cdb_sort', 'followers')
+    else if (sort === 'recent') qs.set('cdb_sort', 'lastPublishTime')
+    else if (sort === 'relevance') qs.set('cdb_sort', 'platformScore')
     if (showLatestPost) qs.set('show_latest_post', '1')
 
     await runSearchPage(
@@ -2670,9 +2674,10 @@ export default function DiscoverPanel() {
               <label className="text-xs font-medium text-gray-500">{d.sortLabel}</label>
               <select
                 value={sort}
-                onChange={(e) => setSort(e.target.value as 'followers' | 'recent')}
+                onChange={(e) => setSort(e.target.value as 'relevance' | 'followers' | 'recent')}
                 className={inputCls}
               >
+                <option value="relevance">{zh ? '相关度' : 'Relevance'}</option>
                 <option value="followers">{d.sortFollowers}</option>
                 <option value="recent">{d.sortRecent}</option>
               </select>

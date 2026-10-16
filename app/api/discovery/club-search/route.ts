@@ -479,7 +479,9 @@ export async function GET(req: NextRequest) {
             value: f.value as CreatorDbFilterValue,
           }))
         }
-        if (!creatorDbSortField) creatorDbSortField = 'followers'
+        // Sort AI-parsed searches by platform relevance score instead of
+        // raw follower count so results mix relevance with reach.
+        if (!creatorDbSortField) creatorDbSortField = 'platformScore'
         // If the AI detected a different platform, override the URL param
         if (aiParsed.platform && CLUB_PLATFORMS.includes(aiParsed.platform as ClubPlatform)) {
           platform = aiParsed.platform as ClubPlatform
