@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { randomUUID } from 'crypto'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB
@@ -39,9 +41,6 @@ export async function POST(request: NextRequest) {
   const ext = filename.replace(/.*\./, '.') || '.jpg'
   const key = `${prefix || 'campaign_image/'}${randomUUID()}${ext}`
 
-  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
-  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
-
   const s3 = new S3Client({
     region: region!,
     credentials: { accessKeyId: accessKeyId!, secretAccessKey: secretAccessKey! },
@@ -59,7 +58,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     presignedUrl,
     key,
-    // The stable URL the app uses to serve S3 images
     url: `/api/s3-image/${key}`,
   })
 }
