@@ -221,7 +221,7 @@ export default function InfluencerProfile({ influencer }: InfluencerProfileProps
           {influencer.bio && (
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">{pv.about}</h3>
-              <p className="text-gray-700 whitespace-pre-wrap">{influencer.bio}</p>
+              <p className="text-gray-700 whitespace-pre-wrap">{influencer.bio.split('\n').filter((l: string) => !/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l) && !/(?:\+?\d[\d\s\-().]{7,}\d)/.test(l)).join('\n')}</p>
             </div>
           )}
 

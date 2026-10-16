@@ -3424,7 +3424,7 @@ export default function DiscoverPanel() {
                     </div>
 
                     {detail.bio && (
-                      <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed line-clamp-6 mb-3">{detail.bio}</p>
+                      <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed line-clamp-6 mb-3">{detail.bio.split('\n').filter((l: string) => !/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l) && !/(?:\+?\d[\d\s\-().]{7,}\d)/.test(l)).join('\n')}</p>
                     )}
 
                     {/* Category, location, language badges */}

@@ -794,9 +794,10 @@ export async function getCreatorContactEmail(
 function stripContactLines(text: unknown): string | null {
   if (typeof text !== 'string') return null
   const emailRe = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/
+  const phoneRe = /(?:\+?\d[\d\s\-().]{7,}\d)/
   const kept = text
     .split(/\r?\n/)
-    .filter((line) => !emailRe.test(line) && !line.includes('•••'))
+    .filter((line) => !emailRe.test(line) && !phoneRe.test(line) && !line.includes('•••'))
   return kept.join('\n').trim() || null
 }
 

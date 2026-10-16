@@ -86,7 +86,7 @@ export default function InfluencerCard({ influencer }: InfluencerCardProps) {
 
         {/* Bio */}
         {influencer.bio && (
-          <p className="text-sm text-gray-600 mt-3 line-clamp-2">{influencer.bio}</p>
+          <p className="text-sm text-gray-600 mt-3 line-clamp-2">{influencer.bio.split('\n').filter((l: string) => !/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l) && !/(?:\+?\d[\d\s\-().]{7,}\d)/.test(l)).join('\n')}</p>
         )}
 
         {/* Platforms */}

@@ -11,6 +11,14 @@ import type { CreatorDbPlatform } from '@/lib/creatordb-filter-fields'
 
 const BASE = 'https://apiv3.creatordb.app'
 
+const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/
+const PHONE_RE = /(?:\+?\d[\d\s\-().]{7,}\d)/
+/** Remove lines that contain an email or phone number from a bio string. */
+function stripContactLines(bio: string | null): string | null {
+  if (!bio) return bio
+  return bio.split('\n').filter(l => !EMAIL_RE.test(l) && !PHONE_RE.test(l)).join('\n') || null
+}
+
 export class CreatorDbApiError extends Error {
   constructor(
     message: string,
@@ -454,7 +462,7 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
       sortMetric: c[sortMetricField] ?? perf[sortMetricField] ?? null,
       handle: handle || null,
       display_name: c.displayName || handle || null,
-      bio: profile.bio ?? null,
+      bio: stripContactLines(profile.bio ?? null),
       country: profile.country
         ? (COUNTRY_A3_TO_A2[profile.country] || profile.country)
         : (opts.country ? opts.country.toUpperCase() : null),
@@ -696,7 +704,7 @@ async function fetchCreatorDbEnrichment(
     handle: cleanHandle,
     name: cleanHandle, // display name comes from discovery, not this call
     avatar_url: p.avatarUrl || null,
-    bio: p.bio || null,
+    bio: stripContactLines(p.bio || null),
     location: country,
     language,
     gender: null,
