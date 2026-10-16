@@ -7,7 +7,10 @@
 
 set -euo pipefail
 
-PROD_URL="postgresql://neondb_owner:npg_CpOr5x9qGYcz@ep-bold-cake-aikj744w-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require"
+PROD_URL="$(grep '^NEON_DATABASE_URL=' "$(dirname "$0")/../.env" | sed 's/^NEON_DATABASE_URL="//' | sed 's/"$//')"
+if [ -z "$PROD_URL" ]; then
+  echo "❌ NEON_DATABASE_URL not found in .env"; exit 1
+fi
 LOCAL_URL="postgresql://postgres@localhost:5432/overseeddb"
 DUMP_FILE="/tmp/neon-prod-dump.sql"
 
