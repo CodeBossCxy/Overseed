@@ -9,7 +9,7 @@ import { discoverySearch, discoverySearchCacheProbe, getProvider, providerName }
 import { CREATORDB_FIELD_MAP, CREATORDB_PLATFORMS, type CreatorDbCanonicalField, type CreatorDbFilterOp, type CreatorDbPlatform } from '@/lib/creatordb-filter-fields'
 import { CREATORDB_PRESETS, type CreatorDbFilterValue, type CreatorDbPresetId } from '@/lib/creatordb-filter-presets'
 import { buildCustomSearchRequest, buildSearchRequest, type CreatorDbCanonicalFilter, type CreatorDbExtraFilter, type CreatorDbPresetOverrides } from '@/lib/creatordb-search-request'
-import { parseDiscoveryQuery, toCreatorDbFilters } from '@/lib/discovery-ai'
+import { parseDiscoveryQuery, toCreatorDbFilters, broadenFilters } from '@/lib/discovery-ai'
 import {
   CLUB_FILTER_DEFS,
   CREATOR_HAS_KEYS,
@@ -715,7 +715,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await mergeEnrichedProfileFields(
+    let result = await mergeEnrichedProfileFields(
       useYoutube
         ? await youtubeSearchCreators({
             query: searchOpts.query!,
@@ -737,7 +737,54 @@ export async function GET(req: NextRequest) {
           })
         : cachedResult ?? (await discoverySearch(searchOpts))
     )
-    const fullResults = result?.results ?? []
+    let fullResults = result?.results ?? []
+
+    // ── Smart retry: if AI-parsed search returned 0 results, progressively
+    // broaden filters by dropping the most restrictive ones and retrying.
+    // Max 3 retry rounds to stay within timeout. No extra credit charge.
+    if (
+      fullResults.length === 0 &&
+      aiParsed &&
+      creatorDbFilters &&
+      !useYoutube &&
+      requestedPage === 0
+    ) {
+      let currentFilters = creatorDbFilters.map((f) => ({
+        field: f.field,
+        op: f.op,
+        value: f.value as string | number | boolean | string[],
+      }))
+      for (let retry = 0; retry < 3; retry++) {
+        const broader = broadenFilters(currentFilters)
+        if (!broader) break
+        currentFilters = broader
+        try {
+          const retryOpts = {
+            ...searchOpts,
+            creatorDbFilters: broader.map((f) => ({
+              field: f.field,
+              op: f.op,
+              value: f.value as CreatorDbFilterValue,
+            })),
+          }
+          const retryResult = await mergeEnrichedProfileFields(
+            await discoverySearch(retryOpts)
+          )
+          const retryResults = retryResult?.results ?? []
+          if (retryResults.length > 0) {
+            result = retryResult
+            fullResults = retryResults
+            // Update the filters that actually produced results so the
+            // client can display the broadened filter state.
+            creatorDbFilters = retryOpts.creatorDbFilters
+            console.log(`[discovery-ai] Retry ${retry + 1} succeeded with ${retryResults.length} results after broadening filters`)
+            break
+          }
+        } catch {
+          // Retry failed — continue to next broadening round
+        }
+      }
+    }
     settleAfterResponse(fullResults.length)
     // Save the FULL result set (up to API_PAGE_SIZE) in the task log
     const taskId = await persistTaskPage(result)

@@ -101,18 +101,21 @@ Reply with ONLY a JSON object, no prose, using exactly these keys (use null when
   "audience_age": "13-17" | "18-24" | "25-34" | "35-44" | "45-64" | "65-" | null,
   "min_avg_views": number | null
 }
-Notes:
-- When the user describes a PRODUCT, infer the best creator niches and keywords for promoting it. A skincare product → niches: "Skincare, Beauty", keywords: "skincare routine, skincare review". A gaming headset → niches: "Gaming, Tech". Do NOT use product-specific terms as niches.
+IMPORTANT — Fewer filters is better. Every filter narrows the result set; 2-3 well-chosen filters beats 8 specific ones:
+- When the user describes a PRODUCT, infer the best creator niches and keywords for promoting it. A skincare product → niches: "Skincare, Beauty", keywords: "skincare routine". A gaming headset → niches: "Gaming, Tech". Do NOT use product-specific terms as niches.
 - "10万" = 100000, "1万" = 10000, "1M" = 1000000, "1k" = 1000
 - "粉丝1-2万" → min_followers: 10000, max_followers: 20000
 - "美妆" → niches: "Beauty, Makeup", keywords: "beauty, makeup"
+- "餐厅探店" / "美食博主" → niches: "Food", keywords: "food review, restaurant"
 - "High engagement" → min_engagement: 3
 - "Recently active" → last_post: 90
 - Only set audience_age when the AUDIENCE (viewers) age is specified, not the creator's age
 - Only set audience_location when the target audience location is specified (not the creator's country)
 - Always translate non-English terms to English for keywords and niches
-- Only set filters the user mentions or that are clearly implied by the product. Do NOT invent follower ranges, engagement thresholds, or audience demographics unless stated.
-- Keep filters broad enough to return results. 2-3 filters is better than 8 overly specific ones.`
+- Only set filters the user explicitly mentions or that are clearly implied. Do NOT invent follower ranges, engagement thresholds, audience demographics, or language unless stated.
+- Do NOT set language unless the user explicitly asks for a specific language — many bilingual creators would be excluded.
+- keywords should be SHORT English terms (1-3 words) that creators use as hashtags. Keep to 2-4 terms max.
+- Prefer broad niches (e.g. "Food" not "Food & Beverage, Cooking, Restaurant").`
 
 // ── LLM call ───────────────────────────────────────────────────────────────────
 
@@ -171,40 +174,31 @@ export function toCreatorDbFilters(
   const filters: CreatorDbFilterFromAI[] = []
   const platform = parsed.platform || 'instagram'
 
+  // ── Tier 1: Core identity (always keep) ──
   if (parsed.niches) {
     filters.push({ field: 'niches', op: 'in', value: parsed.niches })
-  }
-  // Only add hashtags when they contain terms NOT already covered by niches.
-  // Sending both niches AND overlapping hashtags over-constrains the search.
-  if (parsed.keywords) {
-    const nicheTerms = new Set(
-      (parsed.niches || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
-    )
-    const extraKeywords = parsed.keywords
-      .split(',')
-      .map((t) => t.trim())
-      .filter((t) => !nicheTerms.has(t.toLowerCase()))
-    if (extraKeywords.length > 0) {
-      filters.push({ field: 'hashtags', op: 'in', value: extraKeywords.join(', ') })
-    }
   }
   if (parsed.country) {
     filters.push({ field: 'country', op: '=', value: parsed.country })
   }
-  if (parsed.audience_location) {
-    filters.push({ field: 'audienceLocation', op: '=', value: parsed.audience_location })
-  }
+
+  // ── Tier 2: Sizing (important but droppable in retry) ──
   if (parsed.min_followers != null) {
     filters.push({ field: 'followers', op: '>', value: parsed.min_followers })
   }
   if (parsed.max_followers != null) {
     filters.push({ field: 'followers', op: '<', value: parsed.max_followers })
   }
+
+  // ── Tier 3: Quality & targeting (most likely to over-constrain) ──
   if (parsed.min_engagement != null) {
     filters.push({ field: 'shortEngagementRate', op: '>', value: parsed.min_engagement })
   }
   if (parsed.language) {
     filters.push({ field: 'mainLanguage', op: '=', value: parsed.language })
+  }
+  if (parsed.audience_location) {
+    filters.push({ field: 'audienceLocation', op: '=', value: parsed.audience_location })
   }
   if (parsed.last_post != null) {
     filters.push({ field: 'lastPublishTime', op: '>', value: parsed.last_post })
@@ -216,6 +210,42 @@ export function toCreatorDbFilters(
     filters.push({ field: 'shortAvgViews', op: '>', value: parsed.min_avg_views })
   }
 
-  // Cap at 10 filters — drop from the end (least important)
+  // NOTE: We intentionally do NOT add `keywords` as a hashtags filter here.
+  // CreatorDB hashtag matching requires exact hashtag usage in posts, which
+  // is too restrictive for AI-generated search terms and frequently returns
+  // 0 results. Niches alone provide sufficient category targeting.
+
+  // Cap at 10 filters
   return { filters: filters.slice(0, 10), platform }
+}
+
+/**
+ * Progressively broaden filters for retry when a search returns 0 results.
+ * Each round drops the most restrictive filter category. Returns null when
+ * no more filters can be dropped (only niches or country remain).
+ */
+export function broadenFilters(
+  filters: CreatorDbFilterFromAI[],
+): CreatorDbFilterFromAI[] | null {
+  // Drop in order of restrictiveness (most restrictive first)
+  const DROP_ORDER: CreatorDbCanonicalField[] = [
+    'hashtags',            // exact-match — almost always too narrow
+    'shortEngagementRate', // quality floor
+    'mainLanguage',        // language filter
+    'audienceAge',         // audience targeting
+    'audienceLocation',    // audience location
+    'lastPublishTime',     // recency
+    'shortAvgViews',       // views floor
+    'followers',           // follower range (drops both min and max)
+  ]
+
+  for (const field of DROP_ORDER) {
+    const has = filters.some((f) => f.field === field)
+    if (has) {
+      return filters.filter((f) => f.field !== field)
+    }
+  }
+
+  // Only core filters remain (niches, country) — can't broaden further
+  return null
 }
