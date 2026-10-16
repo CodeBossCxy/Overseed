@@ -115,5 +115,7 @@ export async function rehostImage(
 }
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-// Vercel rejects request bodies over 4.5 MB, so cap uploads safely below that.
+// Legacy route-based upload limit (Vercel rejects bodies over 4.5 MB).
 export const MAX_FILE_SIZE = 4 * 1024 * 1024 // 4 MB
+// Presigned direct-to-S3 upload limit (bypasses Vercel body limit).
+export const MAX_FILE_SIZE_PRESIGNED = 20 * 1024 * 1024 // 20 MB

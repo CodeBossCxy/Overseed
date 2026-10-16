@@ -243,6 +243,32 @@ export default function CampaignForm({
   }
 
   const uploadSingle = async (f: File) => {
+    // Try presigned direct-to-S3 upload first (supports up to 20 MB).
+    // Falls back to legacy route-based upload if presign is unavailable.
+    const presignRes = await fetch('/api/upload/presign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: f.name,
+        contentType: f.type,
+        size: f.size,
+        prefix: 'campaign_image/',
+      }),
+    })
+
+    if (presignRes.ok) {
+      const { presignedUrl, url } = await presignRes.json()
+      const putRes = await fetch(presignedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': f.type },
+        body: f,
+      })
+      if (!putRes.ok) throw new Error(`Upload failed for "${f.name}"`)
+      setFormData((prev) => ({ ...prev, images: [...prev.images, url] }))
+      return
+    }
+
+    // Fallback: legacy FormData upload through API route
     const body = new FormData()
     body.append('files', f)
     const res = await fetch('/api/upload', { method: 'POST', body })
@@ -288,7 +314,7 @@ export default function CampaignForm({
 
     // Client-side validation
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-    const maxSize = 4 * 1024 * 1024
+    const maxSize = 20 * 1024 * 1024 // 20 MB (presigned direct-to-S3)
     const maxTotal = 8
 
     const remaining = maxTotal - formData.images.length

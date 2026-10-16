@@ -561,7 +561,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             </div>
           </header>
 
-          <div className="h-72 md:h-[360px] rounded-3xl overflow-hidden bg-gradient-to-br from-[#f3e4d9] to-[#ead4c5]">{cover ? <img src={cover} alt="" className="w-full h-full object-cover"/> : <div className="w-full h-full flex flex-col items-center justify-center text-[#947f79]"><span className="text-7xl">✦</span><span className="mt-3">{m.campaignCover}</span></div>}</div>
+          <div className="h-72 md:h-[360px] rounded-3xl overflow-hidden bg-gradient-to-br from-[#f3e4d9] to-[#ead4c5]">{cover ? <img src={cover} alt="" className="w-full h-full object-contain"/> : <div className="w-full h-full flex flex-col items-center justify-center text-[#947f79]"><span className="text-7xl">✦</span><span className="mt-3">{m.campaignCover}</span></div>}</div>
 
           <section className="workspace-glass-card rounded-3xl p-6">
             <h2 className="text-xl font-bold">{m.aboutTitle}</h2>
