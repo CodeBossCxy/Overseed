@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -38,11 +38,50 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
   const zh = locale === 'zh'
 
   const router = useRouter()
-  const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [sort, setSort] = useState<'deadline' | 'newest'>('deadline')
-  const [mineOnly, setMineOnly] = useState(true)
-  const [page, setPage] = useState(1)
+
+  // Restore filter state from sessionStorage on mount
+  const [query, setQuery] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return sessionStorage.getItem('cp_query') || ''
+  })
+  const [statusFilter, setStatusFilter] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return sessionStorage.getItem('cp_status') || ''
+  })
+  const [sort, setSort] = useState<'deadline' | 'newest'>(() => {
+    if (typeof window === 'undefined') return 'deadline'
+    return (sessionStorage.getItem('cp_sort') as 'deadline' | 'newest') || 'deadline'
+  })
+  const [mineOnly, setMineOnly] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = sessionStorage.getItem('cp_mine')
+    return v === null ? true : v === '1'
+  })
+  const [page, setPage] = useState(() => {
+    if (typeof window === 'undefined') return 1
+    return Number(sessionStorage.getItem('cp_page')) || 1
+  })
+  // Persist filter state to sessionStorage
+  useEffect(() => { sessionStorage.setItem('cp_mine', mineOnly ? '1' : '0') }, [mineOnly])
+  useEffect(() => { sessionStorage.setItem('cp_page', String(page)) }, [page])
+  useEffect(() => { sessionStorage.setItem('cp_query', query) }, [query])
+  useEffect(() => { sessionStorage.setItem('cp_status', statusFilter) }, [statusFilter])
+  useEffect(() => { sessionStorage.setItem('cp_sort', sort) }, [sort])
+
+  // Restore scroll position after render
+  const scrollRestored = useRef(false)
+  useEffect(() => {
+    if (scrollRestored.current) return
+    scrollRestored.current = true
+    const y = Number(sessionStorage.getItem('cp_scrollY')) || 0
+    if (y > 0) requestAnimationFrame(() => window.scrollTo(0, y))
+  }, [])
+  useEffect(() => {
+    const save = () => sessionStorage.setItem('cp_scrollY', String(window.scrollY))
+    window.addEventListener('scroll', save, { passive: true })
+    return () => window.removeEventListener('scroll', save)
+  }, [])
+
   const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [submittingId, setSubmittingId] = useState<string | null>(null)
@@ -284,12 +323,24 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
                   <div className="relative w-28 h-20 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
                     {cp.images?.[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={cp.images[0]} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold text-lg">
-                        {cp.title.charAt(0)}
-                      </div>
-                    )}
+                      <img
+                        src={cp.images[0]}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const img = e.currentTarget
+                          img.style.display = 'none'
+                          const fallback = img.nextElementSibling as HTMLElement | null
+                          if (fallback) fallback.style.display = 'flex'
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className="w-full h-full flex items-center justify-center text-gray-300 font-bold text-lg"
+                      style={{ display: cp.images?.[0] ? 'none' : 'flex' }}
+                    >
+                      {cp.title.charAt(0)}
+                    </div>
                     {isDraft && (
                       <div className="absolute inset-0 bg-gray-900/30 flex items-center justify-center">
                         <span className="text-[10px] font-semibold text-white bg-gray-900/50 px-2 py-0.5 rounded-full">{statusLabel('DRAFT')}</span>
@@ -362,8 +413,8 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
                   )}
                 </div>
 
-                {/* Action */}
-                <div className="flex-shrink-0 lg:ml-auto flex items-center gap-4">
+                {/* Action — fixed min-width so rows align even when delete button is absent */}
+                <div className="flex-shrink-0 lg:ml-auto flex items-center gap-4 min-w-[10rem] justify-end">
                   {isDraft && (
                     isVerified ? (
                       <button

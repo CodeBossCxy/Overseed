@@ -129,6 +129,16 @@ npx prisma db push --force-reset  # Reset database (destructive)
 npx prisma generate             # Regenerate client
 ```
 
+### Sync production data to local
+
+Pull a snapshot of the production Neon database into your local PostgreSQL. This gives you real users, campaigns, search history, and credits locally without affecting production.
+
+```bash
+./scripts/sync-from-prod.sh
+```
+
+Requires `pg_dump` and `psql` (included with Postgres.app or any PostgreSQL installation). Local changes stay local — production is never affected.
+
 ## Internationalization
 
 The app supports English and Chinese at two levels:

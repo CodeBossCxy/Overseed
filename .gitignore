@@ -45,3 +45,4 @@ next-env.d.ts
 
 # Local vendor usage audit logs
 /logs/
+.env*
