@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { Resend } from 'resend'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
 import { chargeCredits, hasPriorCharge, gateFeature } from '@/lib/metering'
 import { discoveryEnrichForOutreach } from '@/lib/discovery-provider'
 import { sendOutreachBatch, type OutreachEmailInput } from '@/lib/outreach-email'
+
+const OPS_EMAIL = 'xinyi@overseed.net'
+
+const PROFILE_URL: Record<string, (h: string) => string> = {
+  instagram: (h) => `https://www.instagram.com/${h}/`,
+  youtube: (h) => `https://www.youtube.com/@${h}`,
+  tiktok: (h) => `https://www.tiktok.com/@${h}`,
+}
+
+const esc = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 async function ownedCampaign(id: string, userId: string) {
   return prisma.campaign.findFirst({
@@ -39,7 +51,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ message: 'Campaign not found', code: 'CAMPAIGN_NOT_FOUND' }, { status: 404 })
   }
 
-  const body = await req.json()
+  const contentType = req.headers.get('content-type') || ''
+  let body: any = {}
+  let formMessage: string | null = null
+  let formFiles: File[] = []
+
+  if (contentType.includes('multipart/form-data')) {
+    const fd = await req.formData()
+    const creatorRaw = fd.get('creator')
+    if (creatorRaw) {
+      try { body.creator = JSON.parse(String(creatorRaw)) } catch {}
+    }
+    const actionRaw = fd.get('action')
+    if (actionRaw) body.action = String(actionRaw)
+    const msgRaw = fd.get('message')
+    if (msgRaw) formMessage = String(msgRaw).trim()
+    formFiles = fd.getAll('files').filter((f): f is File => f instanceof File && f.size > 0)
+  } else {
+    body = await req.json()
+  }
 
   // ── action: send — enrich, charge, email all PENDING_REVIEW creators ──
   if (body.action === 'send') {
@@ -58,17 +88,71 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ message: 'Creator is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
     const c = body.creator
-    await prisma.campaignOutreach.upsert({
-      where: { campaignId_externalCreatorId: { campaignId: id, externalCreatorId: c.id } },
-      create: {
-        campaignId: id, externalCreatorId: c.id, platform: c.platform,
-        handle: c.handle || null, displayName: c.display_name || null,
-        avatarUrl: c.avatar_url || null, followerCount: c.follower_count ?? null,
-        engagementRate: c.engagement_rate == null ? null : Number(c.engagement_rate),
-        country: c.country || null, nicheTags: Array.isArray(c.niche_tags) ? c.niche_tags.slice(0, 12) : [],
-      },
-      update: {},
-    })
+    try {
+      await prisma.campaignOutreach.upsert({
+        where: { campaignId_externalCreatorId: { campaignId: id, externalCreatorId: c.id } },
+        create: {
+          campaignId: id, externalCreatorId: c.id, platform: c.platform,
+          handle: c.handle || null, displayName: c.display_name || null,
+          avatarUrl: c.avatar_url || null, followerCount: c.follower_count ?? null,
+          engagementRate: c.engagement_rate == null ? null : Number(c.engagement_rate),
+          country: c.country || null, nicheTags: Array.isArray(c.niche_tags) ? c.niche_tags.slice(0, 12) : [],
+          message: formMessage || null,
+        },
+        update: { message: formMessage || undefined },
+      })
+    } catch (dbErr) {
+      console.error('[campaign outreach] upsert failed:', dbErr)
+      return NextResponse.json({ message: 'Failed to save creator to queue', code: 'DB_ERROR' }, { status: 500 })
+    }
+
+    // ── Notify ops team when a message is included ──
+    if (formMessage && formMessage.length >= 10) {
+      const [brand, user] = await Promise.all([
+        prisma.brandProfile.findUnique({ where: { userId }, select: { companyName: true } }),
+        prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } }),
+      ])
+      if (brand && user?.email) {
+        const brandName = brand.companyName || user.name || 'A brand on Overseed'
+        const handle = c.handle || c.id
+        const profileUrl = PROFILE_URL[c.platform]?.(handle.replace(/^@/, '')) || `${c.platform}:${handle}`
+        const displayName = c.display_name || handle
+        const attachments = await Promise.all(
+          formFiles.map(async (f) => ({
+            filename: f.name,
+            content: Buffer.from(await f.arrayBuffer()),
+          }))
+        )
+        const html = `
+<div style="font-family:sans-serif;max-width:700px;margin:0 auto;">
+  <h2 style="color:#1F2A44;">Campaign Outreach Request</h2>
+  <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+    <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;width:140px;">Campaign</td><td style="padding:8px 12px;">${esc(campaign.title || id)}</td></tr>
+    <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;">Brand</td><td style="padding:8px 12px;">${esc(brandName)} (${esc(user.email)})</td></tr>
+    <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;">Creator</td><td style="padding:8px 12px;"><a href="${esc(profileUrl)}" style="color:#2563eb;text-decoration:none;">@${esc(handle.replace(/^@/, ''))}</a> (${esc(c.platform)})</td></tr>
+    <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;">Display Name</td><td style="padding:8px 12px;">${esc(displayName)}</td></tr>
+    <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;">Attachments</td><td style="padding:8px 12px;">${attachments.length > 0 ? attachments.map((a) => esc(a.filename)).join(', ') : 'None'}</td></tr>
+  </table>
+  <h3 style="color:#1F2A44;margin:24px 0 8px;">Brand's Message</h3>
+  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;font-size:15px;line-height:1.7;white-space:pre-wrap;">${esc(formMessage)}</div>
+  <p style="margin-top:24px;color:#6b7280;font-size:12px;">This is an automated notification from Overseed. Please reach out to the creator on behalf of the brand.</p>
+</div>`
+        try {
+          const resend = new Resend(process.env.RESEND_API_KEY)
+          const { error } = await resend.emails.send({
+            from: `Overseed Ops <${process.env.EMAIL_FROM}>`,
+            to: OPS_EMAIL,
+            replyTo: user.email,
+            subject: `[Campaign Outreach] ${brandName} → @${handle.replace(/^@/, '')} (${c.platform})`,
+            html,
+            attachments,
+          })
+          if (error) console.error('[campaign outreach] resend error:', error)
+        } catch (err) {
+          console.error('[campaign outreach] failed to send notification email:', err)
+        }
+      }
+    }
   }
 
   const queue = await prisma.campaignOutreach.findMany({ where: { campaignId: id }, orderBy: { createdAt: 'asc' } })

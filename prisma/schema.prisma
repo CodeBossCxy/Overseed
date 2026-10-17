@@ -569,6 +569,7 @@ model CampaignOutreach {
   country           String?
   nicheTags         String[] @default([])
   status            String   @default("SHORTLISTED")
+  message           String?
   requestedAt       DateTime?
   sentAt            DateTime?
   errorMessage      String?

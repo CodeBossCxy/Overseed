@@ -133,7 +133,7 @@ function nicheIdToLabel(id: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function MultiSelectFilter({
+export function MultiSelectFilter({
   value, onChange, options, placeholder, inputCls,
 }: {
   value: string
@@ -224,7 +224,9 @@ function MultiSelectFilter({
   )
 }
 
-function NicheAutocomplete({
+export { NicheTags }
+
+export function NicheAutocomplete({
   value, onChange, labelCls, inputCls, zh,
 }: {
   platform: string; value: string; onChange: (v: string) => void
@@ -628,26 +630,83 @@ function NicheTags({
   if (!niches || niches.length === 0) return null
 
   const labels = niches.map(nicheIdToLabel)
-  const shown = expanded ? labels : labels.slice(0, 3)
-  const remaining = labels.length - 3
+
+  // When collapsed, use CSS to clip to exactly 2 rows of tags.
+  // Tag height ≈ 22px (text-[10px] + py-0.5 + border), gap-1.5 = 6px → 2 rows ≈ 50px.
+  const shown = expanded ? labels : labels
+  const clampStyle = expanded
+    ? undefined
+    : { maxHeight: '3.2rem', overflow: 'hidden' as const }
 
   return (
-    <div className="flex gap-1.5 flex-wrap w-full mt-2">
-      {shown.map((label, i) => (
-        <span key={`${label}-${i}`} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[10px] font-medium">
-          {label}
-        </span>
-      ))}
-      {!expanded && remaining > 0 && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
-          className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-[10px] font-medium hover:bg-gray-200 transition"
-        >
-          +{remaining}
-        </button>
+    <div className="relative w-full mt-2">
+      <div className="flex gap-1.5 flex-wrap w-full" style={clampStyle}>
+        {shown.map((label, i) => (
+          <span key={`${label}-${i}`} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[10px] font-medium">
+            {label}
+          </span>
+        ))}
+      </div>
+      {!expanded && labels.length > 0 && (
+        <NicheExpandButton labels={labels} onExpand={() => setExpanded(true)} />
       )}
     </div>
+  )
+}
+
+/** Shows a "+N" button only when tags overflow beyond 2 rows. */
+function NicheExpandButton({ labels, onExpand }: { labels: string[]; onExpand: () => void }) {
+  const measureRef = useRef<HTMLDivElement>(null)
+  const [hiddenCount, setHiddenCount] = useState(0)
+
+  useEffect(() => {
+    const el = measureRef.current
+    if (!el) return
+    const children = Array.from(el.children) as HTMLElement[]
+    if (children.length === 0) return
+
+    let rowCount = 1
+    let lastTop = children[0].offsetTop
+    let cutoff = children.length
+
+    for (let i = 1; i < children.length; i++) {
+      if (children[i].offsetTop > lastTop) {
+        rowCount++
+        lastTop = children[i].offsetTop
+      }
+      if (rowCount > 2) {
+        cutoff = i
+        break
+      }
+    }
+    setHiddenCount(children.length - cutoff)
+  }, [labels.length])
+
+  return (
+    <>
+      {/* Hidden measurement container with all tags rendered at full width */}
+      <div
+        ref={measureRef}
+        className="flex gap-1.5 flex-wrap w-full"
+        style={{ position: 'absolute', visibility: 'hidden', top: 0, left: 0, right: 0 }}
+        aria-hidden
+      >
+        {labels.map((label, i) => (
+          <span key={`m-${label}-${i}`} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[10px] font-medium">
+            {label}
+          </span>
+        ))}
+      </div>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onExpand() }}
+          className="mt-1 px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-[10px] font-medium hover:bg-gray-200 transition"
+        >
+          +{hiddenCount}
+        </button>
+      )}
+    </>
   )
 }
 

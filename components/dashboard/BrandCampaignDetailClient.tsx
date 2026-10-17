@@ -1,12 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatNumber } from '@/lib/i18n/formatNumber'
 import {
   COUNTRY_FILTER_OPTIONS,
+  MultiSelectFilter,
+  NicheAutocomplete,
+  NicheTags,
 } from '@/components/discovery/DiscoverPanel'
 import {
   CREATORDB_LANGUAGE_OPTIONS,
@@ -137,7 +141,17 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       </div>
     </div>
   )
-  const [tab, setTab] = useState<'detail' | 'direct'>('detail')
+  const [tab, setTabRaw] = useState<'detail' | 'direct'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem(`campaign-tab:${initialCampaign.id}`)
+      if (saved === 'direct') return 'direct'
+    }
+    return 'detail'
+  })
+  const setTab = (t: 'detail' | 'direct') => {
+    setTabRaw(t)
+    try { sessionStorage.setItem(`campaign-tab:${initialCampaign.id}`, t) } catch {}
+  }
   const [query, setQuery] = useState('')
   // Filters default to the campaign brief (platform / follower requirement);
   // the brand can adjust them before running the AI match.
@@ -185,6 +199,21 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [selected, setSelected] = useState<Creator | null>(null)
   const [detail, setDetail] = useState<any>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [outreachModalCreator, setOutreachModalCreator] = useState<Creator | null>(null)
+  const [outreachMsg, setOutreachMsg] = useState('')
+  const [outreachFiles, setOutreachFiles] = useState<File[]>([])
+  const [outreachSending, setOutreachSending] = useState(false)
+  const [outreachSent, setOutreachSent] = useState(false)
+  const [outreachError, setOutreachError] = useState<string | null>(null)
+  const [rememberMsg, setRememberMsg] = useState(false)
+  const [rememberedMsg, setRememberedMsg] = useState('')
+  const [nicheMap, setNicheMap] = useState<Record<string, string[]>>({})
+  const [nichesLoading, setNichesLoading] = useState(false)
+  const [followerTierMode, setFollowerTierMode] = useState('')
+  const [openFilterSections, setOpenFilterSections] = useState<Record<string, boolean>>({
+    audience: true, creator: true, performance: true,
+  })
+  const toggleFilterSection = (key: string) => setOpenFilterSections(prev => ({ ...prev, [key]: !prev[key] }))
 
   // Filters + results survive navigating away and back (per campaign, per tab)
   const searchStateKey = `campaign-discover:${initialCampaign.id}:v1`
@@ -227,13 +256,13 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       if (!f.value.trim()) continue
       const field = f.field
       // Array fields
-      if (['hashtags', 'niches', 'audienceAge'].includes(field)) {
+      if (['hashtags', 'niches', 'audienceAge', 'audienceLocation', 'mainLanguage'].includes(field)) {
         filters.push({ field, op: 'in', value: f.value.split(',').map(v => v.trim()).filter(Boolean) })
       } else if (field === 'audienceFemaleRatio') {
         filters.push({ field, op: '>', value: Number(f.value) })
       } else if (field === 'isAccountVerified') {
         filters.push({ field, op: '=', value: f.value === 'true' })
-      } else if (['followers', 'shortEngagementRate', 'shortAvgViews', 'lastPublishTime'].includes(field)) {
+      } else if (['followers', 'shortEngagementRate', 'shortAvgViews', 'lastPublishTime', 'followerGrowth30d', 'contentsIn30Days'].includes(field)) {
         filters.push({ field, op: f.op || '>', value: Number(f.value) })
       } else {
         filters.push({ field, op: f.op || '=', value: f.value })
@@ -248,7 +277,12 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       filters.push({ field: 'followers', op: '<', value: Number(maxFollowers) })
     }
     if (creatorCountry.trim() && !filters.some(f => f.field === 'country')) {
-      filters.push({ field: 'country', op: '=', value: creatorCountry.trim().toUpperCase() })
+      const countries = creatorCountry.split(',').map(c => c.trim().toUpperCase()).filter(Boolean)
+      if (countries.length === 1) {
+        filters.push({ field: 'country', op: '=', value: countries[0] })
+      } else if (countries.length > 1) {
+        filters.push({ field: 'country', op: 'in', value: countries })
+      }
     }
 
     return filters
@@ -291,6 +325,19 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     if (aiMatching) return
     setAiMatching(true); setError('')
     try {
+      // ── LOG: Campaign brief inputs ──
+      console.group('[DirectOutreach] AI Match — Campaign Brief')
+      console.log('Campaign ID:', campaign.id)
+      console.log('Campaign Title:', campaign.title)
+      console.log('Categories:', campaign.categories.map(c => c.category.name))
+      console.log('Platforms:', campaign.platforms.map(p => p.platform.name))
+      console.log('Follower requirements:', campaign.followerRequirements)
+      console.log('Content type:', campaign.contentType)
+      console.log('Description:', campaign.description?.slice(0, 200))
+      console.log('User query:', query || '(none)')
+      console.log('Pre-set filters — minFollowers:', minFollowers, 'maxFollowers:', maxFollowers, 'country:', creatorCountry)
+      console.groupEnd()
+
       // Auto-fill filters from campaign brief
       const autoFilters: CdbFilter[] = []
 
@@ -313,6 +360,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
 
       // Set last active to 3 months for freshness
       autoFilters.push({ field: 'lastPublishTime', op: '>', value: '90' })
+
+      // ── LOG: Auto-derived filters ──
+      console.group('[DirectOutreach] Auto-derived CDB filters from campaign')
+      console.table(autoFilters)
+      console.groupEnd()
 
       // Set the filters in state so they appear in the UI
       setCdbFilters(autoFilters)
@@ -342,13 +394,39 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         filters.push({ field: 'country', op: '=', value: creatorCountry.trim().toUpperCase() })
       }
 
+      // ── LOG: Final filters sent to API ──
+      console.group('[DirectOutreach] Final filters → /api/discovery/club-search')
+      console.log('Filters:', JSON.stringify(filters, null, 2))
+      console.groupEnd()
+
       const activePlatform = campPlatform && ['youtube', 'instagram', 'tiktok'].includes(campPlatform) ? campPlatform : platform
       const qs = new URLSearchParams({ platform: activePlatform, limit: '100', offset: '0', cdb_sort: 'followers' })
       qs.set('cdb_filters', JSON.stringify(filters))
 
+      console.log('[DirectOutreach] Request URL:', `/api/discovery/club-search?platform=${activePlatform}&limit=100&offset=0&cdb_sort=followers`)
+
       const res = await fetch(`/api/discovery/club-search?${qs}`)
       window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
+
+      // ── LOG: Response summary ──
+      console.group('[DirectOutreach] Search response')
+      console.log('Status:', res.status)
+      console.log('Total results:', data?.total)
+      console.log('Returned results:', data?.results?.length)
+      if (data?.results?.length > 0) {
+        console.table(data.results.slice(0, 5).map((c: any) => ({
+          handle: c.handle,
+          display_name: c.display_name,
+          followers: c.follower_count,
+          engagement: c.engagement_rate,
+          niches: c.niche_tags?.join(', '),
+          country: c.country,
+        })))
+      }
+      if (data?.ai_parsed) console.log('AI parsed params:', data.ai_parsed)
+      console.groupEnd()
+
       if (!res.ok) throw new Error(data?.message || 'Creator matching is temporarily unavailable.')
       setCreators(data?.results || [])
       setMatched(true)
@@ -357,6 +435,28 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   }
 
   useEffect(() => { loadQueue() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch niche tags for displayed creators (same mechanism as DiscoverPanel)
+  useEffect(() => {
+    if (creators.length === 0) return
+    const toFetch = creators
+      .filter(c => c.handle && c.platform)
+      .map(c => ({ platform: c.platform, handle: (c.handle || '').replace(/^@/, '').toLowerCase() }))
+      .filter(c => !nicheMap[`${c.platform}:${c.handle}`])
+    if (toFetch.length === 0) return
+    setNichesLoading(true)
+    fetch('/api/discovery/creator-niches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creators: toFetch }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data?.niches) setNicheMap(prev => ({ ...prev, ...data.niches }))
+      })
+      .catch(() => {})
+      .finally(() => setNichesLoading(false))
+  }, [creators]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetch('/api/pricing/config')
       .then(res => (res.ok ? res.json() : null))
@@ -376,14 +476,61 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     return () => controller.abort()
   }, [initialCampaign.id, locale])
 
-  const addCreator = async (creator: Creator) => {
+  const addCreator = async (creator: Creator, message?: string, files?: File[]) => {
     setQueueBusy(true); setError('')
     try {
-      const res = await fetch(`/api/campaigns/${campaign.id}/outreach`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ creator }) })
+      const fd = new FormData()
+      fd.set('creator', JSON.stringify(creator))
+      if (message) fd.set('message', message.trim())
+      if (files) files.forEach((f) => fd.append('files', f))
+      const res = await fetch(`/api/campaigns/${campaign.id}/outreach`, { method: 'POST', body: fd })
       const data = await res.json(); if (!res.ok) throw new Error(data.message)
       setQueue(data.queue); setSelected(null)
     } catch (e: any) { setError(e.message || 'Could not add creator') }
     finally { setQueueBusy(false) }
+  }
+
+  const addOutreachFiles = (list: FileList | null) => {
+    if (!list) return
+    setOutreachError(null)
+    const next = [...outreachFiles]
+    for (const f of Array.from(list)) {
+      if (next.length >= 3) break
+      if (f.size > 4 * 1024 * 1024) {
+        setOutreachError(`"${f.name}" exceeds the 4MB limit`)
+        continue
+      }
+      const total = next.reduce((sum, file) => sum + file.size, 0) + f.size
+      if (total > 4 * 1024 * 1024) {
+        setOutreachError('Attachments exceed 4MB combined — remove a file or use smaller ones')
+        continue
+      }
+      next.push(f)
+    }
+    setOutreachFiles(next)
+  }
+
+  const sendOutreach = async () => {
+    if (!outreachModalCreator || outreachMsg.trim().length < 10) return
+    setOutreachSending(true)
+    setOutreachError(null)
+    try {
+      const fd = new FormData()
+      fd.set('creator', JSON.stringify(outreachModalCreator))
+      fd.set('message', outreachMsg.trim())
+      outreachFiles.forEach((f) => fd.append('files', f))
+      const res = await fetch(`/api/campaigns/${campaign.id}/outreach`, { method: 'POST', body: fd })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || `Server error (${res.status})`)
+      if (!data) throw new Error('Empty response from server')
+      setQueue(data.queue)
+      setOutreachSent(true)
+      if (rememberMsg) setRememberedMsg(outreachMsg.trim())
+    } catch (err: any) {
+      setOutreachError(err.message || 'Failed to send message')
+    } finally {
+      setOutreachSending(false)
+    }
   }
   const removeCreator = async (id: string) => {
     const res = await fetch(`/api/campaigns/${campaign.id}/outreach?outreachId=${encodeURIComponent(id)}`, { method: 'DELETE' })
@@ -416,101 +563,433 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   </div>
 
   const fCls = 'workspace-glass-control px-3 py-2 text-sm'
+  const inputCls = 'px-3 py-1.5 workspace-glass-control text-sm focus:outline-none'
+  const labelCls = 'block text-xs font-medium text-gray-500 mb-1.5'
   const zh = locale === 'zh'
   const filterSections = <>
     {/* Section 1 — Audience */}
-    <div className="rounded-xl bg-gradient-to-r from-green-50/40 to-transparent border border-gray-100 p-3">
-      <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
-        <span className="w-4 h-4 rounded-full bg-green-100 text-green-700 text-[9px] font-bold flex items-center justify-center">1</span>
-        {zh ? '受众' : 'Audience'}
-      </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <select value={cdbFilterFor('audienceLocation').value} onChange={e => updateCdbFilter('audienceLocation', { value: e.target.value })} className={fCls}>
-          <option value="">{zh ? '受众所在地' : 'Audience location'}</option>
-          {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>)}
-        </select>
-        <select value={cdbFilterFor('mainLanguage').value} onChange={e => updateCdbFilter('mainLanguage', { value: e.target.value })} className={fCls}>
-          <option value="">{zh ? '语言' : 'Language'}</option>
-          {CREATORDB_LANGUAGE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <select value={cdbFilterFor('audienceAge').value} onChange={e => updateCdbFilter('audienceAge', { value: e.target.value })} className={fCls}>
-          <option value="">{zh ? '受众年龄' : 'Audience age'}</option>
-          {['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map(age => <option key={age} value={age}>{age}</option>)}
-        </select>
-        <select value={cdbFilterFor('audienceGender').value} onChange={e => updateCdbFilter('audienceGender', { value: e.target.value })} className={fCls}>
-          <option value="">{zh ? '受众性别' : 'Audience gender'}</option>
-          <option value="female">{zh ? '女性为主' : 'Mostly female'}</option>
-          <option value="male">{zh ? '男性为主' : 'Mostly male'}</option>
-        </select>
-      </div>
+    <div className="rounded-xl bg-gradient-to-r from-green-50/40 to-transparent border border-gray-100 mb-2">
+      <button type="button" onClick={() => toggleFilterSection('audience')} className="w-full flex items-center justify-between px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold flex items-center justify-center">1</span>
+          <div className="text-left">
+            <span className="text-xs font-semibold text-gray-800">{zh ? '受众' : 'Audience'}</span>
+            <span className="ml-2 text-[10px] text-gray-400">{zh ? '你想触达谁？' : 'Who do you want to reach?'}</span>
+          </div>
+        </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.audience ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      {openFilterSections.audience && (
+        <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+          {/* Audience location */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                {zh ? '受众所在地' : 'Audience location'}
+              </span>
+            </label>
+            <MultiSelectFilter
+              value={cdbFilterFor('audienceLocation').value}
+              onChange={(v) => updateCdbFilter('audienceLocation', { op: 'in', value: v })}
+              options={COUNTRY_FILTER_OPTIONS.map(({ code, key }) => ({
+                value: code,
+                label: (t.signupBusiness.countries as Record<string, string>)[key] || code,
+              }))}
+              placeholder={zh ? '全部地区' : 'Anywhere'}
+              inputCls={inputCls}
+            />
+          </div>
+          {/* Language */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M12 22l5-10 5 10"/><path d="M14 18h6"/></svg>
+                {zh ? '语言' : 'Language'}
+              </span>
+            </label>
+            <MultiSelectFilter
+              value={cdbFilterFor('mainLanguage').value}
+              onChange={(v) => updateCdbFilter('mainLanguage', { op: 'in', value: v })}
+              options={CREATORDB_LANGUAGE_OPTIONS.map(([value, langLabel]) => ({
+                value,
+                label: langLabel,
+              }))}
+              placeholder={zh ? '全部语言' : 'All languages'}
+              inputCls={inputCls}
+            />
+          </div>
+          {/* Audience age */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                {zh ? '受众年龄' : 'Audience age'}
+              </span>
+            </label>
+            <MultiSelectFilter
+              value={cdbFilterFor('audienceAge').value}
+              onChange={(v) => updateCdbFilter('audienceAge', { op: 'in', value: v })}
+              options={['13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map((age) => ({
+                value: age,
+                label: age,
+              }))}
+              placeholder={zh ? '全部' : 'Any'}
+              inputCls={inputCls}
+            />
+          </div>
+          {/* Gender composition */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a8.38 8.38 0 0 1 13 0"/></svg>
+                {zh ? '性别构成' : 'Gender'}
+              </span>
+            </label>
+            {['instagram', 'tiktok', 'youtube'].includes(platform) ? (() => {
+              const femaleVal = cdbFilterFor('audienceFemaleRatio').value
+              const femalePct = femaleVal ? Math.round(Number(femaleVal) * 100) : 50
+              const isActive = femaleVal !== ''
+              return (
+                <div className="space-y-1">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={femalePct}
+                    onChange={(e) => {
+                      const pct = Number(e.target.value)
+                      updateCdbFilter('audienceFemaleRatio', { op: '>', value: String(pct / 100) })
+                      updateCdbFilter('audienceGender', { value: '' })
+                    }}
+                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-pink-500"
+                    style={{
+                      background: isActive
+                        ? `linear-gradient(to right, #ec4899 0%, #ec4899 ${femalePct}%, #3b82f6 ${femalePct}%, #3b82f6 100%)`
+                        : '#e5e7eb',
+                    }}
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-500">
+                    <span style={{ color: isActive ? '#ec4899' : undefined }}>
+                      {zh ? '女' : 'F'} {isActive ? `${femalePct}%+` : ''}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateCdbFilter('audienceFemaleRatio', { value: '' })
+                        updateCdbFilter('audienceGender', { value: '' })
+                      }}
+                      className="text-[10px] text-gray-400 hover:text-gray-600"
+                    >
+                      {isActive ? (zh ? '重置' : 'Reset') : (zh ? '任意' : 'Any')}
+                    </button>
+                    <span style={{ color: isActive ? '#3b82f6' : undefined }}>
+                      {isActive ? `${100 - femalePct}%+` : ''} {zh ? '男' : 'M'}
+                    </span>
+                  </div>
+                </div>
+              )
+            })() : (
+              <select
+                value={cdbFilterFor('audienceGender').value}
+                onChange={(e) => updateCdbFilter('audienceGender', { value: e.target.value })}
+                className={`w-full ${inputCls}`}
+              >
+                <option value="">{zh ? '全部' : 'Any'}</option>
+                <option value="female">{zh ? '女性为主' : 'Mostly female'}</option>
+                <option value="male">{zh ? '男性为主' : 'Mostly male'}</option>
+              </select>
+            )}
+          </div>
+        </div>
+      )}
     </div>
 
     {/* Section 2 — Creator */}
-    <div className="rounded-xl bg-gradient-to-r from-blue-50/40 to-transparent border border-gray-100 p-3">
-      <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
-        <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 text-[9px] font-bold flex items-center justify-center">2</span>
-        {zh ? '创作者' : 'Creator'}
-      </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <select value={platform} onChange={e => setPlatform(e.target.value)} className={fCls}>
-          <option value="youtube">YouTube</option>
-          <option value="instagram">Instagram</option>
-          <option value="tiktok">TikTok</option>
-        </select>
-        <select value={creatorCountry} onChange={e => setCreatorCountry(e.target.value)} className={fCls}>
-          <option value="">{zh ? '创作者所在国' : "Creator's country"}</option>
-          {COUNTRY_FILTER_OPTIONS.map(({ code, key }) => <option key={code} value={code}>{(t.signupBusiness.countries as Record<string, string>)[key] || code}</option>)}
-        </select>
-        <input type="text" value={cdbFilterFor('hashtags').value} onChange={e => updateCdbFilter('hashtags', { op: 'in', value: e.target.value })} placeholder={zh ? '标签（可选）' : 'Hashtags'} className={fCls} />
-        <input type="text" value={cdbFilterFor('niches').value} onChange={e => updateCdbFilter('niches', { op: 'in', value: e.target.value })} placeholder={zh ? '领域' : 'Niche'} className={fCls} />
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-        <select value={minFollowers} onChange={e => setMinFollowers(e.target.value)} className={fCls}>
-          <option value="">{zh ? '最少粉丝' : 'Min followers'}</option>
-          <option value="1000">1,000</option>
-          <option value="5000">5,000</option>
-          <option value="10000">10,000</option>
-          <option value="25000">25,000</option>
-          <option value="50000">50,000</option>
-          <option value="100000">100,000</option>
-          <option value="500000">500,000</option>
-          <option value="1000000">1,000,000</option>
-        </select>
-        <select value={maxFollowers} onChange={e => setMaxFollowers(e.target.value)} className={fCls}>
-          <option value="">{zh ? '最多粉丝' : 'Max followers'}</option>
-          <option value="5000">5,000</option>
-          <option value="10000">10,000</option>
-          <option value="25000">25,000</option>
-          <option value="50000">50,000</option>
-          <option value="100000">100,000</option>
-          <option value="500000">500,000</option>
-          <option value="1000000">1,000,000</option>
-          <option value="10000000">10,000,000</option>
-        </select>
-        <select value={cdbFilterFor('lastPublishTime').value} onChange={e => updateCdbFilter('lastPublishTime', { op: '>', value: e.target.value })} className={fCls}>
-          <option value="">{zh ? '最近活跃' : 'Last active'}</option>
-          <option value="90">{zh ? '近3个月' : 'Last 3 months'}</option>
-          <option value="180">{zh ? '近6个月' : 'Last 6 months'}</option>
-          <option value="365">{zh ? '近1年' : 'Last year'}</option>
-        </select>
-        <select value={cdbFilterFor('isAccountVerified').value} onChange={e => updateCdbFilter('isAccountVerified', { value: e.target.value })} className={fCls}>
-          <option value="">{zh ? '认证账号' : 'Verified'}</option>
-          <option value="true">{zh ? '是' : 'Yes'}</option>
-          <option value="false">{zh ? '否' : 'No'}</option>
-        </select>
-      </div>
+    <div className="rounded-xl bg-gradient-to-r from-blue-50/40 to-transparent border border-gray-100 mb-2">
+      <button type="button" onClick={() => toggleFilterSection('creator')} className="w-full flex items-center justify-between px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center">2</span>
+          <div className="text-left">
+            <span className="text-xs font-semibold text-gray-800">{zh ? '创作者' : 'Creator'}</span>
+            <span className="ml-2 text-[10px] text-gray-400">{zh ? '寻找合适的创作者类型' : 'Find the right type of creators'}</span>
+          </div>
+        </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.creator ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      {openFilterSections.creator && (
+        <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+          {/* Platform */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                {zh ? '平台' : 'Platform'}
+              </span>
+            </label>
+            <select value={platform} onChange={e => setPlatform(e.target.value)} className={`w-full ${inputCls}`}>
+              <option value="youtube">YouTube</option>
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+            </select>
+          </div>
+          {/* Creator's country */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                {zh ? '创作者所在国' : "Creator's country"}
+              </span>
+            </label>
+            <MultiSelectFilter
+              value={creatorCountry}
+              onChange={setCreatorCountry}
+              options={COUNTRY_FILTER_OPTIONS.map(({ code, key }) => ({
+                value: code,
+                label: (t.signupBusiness.countries as Record<string, string>)[key] || code,
+              }))}
+              placeholder={zh ? '全部国家' : 'Any country'}
+              inputCls={inputCls}
+            />
+          </div>
+          {/* Verified account */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                {zh ? '认证账号' : 'Verified account'}
+              </span>
+            </label>
+            <select
+              value={cdbFilterFor('isAccountVerified').value}
+              onChange={(e) => updateCdbFilter('isAccountVerified', { value: e.target.value })}
+              className={`w-full ${inputCls}`}
+            >
+              <option value="">{zh ? '全部' : 'Any'}</option>
+              <option value="true">{zh ? '是' : 'Yes'}</option>
+              <option value="false">{zh ? '否' : 'No'}</option>
+            </select>
+          </div>
+          {/* Hashtags */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <span className="text-[10px] font-bold text-gray-400">#</span>
+                {zh ? '标签（可选）' : 'Hashtags (optional)'}
+              </span>
+            </label>
+            <input
+              type="text"
+              value={cdbFilterFor('hashtags').value}
+              onChange={(e) => updateCdbFilter('hashtags', { op: 'in', value: e.target.value })}
+              placeholder={zh ? '如 #护肤, #旅行' : 'e.g. #skincare, #travel'}
+              className={`w-full ${inputCls}`}
+            />
+          </div>
+          {/* Niches */}
+          <NicheAutocomplete
+            platform={platform}
+            value={cdbFilterFor('niches').value}
+            onChange={(v) => updateCdbFilter('niches', { op: 'in', value: v })}
+            labelCls={labelCls}
+            inputCls={inputCls}
+            zh={zh}
+          />
+          {/* Followers / subscribers */}
+          <div className="col-span-2">
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                {zh ? '粉丝数' : 'Followers / subscribers'}
+              </span>
+            </label>
+            <div className="flex items-center gap-1.5">
+              {minFollowers === 'custom' ? (
+                <input
+                  type="number"
+                  min={0}
+                  placeholder={zh ? '最少粉丝' : 'Min followers'}
+                  autoFocus
+                  onBlur={(e) => {
+                    const v = e.target.value.trim()
+                    setMinFollowers(v && Number(v) > 0 ? v : '')
+                    setFollowerTierMode('custom')
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const v = (e.target as HTMLInputElement).value.trim()
+                      setMinFollowers(v && Number(v) > 0 ? v : '')
+                      setFollowerTierMode('custom')
+                    }
+                  }}
+                  className={`flex-1 ${inputCls}`}
+                />
+              ) : (
+                <select
+                  value={minFollowers}
+                  onChange={(e) => { setMinFollowers(e.target.value); setFollowerTierMode('custom') }}
+                  className={`flex-1 ${inputCls}`}
+                >
+                  <option value="">{zh ? '不限' : 'Any'}</option>
+                  {[1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000].map((n) => (
+                    <option key={n} value={String(n)}>{n.toLocaleString()}</option>
+                  ))}
+                  <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
+                </select>
+              )}
+              <span className="text-gray-400 font-medium text-sm">–</span>
+              {maxFollowers === 'custom' ? (
+                <input
+                  type="number"
+                  min={0}
+                  placeholder={zh ? '最多粉丝' : 'Max followers'}
+                  autoFocus
+                  onBlur={(e) => {
+                    const v = e.target.value.trim()
+                    setMaxFollowers(v && Number(v) > 0 ? v : '')
+                    setFollowerTierMode('custom')
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const v = (e.target as HTMLInputElement).value.trim()
+                      setMaxFollowers(v && Number(v) > 0 ? v : '')
+                      setFollowerTierMode('custom')
+                    }
+                  }}
+                  className={`flex-1 ${inputCls}`}
+                />
+              ) : (
+                <select
+                  value={maxFollowers}
+                  onChange={(e) => { setMaxFollowers(e.target.value); setFollowerTierMode('custom') }}
+                  className={`flex-1 ${inputCls}`}
+                >
+                  <option value="">{zh ? '不限' : 'Any'}</option>
+                  {[5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 5000000, 10000000].map((n) => (
+                    <option key={n} value={String(n)}>{n.toLocaleString()}</option>
+                  ))}
+                  <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
+                </select>
+              )}
+            </div>
+          </div>
+          {/* Last active */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {zh ? '最近活跃' : 'Last active'}
+              </span>
+            </label>
+            <select
+              value={cdbFilterFor('lastPublishTime').value}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === '-365') {
+                  updateCdbFilter('lastPublishTime', { op: '<', value: v })
+                } else {
+                  updateCdbFilter('lastPublishTime', { op: '>', value: v })
+                }
+              }}
+              className={`w-full ${inputCls}`}
+            >
+              <option value="">{zh ? '全部' : 'Any'}</option>
+              <option value="90">{zh ? '近3个月活跃' : 'Within 3 months'}</option>
+              <option value="180">{zh ? '近6个月活跃' : 'Within 6 months'}</option>
+              <option value="365">{zh ? '近1年活跃' : 'Within 1 year'}</option>
+              <option value="-365">{zh ? '超过1年未活跃' : 'Over 1 year ago'}</option>
+            </select>
+          </div>
+        </div>
+      )}
     </div>
 
     {/* Section 3 — Performance */}
-    <div className="rounded-xl bg-gradient-to-r from-amber-50/40 to-transparent border border-gray-100 p-3">
-      <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
-        <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold flex items-center justify-center">3</span>
-        {zh ? '数据表现' : 'Performance'}
-      </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <input type="number" min={0} step="0.1" value={cdbFilterFor('shortEngagementRate').value} onChange={e => updateCdbFilter('shortEngagementRate', { op: '>', value: e.target.value })} placeholder={zh ? '最低互动率 %' : 'Min engagement %'} className={fCls} />
-        <input type="number" min={0} value={cdbFilterFor('shortAvgViews').value} onChange={e => updateCdbFilter('shortAvgViews', { op: '>', value: e.target.value })} placeholder={zh ? '最低平均播放量' : 'Min avg views'} className={fCls} />
-      </div>
+    <div className="rounded-xl bg-gradient-to-r from-purple-50/40 to-transparent border border-gray-100 mb-2">
+      <button type="button" onClick={() => toggleFilterSection('performance')} className="w-full flex items-center justify-between px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold flex items-center justify-center">3</span>
+          <div className="text-left">
+            <span className="text-xs font-semibold text-gray-800">{zh ? '数据表现' : 'Performance'}</span>
+            <span className="ml-2 text-[10px] text-gray-400">{zh ? '关注真实影响力的创作者' : 'Focus on creators with real impact'}</span>
+          </div>
+        </div>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.performance ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      {openFilterSections.performance && (
+        <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+          {/* Average short views */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                {zh ? '平均短视频播放量' : 'Average short views'}
+              </span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={cdbFilterFor('shortAvgViews').value}
+              onChange={(e) => updateCdbFilter('shortAvgViews', { op: '>', value: e.target.value })}
+              placeholder={zh ? '如 5,000' : 'e.g. 5,000'}
+              className={`w-full ${inputCls}`}
+            />
+          </div>
+          {/* Average engagement rate */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                {zh ? '平均互动率' : 'Average engagement rate'}
+              </span>
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              min={0}
+              value={cdbFilterFor('shortEngagementRate').value}
+              onChange={(e) => updateCdbFilter('shortEngagementRate', { op: '>', value: e.target.value })}
+              placeholder={zh ? '如 2.5%' : 'e.g. 2.5%'}
+              className={`w-full ${inputCls}`}
+            />
+          </div>
+          {/* Followers growth (30d) */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                {zh ? '粉丝增长 (30天)' : 'Followers growth (30d)'}
+              </span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={cdbFilterFor('followerGrowth30d').value}
+              onChange={(e) => updateCdbFilter('followerGrowth30d', { op: '>', value: e.target.value })}
+              placeholder={zh ? '如 500' : 'e.g. 500'}
+              className={`w-full ${inputCls}`}
+            />
+          </div>
+          {/* Content count (30d) */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                {zh ? '近30天发布数' : 'Posts in last 30d'}
+              </span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={cdbFilterFor('contentsIn30Days').value}
+              onChange={(e) => updateCdbFilter('contentsIn30Days', { op: '>', value: e.target.value })}
+              placeholder={zh ? '如 5' : 'e.g. 5'}
+              className={`w-full ${inputCls}`}
+            />
+          </div>
+        </div>
+      )}
     </div>
   </>
 
@@ -690,13 +1169,112 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           )}
           {matched && (<>
           <div className="flex items-center justify-between mb-3"><b>{loading ? m.findingCreators : m.creatorsFound.replace('{count}', String(creators.length))}</b><span className="text-sm text-[#7180ad]">{m.sortBy}<b>{m.relevance}</b></span></div>
-          <div className={`grid md:grid-cols-2 2xl:grid-cols-3 gap-3 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
-            {creators.map(c => <article key={c.id} className="workspace-glass-card rounded-3xl p-5 min-h-64 flex flex-col">
-              <div className="flex gap-3 items-center"><CreatorAvatar url={c.avatar_url} name={c.display_name || c.handle || 'Creator'} size="w-14 h-14" /><div className="min-w-0"><button onClick={() => openCreator(c)} className="font-bold truncate block max-w-full text-left hover:text-indigo-600">{c.display_name || c.handle || 'Creator'} <span className="text-indigo-500">●</span></button><p className="text-xs text-[#7581a5] truncate">@{c.handle?.replace(/^@/, '') || 'creator'}</p><span className="text-xs mt-1 inline-block px-2 py-0.5 rounded bg-white/50">{PLATFORM_LABEL[c.platform] || c.platform}</span>{(c.country || c.language) && <p className="text-xs text-[#7581a5] mt-1 truncate">{[c.country, c.language ? (CREATORDB_LANGUAGE_OPTIONS.find(([code]) => code === c.language)?.[1] || c.language) : null].filter(Boolean).join(' · ')}</p>}</div></div>
-              <div className="grid grid-cols-2 gap-4 mt-5"><div><b className="text-xl">{compact(c.follower_count)}</b><p className="text-xs text-[#7d88aa]">{m.followers}</p></div><div><b className="text-xl">{c.engagement_rate == null ? '—' : `${Number(c.engagement_rate).toFixed(1)}%`}</b><p className="text-xs text-[#7d88aa]">{m.engRate}</p></div></div>
-              <div className="flex flex-wrap gap-1 mt-4">{c.niche_tags.slice(0,3).map(t => <span key={t} className="text-xs bg-white/50 rounded-full px-2.5 py-1">{t}</span>)}</div>
-              <div className="flex gap-2 mt-auto pt-5"><button onClick={() => openCreator(c)} className="flex-1 py-2 rounded-xl border border-white bg-white/25 text-sm font-semibold">{m.viewProfile}</button><button disabled={queuedIds.has(c.id) || queueBusy} onClick={() => addCreator(c)} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-semibold disabled:opacity-50">{queuedIds.has(c.id) ? m.added : m.addToCampaign}</button></div>
-            </article>)}
+          <div className={`space-y-3 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
+            {creators.map(c => {
+              const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
+              const creatorKey = handle ? `${c.platform}:${handle}` : null
+              return (
+              <div key={c.id} className="workspace-glass-card rounded-2xl p-5">
+                {/* Top section: avatar + info + platform link */}
+                <div className="flex gap-4">
+                  {/* Avatar with gradient ring */}
+                  <div className="flex-shrink-0">
+                    <div className="w-[80px] h-[80px] rounded-full p-[3px] bg-gradient-to-br from-yellow-400 via-pink-500 to-purple-600">
+                      <div className="w-full h-full rounded-full bg-white p-[2px]">
+                        <div className="w-full h-full rounded-full bg-gray-100 overflow-hidden">
+                          <CreatorAvatar url={c.avatar_url} name={c.display_name || c.handle || '?'} size="w-full h-full" textSize="text-xl" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Name, handle, niche tags */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-extrabold text-lg text-gray-900 truncate leading-tight uppercase tracking-wide">
+                          {c.display_name || c.handle || c.id}
+                        </p>
+                        {c.handle && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <p className="text-sm text-gray-400">@{c.handle.replace(/^@/, '')}</p>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(c.handle?.replace(/^@/, '') || '') }}
+                              className="text-gray-300 hover:text-gray-500 flex-shrink-0"
+                              title={zh ? '复制' : 'Copy handle'}
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {/* Platform link */}
+                      {c.profile_url && (
+                        <a
+                          href={c.profile_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-50 transition flex-shrink-0"
+                        >
+                          {PLATFORM_LABEL[c.platform] || c.platform}
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
+                    {/* Niche tags (fetched separately like discovery) */}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      <NicheTags creatorKey={creatorKey} nicheMap={nicheMap} loading={nichesLoading} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom row: followers + actions */}
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100/80">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                    </svg>
+                    <span className="text-lg font-bold text-gray-900">{c.follower_count != null ? new Intl.NumberFormat(zh ? 'zh-CN' : 'en-US').format(c.follower_count) : '—'}</span>
+                    <span className="text-sm text-gray-400">{zh ? '粉丝' : 'followers'}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => openCreator(c)}
+                      className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-400 to-slate-400 text-white rounded-full text-sm font-semibold hover:from-indigo-500 hover:to-slate-500 transition shadow-sm"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                      {zh ? '查看资料' : 'View Profile'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={queuedIds.has(c.id) || queueBusy}
+                      onClick={() => {
+                        setOutreachModalCreator(c)
+                        setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : '')
+                        setOutreachFiles([])
+                        setOutreachSent(false)
+                        setOutreachError(null)
+                      }}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 border border-indigo-200 text-indigo-600 rounded-full text-sm font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
+                      {queuedIds.has(c.id) ? (zh ? '已添加' : m.added) : (zh ? '联系' : 'Contact')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              )
+            })}
           </div>
           </>)}
         </>
@@ -716,7 +1294,93 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       <div className="p-7 flex justify-between"><div className="flex gap-5"><CreatorAvatar url={selected.avatar_url} name={selected.display_name || selected.handle || 'Creator'} size="w-24 h-24" textSize="text-3xl" /><div><h2 className="text-2xl font-bold">{selected.display_name || selected.handle} <span className="text-indigo-500">●</span></h2><p className="text-[#7180ad]">@{selected.handle?.replace(/^@/,'')}</p><p className="text-sm mt-2">{PLATFORM_LABEL[selected.platform]} {selected.country && ` · ${selected.country}`}</p></div></div><button onClick={() => setSelected(null)} className="text-2xl self-start">×</button></div>
       <div className="px-7 grid grid-cols-2 md:grid-cols-4 gap-3">{[[m.followers,compact(detail?.total_followers ?? selected.follower_count)],[m.modalEngagement,selected.engagement_rate == null ? '—' : `${Number(selected.engagement_rate).toFixed(1)}%`],[m.modalCountry,detail?.location || selected.country || '—'],[m.modalMatchScore,selected.score == null ? '—' : `${Math.round(selected.score)}%`]].map(([k,v]) => <div key={k} className="border border-slate-100 rounded-2xl p-4"><b className="text-xl">{v}</b><p className="text-xs text-[#7d88aa] mt-1">{k}</p></div>)}</div>
       <div className="p-7"><h3 className="font-bold">{m.modalAbout}</h3><p className="text-sm leading-6 text-[#5f6c95] mt-2">{(detailLoading ? m.loadingProfile : detail?.bio || selected.bio || m.profileFallback).split('\n').filter((l: string) => !/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l) && !/(?:\+?\d[\d\s\-().]{7,}\d)/.test(l)).join('\n')}</p><div className="flex flex-wrap gap-2 mt-4">{(detail?.niche || selected.niche_tags).slice(0,8).map((t:string) => <span key={t} className="bg-gray-200 text-gray-700 rounded-full px-3 py-1 text-xs">{t}</span>)}</div></div>
-      <div className="border-t border-slate-100 p-5 flex items-center gap-3 justify-between"><div className="text-xs text-[#7180ad]">🛡 {m.businessContactNote}<br/>{m.neverSharedNote}</div><button disabled={queuedIds.has(selected.id) || queueBusy} onClick={() => addCreator(selected)} className="px-7 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50">{queuedIds.has(selected.id) ? m.addedToQueue : m.addToQueue}</button></div>
+      <div className="border-t border-slate-100 p-5 flex items-center gap-3 justify-between"><div className="text-xs text-[#7180ad]">🛡 {m.businessContactNote}<br/>{m.neverSharedNote}</div><button disabled={queuedIds.has(selected.id) || queueBusy} onClick={() => { setOutreachModalCreator(selected); setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : ''); setOutreachFiles([]); setOutreachSent(false); setOutreachError(null) }} className="px-7 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50">{queuedIds.has(selected.id) ? m.addedToQueue : m.addToQueue}</button></div>
     </div></div>}
+
+    {outreachModalCreator && createPortal(
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+        onClick={() => !outreachSending && setOutreachModalCreator(null)}
+      >
+        <div className="rounded-3xl shadow-2xl max-w-lg w-full p-7" style={{ backgroundColor: '#ffffff' }} onClick={(e) => e.stopPropagation()}>
+          {outreachSent ? (
+            <div className="text-center py-6">
+              <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl">✓</div>
+              <h3 className="text-lg font-bold text-gray-900 mt-4">{zh ? '已添加到外联队列' : 'Added to outreach queue'}</h3>
+              <p className="text-sm text-gray-500 mt-1.5">
+                {zh
+                  ? `${outreachModalCreator.display_name || outreachModalCreator.handle} 已添加到队列。点击"请求 Overseed 外联"后我们将代您联系。`
+                  : `${outreachModalCreator.display_name || outreachModalCreator.handle} has been added to the queue. Click "Request Overseed Outreach" when ready and we'll reach out on your behalf.`}
+              </p>
+              <button onClick={() => setOutreachModalCreator(null)} className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">
+                {zh ? '完成' : 'Done'}
+              </button>
+            </div>
+          ) : (
+            <>
+              <h3 className="text-lg font-bold text-gray-900">
+                {zh ? '联系 ' : 'Contact '}{outreachModalCreator.display_name || outreachModalCreator.handle}
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {zh ? '由 Overseed 代为发送 — 创作者可以直接回复您的消息。' : 'Delivered by Overseed — the creator can reply directly to your message.'}
+              </p>
+              <textarea
+                value={outreachMsg}
+                onChange={(e) => setOutreachMsg(e.target.value)}
+                rows={6}
+                maxLength={2000}
+                placeholder={zh ? '写下您的合作邀请消息...' : 'Write your collaboration message...'}
+                className="mt-4 w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
+                style={{ border: '1px solid #e5e7eb' }}
+              />
+              <p className="text-right text-[11px] text-gray-400 mt-1">{outreachMsg.length}/2000</p>
+
+              <div className="mt-2">
+                {outreachFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {outreachFiles.map((f, i) => (
+                      <span key={`${f.name}-${i}`} className="flex items-center gap-2 pl-1.5 pr-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+                        {f.type.startsWith('image/') ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={URL.createObjectURL(f)} alt="" className="w-6 h-6 rounded object-cover" />
+                        ) : (
+                          <span className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500">PDF</span>
+                        )}
+                        <span className="max-w-[140px] truncate">{f.name}</span>
+                        <button onClick={() => setOutreachFiles(outreachFiles.filter((_, j) => j !== i))} className="text-gray-400 hover:text-gray-600" aria-label="Remove">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <label className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 cursor-pointer">
+                  <span className="text-base leading-none">＋</span> {zh ? '添加图片或文件' : 'Add photos or files'}
+                  <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" className="hidden" onChange={(e) => { addOutreachFiles(e.target.files); e.target.value = '' }} />
+                </label>
+                <span className="ml-2 text-[11px] text-gray-400">{zh ? '图片或PDF · 最多3个 · 共4MB' : 'Images or PDF · up to 3 files · 4MB combined'}</span>
+              </div>
+
+              <label className="flex items-center gap-2 mt-4 cursor-pointer">
+                <input type="checkbox" checked={rememberMsg} onChange={(e) => setRememberMsg(e.target.checked)} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                <span className="text-sm text-gray-600">{zh ? '记住此消息用于下一位创作者' : 'Remember this message for the next creator'}</span>
+              </label>
+
+              {outreachError && (
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{outreachError}</div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 mt-5">
+                <button onClick={() => setOutreachModalCreator(null)} disabled={outreachSending} className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">
+                  {zh ? '取消' : 'Cancel'}
+                </button>
+                <button onClick={sendOutreach} disabled={outreachSending || outreachMsg.trim().length < 10} className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                  {outreachSending ? (zh ? '发送中…' : 'Sending…') : (zh ? '发送消息' : 'Send message')}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>,
+    document.body)}
   </div>
 }

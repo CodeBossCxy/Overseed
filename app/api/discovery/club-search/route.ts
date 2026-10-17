@@ -336,6 +336,11 @@ export async function GET(req: NextRequest) {
         value: item.value as CreatorDbFilterValue,
       }))
       creatorDbSortField = (params.get('cdb_sort') || 'followers') as CreatorDbCanonicalField
+
+      // ── LOG: Incoming canonical filters ──
+      console.log('[club-search] Incoming canonical filters:', JSON.stringify(creatorDbFilters, null, 2))
+      console.log('[club-search] Platform:', platform, '| Sort:', creatorDbSortField, '| Limit:', num('limit'), '| Offset:', num('offset'))
+
       buildCustomSearchRequest(
         platform as CreatorDbPlatform,
         creatorDbFilters,

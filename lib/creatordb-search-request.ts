@@ -207,6 +207,12 @@ export function buildCustomSearchRequest(
   const offset = pagination.offset ?? 0
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) throw new Error('pageSize must be an integer between 1 and 100')
   if (!Number.isInteger(offset) || offset < 0) throw new Error('offset must be a non-negative integer')
+
+  // ── LOG: Transformed CreatorDB API filters ──
+  console.log('[buildCustomSearchRequest] Niche resolution:', nicheResolution ? JSON.stringify(nicheResolution) : '(none)')
+  console.log('[buildCustomSearchRequest] Final API filters:', JSON.stringify(filters, null, 2))
+  console.log('[buildCustomSearchRequest] Sort:', creatorDbFieldName(sortField, platform), desc ? 'DESC' : 'ASC', '| pageSize:', pageSize, '| offset:', offset)
+
   return { filters, sortBy: creatorDbFieldName(sortField, platform), desc, pageSize, offset, nicheResolution }
 }
 

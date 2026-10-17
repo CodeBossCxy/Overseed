@@ -397,6 +397,12 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
     throw new Error(`CreatorDB searches are limited to 20 filters (received ${filters.length})`)
   }
 
+  // ── LOG: CreatorDB API request ──
+  console.group('[CreatorDB] Outgoing search request')
+  console.log('URL:', `${BASE}/${platformPath}/search`)
+  console.log('Request body:', JSON.stringify(body, null, 2))
+  console.groupEnd()
+
   const res = await searchFetch(`${BASE}/${platformPath}/search`, {
     method: 'POST',
     headers: authHeaders(),
@@ -424,6 +430,25 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
   }
 
   const creatorList = Array.isArray(data?.data?.creatorList) ? data.data.creatorList : []
+
+  // ── LOG: CreatorDB API response summary ──
+  console.group('[CreatorDB] Search response')
+  console.log('Total results:', data.data?.totalResults)
+  console.log('Returned:', creatorList.length)
+  console.log('Credits used:', data.creditsUsed ?? data.quotaUsed ?? '(unknown)')
+  console.log('Credits remaining:', data.creditsAvailable ?? data.remainingQuota ?? '(unknown)')
+  console.log('Trace ID:', data.traceId ?? '(none)')
+  if (creatorList.length > 0) {
+    console.log('Top 5 creators:', creatorList.slice(0, 5).map((c: any) => ({
+      handle: c.uniqueId || c.channelId,
+      displayName: c.displayName,
+      followers: c.totalFollowers ?? c.totalSubscribers,
+      country: c.profile?.country,
+      niches: c.profile?.niches?.slice(0, 3),
+    })))
+  }
+  console.groupEnd()
+
   const followerField = FOLLOWER_FIELD[opts.platform] || 'totalFollowers'
   const bodyAny = body as any
   const sortMetricField = bodyAny.sortBy
