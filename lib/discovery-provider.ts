@@ -169,6 +169,72 @@ export async function discoveryEnrichForOutreach(
 }
 
 /**
+ * Resolve a creator's contact email using the cached hasEmail signal.
+ * - If email is already cached, return it immediately.
+ * - If hasEmail === true but no email cached, call CreatorDB /contact to fetch it.
+ * - If hasEmail === false, skip the API call.
+ * - If no cache entry, return unknown.
+ */
+export async function resolveCreatorEmail(
+  platform: string,
+  handle: string,
+  opts?: { logUserId?: string },
+): Promise<{
+  email: string | null
+  hasEmail: boolean | null
+  source: 'cache' | 'contact-api' | 'none'
+}> {
+  const normalizedHandle = handle.replace(/^@/, '').toLowerCase()
+  const { prisma } = await import('@/lib/prisma')
+
+  const cached = await prisma.creatorContactCache
+    .findUnique({ where: { platform_handle: { platform, handle: normalizedHandle } } })
+    .catch(() => null)
+
+  if (cached) {
+    if (cached.email) {
+      return { email: cached.email, hasEmail: true, source: 'cache' }
+    }
+    if (!cached.hasEmail) {
+      return { email: null, hasEmail: false, source: 'cache' }
+    }
+    // hasEmail === true but email not yet fetched — call the contact endpoint
+    try {
+      const email = await discoveryGetContactEmail(platform, normalizedHandle)
+      if (email) {
+        await prisma.creatorContactCache
+          .upsert({
+            where: { platform_handle: { platform, handle: normalizedHandle } },
+            create: { platform, handle: normalizedHandle, hasEmail: true, email, emails: [email] },
+            update: { email, emails: [email], fetchedAt: new Date() },
+          })
+          .catch(() => {})
+      }
+      return { email, hasEmail: true, source: 'contact-api' }
+    } catch {
+      return { email: null, hasEmail: true, source: 'contact-api' }
+    }
+  }
+
+  // No cache entry — proactively fetch contact info from the API
+  try {
+    const email = await discoveryGetContactEmail(platform, normalizedHandle)
+    const hasEmail = email != null
+    // Cache the result so future lookups are instant
+    await prisma.creatorContactCache
+      .upsert({
+        where: { platform_handle: { platform, handle: normalizedHandle } },
+        create: { platform, handle: normalizedHandle, hasEmail, email, emails: email ? [email] : [] },
+        update: { hasEmail, email, emails: email ? [email] : [], fetchedAt: new Date() },
+      })
+      .catch(() => {})
+    return { email, hasEmail, source: 'contact-api' }
+  } catch {
+    return { email: null, hasEmail: null, source: 'none' }
+  }
+}
+
+/**
  * Get a creator's contact email (server-side only).
  * For CreatorDB, the email is extracted during enrichment and cached.
  */

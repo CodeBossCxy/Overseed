@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm'
 // etc.). Inherits the surrounding text color; prose classes handle spacing.
 export default function Markdown({ children, className = '' }: { children: string; className?: string }) {
   return (
-    <div className={`prose prose-sm max-w-none prose-headings:text-inherit prose-p:text-inherit prose-li:text-inherit prose-strong:text-inherit ${className}`}>
+    <div className={`prose prose-sm max-w-none prose-headings:text-inherit prose-headings:text-base prose-headings:font-semibold prose-headings:mt-2 prose-headings:mb-1 prose-p:text-inherit prose-li:text-inherit prose-strong:text-inherit ${className}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
     </div>
   )

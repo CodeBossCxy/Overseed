@@ -632,17 +632,17 @@ function NicheTags({
   const labels = niches.map(nicheIdToLabel)
 
   // When collapsed, use CSS to clip to exactly 2 rows of tags.
-  // Tag height ≈ 22px (text-[10px] + py-0.5 + border), gap-1.5 = 6px → 2 rows ≈ 50px.
+  // Tag height ≈ 24px (text-xs + py-0.5 + border), gap-1.5 = 6px → 2 rows ≈ 54px.
   const shown = expanded ? labels : labels
   const clampStyle = expanded
     ? undefined
-    : { maxHeight: '3.2rem', overflow: 'hidden' as const }
+    : { maxHeight: '3.6rem', overflow: 'hidden' as const }
 
   return (
     <div className="relative w-full mt-2">
       <div className="flex gap-1.5 flex-wrap w-full" style={clampStyle}>
         {shown.map((label, i) => (
-          <span key={`${label}-${i}`} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[10px] font-medium">
+          <span key={`${label}-${i}`} className="px-2.5 py-0.5 bg-[#2c0beb]/10 text-[#2c0beb] rounded-full text-xs font-medium">
             {label}
           </span>
         ))}
@@ -692,7 +692,7 @@ function NicheExpandButton({ labels, onExpand }: { labels: string[]; onExpand: (
         aria-hidden
       >
         {labels.map((label, i) => (
-          <span key={`m-${label}-${i}`} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[10px] font-medium">
+          <span key={`m-${label}-${i}`} className="px-2.5 py-0.5 bg-[#2c0beb]/10 text-[#2c0beb] rounded-full text-xs font-medium">
             {label}
           </span>
         ))}
@@ -3199,7 +3199,7 @@ export default function DiscoverPanel() {
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); openDetail(creator) }}
-                          className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-400 to-slate-400 text-white rounded-full text-sm font-semibold hover:from-indigo-500 hover:to-slate-500 transition shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-400 to-slate-400 text-white rounded-full text-xs font-semibold hover:from-indigo-500 hover:to-slate-500 transition shadow-sm"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
@@ -3212,7 +3212,7 @@ export default function DiscoverPanel() {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-400 to-slate-400 text-white rounded-full text-sm font-semibold hover:from-indigo-500 hover:to-slate-500 transition shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-400 to-slate-400 text-white rounded-full text-xs font-semibold hover:from-indigo-500 hover:to-slate-500 transition shadow-sm"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
@@ -3223,7 +3223,7 @@ export default function DiscoverPanel() {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); openContact(creator) }}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 border border-indigo-200 text-indigo-600 rounded-full text-sm font-semibold hover:bg-indigo-50 transition"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
@@ -3234,7 +3234,7 @@ export default function DiscoverPanel() {
                         type="button"
                         disabled={!handle || savingKey === saveKey}
                         onClick={(e) => { e.stopPropagation(); toggleSaveCreator(creator) }}
-                        className={`w-10 h-10 flex items-center justify-center rounded-full border transition flex-shrink-0 disabled:opacity-50 ${
+                        className={`w-9 h-9 flex items-center justify-center rounded-full border transition flex-shrink-0 disabled:opacity-50 ${
                           isSaved
                             ? 'bg-amber-50 border-amber-200 text-amber-600'
                             : 'bg-orange-50/50 border-gray-200 text-gray-400 hover:text-amber-600 hover:border-amber-200'

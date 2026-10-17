@@ -45,6 +45,45 @@ type Campaign = {
 }
 
 const PLATFORM_LABEL: Record<string, string> = { youtube: 'YouTube', instagram: 'Instagram', tiktok: 'TikTok' }
+
+function PlatformIcon({ platform, size = 16 }: { platform: string; size?: number }) {
+  switch (platform) {
+    case 'instagram':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-label="Instagram">
+          <defs>
+            <radialGradient id="cdb-ig-grad" cx="30%" cy="107%" r="150%">
+              <stop offset="0%" stopColor="#fdf497" />
+              <stop offset="5%" stopColor="#fdf497" />
+              <stop offset="45%" stopColor="#fd5949" />
+              <stop offset="60%" stopColor="#d6249f" />
+              <stop offset="90%" stopColor="#285AEB" />
+            </radialGradient>
+          </defs>
+          <rect x="2" y="2" width="20" height="20" rx="6" fill="url(#cdb-ig-grad)" />
+          <circle cx="12" cy="12" r="4.5" stroke="white" strokeWidth="1.8" fill="none" />
+          <circle cx="17.5" cy="6.5" r="1.2" fill="white" />
+        </svg>
+      )
+    case 'youtube':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-label="YouTube">
+          <rect x="1" y="4" width="22" height="16" rx="4" fill="#FF0000" />
+          <polygon points="10,8.5 16,12 10,15.5" fill="white" />
+        </svg>
+      )
+    case 'tiktok':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-label="TikTok">
+          <rect x="2" y="2" width="20" height="20" rx="5" fill="black" />
+          <path d="M16.5 7.5c-.8-.5-1.3-1.4-1.3-2.5h-2.2v10.2a2.3 2.3 0 1 1-1.6-2.2V10.7a4.5 4.5 0 1 0 3.8 4.5V10a5.3 5.3 0 0 0 3.1 1V8.8a3.3 3.3 0 0 1-1.8-.3z" fill="white" />
+          <path d="M16.2 7.2c-.7-.5-1.2-1.3-1.2-2.2h-2v10a2.2 2.2 0 1 1-1.5-2.1v-2.2a4.3 4.3 0 1 0 3.7 4.4V9.7a5.1 5.1 0 0 0 3 1V8.5a3.2 3.2 0 0 1-2-1.3z" fill="#25F4EE" opacity="0.7" />
+        </svg>
+      )
+    default:
+      return null
+  }
+}
 const STATUS_STYLE: Record<string, string> = {
   SHORTLISTED: 'bg-slate-100 text-slate-600', PENDING_REVIEW: 'bg-amber-50 text-amber-600',
   READY_FOR_OUTREACH: 'bg-violet-50 text-violet-600', CONTACTED: 'bg-blue-50 text-blue-600',
@@ -141,13 +180,13 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       </div>
     </div>
   )
-  const [tab, setTabRaw] = useState<'detail' | 'direct'>(() => {
-    if (typeof window !== 'undefined') {
+  const [tab, setTabRaw] = useState<'detail' | 'direct'>('detail')
+  useEffect(() => {
+    try {
       const saved = sessionStorage.getItem(`campaign-tab:${initialCampaign.id}`)
-      if (saved === 'direct') return 'direct'
-    }
-    return 'detail'
-  })
+      if (saved === 'direct') setTabRaw('direct')
+    } catch {}
+  }, [initialCampaign.id])
   const setTab = (t: 'detail' | 'direct') => {
     setTabRaw(t)
     try { sessionStorage.setItem(`campaign-tab:${initialCampaign.id}`, t) } catch {}
@@ -207,6 +246,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [outreachError, setOutreachError] = useState<string | null>(null)
   const [rememberMsg, setRememberMsg] = useState(false)
   const [rememberedMsg, setRememberedMsg] = useState('')
+  const [rememberedFiles, setRememberedFiles] = useState<File[]>([])
   const [nicheMap, setNicheMap] = useState<Record<string, string[]>>({})
   const [nichesLoading, setNichesLoading] = useState(false)
   const [followerTierMode, setFollowerTierMode] = useState('')
@@ -525,7 +565,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       if (!data) throw new Error('Empty response from server')
       setQueue(data.queue)
       setOutreachSent(true)
-      if (rememberMsg) setRememberedMsg(outreachMsg.trim())
+      if (rememberMsg) {
+        setRememberedMsg(outreachMsg.trim())
+        setRememberedFiles([...outreachFiles])
+      }
     } catch (err: any) {
       setOutreachError(err.message || 'Failed to send message')
     } finally {
@@ -927,14 +970,17 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 {zh ? '平均短视频播放量' : 'Average short views'}
               </span>
             </label>
-            <input
-              type="number"
-              min={0}
-              value={cdbFilterFor('shortAvgViews').value}
-              onChange={(e) => updateCdbFilter('shortAvgViews', { op: '>', value: e.target.value })}
-              placeholder={zh ? '如 5,000' : 'e.g. 5,000'}
-              className={`w-full ${inputCls}`}
-            />
+            <div className="relative">
+              <input
+                type="number"
+                min={0}
+                value={cdbFilterFor('shortAvgViews').value}
+                onChange={(e) => updateCdbFilter('shortAvgViews', { op: '>', value: e.target.value })}
+                placeholder={zh ? '如 5,000' : 'e.g. 5,000'}
+                className={`w-full ${inputCls}`}
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 次播放' : '≥ views'}</span>
+            </div>
           </div>
           {/* Average engagement rate */}
           <div>
@@ -944,15 +990,18 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 {zh ? '平均互动率' : 'Average engagement rate'}
               </span>
             </label>
-            <input
-              type="number"
-              step="0.1"
-              min={0}
-              value={cdbFilterFor('shortEngagementRate').value}
-              onChange={(e) => updateCdbFilter('shortEngagementRate', { op: '>', value: e.target.value })}
-              placeholder={zh ? '如 2.5%' : 'e.g. 2.5%'}
-              className={`w-full ${inputCls}`}
-            />
+            <div className="relative">
+              <input
+                type="number"
+                step="0.1"
+                min={0}
+                value={cdbFilterFor('shortEngagementRate').value}
+                onChange={(e) => updateCdbFilter('shortEngagementRate', { op: '>', value: e.target.value })}
+                placeholder={zh ? '如 2.5%' : 'e.g. 2.5%'}
+                className={`w-full ${inputCls}`}
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">≥ %</span>
+            </div>
           </div>
           {/* Followers growth (30d) */}
           <div>
@@ -962,14 +1011,17 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 {zh ? '粉丝增长 (30天)' : 'Followers growth (30d)'}
               </span>
             </label>
-            <input
-              type="number"
-              min={0}
-              value={cdbFilterFor('followerGrowth30d').value}
-              onChange={(e) => updateCdbFilter('followerGrowth30d', { op: '>', value: e.target.value })}
-              placeholder={zh ? '如 500' : 'e.g. 500'}
-              className={`w-full ${inputCls}`}
-            />
+            <div className="relative">
+              <input
+                type="number"
+                min={0}
+                value={cdbFilterFor('followerGrowth30d').value}
+                onChange={(e) => updateCdbFilter('followerGrowth30d', { op: '>', value: e.target.value })}
+                placeholder={zh ? '如 500' : 'e.g. 500'}
+                className={`w-full ${inputCls}`}
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 新粉丝' : '≥ new'}</span>
+            </div>
           </div>
           {/* Content count (30d) */}
           <div>
@@ -979,14 +1031,17 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 {zh ? '近30天发布数' : 'Posts in last 30d'}
               </span>
             </label>
-            <input
-              type="number"
-              min={0}
-              value={cdbFilterFor('contentsIn30Days').value}
-              onChange={(e) => updateCdbFilter('contentsIn30Days', { op: '>', value: e.target.value })}
-              placeholder={zh ? '如 5' : 'e.g. 5'}
-              className={`w-full ${inputCls}`}
-            />
+            <div className="relative">
+              <input
+                type="number"
+                min={0}
+                value={cdbFilterFor('contentsIn30Days').value}
+                onChange={(e) => updateCdbFilter('contentsIn30Days', { op: '>', value: e.target.value })}
+                placeholder={zh ? '如 5' : 'e.g. 5'}
+                className={`w-full ${inputCls}`}
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 条' : '≥ posts'}</span>
+            </div>
           </div>
         </div>
       )}
@@ -1219,6 +1274,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                           onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-50 transition flex-shrink-0"
                         >
+                          <PlatformIcon platform={c.platform} size={16} />
                           {PLATFORM_LABEL[c.platform] || c.platform}
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
@@ -1293,8 +1349,8 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     {selected && <div className="fixed inset-0 z-50 bg-[#18204b]/35 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelected(null)}><div className="bg-[#fbfbff] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[88vh] overflow-auto" onClick={e => e.stopPropagation()}>
       <div className="p-7 flex justify-between"><div className="flex gap-5"><CreatorAvatar url={selected.avatar_url} name={selected.display_name || selected.handle || 'Creator'} size="w-24 h-24" textSize="text-3xl" /><div><h2 className="text-2xl font-bold">{selected.display_name || selected.handle} <span className="text-indigo-500">●</span></h2><p className="text-[#7180ad]">@{selected.handle?.replace(/^@/,'')}</p><p className="text-sm mt-2">{PLATFORM_LABEL[selected.platform]} {selected.country && ` · ${selected.country}`}</p></div></div><button onClick={() => setSelected(null)} className="text-2xl self-start">×</button></div>
       <div className="px-7 grid grid-cols-2 md:grid-cols-4 gap-3">{[[m.followers,compact(detail?.total_followers ?? selected.follower_count)],[m.modalEngagement,selected.engagement_rate == null ? '—' : `${Number(selected.engagement_rate).toFixed(1)}%`],[m.modalCountry,detail?.location || selected.country || '—'],[m.modalMatchScore,selected.score == null ? '—' : `${Math.round(selected.score)}%`]].map(([k,v]) => <div key={k} className="border border-slate-100 rounded-2xl p-4"><b className="text-xl">{v}</b><p className="text-xs text-[#7d88aa] mt-1">{k}</p></div>)}</div>
-      <div className="p-7"><h3 className="font-bold">{m.modalAbout}</h3><p className="text-sm leading-6 text-[#5f6c95] mt-2">{(detailLoading ? m.loadingProfile : detail?.bio || selected.bio || m.profileFallback).split('\n').filter((l: string) => !/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l) && !/(?:\+?\d[\d\s\-().]{7,}\d)/.test(l)).join('\n')}</p><div className="flex flex-wrap gap-2 mt-4">{(detail?.niche || selected.niche_tags).slice(0,8).map((t:string) => <span key={t} className="bg-gray-200 text-gray-700 rounded-full px-3 py-1 text-xs">{t}</span>)}</div></div>
-      <div className="border-t border-slate-100 p-5 flex items-center gap-3 justify-between"><div className="text-xs text-[#7180ad]">🛡 {m.businessContactNote}<br/>{m.neverSharedNote}</div><button disabled={queuedIds.has(selected.id) || queueBusy} onClick={() => { setOutreachModalCreator(selected); setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : ''); setOutreachFiles([]); setOutreachSent(false); setOutreachError(null) }} className="px-7 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50">{queuedIds.has(selected.id) ? m.addedToQueue : m.addToQueue}</button></div>
+      <div className="p-7"><h3 className="font-bold">{m.modalAbout}</h3><p className="text-sm leading-6 text-[#5f6c95] mt-2">{(detailLoading ? m.loadingProfile : detail?.bio || selected.bio || m.profileFallback).split('\n').filter((l: string) => !/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l) && !/(?:\+?\d[\d\s\-().]{7,}\d)/.test(l)).join('\n')}</p><div className="flex flex-wrap gap-2 mt-4">{(detail?.niche || selected.niche_tags).slice(0,8).map((t:string) => <span key={t} className="bg-[#2c0beb]/10 text-[#2c0beb] rounded-full px-3 py-1 text-xs">{t}</span>)}</div></div>
+      <div className="border-t border-slate-100 p-5 flex items-center gap-3 justify-between"><div className="text-xs text-[#7180ad]">🛡 {m.businessContactNote}<br/>{m.neverSharedNote}</div><button disabled={queuedIds.has(selected.id) || queueBusy} onClick={() => { setOutreachModalCreator(selected); setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : ''); setOutreachFiles(rememberMsg && rememberedFiles.length > 0 ? [...rememberedFiles] : []); setOutreachSent(false); setOutreachError(null) }} className="px-7 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50">{queuedIds.has(selected.id) ? m.addedToQueue : m.addToQueue}</button></div>
     </div></div>}
 
     {outreachModalCreator && createPortal(

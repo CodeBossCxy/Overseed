@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { containsBannedContent } from '@/lib/message-filter'
 import { type ClubPlatform } from '@/lib/influencers-club'
-import { discoveryGetContactEmail } from '@/lib/discovery-provider'
+import { resolveCreatorEmail } from '@/lib/discovery-provider'
 import { consumeQuota, releaseQuota } from '@/lib/plan'
 import { getEffectiveTier } from '@/lib/subscription'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
@@ -98,33 +98,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Try to find creator's email — check shared cache first, then CreatorDB.
-  // If not found, we still proceed (team will look it up manually).
+  // Try to find creator's email via shared cache + CreatorDB.
+  // resolveCreatorEmail handles all caching internally.
   let creatorEmail: string | null = null
-  const normalizedHandle = handle.replace(/^@/, '').toLowerCase()
+  let creatorHasEmail: boolean | null = null
   try {
-    // 1. Check permanent contact cache (shared across all users)
-    const cached = await prisma.creatorContactCache.findUnique({
-      where: { platform_handle: { platform, handle: normalizedHandle } },
-    })
-    if (cached?.email) {
-      // Cache hit — skip CreatorDB call entirely
-      creatorEmail = cached.email
-    } else if (cached && !cached.hasEmail) {
-      // Creator confirmed to have no email — don't waste CreatorDB credits
-      creatorEmail = null
-    } else {
-      // 2. Cache miss or hasEmail=true but email not yet fetched — call CreatorDB
-      creatorEmail = await discoveryGetContactEmail(platform, handle)
-      // 3. Persist to cache for future users
-      if (creatorEmail) {
-        await prisma.creatorContactCache.upsert({
-          where: { platform_handle: { platform, handle: normalizedHandle } },
-          create: { platform, handle: normalizedHandle, hasEmail: true, email: creatorEmail, emails: [creatorEmail] },
-          update: { hasEmail: true, email: creatorEmail, emails: [creatorEmail], fetchedAt: new Date() },
-        }).catch(() => {})
-      }
-    }
+    const resolved = await resolveCreatorEmail(platform, handle)
+    creatorEmail = resolved.email
+    creatorHasEmail = resolved.hasEmail
   } catch {
     // Non-critical — team notification will note that email is missing
   }
@@ -173,9 +154,16 @@ export async function POST(req: NextRequest) {
   )
 
   // ── Notify Overseed team ──
-  const emailStatus = creatorEmail
-    ? `<span style="color:#16a34a;font-weight:bold;">Found: ${esc(creatorEmail)}</span>`
-    : `<span style="color:#dc2626;font-weight:bold;">Not found in CreatorDB — manual lookup required</span>`
+  let emailStatus: string
+  if (creatorEmail) {
+    emailStatus = `<span style="color:#16a34a;font-weight:bold;">&#x2705; Found: ${esc(creatorEmail)}</span>`
+  } else if (creatorHasEmail === true) {
+    emailStatus = `<span style="color:#d97706;font-weight:bold;">&#x26A0;&#xFE0F; Has email but fetch failed</span>`
+  } else if (creatorHasEmail === false) {
+    emailStatus = `<span style="color:#dc2626;font-weight:bold;">&#x274C; No email found</span>`
+  } else {
+    emailStatus = `<span style="color:#6b7280;font-weight:bold;">&#x2753; Unknown — not checked yet</span>`
+  }
 
   const html = `
     <div style="font-family:sans-serif;max-width:700px;margin:0 auto;">

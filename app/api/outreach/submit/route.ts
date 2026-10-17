@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
+import { resolveCreatorEmail } from '@/lib/discovery-provider'
 
 // Extract email addresses from a bio/text string
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
@@ -140,7 +141,7 @@ async function lookupContactsAndNotify(
   })
 
   // Try to find contact info from existing caches
-  const results: { handle: string; displayName: string | null; platform: string; followers: number | null; email: string | null; profileUrl: string | null }[] = []
+  const results: { handle: string; displayName: string | null; platform: string; followers: number | null; email: string | null; hasEmail: boolean | null; emailSource: 'bio' | 'db' | 'cache' | 'contact-api' | 'cap' | 'none'; profileUrl: string | null }[] = []
 
   const PROFILE_URL: Record<string, (h: string) => string> = {
     instagram: (h) => `https://www.instagram.com/${h}/`,
@@ -148,16 +149,30 @@ async function lookupContactsAndNotify(
     tiktok: (h) => `https://www.tiktok.com/@${h}`,
   }
 
-  // Step 1: Check DB caches first (free, instant)
+  // Step 1: Check DB caches first (free, instant), then call resolveCreatorEmail (capped at 10 /contact API calls)
+  const CONTACT_API_CAP = 10
+  let contactApiFetchCount = 0
+
   for (const r of recipients) {
     let email: string | null = r.email || null
+    let emailSource: 'bio' | 'db' | 'cache' | 'contact-api' | 'cap' | 'none' = 'none'
+    let hasEmail: boolean | null = null
+
+    if (email) {
+      emailSource = 'bio'
+      hasEmail = true
+    }
 
     if (!email) {
       const profile = await prisma.creatorProfile.findUnique({
         where: { platform_handle: { platform: r.platform, handle: r.handle } },
         select: { email: true },
       })
-      if (profile?.email) email = profile.email
+      if (profile?.email) {
+        email = profile.email
+        emailSource = 'db'
+        hasEmail = true
+      }
     }
 
     if (!email) {
@@ -169,12 +184,37 @@ async function lookupContactsAndNotify(
         .catch(() => null)
       if (cached?.data && typeof cached.data === 'object') {
         const data = cached.data as any
-        email = data.email || data._email || null
+        const cacheEmail = data.email || data._email || null
+        if (cacheEmail) {
+          email = cacheEmail
+          emailSource = 'cache'
+          hasEmail = true
+        }
+      }
+    }
+
+    if (!email) {
+      if (contactApiFetchCount < CONTACT_API_CAP) {
+        try {
+          const resolved = await resolveCreatorEmail(r.platform, r.handle)
+          email = resolved.email
+          hasEmail = resolved.hasEmail
+          emailSource = resolved.source === 'contact-api' ? 'contact-api' : resolved.source === 'cache' ? 'cache' : 'none'
+          if (resolved.source === 'contact-api') contactApiFetchCount++
+        } catch (err) {
+          console.error(`[outreach-submit] resolveCreatorEmail failed for ${r.handle}:`, err)
+          emailSource = 'none'
+          hasEmail = null
+        }
+      } else {
+        // Cap reached — show cache status without fetching
+        emailSource = 'cap'
+        hasEmail = null
       }
     }
 
     const profileUrl = PROFILE_URL[r.platform]?.(r.handle) || null
-    results.push({ handle: r.handle, displayName: r.displayName, platform: r.platform, followers: r.followerCount, email, profileUrl })
+    results.push({ handle: r.handle, displayName: r.displayName, platform: r.platform, followers: r.followerCount, email, hasEmail, emailSource, profileUrl })
   }
 
   // Note: Bio scraping from Instagram is blocked on datacenter IPs (Vercel).
@@ -205,12 +245,31 @@ async function lookupContactsAndNotify(
     const handleCell = r.profileUrl
       ? `<a href="${r.profileUrl}" style="color:#2563eb;text-decoration:none">@${r.handle}</a>`
       : `@${r.handle}`
+    let emailCell: string
+    if (r.email) {
+      emailCell = `<span style="color:#16a34a">${r.email}</span>`
+    } else if (r.emailSource === 'cap') {
+      emailCell = `<span style="color:#d97706">not fetched (cap)</span>`
+    } else {
+      emailCell = `<span style="color:#ef4444">N/A</span>`
+    }
+    let hasEmailCell: string
+    if (r.hasEmail === true) {
+      hasEmailCell = `<span style="color:#16a34a">true</span>`
+    } else if (r.hasEmail === false) {
+      hasEmailCell = `<span style="color:#ef4444">false</span>`
+    } else if (r.emailSource === 'cap') {
+      hasEmailCell = `<span style="color:#d97706">unknown (cap)</span>`
+    } else {
+      hasEmailCell = `<span style="color:#6b7280">unknown</span>`
+    }
     return `<tr>
       <td style="padding:8px;border:1px solid #e5e7eb">${r.displayName || r.handle}</td>
       <td style="padding:8px;border:1px solid #e5e7eb">${handleCell}</td>
       <td style="padding:8px;border:1px solid #e5e7eb">${r.platform}</td>
       <td style="padding:8px;border:1px solid #e5e7eb">${followers}</td>
-      <td style="padding:8px;border:1px solid #e5e7eb">${r.email || '<span style="color:#ef4444">N/A</span>'}</td>
+      <td style="padding:8px;border:1px solid #e5e7eb">${hasEmailCell}</td>
+      <td style="padding:8px;border:1px solid #e5e7eb">${emailCell}</td>
     </tr>`
   }).join('')
 
@@ -229,6 +288,7 @@ async function lookupContactsAndNotify(
             <th style="padding:8px;border:1px solid #e5e7eb;text-align:left">Handle</th>
             <th style="padding:8px;border:1px solid #e5e7eb;text-align:left">Platform</th>
             <th style="padding:8px;border:1px solid #e5e7eb;text-align:left">Followers</th>
+            <th style="padding:8px;border:1px solid #e5e7eb;text-align:left">hasEmail</th>
             <th style="padding:8px;border:1px solid #e5e7eb;text-align:left">Email</th>
           </tr>
         </thead>

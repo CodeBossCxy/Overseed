@@ -210,17 +210,21 @@ export const authOptions: NextAuthOptions = {
         (typeof token.tierRefreshedAt !== 'number' ||
           Date.now() - (token.tierRefreshedAt as number) > REFRESH_MS)
       if ((trigger === 'update' || stale) && token.sub) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.sub },
-          select: { userType: true, activeView: true, subscriptionTier: true, brandProfile: { select: { brandVerificationStatus: true } } },
-        })
-        if (dbUser) {
-          token.userType = dbUser.userType
-          token.activeView = dbUser.activeView || null
-          token.subscriptionTier = dbUser.subscriptionTier
-          token.brandVerificationStatus = dbUser.brandProfile?.brandVerificationStatus || null
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.sub },
+            select: { userType: true, activeView: true, subscriptionTier: true, brandProfile: { select: { brandVerificationStatus: true } } },
+          })
+          if (dbUser) {
+            token.userType = dbUser.userType
+            token.activeView = dbUser.activeView || null
+            token.subscriptionTier = dbUser.subscriptionTier
+            token.brandVerificationStatus = dbUser.brandProfile?.brandVerificationStatus || null
+          }
+          token.tierRefreshedAt = Date.now()
+        } catch (err) {
+          console.warn('[auth] jwt refresh failed, using cached token:', err)
         }
-        token.tierRefreshedAt = Date.now()
       }
       return token
     },

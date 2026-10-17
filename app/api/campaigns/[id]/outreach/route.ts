@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
 import { chargeCredits, hasPriorCharge, gateFeature } from '@/lib/metering'
-import { discoveryEnrichForOutreach } from '@/lib/discovery-provider'
+import { discoveryEnrichForOutreach, resolveCreatorEmail } from '@/lib/discovery-provider'
 import { sendOutreachBatch, type OutreachEmailInput } from '@/lib/outreach-email'
 
 const OPS_EMAIL = 'xinyi@overseed.net'
@@ -108,15 +108,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // ── Notify ops team when a message is included ──
     if (formMessage && formMessage.length >= 10) {
-      const [brand, user] = await Promise.all([
+      const normalizedHandle = (c.handle || c.id).replace(/^@/, '').toLowerCase()
+      const [brand, user, contactResult] = await Promise.all([
         prisma.brandProfile.findUnique({ where: { userId }, select: { companyName: true } }),
         prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } }),
+        resolveCreatorEmail(c.platform, normalizedHandle),
       ])
       if (brand && user?.email) {
         const brandName = brand.companyName || user.name || 'A brand on Overseed'
         const handle = c.handle || c.id
         const profileUrl = PROFILE_URL[c.platform]?.(handle.replace(/^@/, '')) || `${c.platform}:${handle}`
         const displayName = c.display_name || handle
+        const emailStatus = contactResult.email
+          ? `✅ Found: ${contactResult.email}`
+          : contactResult.hasEmail === true
+            ? '⚠️ Has email but fetch failed'
+            : contactResult.hasEmail === false
+              ? '❌ No email found'
+              : '❓ Unknown — not checked yet'
         const attachments = await Promise.all(
           formFiles.map(async (f) => ({
             filename: f.name,
@@ -131,6 +140,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;">Brand</td><td style="padding:8px 12px;">${esc(brandName)} (${esc(user.email)})</td></tr>
     <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;">Creator</td><td style="padding:8px 12px;"><a href="${esc(profileUrl)}" style="color:#2563eb;text-decoration:none;">@${esc(handle.replace(/^@/, ''))}</a> (${esc(c.platform)})</td></tr>
     <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;">Display Name</td><td style="padding:8px 12px;">${esc(displayName)}</td></tr>
+    <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;">Email Reachable</td><td style="padding:8px 12px;">${emailStatus}</td></tr>
     <tr><td style="padding:8px 12px;background:#f3f4f6;font-weight:600;">Attachments</td><td style="padding:8px 12px;">${attachments.length > 0 ? attachments.map((a) => esc(a.filename)).join(', ') : 'None'}</td></tr>
   </table>
   <h3 style="color:#1F2A44;margin:24px 0 8px;">Brand's Message</h3>
