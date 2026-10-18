@@ -211,15 +211,6 @@ export default function OutreachDetailPage() {
               </svg>
               {zh ? '查看消息' : 'View Messages'}
             </Link>
-            <Link
-              href="/dashboard/brand/outreach/new"
-              className="flex items-center gap-2.5 px-4 py-3 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              {zh ? '创建新外联' : 'New Outreach'}
-            </Link>
           </div>
         </div>
 

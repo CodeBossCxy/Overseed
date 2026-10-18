@@ -163,6 +163,33 @@ enum OutreachRecipientStatus {
   FAILED
 }
 
+// Unified outreach status shared by CampaignOutreach and OutreachRecipient.
+// Stages: OUTREACH → RESPONSE → OFFER → COLLABORATION → COMPLETE
+enum OutreachStatus {
+  // Stage: OUTREACH
+  SHORTLISTED        // brand picked creator, not yet sent
+  SENT               // outreach message sent
+  FAILED             // delivery failed
+
+  // Stage: RESPONSE
+  AWAITING_RESPONSE  // waiting for creator reply
+  RESPONDED          // creator replied
+  DECLINED           // creator declined
+
+  // Stage: OFFER
+  NEGOTIATING        // terms being discussed
+  OFFER_ACCEPTED     // creator accepted terms
+
+  // Stage: COLLABORATION
+  IN_PROGRESS        // creator working on deliverables
+
+  // Stage: COMPLETE
+  COMPLETED          // done, payment released
+
+  // Terminal
+  CANCELLED          // brand cancelled
+}
+
 // ===========================================
 // MULTILINGUAL SUPPORT
 // ===========================================
@@ -569,7 +596,7 @@ model CampaignOutreach {
   engagementRate    Decimal? @db.Decimal(7, 3)
   country           String?
   nicheTags         String[] @default([])
-  status            String   @default("SHORTLISTED")
+  status            OutreachStatus @default(SHORTLISTED)
   message           String?
   requestedAt       DateTime?
   sentAt            DateTime?

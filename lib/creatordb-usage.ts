@@ -120,5 +120,11 @@ export async function creatorDbFetch(
   } catch (dbErr) {
     console.error('[CreatorDB usage] DB write failed:', dbErr)
   }
-  return response
+  // Return a fresh Response with the already-parsed body so downstream
+  // callers can still read .json() without "body already consumed" errors.
+  return new Response(JSON.stringify(data), {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
 }

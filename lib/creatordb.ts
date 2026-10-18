@@ -410,9 +410,9 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
     cache: 'no-store',
   }, opts?.logUserId)
 
-  // Read from clone — the original body stream may already be consumed by
-  // creatorDbFetch's logging layer in some Node.js/undici versions.
-  const data = await res.clone().json().catch(() => null)
+  // creatorDbFetch's logging layer clones the response internally, so read
+  // the body directly here (clone() would fail if the body was consumed).
+  const data = await res.json().catch(() => null)
   if (!res.ok || !data?.success) {
     console.error('[CreatorDB] Search failed', {
       status: res.status,

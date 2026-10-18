@@ -17,6 +17,7 @@ import {
 } from '@/lib/creatordb-filter-fields'
 import Markdown from '@/components/Markdown'
 import CreatorAvatar from '@/components/ui/CreatorAvatar'
+import CollaborationProgress from '@/components/CollaborationProgress'
 
 type Creator = {
   id: string; platform: string; handle: string | null; display_name: string | null
@@ -85,9 +86,17 @@ function PlatformIcon({ platform, size = 16 }: { platform: string; size?: number
   }
 }
 const STATUS_STYLE: Record<string, string> = {
-  SHORTLISTED: 'bg-slate-100 text-slate-600', PENDING_REVIEW: 'bg-amber-50 text-amber-600',
-  READY_FOR_OUTREACH: 'bg-violet-50 text-violet-600', CONTACTED: 'bg-blue-50 text-blue-600',
-  INTERESTED: 'bg-emerald-50 text-emerald-600', PENDING_RESPONSE: 'bg-orange-50 text-orange-600',
+  SHORTLISTED: 'bg-slate-100 text-slate-600',
+  SENT: 'bg-blue-50 text-blue-600',
+  FAILED: 'bg-red-50 text-red-600',
+  AWAITING_RESPONSE: 'bg-amber-50 text-amber-600',
+  RESPONDED: 'bg-emerald-50 text-emerald-600',
+  DECLINED: 'bg-red-50 text-red-600',
+  NEGOTIATING: 'bg-violet-50 text-violet-600',
+  OFFER_ACCEPTED: 'bg-indigo-50 text-indigo-600',
+  IN_PROGRESS: 'bg-sky-50 text-sky-600',
+  COMPLETED: 'bg-green-50 text-green-600',
+  CANCELLED: 'bg-gray-100 text-gray-500',
 }
 const icon = (path: string, className = 'w-5 h-5') => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d={path}/></svg>
@@ -1357,6 +1366,13 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       <div className="p-7 flex justify-between"><div className="flex gap-5"><CreatorAvatar url={selected.avatar_url} name={selected.display_name || selected.handle || 'Creator'} size="w-24 h-24" textSize="text-3xl" /><div><h2 className="text-2xl font-bold">{selected.display_name || selected.handle} <span className="text-indigo-500">●</span></h2><p className="text-[#7180ad]">@{selected.handle?.replace(/^@/,'')}</p><p className="text-sm mt-2">{PLATFORM_LABEL[selected.platform]} {selected.country && ` · ${selected.country}`}</p></div></div><button onClick={() => setSelected(null)} className="text-2xl self-start">×</button></div>
       <div className="px-7 grid grid-cols-2 md:grid-cols-4 gap-3">{[[m.followers,compact(detail?.total_followers ?? selected.follower_count)],[m.modalEngagement,selected.engagement_rate == null ? '—' : `${Number(selected.engagement_rate).toFixed(1)}%`],[m.modalCountry,detail?.location || selected.country || '—'],[m.modalMatchScore,selected.score == null ? '—' : `${Math.round(selected.score)}%`]].map(([k,v]) => <div key={k} className="border border-slate-100 rounded-2xl p-4"><b className="text-xl">{v}</b><p className="text-xs text-[#7d88aa] mt-1">{k}</p></div>)}</div>
       <div className="p-7"><h3 className="font-bold">{m.modalAbout}</h3><p className="text-sm leading-6 text-[#5f6c95] mt-2">{(detailLoading ? m.loadingProfile : detail?.bio || selected.bio || m.profileFallback).split('\n').filter((l: string) => !/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l) && !/(?:\+?\d[\d\s\-().]{7,}\d)/.test(l)).join('\n')}</p><div className="flex flex-wrap gap-2 mt-4">{(detail?.niche || selected.niche_tags).slice(0,8).map((t:string) => <span key={t} className="bg-[#2c0beb]/10 text-[#2c0beb] rounded-full px-3 py-1 text-xs">{t}</span>)}</div></div>
+      <div className="px-7 pb-4">
+        <CollaborationProgress
+          status={queue.find(q => q.externalCreatorId === selected.id)?.status || 'SHORTLISTED'}
+          locale={locale}
+          compact
+        />
+      </div>
       <div className="border-t border-slate-100 p-5 flex items-center gap-3 justify-between"><div className="text-xs text-[#7180ad]">🛡 {m.businessContactNote}<br/>{m.neverSharedNote}</div><button disabled={queuedIds.has(selected.id) || queueBusy} onClick={() => { setOutreachModalCreator(selected); setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : ''); setOutreachFiles(rememberMsg && rememberedFiles.length > 0 ? [...rememberedFiles] : []); setOutreachSent(false); setOutreachError(null) }} className="px-7 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50">{queuedIds.has(selected.id) ? m.addedToQueue : m.addToQueue}</button></div>
     </div></div>}
 

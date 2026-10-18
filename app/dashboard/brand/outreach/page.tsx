@@ -104,15 +104,6 @@ export default function OutreachListPage() {
                 ? '发起批量触达，让 AI 为您的品牌找到最匹配的达人并发送个性化邀请。'
                 : 'Launch a mass outreach and let AI find the best creators for your brand.'}
             </p>
-            <Link
-              href="/dashboard/brand/outreach/new"
-              className="mt-6 inline-flex items-center gap-2 bg-primary-600 text-white rounded-xl px-7 py-3.5 font-semibold hover:bg-primary-700 transition shadow-sm"
-            >
-              {zh
-                ? hasItems ? '+ 新建触达' : '创建您的第一个触达'
-                : hasItems ? '+ New Outreach' : 'Create Your First Outreach'}
-              <span aria-hidden>→</span>
-            </Link>
           </div>
           {/* Decorative circles */}
           <div className="absolute -right-8 -top-8 w-64 h-64 rounded-full bg-gradient-to-br from-primary-200/30 to-orange-200/30 blur-2xl" />

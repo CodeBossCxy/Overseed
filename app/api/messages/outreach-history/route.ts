@@ -21,7 +21,10 @@ export async function GET() {
   const campaignOutreach = await prisma.campaignOutreach.findMany({
     where: {
       campaign: { brandId: brand.id },
-      status: { not: 'SHORTLISTED' }, // Only show actually outreached, not just shortlisted
+      OR: [
+        { status: { not: 'SHORTLISTED' } },        // Creators past shortlisting
+        { message: { not: null }, NOT: { message: '' } }, // Shortlisted but with a message from the brand
+      ],
     },
     select: {
       id: true,

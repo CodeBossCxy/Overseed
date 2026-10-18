@@ -71,17 +71,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     body = await req.json()
   }
 
-  // ── action: send — enrich, charge, email all PENDING_REVIEW creators ──
+  // ── action: send — enrich, charge, email all SHORTLISTED creators ──
   if (body.action === 'send') {
     return handleSend(id, userId, campaign, body.briefMessage)
   }
 
-  // ── action: request — transition SHORTLISTED → PENDING_REVIEW ──
+  // ── action: request — kept for backwards compat, now triggers send directly ──
   if (body.action === 'request') {
-    await prisma.campaignOutreach.updateMany({
-      where: { campaignId: id, status: 'SHORTLISTED' },
-      data: { status: 'PENDING_REVIEW', requestedAt: new Date() },
-    })
+    return handleSend(id, userId, campaign, body.briefMessage)
   } else {
     // ── default: upsert a creator into the shortlist ──
     if (!body.creator?.id || !body.creator?.platform) {
@@ -178,7 +175,7 @@ async function handleSend(
   briefMessage?: string,
 ) {
   const pending = await prisma.campaignOutreach.findMany({
-    where: { campaignId, status: 'PENDING_REVIEW' },
+    where: { campaignId, status: 'SHORTLISTED' },
   })
   if (pending.length === 0) {
     return NextResponse.json({ message: 'No creators pending review', code: 'NO_RECIPIENTS' }, { status: 400 })
@@ -202,8 +199,8 @@ async function handleSend(
 
   // Mark all as SENDING to prevent concurrent sends
   await prisma.campaignOutreach.updateMany({
-    where: { campaignId, status: 'PENDING_REVIEW' },
-    data: { status: 'SENDING' },
+    where: { campaignId, status: 'SHORTLISTED' },
+    data: { status: 'SHORTLISTED' },
   })
 
   // Enrich each creator to get contact emails
@@ -266,8 +263,8 @@ async function handleSend(
           }
           // Revert statuses back to PENDING_REVIEW
           await prisma.campaignOutreach.updateMany({
-            where: { campaignId, status: 'SENDING' },
-            data: { status: 'PENDING_REVIEW' },
+            where: { campaignId, status: 'SHORTLISTED' },
+            data: { status: 'SHORTLISTED' },
           })
           return NextResponse.json(gate.body, { status: gate.status })
         }
@@ -280,8 +277,8 @@ async function handleSend(
             if (prior) await prior.refund().catch(() => {})
           }
           await prisma.campaignOutreach.updateMany({
-            where: { campaignId, status: 'SENDING' },
-            data: { status: 'PENDING_REVIEW' },
+            where: { campaignId, status: 'SHORTLISTED' },
+            data: { status: 'SHORTLISTED' },
           })
           return NextResponse.json(charge.body, { status: charge.status })
         }

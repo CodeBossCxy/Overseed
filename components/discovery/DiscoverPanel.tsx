@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
+import { createPortal } from 'react-dom'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import {
   CLUB_FILTER_DEFS,
@@ -1180,10 +1181,12 @@ export default function DiscoverPanel() {
     }
   }
 
+  // Client-side profile cache — avoids repeat API calls during the same session
+  const profileCacheRef = useRef<Record<string, any>>({})
+
   const openDetail = async (creator: DiscoveredCreator) => {
     if (!creator.handle) return
     setDetailFor(creator)
-    setDetail(null)
     setDetailError(null)
     setDetailBlocked(false)
     setAnalytics(null)
@@ -1194,8 +1197,18 @@ export default function DiscoverPanel() {
     setFeatureLoading(null)
     setFeatureError(null)
     setFeatureConfirm(null)
-    setDetailLoading(true)
     loadExistingUnlocks(creator.platform, creator.handle)
+
+    // Check client-side cache first
+    const cacheKey = `${creator.platform}:${creator.handle.replace(/^@/, '').toLowerCase()}`
+    const cached = profileCacheRef.current[cacheKey]
+    if (cached) {
+      setDetail(cached)
+      return
+    }
+
+    setDetail(null)
+    setDetailLoading(true)
     try {
       const qs = new URLSearchParams({
         platform: creator.platform,
@@ -1208,6 +1221,8 @@ export default function DiscoverPanel() {
         setDetailBlocked(QUOTA_CODES.includes(data?.code))
         throw new Error(data?.message || 'Failed to load creator details')
       }
+      // Cache in memory for this session
+      profileCacheRef.current[cacheKey] = data
       setDetail(data)
       // Back-patch the permanent avatar URL from the profile response into
       // the creator card so it survives TikTok CDN URL expiration.
@@ -1228,6 +1243,18 @@ export default function DiscoverPanel() {
       setDetailLoading(false)
     }
   }
+
+  // Multi-select outreach
+  const [selectedCreators, setSelectedCreators] = useState<Set<string>>(new Set())
+  const [bulkOutreachOpen, setBulkOutreachOpen] = useState(false)
+  const [bulkMsg, setBulkMsg] = useState('')
+  const [bulkFiles, setBulkFiles] = useState<File[]>([])
+  const [bulkSending, setBulkSending] = useState(false)
+  const [bulkSent, setBulkSent] = useState(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
+  const [bulkRememberMsg, setBulkRememberMsg] = useState(false)
+  const [bulkRememberedMsg, setBulkRememberedMsg] = useState('')
+  const [bulkRememberedFiles, setBulkRememberedFiles] = useState<File[]>([])
 
   // Contact-the-creator compose modal
   const [contactOpen, setContactOpen] = useState(false)
@@ -1272,6 +1299,101 @@ export default function DiscoverPanel() {
       next.push(f)
     }
     setContactFiles(next)
+  }
+
+  const toggleSelectCreator = (creator: DiscoveredCreator) => {
+    const key = `${creator.platform}:${(creator.handle || '').replace(/^@/, '').toLowerCase()}`
+    setSelectedCreators(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const isCreatorSelected = (creator: DiscoveredCreator) => {
+    const key = `${creator.platform}:${(creator.handle || '').replace(/^@/, '').toLowerCase()}`
+    return selectedCreators.has(key)
+  }
+
+  const selectAllCreators = () => {
+    const keys = creators.filter(c => c.handle).map(c => `${c.platform}:${c.handle!.replace(/^@/, '').toLowerCase()}`)
+    setSelectedCreators(new Set(keys))
+  }
+
+  const deselectAllCreators = () => setSelectedCreators(new Set())
+
+  const getSelectedCreatorObjects = () => {
+    return creators.filter(c => {
+      const key = `${c.platform}:${(c.handle || '').replace(/^@/, '').toLowerCase()}`
+      return selectedCreators.has(key)
+    })
+  }
+
+  const addBulkFiles = (list: FileList | null) => {
+    if (!list) return
+    setBulkError(null)
+    const next = [...bulkFiles]
+    for (const f of Array.from(list)) {
+      if (next.length >= 3) break
+      if (f.size > 4 * 1024 * 1024) { setBulkError(`"${f.name}" exceeds the 4MB limit`); continue }
+      const total = next.reduce((sum, file) => sum + file.size, 0) + f.size
+      if (total > 4 * 1024 * 1024) { setBulkError('Attachments exceed 4MB combined'); continue }
+      next.push(f)
+    }
+    setBulkFiles(next)
+  }
+
+  const openBulkOutreach = () => {
+    setBulkMsg(bulkRememberMsg && bulkRememberedMsg ? bulkRememberedMsg : '')
+    setBulkFiles(bulkRememberMsg && bulkRememberedFiles.length > 0 ? [...bulkRememberedFiles] : [])
+    setBulkSent(false)
+    setBulkError(null)
+    setBulkOutreachOpen(true)
+  }
+
+  const sendBulkOutreach = async () => {
+    const selected = getSelectedCreatorObjects()
+    if (selected.length === 0 || bulkMsg.trim().length < 10) return
+    setBulkSending(true)
+    setBulkError(null)
+    try {
+      const res = await fetch('/api/outreach/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Outreach to ${selected.length} creators`,
+          briefMessage: bulkMsg.trim(),
+          platform: selected[0].platform,
+          criteria: {},
+          collaborationDetails: {},
+          creators: selected.map(c => ({
+            platform: c.platform,
+            handle: (c.handle || '').replace(/^@/, '').toLowerCase(),
+            displayName: c.display_name,
+            avatarUrl: c.avatar_url,
+            followerCount: c.follower_count,
+            engagementRate: c.engagement_rate != null ? Number(c.engagement_rate) : null,
+            country: c.country,
+            nicheTags: c.niche_tags || [],
+            bio: c.bio,
+            profileUrl: c.profile_url,
+          })),
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Failed to submit outreach')
+      setBulkSent(true)
+      if (bulkRememberMsg) {
+        setBulkRememberedMsg(bulkMsg.trim())
+        setBulkRememberedFiles([...bulkFiles])
+      }
+      setSelectedCreators(new Set())
+    } catch (err: any) {
+      setBulkError(err.message || 'Failed to send')
+    } finally {
+      setBulkSending(false)
+    }
   }
 
   const sendContact = async () => {
@@ -2055,6 +2177,10 @@ export default function DiscoverPanel() {
     // Sort by most followers (client-side to guarantee correct order)
     return [...creatorsRaw].sort((a, b) => (b.follower_count ?? 0) - (a.follower_count ?? 0))
   }, [creatorsRaw, sortByRelevance, relevanceQuery, bioMap, nicheMap])
+
+  // Clear multi-select when search results change
+  useEffect(() => { setSelectedCreators(new Set()) }, [creatorsRaw])
+
   const isBrowsing = !searchResult
 
   // Fetch niches whenever displayed creators change
@@ -3035,7 +3161,7 @@ export default function DiscoverPanel() {
                 {zh ? '搜索历史' : 'Search history'}
               </button>
               <h2 className="text-lg font-semibold">
-                {isLoading ? d.loadingCreators : `${creators.length}${isBrowsing && hasMore ? '+' : ''} ${d.resultsCount}`}
+                {isLoading ? d.loadingCreators : (zh ? `为您推荐 ${creators.length} 位达人` : `Top ${creators.length} creators for you`)}
               </h2>
             </div>
             <div className="flex items-center gap-3">
@@ -3084,6 +3210,39 @@ export default function DiscoverPanel() {
                 </span>
               </div>
             )}
+            {/* Multi-select toolbar */}
+            {creators.length > 0 && (
+              <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={selectedCreators.size > 0 && selectedCreators.size === creators.filter(c => c.handle).length}
+                      onChange={(e) => e.target.checked ? selectAllCreators() : deselectAllCreators()}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {zh ? '全选' : 'Select all'}
+                  </label>
+                  {selectedCreators.size > 0 && (
+                    <span className="text-sm font-medium text-primary-600">
+                      {selectedCreators.size} {zh ? '已选' : 'selected'}
+                    </span>
+                  )}
+                </div>
+                {selectedCreators.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={openBulkOutreach}
+                    className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-full text-sm font-semibold hover:opacity-90 transition shadow-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                    </svg>
+                    {zh ? `向 ${selectedCreators.size} 位达人发送外联` : `Send outreach to ${selectedCreators.size}`}
+                  </button>
+                )}
+              </div>
+            )}
             <div
               className={`grid grid-cols-1 lg:grid-cols-2 gap-4 transition-opacity ${
                 isLoading ? 'opacity-40 pointer-events-none' : ''
@@ -3098,10 +3257,18 @@ export default function DiscoverPanel() {
                 return (
                 <div
                   key={`${searchTaskId ?? activeSearch?.params ?? 'browse'}:${searchPage}:${creator.id}:${creatorIndex}`}
-                  className="workspace-glass-card rounded-2xl p-5"
+                  className={`workspace-glass-card rounded-2xl p-5 transition-colors ${isCreatorSelected(creator) ? 'ring-2 ring-primary-400 bg-primary-50/30' : ''}`}
                 >
-                  {/* Top section: avatar + info + platform link */}
+                  {/* Top section: checkbox + avatar + info + platform link */}
                   <div className="flex gap-4">
+                    <label className="flex items-start pt-2 cursor-pointer flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isCreatorSelected(creator)}
+                        onChange={() => toggleSelectCreator(creator)}
+                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                    </label>
                     {/* Avatar with gradient ring */}
                     <div className="flex-shrink-0">
                       <div className="w-[80px] h-[80px] rounded-full p-[3px] bg-gradient-to-br from-yellow-400 via-pink-500 to-purple-600">
@@ -4217,6 +4384,93 @@ export default function DiscoverPanel() {
         </div>
       )}
       {/* END TEMP */}
+      {bulkOutreachOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
+          onClick={() => !bulkSending && setBulkOutreachOpen(false)}
+        >
+          <div className="rounded-3xl shadow-2xl max-w-lg w-full p-7" style={{ backgroundColor: '#ffffff' }} onClick={(e) => e.stopPropagation()}>
+            {bulkSent ? (
+              <div className="text-center py-6">
+                <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center text-2xl" style={{ backgroundColor: '#ecfdf5', color: '#10b981' }}>✓</div>
+                <h3 className="text-lg font-bold mt-4" style={{ color: '#111827' }}>{zh ? '外联已提交' : 'Outreach submitted'}</h3>
+                <p className="text-sm mt-1.5" style={{ color: '#6b7280' }}>
+                  {zh
+                    ? `已向 ${getSelectedCreatorObjects().length || selectedCreators.size} 位达人提交外联请求。我们的团队将代您联系。`
+                    : `Outreach request submitted. Our team will reach out to the creators on your behalf.`}
+                </p>
+                <button onClick={() => setBulkOutreachOpen(false)} className="mt-6 px-6 py-2.5 rounded-xl text-sm font-semibold transition" style={{ backgroundColor: '#111827', color: '#ffffff' }}>
+                  {zh ? '完成' : 'Done'}
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-lg font-bold" style={{ color: '#111827' }}>
+                  {zh ? `向 ${selectedCreators.size} 位达人发送外联` : `Send outreach to ${selectedCreators.size} creators`}
+                </h3>
+                <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
+                  {zh ? '由 Overseed 代为发送 — 创作者可以直接回复您的消息。' : 'Delivered by Overseed — creators can reply directly to your message.'}
+                </p>
+                <textarea
+                  value={bulkMsg}
+                  onChange={(e) => setBulkMsg(e.target.value)}
+                  rows={6}
+                  maxLength={2000}
+                  placeholder={zh ? '写下您的合作邀请消息...' : 'Write your collaboration message...'}
+                  className="mt-4 w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
+                  style={{ border: '1px solid #e5e7eb' }}
+                />
+                <p className="text-right text-[11px] mt-1" style={{ color: '#9ca3af' }}>{bulkMsg.length}/2000</p>
+
+                {/* Attachments */}
+                <div className="mt-2">
+                  {bulkFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {bulkFiles.map((f, i) => (
+                        <span key={`${f.name}-${i}`} className="flex items-center gap-2 pl-1.5 pr-2 py-1 rounded-lg text-xs" style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', color: '#4b5563' }}>
+                          {f.type.startsWith('image/') ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={URL.createObjectURL(f)} alt="" className="w-6 h-6 rounded object-cover" />
+                          ) : (
+                            <span className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold" style={{ backgroundColor: '#e5e7eb', color: '#6b7280' }}>PDF</span>
+                          )}
+                          <span className="max-w-[140px] truncate">{f.name}</span>
+                          <button onClick={() => setBulkFiles(bulkFiles.filter((_, j) => j !== i))} style={{ color: '#9ca3af' }}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <label className="inline-flex items-center gap-1.5 text-sm font-medium cursor-pointer" style={{ color: '#4f46e5' }}>
+                    <span className="text-base leading-none">＋</span> {zh ? '添加图片或文件' : 'Add photos or files'}
+                    <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" className="hidden" onChange={(e) => { addBulkFiles(e.target.files); e.target.value = '' }} />
+                  </label>
+                  <span className="ml-2 text-[11px]" style={{ color: '#9ca3af' }}>{zh ? '图片或PDF · 最多3个 · 共4MB' : 'Images or PDF · up to 3 files · 4MB combined'}</span>
+                </div>
+
+                {/* Remember message */}
+                <label className="flex items-center gap-2 mt-4 cursor-pointer">
+                  <input type="checkbox" checked={bulkRememberMsg} onChange={(e) => setBulkRememberMsg(e.target.checked)} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                  <span className="text-sm" style={{ color: '#4b5563' }}>{zh ? '记住此消息用于下次' : 'Remember this message for next time'}</span>
+                </label>
+
+                {bulkError && (
+                  <div className="mt-3 rounded-lg p-3 text-sm" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c' }}>{bulkError}</div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 mt-5">
+                  <button onClick={() => setBulkOutreachOpen(false)} disabled={bulkSending} className="px-5 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-50" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
+                    {zh ? '取消' : 'Cancel'}
+                  </button>
+                  <button onClick={sendBulkOutreach} disabled={bulkSending || bulkMsg.trim().length < 10} className="px-6 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: 'linear-gradient(to right, #4f46e5, #e11d48)', color: '#ffffff' }}>
+                    {bulkSending ? (zh ? '发送中…' : 'Sending…') : (zh ? '发送外联' : 'Send outreach')}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>,
+      document.body)}
     </div>
   )
 }

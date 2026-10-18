@@ -9,6 +9,7 @@ import { useViewMode } from '@/lib/hooks/useViewMode'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import Link from 'next/link'
 import { getPusherClient } from '@/lib/pusher-client'
+import CollaborationProgress from '@/components/CollaborationProgress'
 
 interface ConversationItem {
   id: string
@@ -575,8 +576,14 @@ export default function MessagesPage() {
                     {/* Avatar */}
                     <div className="w-14 h-14 bg-white/65 ring-1 ring-white rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {conv.type === 'outreach' && conv.creatorAvatar ? (
-                        <img src={conv.creatorAvatar} alt="" className="w-14 h-14 rounded-full object-cover" />
-                      ) : conv.otherUser?.image ? (
+                        <img src={conv.creatorAvatar} alt="" className="w-14 h-14 rounded-full object-cover" onError={(e) => { const el = e.target as HTMLImageElement; el.onerror = null; el.style.display = 'none'; el.nextElementSibling?.classList.remove('hidden') }} />
+                      ) : null}
+                      {conv.type === 'outreach' ? (
+                        <span className={`text-primary-700 font-bold text-lg ${conv.creatorAvatar ? 'hidden' : ''}`}>
+                          {(conv.creatorName || conv.creatorHandle)?.charAt(0)?.toUpperCase() || '?'}
+                        </span>
+                      ) : null}
+                      {conv.type !== 'outreach' && conv.otherUser?.image ? (
                         <img
                           src={conv.otherUser.image}
                           alt=""
@@ -668,7 +675,7 @@ export default function MessagesPage() {
                   >
                   <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-white/65 ring-1 ring-white flex items-center justify-center overflow-hidden flex-shrink-0">
                     {selectedConv?.type === 'outreach' && selectedConv?.creatorAvatar
-                      ? <img src={selectedConv.creatorAvatar} alt="" className="w-full h-full object-cover" />
+                      ? <><img src={selectedConv.creatorAvatar} alt="" className="w-full h-full object-cover" onError={(e) => { const el = e.target as HTMLImageElement; el.onerror = null; el.style.display = 'none'; el.nextElementSibling?.classList.remove('hidden') }} /><span className="text-base sm:text-xl font-bold text-primary-700 hidden">{(selectedConv?.creatorName || selectedConv?.creatorHandle)?.charAt(0)?.toUpperCase() || '?'}</span></>
                       : convDetails.otherUser?.image
                         ? <img src={convDetails.otherUser.image} alt="" className="w-full h-full object-cover" />
                         : <span className="text-base sm:text-xl font-bold text-primary-700">{(selectedConv?.type === 'outreach' ? selectedConv?.creatorName || selectedConv?.creatorHandle : convDetails.otherUser?.name)?.charAt(0)?.toUpperCase() || '?'}</span>}
@@ -923,12 +930,11 @@ export default function MessagesPage() {
                   </button>
                   <div className="w-12 h-12 rounded-full bg-white/65 ring-1 ring-white overflow-hidden flex items-center justify-center flex-shrink-0">
                     {selectedOutreachItem.creatorAvatar ? (
-                      <img src={selectedOutreachItem.creatorAvatar} alt="" className="w-12 h-12 rounded-full object-cover" />
-                    ) : (
-                      <span className="text-primary-700 font-bold text-lg">
-                        {(selectedOutreachItem.creatorName || selectedOutreachItem.creatorHandle)?.charAt(0)?.toUpperCase() || '?'}
-                      </span>
-                    )}
+                      <img src={selectedOutreachItem.creatorAvatar} alt="" className="w-12 h-12 rounded-full object-cover" onError={(e) => { const el = e.target as HTMLImageElement; el.onerror = null; el.style.display = 'none'; el.nextElementSibling?.classList.remove('hidden') }} />
+                    ) : null}
+                    <span className={`text-primary-700 font-bold text-lg ${selectedOutreachItem.creatorAvatar ? 'hidden' : ''}`}>
+                      {(selectedOutreachItem.creatorName || selectedOutreachItem.creatorHandle)?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-gray-900 truncate">
@@ -938,23 +944,18 @@ export default function MessagesPage() {
                       @{selectedOutreachItem.creatorHandle} · {selectedOutreachItem.creatorPlatform}
                     </p>
                   </div>
-                  <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ${
-                    selectedOutreachItem.outreachStatus === 'SENT' || selectedOutreachItem.outreachStatus === 'DELIVERED'
-                      ? 'bg-green-100 text-green-700'
-                      : selectedOutreachItem.outreachStatus === 'FAILED'
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-amber-100 text-amber-700'
-                  }`}>
-                    {selectedOutreachItem.outreachStatus}
-                  </span>
                 </div>
 
                 {/* Outreach detail body */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                  <div className="workspace-glass-card rounded-2xl p-5 space-y-3">
-                    <h3 className="font-bold text-sm text-gray-900">
-                      {locale === 'zh' ? '触达详情' : 'Outreach Details'}
-                    </h3>
+                  <div className="workspace-glass-card rounded-2xl p-5">
+                    <CollaborationProgress
+                      status={selectedOutreachItem.outreachStatus || 'PENDING_REVIEW'}
+                      locale={locale}
+                    />
+                  </div>
+
+                  <div className="workspace-glass-card rounded-2xl p-5">
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-xs text-gray-400">{locale === 'zh' ? '活动' : 'Campaign'}</p>
@@ -963,10 +964,6 @@ export default function MessagesPage() {
                       <div>
                         <p className="text-xs text-gray-400">{locale === 'zh' ? '平台' : 'Platform'}</p>
                         <p className="font-medium text-gray-800 capitalize">{selectedOutreachItem.creatorPlatform}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400">{locale === 'zh' ? '状态' : 'Status'}</p>
-                        <p className="font-medium text-gray-800 capitalize">{selectedOutreachItem.outreachStatus?.toLowerCase().replace('_', ' ')}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-400">{locale === 'zh' ? '日期' : 'Date'}</p>
