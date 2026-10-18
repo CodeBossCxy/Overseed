@@ -797,7 +797,7 @@ export default function DiscoverPanel() {
   const [source] = useState<DiscoverySource>('club')
   // YouTube default: the browse list comes from the YouTube Data API ranked
   // by subscribers; the Instagram pill shows the cached club showcase.
-  const [platforms, setPlatforms] = useState<string[]>(['youtube'])
+  const [platforms, setPlatforms] = useState<string[]>(['tiktok'])
   const [country, setCountry] = useState('')
   const [minFollowers, setMinFollowers] = useState('')
   const [maxFollowers, setMaxFollowers] = useState('')
@@ -1389,7 +1389,7 @@ export default function DiscoverPanel() {
     const saved = readSavedSearch()
     if (saved) {
       setQuery(saved.query)
-      setPlatforms(saved.platforms?.length ? saved.platforms : ['youtube'])
+      setPlatforms(saved.platforms?.length ? saved.platforms : ['tiktok'])
       setCountry(saved.country || '')
       setMinFollowers(saved.minFollowers || '')
       setMaxFollowers(saved.maxFollowers || '')

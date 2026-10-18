@@ -88,7 +88,9 @@ export default function MessagesPage() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [savedCreatorIds, setSavedCreatorIds] = useState<Set<string>>(new Set())
   const [listQuery, setListQuery] = useState('')
-  const [listFilter, setListFilter] = useState<'all' | 'unread' | 'favorites'>('all')
+  const [listFilter, setListFilter] = useState<'all' | 'unread' | 'favorites' | 'outreach'>('all')
+  const [outreachHistory, setOutreachHistory] = useState<ConversationItem[]>([])
+  const [outreachLoaded, setOutreachLoaded] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Brands see a bookmark next to creators they saved
@@ -99,6 +101,22 @@ export default function MessagesPage() {
       .then((data) => setSavedCreatorIds(new Set(data.ids || [])))
       .catch(() => {})
   }, [isBrand])
+
+  // Fetch outreach history (campaign outreach + mass outreach recipients)
+  useEffect(() => {
+    if (!isBrand || outreachLoaded) return
+    const load = async () => {
+      try {
+        const res = await fetch('/api/messages/outreach-history')
+        if (res.ok) {
+          const data = await res.json()
+          setOutreachHistory(data.items || [])
+        }
+      } catch {}
+      setOutreachLoaded(true)
+    }
+    load()
+  }, [isBrand, outreachLoaded])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -273,9 +291,22 @@ export default function MessagesPage() {
     }
   }
 
-  const handleSelectConversation = (convId: string) => {
-    setTranslations({})
+  const [selectedOutreachItem, setSelectedOutreachItem] = useState<ConversationItem | null>(null)
 
+  const handleSelectConversation = (convId: string) => {
+    // Outreach history items (not real conversations) — show detail panel instead
+    if (convId.startsWith('co:') || convId.startsWith('mo:')) {
+      const item = outreachHistory.find((h) => h.id === convId)
+      if (item) {
+        setSelectedOutreachItem(item)
+        setSelectedConvId(null)
+        setShowMobileThread(true)
+      }
+      return
+    }
+
+    setSelectedOutreachItem(null)
+    setTranslations({})
     setSelectedConvId(convId)
     setShowMobileThread(true)
     // Clear unread for this conversation in local state
@@ -402,18 +433,36 @@ export default function MessagesPage() {
   const isFavorited = (conv: ConversationItem) =>
     !!conv.favorited || (isBrand && !!conv.influencerId && savedCreatorIds.has(conv.influencerId))
 
-  const visibleConversations = conversations.filter((conv) => {
-    if (listFilter === 'unread' && conv.unreadCount === 0) return false
-    if (listFilter === 'favorites' && !isFavorited(conv)) return false
-    const q = listQuery.trim().toLowerCase()
-    if (!q) return true
-    return (
-      (conv.otherUser?.name || '').toLowerCase().includes(q) ||
-      (conv.campaignTitle || '').toLowerCase().includes(q) ||
-      (conv.creatorName || '').toLowerCase().includes(q) ||
-      (conv.creatorHandle || '').toLowerCase().includes(q)
-    )
-  })
+  const visibleConversations = (() => {
+    // For the outreach tab, merge conversation-based outreach with standalone outreach history
+    if (listFilter === 'outreach') {
+      const convOutreach = conversations.filter((c) => c.type === 'outreach')
+      // Merge outreach history items that don't already have a conversation
+      const convKeys = new Set(convOutreach.map((c) => `${c.creatorPlatform}:${c.creatorHandle}`))
+      const extra = outreachHistory.filter((h) => !convKeys.has(`${h.creatorPlatform}:${h.creatorHandle}`))
+      const merged = [...convOutreach, ...extra]
+      const q = listQuery.trim().toLowerCase()
+      if (!q) return merged
+      return merged.filter((conv) =>
+        (conv.otherUser?.name || '').toLowerCase().includes(q) ||
+        (conv.campaignTitle || '').toLowerCase().includes(q) ||
+        (conv.creatorName || '').toLowerCase().includes(q) ||
+        (conv.creatorHandle || '').toLowerCase().includes(q)
+      )
+    }
+    return conversations.filter((conv) => {
+      if (listFilter === 'unread' && conv.unreadCount === 0) return false
+      if (listFilter === 'favorites' && !isFavorited(conv)) return false
+      const q = listQuery.trim().toLowerCase()
+      if (!q) return true
+      return (
+        (conv.otherUser?.name || '').toLowerCase().includes(q) ||
+        (conv.campaignTitle || '').toLowerCase().includes(q) ||
+        (conv.creatorName || '').toLowerCase().includes(q) ||
+        (conv.creatorHandle || '').toLowerCase().includes(q)
+      )
+    })
+  })()
 
   const selectedConv = conversations.find((cv) => cv.id === selectedConvId)
 
@@ -470,7 +519,7 @@ export default function MessagesPage() {
                 </button>
               </div>
               <div className="flex gap-3">
-                {([['all', (t.messages as any)?.tabAll || 'All'], ['unread', (t.messages as any)?.tabUnread || 'Unread'], ['favorites', (t.messages as any)?.tabFavorites || 'Favorites']] as const).map(([key, label]) => (
+                {([['all', (t.messages as any)?.tabAll || 'All'], ['unread', (t.messages as any)?.tabUnread || 'Unread'], ['favorites', (t.messages as any)?.tabFavorites || 'Favorites'], ...(isBrand ? [['outreach', locale === 'zh' ? '触达记录' : 'Outreach'] as const] : [])] as const).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => setListFilter(key)}
@@ -860,6 +909,92 @@ export default function MessagesPage() {
                   </div>
                 </div>
               </>
+            ) : selectedOutreachItem ? (
+              <div className="flex-1 flex flex-col">
+                {/* Outreach detail header */}
+                <div className="px-4 sm:px-6 py-4 sm:py-5 flex items-center gap-3 border-b border-gray-100/60">
+                  <button
+                    onClick={() => { setSelectedOutreachItem(null); setShowMobileThread(false) }}
+                    className="md:hidden p-1 hover:bg-gray-100 rounded"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <div className="w-12 h-12 rounded-full bg-white/65 ring-1 ring-white overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {selectedOutreachItem.creatorAvatar ? (
+                      <img src={selectedOutreachItem.creatorAvatar} alt="" className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <span className="text-primary-700 font-bold text-lg">
+                        {(selectedOutreachItem.creatorName || selectedOutreachItem.creatorHandle)?.charAt(0)?.toUpperCase() || '?'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-gray-900 truncate">
+                      {selectedOutreachItem.creatorName || `@${selectedOutreachItem.creatorHandle}`}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      @{selectedOutreachItem.creatorHandle} · {selectedOutreachItem.creatorPlatform}
+                    </p>
+                  </div>
+                  <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ${
+                    selectedOutreachItem.outreachStatus === 'SENT' || selectedOutreachItem.outreachStatus === 'DELIVERED'
+                      ? 'bg-green-100 text-green-700'
+                      : selectedOutreachItem.outreachStatus === 'FAILED'
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {selectedOutreachItem.outreachStatus}
+                  </span>
+                </div>
+
+                {/* Outreach detail body */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                  <div className="workspace-glass-card rounded-2xl p-5 space-y-3">
+                    <h3 className="font-bold text-sm text-gray-900">
+                      {locale === 'zh' ? '触达详情' : 'Outreach Details'}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-xs text-gray-400">{locale === 'zh' ? '活动' : 'Campaign'}</p>
+                        <p className="font-medium text-gray-800">{selectedOutreachItem.campaignTitle}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">{locale === 'zh' ? '平台' : 'Platform'}</p>
+                        <p className="font-medium text-gray-800 capitalize">{selectedOutreachItem.creatorPlatform}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">{locale === 'zh' ? '状态' : 'Status'}</p>
+                        <p className="font-medium text-gray-800 capitalize">{selectedOutreachItem.outreachStatus?.toLowerCase().replace('_', ' ')}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">{locale === 'zh' ? '日期' : 'Date'}</p>
+                        <p className="font-medium text-gray-800">
+                          {new Date(selectedOutreachItem.updatedAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedOutreachItem.lastMessage && (
+                    <div className="workspace-glass-card rounded-2xl p-5">
+                      <h3 className="font-bold text-sm text-gray-900 mb-2">
+                        {locale === 'zh' ? '发送的消息' : 'Message Sent'}
+                      </h3>
+                      <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">
+                        {selectedOutreachItem.lastMessage.content}
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-gray-400 text-center">
+                    {locale === 'zh'
+                      ? 'Overseed 已代您向该达人发送触达邮件。如有回复，将显示在消息中。'
+                      : 'Overseed has sent an outreach email to this creator on your behalf. Replies will appear in messages.'}
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
