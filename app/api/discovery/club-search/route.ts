@@ -659,7 +659,7 @@ export async function GET(req: NextRequest) {
     cachedResult = probe
   } else if (params.get('q')?.trim()) {
     // Pricing v3 (legacy): keyword searches consume the monthly discovery
-    // quota; beyond it, extra searches bill 6 credits each.
+    // quota; beyond it, extra searches bill 12 credits each.
     const tier = await getEffectiveTier(userId)
     const quota = await consumeQuota(userId, tier, 'discovery_search')
     if (!quota.ok) {

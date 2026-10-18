@@ -28,13 +28,13 @@ export const CREDIT_COSTS = {
   chat_standard: 1,
   chat_advanced: 3,
   image: 4,
-  profile_view: 12,
+  profile_view: 15,
   analytics: 45,
   // Discovery search beyond the monthly quota (quota itself is free).
-  discovery_search_extra: 6,
+  discovery_search_extra: 12,
   // Paid feature unlock (audience gender/age/country, brand collaborations).
   // Actual cost varies — callers pass costOverride to deductCredits.
-  feature_unlock: 12,
+  feature_unlock: 15,
 } as const
 
 export type CreditFeature = keyof typeof CREDIT_COSTS

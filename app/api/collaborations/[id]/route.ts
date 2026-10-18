@@ -15,6 +15,7 @@ import {
 } from '@/lib/notification-emails'
 
 const NOTIFY_USER_SELECT = {
+  id: true,
   name: true,
   email: true,
   preferredLanguage: true,

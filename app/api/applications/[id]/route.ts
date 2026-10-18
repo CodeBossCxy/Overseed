@@ -232,6 +232,7 @@ export async function PATCH(
             include: {
               user: {
                 select: {
+                  id: true,
                   name: true,
                   email: true,
                   preferredLanguage: true,

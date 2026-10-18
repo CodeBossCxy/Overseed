@@ -3671,7 +3671,7 @@ export default function DiscoverPanel() {
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-bold text-gray-900">{zh ? '受众洞察' : 'Audience Insights'}</h4>
                     <p className="text-[11px] text-gray-400">
-                      {zh ? '获取详细受众分析。每项解锁需 12 积分。' : 'Unlock detailed audience demographics per section.'}
+                      {zh ? '获取详细受众分析。每项解锁需 15 积分。' : 'Unlock detailed audience demographics per section.'}
                     </p>
                   </div>
                   {/* Unlock All bundle button — hidden when all 3 are already unlocked */}

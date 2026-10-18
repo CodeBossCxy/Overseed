@@ -68,6 +68,7 @@ export async function PATCH(req: NextRequest) {
         companyName: true,
         user: {
           select: {
+            id: true,
             email: true,
             name: true,
             preferredLanguage: true,

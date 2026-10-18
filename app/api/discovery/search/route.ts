@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   const incoming = req.nextUrl.searchParams
 
   // Pricing v3: keyword/topic searches consume the monthly discovery quota;
-  // once the quota is exhausted, extra searches bill 6 credits each.
+  // once the quota is exhausted, extra searches bill 12 credits each.
   // Plain browsing (no q/topics) stays unmetered.
   const isKeywordSearch = Boolean(incoming.get('q') || incoming.get('topics'))
   let searchCharge: { referenceId: string; refund: () => Promise<void> } | null = null

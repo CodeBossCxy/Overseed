@@ -26,7 +26,7 @@ const ALLOWED_TYPES = [
 ]
 
 const OPS_EMAIL = 'xinyi@overseed.net'
-const OUTREACH_COST = 45
+const OUTREACH_COST = 5
 
 const PROFILE_URL: Record<string, (h: string) => string> = {
   instagram: (h) => `https://www.instagram.com/${h}/`,
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     // Non-critical — team notification will note that email is missing
   }
 
-  // ── Billing: 45 credits per outreach request ──
+  // ── Billing: 5 credits per outreach request ──
   let outreachCharge: { refund: () => Promise<void> } | null = null
   let quota: { ok: boolean; used: number; limit: number; usageId?: string } | null = null
   if (CREDIT_SYSTEM_ENABLED) {

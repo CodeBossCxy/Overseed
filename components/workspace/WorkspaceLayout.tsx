@@ -68,6 +68,9 @@ export default function WorkspaceLayout({
   const [accountOpen, setAccountOpen] = useState(false)
   const [pendingHref, setPendingHref] = useState<string | null>(null)
   const [unread, setUnread] = useState(0)
+  const [notifUnread, setNotifUnread] = useState(0)
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifOpen, setNotifOpen] = useState(false)
 
   // Credits chip state
   const [credits, setCredits] = useState<{
@@ -98,6 +101,25 @@ export default function WorkspaceLayout({
     const interval = setInterval(fetchUnread, 30000)
     return () => clearInterval(interval)
   }, [session?.user])
+
+  // In-app notifications polling
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications?limit=20')
+      if (res.ok) {
+        const data = await res.json()
+        setNotifications(data.notifications || [])
+        setNotifUnread(data.unreadCount || 0)
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (!session?.user) return
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, 30000)
+    return () => clearInterval(interval)
+  }, [session?.user, fetchNotifications])
 
   useEffect(() => {
     if (!session?.user) return
@@ -414,18 +436,38 @@ export default function WorkspaceLayout({
               >
                 🌐 {locale === 'en' ? 'EN' : '中文'}
               </button>
-              <Link
-                href="/dashboard/messages"
-                className="relative w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-600 hover:text-gray-900 transition"
-                title={t.messages?.title}
-              >
-                {unread > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+              <div className="relative">
+                <button
+                  onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifications() }}
+                  className="relative w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-600 hover:text-gray-900 transition"
+                  title={locale === 'zh' ? '通知' : 'Notifications'}
+                >
+                  {(unread > 0 || notifUnread > 0) && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-red-500 ring-2 ring-white text-[10px] font-bold text-white flex items-center justify-center px-1">
+                      {unread + notifUnread}
+                    </span>
+                  )}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </button>
+                {notifOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                    <NotificationDropdown
+                      notifications={notifications}
+                      unreadCount={notifUnread}
+                      unreadMessages={unread}
+                      locale={locale}
+                      onMarkAllRead={async () => {
+                        await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) })
+                        fetchNotifications()
+                      }}
+                      onClose={() => setNotifOpen(false)}
+                    />
+                  </>
                 )}
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.7} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-              </Link>
+              </div>
             </div>
           </div>
 
@@ -503,5 +545,102 @@ function CreditsChip({
       <span aria-hidden>⚡</span>
       {formatNumber(total, locale)}
     </Link>
+  )
+}
+
+function NotificationDropdown({
+  notifications,
+  unreadCount,
+  unreadMessages,
+  locale,
+  onMarkAllRead,
+  onClose,
+}: {
+  notifications: any[]
+  unreadCount: number
+  unreadMessages: number
+  locale: string
+  onMarkAllRead: () => void
+  onClose: () => void
+}) {
+  const zh = locale === 'zh'
+  const router = useRouter()
+
+  const timeAgo = (date: string) => {
+    const diff = Date.now() - new Date(date).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return zh ? '刚刚' : 'just now'
+    if (mins < 60) return zh ? `${mins}分钟前` : `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return zh ? `${hrs}小时前` : `${hrs}h ago`
+    const days = Math.floor(hrs / 24)
+    return zh ? `${days}天前` : `${days}d ago`
+  }
+
+  return (
+    <div className="absolute right-0 top-12 z-50 w-[360px] bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <h3 className="font-bold text-sm">{zh ? '通知' : 'Notifications'}</h3>
+        {unreadCount > 0 && (
+          <button
+            onClick={onMarkAllRead}
+            className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+          >
+            {zh ? '全部标为已读' : 'Mark all read'}
+          </button>
+        )}
+      </div>
+
+      {/* Messages shortcut */}
+      {unreadMessages > 0 && (
+        <button
+          onClick={() => { onClose(); router.push('/dashboard/messages') }}
+          className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 hover:bg-blue-100 transition text-left border-b border-gray-100"
+        >
+          <span className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-blue-900">
+              {zh ? `${unreadMessages} 条未读消息` : `${unreadMessages} unread message${unreadMessages > 1 ? 's' : ''}`}
+            </p>
+          </div>
+          <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+
+      {/* Notification list */}
+      <div className="max-h-[380px] overflow-y-auto">
+        {notifications.length === 0 && (
+          <div className="py-10 text-center text-sm text-gray-400">
+            {zh ? '暂无通知' : 'No notifications yet'}
+          </div>
+        )}
+        {notifications.map((n) => (
+          <button
+            key={n.id}
+            onClick={() => {
+              onClose()
+              if (n.link) router.push(n.link)
+            }}
+            className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition border-b border-gray-50 ${!n.read ? 'bg-primary-50/30' : ''}`}
+          >
+            <div className="flex gap-3">
+              <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${n.read ? 'bg-transparent' : 'bg-primary-500'}`} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-900 leading-snug">{n.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
+                <p className="text-[11px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }

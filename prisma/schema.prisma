@@ -255,6 +255,7 @@ model User {
   discoveryTasks     DiscoverySearchTask[]
   outreachCampaigns  OutreachCampaign[]
   featureUnlocks     CreatorFeatureUnlock[]
+  notifications      Notification[]
 
   @@map("users")
 }
@@ -1481,4 +1482,21 @@ model CollaborationDeliverable {
 
   @@index([collaborationId])
   @@map("collaboration_deliverables")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // e.g. "application_approved", "verification_approved", etc.
+  title     String
+  body      String
+  link      String?  // in-app path to navigate to
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }

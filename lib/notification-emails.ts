@@ -13,6 +13,7 @@ type Locale = 'en' | 'zh'
 type Localized = { en: string; zh: string }
 
 export interface NotificationRecipient {
+  id?: string
   email: string
   name?: string | null
   preferredLanguage?: string | null
@@ -58,14 +59,34 @@ export async function sendStatusEmail(opts: StatusEmailOptions) {
   try {
     const { recipient } = opts
     if (!recipient?.email) return
-    // Skip placeholder emails that aren't real addresses (e.g. WeChat OAuth)
+
+    const locale: Locale = recipient.preferredLanguage === 'zh' ? 'zh' : 'en'
+    const t = (s: Localized) => s[locale]
+
+    // Always create an in-app notification (works for WeChat users too)
+    if (recipient.id) {
+      try {
+        const { prisma } = await import('@/lib/prisma')
+        await prisma.notification.create({
+          data: {
+            userId: recipient.id,
+            type: opts.category,
+            title: t(opts.title),
+            body: t(opts.intro),
+            link: opts.cta.path,
+          },
+        })
+      } catch (err) {
+        console.error('Failed to create in-app notification:', err)
+      }
+    }
+
+    // Skip email for placeholder addresses (e.g. WeChat OAuth)
     if (recipient.email.endsWith('@wechat.local')) return
     if (!recipient.emailNotifications) return
     if (opts.category === 'campaign' && !recipient.emailCampaignUpdates) return
     if (opts.category === 'collaboration' && !recipient.emailCollaborationUpdates) return
 
-    const locale: Locale = recipient.preferredLanguage === 'zh' ? 'zh' : 'en'
-    const t = (s: Localized) => s[locale]
     const baseUrl = process.env.NEXTAUTH_URL || 'https://overseed.net'
     const ctaUrl = opts.cta.path.startsWith('http') ? opts.cta.path : `${baseUrl}${opts.cta.path}`
 

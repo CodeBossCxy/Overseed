@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
       }
     }
   } else {
-    // Pricing v3 (legacy): 12 credits from the monthly/purchased pools.
+    // Pricing v3 (legacy): 15 credits from the monthly/purchased pools.
     alreadyViewed = await hasPriorDeduction(userId, viewRef)
     if (!alreadyViewed) {
       const tier = await getEffectiveTier(userId)

@@ -21,8 +21,8 @@ Assumptions: FX 7.2 CNY/USD · influencers.club (IC) credit = $0.60 · blended A
 | 每日新对话数 | 10 | 50 | 20 | 50 |
 | 与报名/合作中达人沟通 | 不限 | 不限 | 不限 | 不限 |
 | **DISCOVERY & OUTREACH** | | | | |
-| Creator Discovery（搜索次数，10 results/次） | 5/月 | 50/月 | 80/月 | 150/月 |
-| Creator Profile View | 12 credits/次（从AI Credits扣） | 同左 | 同左 | 同左 |
+| Creator Discovery（搜索次数，20 results/次） | 5/月 | 50/月 | 80/月 | 150/月 |
+| Creator Profile View | 15 credits/次（从AI Credits扣） | 同左 | 同左 | 同左 |
 | Advanced Analytics | — | 1/月 | 3/月 | 6/月 |
 | Managed Outreach（全自动化） | — | 5/月 | 15/月 | 30/月 |
 | Saved Creators / 重复访问已查看达人 | 不限 | 不限 | 不限 | 不限 |
@@ -33,7 +33,7 @@ Assumptions: FX 7.2 CNY/USD · influencers.club (IC) credit = $0.60 · blended A
 
 Note: discovery quotas assume IC base rate (0.01 cr/creator). If keyword search bills at premium rate (0.03), revert quotas to 20/30/60.
 
-统一额度原则：所有 AI 功能与达人数据（搜索超额 6 / 主页查看 12 / 深度分析 45）共用同一 Credits 余额；月度配额内免费，超出后按价目表扣除（无独立 CNY add-on SKU）。
+统一额度原则：所有 AI 功能与达人数据（搜索超额 12 / 主页查看 15 / 托管触达 5 / 深度分析 45）共用同一 Credits 余额；月度配额内免费，超出后按价目表扣除（无独立 CNY add-on SKU）。
 
 ---
 
@@ -44,8 +44,9 @@ Note: discovery quotas assume IC base rate (0.01 cr/creator). If keyword search 
 | AI Chat — Standard (Kimi / DeepSeek) | 1 | ¥0.014 | ~86% |
 | AI Chat — Advanced (GPT-5.6 / Claude Sonnet 5) | 3 | ¥0.18 | ~40% |
 | AI Image — Standard (gpt-image-2, 1024, medium) | 4 | ¥0.29 | ~28% |
-| Discovery Search 超出月度配额后（每次返回10位达人） | 6 | ¥0.43 | ~28% |
-| Creator Profile View — 按达人计 (IC enrich, incl. validated email) | 12 | ¥0.86 | ~28% |
+| Discovery Search 超出月度配额后（每次返回20位达人） | 12 | ¥0.86 | ~28% |
+| Creator Profile View — 按达人计 (IC enrich, incl. validated email) | 15 | ¥1.08 | ~28% |
+| Managed Outreach — 按次计 | 5 | ¥0.36 | — |
 | Creator Analytics — 按达人计（超出月度配额，含lookalikes） | 45 | ¥3.46 | ~23% |
 | Translation | 免费 | ~¥0 | — |
 | Doc export (Word / Excel / PDF) | 免费 | ¥0 | — |
@@ -68,10 +69,10 @@ Note: discovery quotas assume IC base rate (0.01 cr/creator). If keyword search 
 
 | Pack | 标准对话 | 高级对话 | AI图片 | 达人主页查看 | 深度分析 |
 |---|---|---|---|---|---|
-| Mini 60 | 60 | 20 | 15 | 5 | 1 |
-| Starter 240 | 240 | 80 | 60 | 20 | 5 |
-| Standard 880 | 880 | ~293 | 220 | ~73 | ~19 |
-| Pro 1,800 | 1,800 | 600 | 450 | 150 | 40 |
+| Mini 60 | 60 | 20 | 15 | 4 | 1 |
+| Starter 240 | 240 | 80 | 60 | 16 | 5 |
+| Standard 880 | 880 | ~293 | 220 | ~58 | ~19 |
+| Pro 1,800 | 1,800 | 600 | 450 | 120 | 40 |
 
 ### Pack margins（全额消耗）
 
