@@ -760,7 +760,7 @@ function RelatedCreatorChip({
           className="fixed z-[100] px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] font-medium shadow-lg whitespace-nowrap pointer-events-none -translate-x-1/2 -translate-y-full"
           style={{ left: tooltip.x, top: tooltip.y - 6 }}
         >
-          {zh ? '点击查看 · 15 积分' : 'Click to view · 15 credits'}
+          {zh ? '点击查看 · 5 积分' : 'Click to view · 5 credits'}
         </span>
       )}
     </span>
@@ -2813,6 +2813,11 @@ export default function DiscoverPanel() {
               <span className="text-xs font-medium text-gray-600">
                 {zh ? '显示最新帖子' : 'Show latest post'}
               </span>
+              {searchPrice != null && (
+                <span className="text-[11px] text-amber-600 font-medium ml-1">
+                  +{searchPrice * 2} {zh ? '积分' : 'credits'}
+                </span>
+              )}
             </label>
             {effectiveSearchPrice != null && showLatestPost && (
               <span className="text-[11px] text-amber-600 font-medium">
@@ -3671,7 +3676,7 @@ export default function DiscoverPanel() {
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-bold text-gray-900">{zh ? '受众洞察' : 'Audience Insights'}</h4>
                     <p className="text-[11px] text-gray-400">
-                      {zh ? '获取详细受众分析。每项解锁需 15 积分。' : 'Unlock detailed audience demographics per section.'}
+                      {zh ? '获取详细受众分析。每项解锁需 4 积分。' : 'Unlock detailed audience demographics per section.'}
                     </p>
                   </div>
                   {/* Unlock All bundle button — hidden when all 3 are already unlocked */}

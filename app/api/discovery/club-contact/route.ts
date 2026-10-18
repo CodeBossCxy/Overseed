@@ -26,7 +26,7 @@ const ALLOWED_TYPES = [
 ]
 
 const OPS_EMAIL = 'xinyi@overseed.net'
-const OUTREACH_COST = 5
+const OUTREACH_COST = 2
 
 const PROFILE_URL: Record<string, (h: string) => string> = {
   instagram: (h) => `https://www.instagram.com/${h}/`,

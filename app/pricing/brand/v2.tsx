@@ -205,8 +205,8 @@ export default function BrandPricingBetaPage() {
                   </p>
                   <p className="text-sm mt-2 text-white/85 leading-relaxed">
                     {zh
-                      ? '我们已免费赠送您 900 积分 — 有效期为发放后一个月。'
-                      : "We've granted you 900 credits for free — they expire one month after being granted."}
+                      ? '我们已免费赠送您 300 积分 — 有效期为发放后一个月。'
+                      : "We've granted you 300 credits for free — they expire one month after being granted."}
                   </p>
                   <a
                     href="/dashboard/brand/campaigns"
@@ -297,8 +297,8 @@ export default function BrandPricingBetaPage() {
                     className="text-gray-300"
                     title={
                       zh
-                        ? '完成 5 项中的 3 项 → 450 积分；全部完成 → 共 900 积分（发放后一个月内有效）。'
-                        : 'Complete 3 of 5 → 450 credits; all 5 → 900 credits total (valid one month after grant).'
+                        ? '完成 5 项中的 3 项 → 150 积分；全部完成 → 共 300 积分（发放后一个月内有效）。'
+                        : 'Complete 3 of 5 → 150 credits; all 5 → 300 credits total (valid one month after grant).'
                     }
                   >
                     <Icon d={ICONS.info} className="w-4 h-4" />
@@ -321,7 +321,7 @@ export default function BrandPricingBetaPage() {
                   }`}
                 >
                   {challenge?.reward450Granted ? '✓ ' : ''}
-                  {zh ? '完成 3 项 → 450 积分' : '3 of 5 → 450 credits'}
+                  {zh ? '完成 3 项 → 150 积分' : '3 of 5 → 150 credits'}
                 </span>
                 <span
                   className={`px-2.5 py-1 rounded-full text-xs font-bold ${
@@ -329,7 +329,7 @@ export default function BrandPricingBetaPage() {
                   }`}
                 >
                   {challenge?.reward900Granted ? '✓ ' : ''}
-                  {zh ? '全部完成 → 900 积分' : 'All 5 → 900 credits'}
+                  {zh ? '全部完成 → 300 积分' : 'All 5 → 300 credits'}
                 </span>
               </div>
 

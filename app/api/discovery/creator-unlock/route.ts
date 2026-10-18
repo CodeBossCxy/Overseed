@@ -24,10 +24,10 @@ const VALID_FEATURES = [
 type Feature = (typeof VALID_FEATURES)[number]
 
 const FEATURE_CREDITS: Record<Feature, number> = {
-  audience_gender: 12,
-  audience_age: 12,
-  audience_country: 12,
-  brand_collaborations: 6,
+  audience_gender: 4,
+  audience_age: 4,
+  audience_country: 4,
+  brand_collaborations: 2,
 }
 
 const VALID_PLATFORMS = ['instagram', 'youtube', 'tiktok']

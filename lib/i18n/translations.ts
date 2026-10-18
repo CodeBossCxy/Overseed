@@ -183,7 +183,7 @@ export const translations = {
       discoveryCostNote:
         'Each Discovery Search returns 20 creators. Results include core creator information such as follower count, engagement rate and other public profile data.',
       profileOutreachCostNote:
-        'Unlock deeper creator profile information including name, location, cross-platform presence, verification status, account type, follower and media counts, bio and niche classification.\n\nYou can also ask Overseed to reach out to the creator on your behalf. If you both view the Creator Profile and request Managed Outreach for the same creator, you are charged only once — 15 credits in total.',
+        'Unlock deeper creator profile information including name, location, cross-platform presence, verification status, account type, follower and media counts, bio and niche classification.\n\nYou can also ask Overseed to reach out to the creator on your behalf. If you both view the Creator Profile and request Managed Outreach for the same creator, you are charged only once — 5 credits in total.',
       analyticsCostNote:
         'Access deeper creator insights such as engagement and growth details, posting frequency, estimated earnings and audience data.',
       creditFeatureChatStandard: 'AI Chat Standard',

@@ -12,8 +12,8 @@ import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
 //   outreach  — managed outreach to 10 creators
 //   connect   — 1 creator moved into a collaboration
 // Rewards (idempotent one-time lots, 1-month validity):
-//   3 of 5 goals → 450 credits; all 5 → another 450 (900 total).
-// Separate "First Collaboration Bonus" (+100, no 30-day window): first
+//   3 of 5 goals → 150 credits; all 5 → another 150 (300 total).
+// Separate "First Collaboration Bonus" (+34, no 30-day window): first
 // real collaboration started through Overseed.
 
 const CHALLENGE_WINDOW_DAYS = 30
@@ -90,13 +90,13 @@ export async function GET() {
         })
 
       if (completedCount >= 3 && withinWindow) {
-        await grant(`beta-challenge-3of5:${userId}`, 450, 'Beta Challenge — 3 of 5 goals')
+        await grant(`beta-challenge-3of5:${userId}`, 150, 'Beta Challenge — 3 of 5 goals')
       }
       if (completedCount === 5 && withinWindow) {
-        await grant(`beta-challenge-5of5:${userId}`, 450, 'Beta Challenge — all 5 goals')
+        await grant(`beta-challenge-5of5:${userId}`, 150, 'Beta Challenge — all 5 goals')
       }
       if (goals.connect.count >= goals.connect.target) {
-        await grant(`first-collab:${userId}`, 100, 'First Collaboration Bonus')
+        await grant(`first-collab:${userId}`, 34, 'First Collaboration Bonus')
       }
 
       // Claimed = lot exists (covers grants from earlier visits too, so a

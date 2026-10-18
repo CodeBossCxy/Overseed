@@ -17,24 +17,24 @@ export type SubscriptionTier = 'FREE' | 'CAMPAIGN_PLUS' | 'OUTREACH_PLUS' | 'PRO
 
 /** Monthly included credits per tier (non-rollover). */
 export const MONTHLY_CREDITS: Record<SubscriptionTier, number> = {
-  FREE: 20,
-  CAMPAIGN_PLUS: 100,
-  OUTREACH_PLUS: 100,
-  PRO: 250,
+  FREE: 7,
+  CAMPAIGN_PLUS: 34,
+  OUTREACH_PLUS: 34,
+  PRO: 84,
 }
 
 /** Credit cost per billable action. */
 export const CREDIT_COSTS = {
   chat_standard: 1,
-  chat_advanced: 3,
-  image: 4,
-  profile_view: 15,
-  analytics: 45,
+  chat_advanced: 1,
+  image: 2,
+  profile_view: 4,
+  analytics: 15,
   // Discovery search beyond the monthly quota (quota itself is free).
-  discovery_search_extra: 12,
+  discovery_search_extra: 4,
   // Paid feature unlock (audience gender/age/country, brand collaborations).
   // Actual cost varies — callers pass costOverride to deductCredits.
-  feature_unlock: 15,
+  feature_unlock: 5,
 } as const
 
 export type CreditFeature = keyof typeof CREDIT_COSTS

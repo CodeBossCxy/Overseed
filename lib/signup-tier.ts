@@ -27,7 +27,7 @@ export async function defaultSignupTier(opts?: {
 }
 
 // Promo signups have no Stripe subscription, so nothing else grants their
-// monthly allowance — grant the first cycle here (Growth Plus = 900).
+// monthly allowance — grant the first cycle here (Growth Plus = 300).
 // Idempotent against the cron via the shared monthly:{userId}:{YYYY-MM} key.
 export async function grantPromoSignupCredits(
   userId: string,

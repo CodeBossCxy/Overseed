@@ -13,10 +13,10 @@ export const SUBSCRIPTION_PLANS: Record<
 }
 
 export const CREDIT_PACKS = {
-  mini: { label: 'Mini Credit Pack', amount: 990, credits: 60 },
-  starter: { label: 'Starter Credit Pack', amount: 2900, credits: 240 },
-  standard: { label: 'Standard Credit Pack', amount: 9900, credits: 880 },
-  pro: { label: 'Pro Credit Pack', amount: 19900, credits: 1800 },
+  mini: { label: 'Mini Credit Pack', amount: 990, credits: 20 },
+  starter: { label: 'Starter Credit Pack', amount: 2900, credits: 80 },
+  standard: { label: 'Standard Credit Pack', amount: 9900, credits: 294 },
+  pro: { label: 'Pro Credit Pack', amount: 19900, credits: 600 },
 } as const
 
 export type CreditPackId = keyof typeof CREDIT_PACKS
