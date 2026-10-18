@@ -14,6 +14,7 @@ import {
   type CreatorDbCanonicalField,
   type CreatorDbFilterOp,
 } from '@/lib/creatordb-filter-fields'
+import { calculateRelevance } from '@/lib/relevance-scoring'
 
 interface DiscoveredCreator {
   id: string
@@ -318,7 +319,7 @@ export function NicheAutocomplete({
   )
 }
 
-const PLATFORMS = ['youtube', 'instagram', 'tiktok'] as const
+const PLATFORMS = ['tiktok', 'instagram', 'youtube'] as const
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: 'YouTube',
   instagram: 'Instagram',
@@ -925,6 +926,10 @@ export default function DiscoverPanel() {
   // Search results return expiring Instagram CDN URLs that 403; the niche
   // fetch piggybacks avatarUrl to get the permanent Firebase version.
   const [avatarOverrides, setAvatarOverrides] = useState<Record<string, string>>({})
+  // Creator bios fetched alongside niches from /profile.
+  const [bioMap, setBioMap] = useState<Record<string, string>>({})
+  // Client-side relevance sort for search results
+  const [sortByRelevance, setSortByRelevance] = useState(false)
 
   // ── Latest post per creator (fetched via /content-detail when toggle is on) ──
   const [contentMap, setContentMap] = useState<Record<string, {
@@ -2015,10 +2020,41 @@ export default function DiscoverPanel() {
     }
   }
 
-  const creators = useMemo(
+  const creatorsRaw = useMemo(
     () => (searchResult ? searchResult.results : browseList || []),
     [searchResult, browseList],
   )
+  // Build a relevance query string from text query + filter values (niches, hashtags)
+  const relevanceQuery = useMemo(() => {
+    const parts: string[] = []
+    if (query.trim()) parts.push(query.trim())
+    const nicheFilter = creatorDbFilters.find((f) => f.field === 'niches')
+    if (nicheFilter?.value) parts.push(nicheFilter.value)
+    const hashtagFilter = creatorDbFilters.find((f) => f.field === 'hashtags')
+    if (hashtagFilter?.value) parts.push(hashtagFilter.value.replace(/#/g, ''))
+    return parts.join(' ')
+  }, [query, creatorDbFilters])
+
+  const creators = useMemo(() => {
+    if (sortByRelevance && relevanceQuery.trim()) {
+      // Sort by relevance: calculate scores using bio + niches vs query + filters
+      const scored = creatorsRaw.map((c) => {
+        const key = c.handle ? `${c.platform}:${c.handle.replace(/^@/, '').toLowerCase()}` : null
+        const bio = c.bio || (key ? bioMap[key] : null) || null
+        const niches = key ? (nicheMap[key] || c.niche_tags || []) : (c.niche_tags || [])
+        const { score } = calculateRelevance(relevanceQuery.trim(), bio, niches)
+        return { ...c, _relevance: score }
+      })
+      return [...scored].sort((a, b) => {
+        const diff = (b._relevance ?? 0) - (a._relevance ?? 0)
+        // Tiebreaker: higher followers first
+        if (diff === 0) return (b.follower_count ?? 0) - (a.follower_count ?? 0)
+        return diff
+      })
+    }
+    // Sort by most followers (client-side to guarantee correct order)
+    return [...creatorsRaw].sort((a, b) => (b.follower_count ?? 0) - (a.follower_count ?? 0))
+  }, [creatorsRaw, sortByRelevance, relevanceQuery, bioMap, nicheMap])
   const isBrowsing = !searchResult
 
   // Fetch niches whenever displayed creators change
@@ -2052,6 +2088,9 @@ export default function DiscoverPanel() {
         }
         if (data.avatars && typeof data.avatars === 'object') {
           setAvatarOverrides((prev) => ({ ...prev, ...data.avatars }))
+        }
+        if (data.bios && typeof data.bios === 'object') {
+          setBioMap((prev) => ({ ...prev, ...data.bios }))
         }
       })
       .catch((err) => console.warn('[niches] fetch failed:', err))
@@ -2994,11 +3033,24 @@ export default function DiscoverPanel() {
                 {isLoading ? d.loadingCreators : `${creators.length}${isBrowsing && hasMore ? '+' : ''} ${d.resultsCount}`}
               </h2>
             </div>
-            {searchResult && searchResult.credits_left == null && (
-              <p className="text-xs text-gray-400">
-                {`${d.cacheHits}: ${searchResult.cache_hits} · ${d.liveCalls}: ${searchResult.live_calls}`}
-              </p>
-            )}
+            <div className="flex items-center gap-3">
+              {searchResult && searchResult.credits_left == null && (
+                <p className="text-xs text-gray-400">
+                  {`${d.cacheHits}: ${searchResult.cache_hits} · ${d.liveCalls}: ${searchResult.live_calls}`}
+                </p>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500">{zh ? '排序:' : 'Sort by:'}</span>
+                <select
+                  value={sortByRelevance ? 'relevance' : 'followers'}
+                  onChange={(e) => setSortByRelevance(e.target.value === 'relevance')}
+                  className="text-xs font-semibold text-gray-700 bg-transparent border-none cursor-pointer focus:outline-none"
+                >
+                  <option value="followers">{zh ? '最多粉丝' : 'Most followers'}</option>
+                  <option value="relevance">{zh ? '相关度' : 'Relevance'}</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           {isLoading && creators.length === 0 ? (
@@ -3099,6 +3151,14 @@ export default function DiscoverPanel() {
                           </a>
                         )}
                       </div>
+                      {/* Bio (from search result or bioMap) */}
+                      {(() => {
+                        const bioKey = creator.handle ? `${creator.platform}:${creator.handle.replace(/^@/, '').toLowerCase()}` : null
+                        const bio = creator.bio || (bioKey ? bioMap[bioKey] : null)
+                        return bio ? (
+                          <p className="mt-2 text-xs text-gray-500 line-clamp-2 leading-relaxed">{bio}</p>
+                        ) : null
+                      })()}
                       {/* Niche tags with colors */}
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         <NicheTags
@@ -3107,6 +3167,7 @@ export default function DiscoverPanel() {
                           loading={nichesLoading}
                         />
                       </div>
+                      {/* Relevance score (when sorting by relevance) */}
                     </div>
                   </div>
 
@@ -3343,9 +3404,6 @@ export default function DiscoverPanel() {
                   </div>
                   <p className="text-sm text-gray-500">
                     @{detailFor.handle?.replace(/^@+/, '')}
-                    {detail && (detail.location || detail.language) && (
-                      <span className="text-gray-400"> · {[detail.location, detail.language].filter(Boolean).join(' · ')}</span>
-                    )}
                   </p>
                   {/* Category badges */}
                   {detail?.category && (

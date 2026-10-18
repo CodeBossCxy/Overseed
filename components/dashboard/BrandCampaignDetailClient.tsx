@@ -196,7 +196,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   // the brand can adjust them before running the AI match.
   const [platform, setPlatform] = useState(() => {
     const p = (initialCampaign.platforms[0]?.platform.name || '').toLowerCase()
-    return ['youtube', 'instagram', 'tiktok'].includes(p) ? p : 'youtube'
+    return ['tiktok', 'instagram', 'youtube'].includes(p) ? p : 'tiktok'
   })
   // CreatorDB canonical filters
   type CdbFilter = { field: string; op: string; value: string }
@@ -249,6 +249,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [rememberedFiles, setRememberedFiles] = useState<File[]>([])
   const [nicheMap, setNicheMap] = useState<Record<string, string[]>>({})
   const [nichesLoading, setNichesLoading] = useState(false)
+  const [bioMap, setBioMap] = useState<Record<string, string>>({})
   const [followerTierMode, setFollowerTierMode] = useState('')
   const [openFilterSections, setOpenFilterSections] = useState<Record<string, boolean>>({
     audience: true, creator: true, performance: true,
@@ -493,6 +494,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       .then(r => r.json())
       .then(data => {
         if (data?.niches) setNicheMap(prev => ({ ...prev, ...data.niches }))
+        if (data?.bios && typeof data.bios === 'object') setBioMap(prev => ({ ...prev, ...data.bios }))
       })
       .catch(() => {})
       .finally(() => setNichesLoading(false))
@@ -772,9 +774,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               </span>
             </label>
             <select value={platform} onChange={e => setPlatform(e.target.value)} className={`w-full ${inputCls}`}>
-              <option value="youtube">YouTube</option>
-              <option value="instagram">Instagram</option>
               <option value="tiktok">TikTok</option>
+              <option value="instagram">Instagram</option>
+              <option value="youtube">YouTube</option>
             </select>
           </div>
           {/* Creator's country */}
@@ -1282,6 +1284,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                         </a>
                       )}
                     </div>
+                    {/* Bio (from search result or bioMap) */}
+                    {(() => {
+                      const bio = c.bio || (creatorKey ? bioMap[creatorKey] : null)
+                      return bio ? <p className="mt-2 text-xs text-gray-500 line-clamp-2 leading-relaxed">{bio}</p> : null
+                    })()}
                     {/* Niche tags (fetched separately like discovery) */}
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       <NicheTags creatorKey={creatorKey} nicheMap={nicheMap} loading={nichesLoading} />

@@ -58,6 +58,8 @@ export async function sendStatusEmail(opts: StatusEmailOptions) {
   try {
     const { recipient } = opts
     if (!recipient?.email) return
+    // Skip placeholder emails that aren't real addresses (e.g. WeChat OAuth)
+    if (recipient.email.endsWith('@wechat.local')) return
     if (!recipient.emailNotifications) return
     if (opts.category === 'campaign' && !recipient.emailCampaignUpdates) return
     if (opts.category === 'collaboration' && !recipient.emailCollaborationUpdates) return

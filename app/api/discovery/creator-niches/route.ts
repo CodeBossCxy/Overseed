@@ -8,8 +8,11 @@ import { creatorDbFetch } from '@/lib/creatordb-usage'
 // Accepts: { creators: [{ platform, handle }] }
 // Returns: { niches: { "instagram:handle": ["id_fashion_All", ...], ... } }
 //
-// Each uncached creator costs 0.1 CreatorDB credits (requires Fractional
-// Calls enabled on the API key). Results are cached per platform+handle.
+// Each uncached creator costs 0.3 CreatorDB credits (3 fields × 0.1 each:
+// niches, avatarUrl, bio). Requires Fractional Calls enabled on the API key.
+// Results are cached per platform+handle to avoid repeat charges.
+// hasEmail and hasSponsors are NOT fetched here — hasEmail is fetched on
+// demand at outreach time to save credits during discovery browsing.
 
 const BASE = 'https://apiv3.creatordb.app'
 const MAX_CREATORS = 25
@@ -29,11 +32,17 @@ function authHeaders() {
   }
 }
 
+const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/
+const PHONE_RE = /(?:\+?\d[\d\s\-().]{7,}\d)/
+function stripContactLines(bio: string | null): string | null {
+  if (!bio) return bio
+  return bio.split('\n').filter(l => !EMAIL_RE.test(l) && !PHONE_RE.test(l)).join('\n') || null
+}
+
 interface ProfileResult {
   niches: string[]
   avatarUrl: string | null
-  hasEmail: boolean | null
-  hasSponsors: boolean | null
+  bio: string | null
 }
 
 async function fetchProfileForCreator(
@@ -41,12 +50,12 @@ async function fetchProfileForCreator(
   handle: string,
   userId: string | undefined,
 ): Promise<ProfileResult> {
-  const empty: ProfileResult = { niches: [], avatarUrl: null, hasEmail: null, hasSponsors: null }
+  const empty: ProfileResult = { niches: [], avatarUrl: null, bio: null }
   const platformPath = PLATFORM_PATH[platform]
   if (!platformPath) return empty
 
-  // Request niches, avatarUrl, hasEmail, hasSponsors — same 0.1 credit cost
-  const body = { uniqueId: handle, fields: ['niches', 'avatarUrl', 'hasEmail', 'hasSponsors'] }
+  // Fractional profile call: 0.1 credit per field × 3 fields = 0.3 credits per creator
+  const body = { uniqueId: handle, fields: ['niches', 'avatarUrl', 'bio'] }
 
   let lastError: Error | null = null
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -92,9 +101,8 @@ async function fetchProfileForCreator(
 
       const niches: string[] = Array.isArray(data.data?.niches) ? data.data.niches : []
       const avatarUrl: string | null = typeof data.data?.avatarUrl === 'string' ? data.data.avatarUrl : null
-      const hasEmail: boolean | null = typeof data.data?.hasEmail === 'boolean' ? data.data.hasEmail : null
-      const hasSponsors: boolean | null = typeof data.data?.hasSponsors === 'boolean' ? data.data.hasSponsors : null
-      return { niches, avatarUrl, hasEmail, hasSponsors }
+      const bio: string | null = stripContactLines(typeof data.data?.bio === 'string' ? data.data.bio : null)
+      return { niches, avatarUrl, bio }
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       if (attempt < MAX_RETRIES) {
@@ -151,47 +159,44 @@ export async function POST(req: NextRequest) {
 
   // Fetch all uncached in parallel
   const avatars: Record<string, string> = {}
+  const bios: Record<string, string> = {}
+
+  // Populate bios from cache first
+  for (const c of cached) {
+    if (c.bio) bios[`${c.platform}:${c.handle}`] = c.bio
+  }
+
   const fetchResults = await Promise.allSettled(
     toFetch.map(async (c) => {
       const profile = await fetchProfileForCreator(c.platform, c.handle, userId)
-      // Cache even empty results to avoid re-fetching creators with no niches
+      // Cache niches + bio to avoid re-fetching
       await prisma.creatorNicheCache.upsert({
         where: { platform_handle: { platform: c.platform, handle: c.handle } },
-        create: { platform: c.platform, handle: c.handle, niches: profile.niches },
-        update: { niches: profile.niches, fetchedAt: new Date() },
+        create: { platform: c.platform, handle: c.handle, niches: profile.niches, bio: profile.bio },
+        update: { niches: profile.niches, bio: profile.bio, fetchedAt: new Date() },
       }).catch((e) => console.error(`[creator-niches] cache write failed for ${c.platform}:${c.handle}:`, e))
-      // Seed the contact cache with hasEmail from the profile call (0.1 credits)
-      // so the outreach route knows whether to call /contact (0-15 credits).
-      if (profile.hasEmail !== null) {
-        await prisma.creatorContactCache.upsert({
-          where: { platform_handle: { platform: c.platform, handle: c.handle } },
-          create: { platform: c.platform, handle: c.handle, hasEmail: profile.hasEmail },
-          update: { hasEmail: profile.hasEmail },
-        }).catch(() => {})
-      }
       const key = `${c.platform}:${c.handle}`
       if (profile.avatarUrl) avatars[key] = profile.avatarUrl
-      return { key, niches: profile.niches, hasSponsors: profile.hasSponsors }
+      if (profile.bio) bios[key] = profile.bio
+      return { key, niches: profile.niches }
     }),
   )
 
   // Build response maps
   const nicheResult: Record<string, string[]> = {}
-  const sponsorFlags: Record<string, boolean> = {}
   for (const [key, niches] of cachedMap) {
     nicheResult[key] = niches
   }
   for (const r of fetchResults) {
     if (r.status === 'fulfilled') {
       nicheResult[r.value.key] = r.value.niches
-      if (r.value.hasSponsors != null) sponsorFlags[r.value.key] = r.value.hasSponsors
     }
   }
 
   return NextResponse.json({
     niches: nicheResult,
     avatars,
-    hasSponsors: sponsorFlags,
+    bios,
     cached: cached.length,
     fetched: toFetch.length,
   })

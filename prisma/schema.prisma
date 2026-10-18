@@ -957,6 +957,7 @@ model CreatorNicheCache {
   platform  String
   handle    String
   niches    String[] // niche ID strings, e.g. ["id_smartphone_ScienceTechnology"]
+  bio       String?  // creator bio text (contact info stripped)
   fetchedAt DateTime @default(now())
 
   @@unique([platform, handle])
