@@ -98,6 +98,19 @@ const STATUS_STYLE: Record<string, string> = {
   COMPLETED: 'bg-green-50 text-green-600',
   CANCELLED: 'bg-gray-100 text-gray-500',
 }
+const STATUS_LABEL: Record<string, { en: string; zh: string }> = {
+  SHORTLISTED: { en: 'Queued', zh: '待发送' },
+  SENT: { en: 'Outreach Sent', zh: '已触达' },
+  FAILED: { en: 'Failed', zh: '发送失败' },
+  AWAITING_RESPONSE: { en: 'Awaiting Reply', zh: '等待回复' },
+  RESPONDED: { en: 'Responded', zh: '已回复' },
+  DECLINED: { en: 'Declined', zh: '已拒绝' },
+  NEGOTIATING: { en: 'Negotiating', zh: '协商中' },
+  OFFER_ACCEPTED: { en: 'Offer Accepted', zh: '已接受' },
+  IN_PROGRESS: { en: 'In Progress', zh: '进行中' },
+  COMPLETED: { en: 'Completed', zh: '已完成' },
+  CANCELLED: { en: 'Cancelled', zh: '已取消' },
+}
 const icon = (path: string, className = 'w-5 h-5') => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d={path}/></svg>
 )
@@ -241,6 +254,12 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   // search) — discovery is metered, so nothing auto-loads.
   const [matched, setMatched] = useState(false)
   const [aiMatching, setAiMatching] = useState(false)
+  // Pagination state
+  const [searchPage, setSearchPage] = useState(0)
+  const [searchTotal, setSearchTotal] = useState(0)
+  const [searchHasMore, setSearchHasMore] = useState(false)
+  const [searchNextOffset, setSearchNextOffset] = useState(0)
+  const lastSearchRef = useRef<{ endpoint: string; qs: URLSearchParams; pageSize: number } | null>(null)
   const [searchPrice, setSearchPrice] = useState<number | null>(null)
   const [queueBusy, setQueueBusy] = useState(false)
   const [error, setError] = useState('')
@@ -280,6 +299,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   })
   const toggleFilterSection = (key: string) => setOpenFilterSections(prev => ({ ...prev, [key]: !prev[key] }))
 
+  const [allCreators, setAllCreators] = useState<Creator[]>([]) // all creators across pages
+  const [searchTaskId, setSearchTaskId] = useState<string | null>(null) // server task ID for free pagination
+
   // Filters + results survive navigating away and back (per campaign, per tab)
   const searchStateKey = `campaign-discover:${initialCampaign.id}:v1`
   useEffect(() => {
@@ -294,7 +316,12 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       setMinFollowers(s.minFollowers || '')
       setMaxFollowers(s.maxFollowers || '')
       setCdbFilters(s.cdbFilters || [])
-      setCreators(s.creators)
+      const all = s.allCreators || s.creators
+      setAllCreators(all)
+      setCreators(all.slice(0, PAGE_SIZE))
+      setSearchPage(0)
+      if (s.searchTaskId) setSearchTaskId(s.searchTaskId)
+      if (all.length >= PAGE_SIZE) setSearchHasMore(true)
       setMatched(true)
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -303,10 +330,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     if (!matched || creators.length === 0) return
     try {
       sessionStorage.setItem(searchStateKey, JSON.stringify({
-        query, platform, creatorCountry, minFollowers, maxFollowers, cdbFilters, creators,
+        query, platform, creatorCountry, minFollowers, maxFollowers, cdbFilters, creators, allCreators, searchTaskId,
       }))
     } catch {}
-  }, [matched, creators, query, platform, creatorCountry, minFollowers, maxFollowers, cdbFilters, searchStateKey])
+  }, [matched, creators, allCreators, query, platform, creatorCountry, minFollowers, maxFollowers, cdbFilters, searchStateKey])
 
   const loadQueue = useCallback(async () => {
     const res = await fetch(`/api/campaigns/${campaign.id}/outreach`)
@@ -353,7 +380,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     return filters
   }, [cdbFilters, minFollowers, maxFollowers, creatorCountry])
 
-  const discover = useCallback(async (search = '') => {
+  const PAGE_SIZE = 20
+  const BATCH_SIZE = 100 // fetch 100 from CreatorDB, slice into 5 pages of 20 client-side
+
+  const discover = useCallback(async (search = '', page = 0, offset = 0) => {
     setLoading(true); setError('')
     const searching = Boolean(search.trim())
     const qs = new URLSearchParams({ platform })
@@ -361,15 +391,17 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
 
     if (filters.length > 0) {
       qs.set('cdb_filters', JSON.stringify(filters))
-      qs.set('limit', '100')
-      qs.set('offset', '0')
+      qs.set('limit', String(BATCH_SIZE))
+      qs.set('offset', String(offset))
       qs.set('cdb_sort', 'followers')
     } else if (searching) {
       qs.set('q', search.trim())
-      qs.set('limit', '10')
+      qs.set('limit', String(PAGE_SIZE))
+      qs.set('offset', String(offset))
     } else {
       qs.set('sort', 'followers')
-      qs.set('limit', '50')
+      qs.set('limit', String(PAGE_SIZE))
+      qs.set('offset', String(offset))
     }
     if (searching && !filters.length) {
       qs.set('q', search.trim())
@@ -381,7 +413,14 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Creator discovery is temporarily unavailable.')
-      setCreators(data?.results || [])
+      const results = data?.results || []
+      setAllCreators(results)
+      setCreators(results)
+      setSearchPage(0)
+      setSearchTotal(0)
+      setSearchTaskId(data?.task_id || null)
+      setSearchHasMore(data?.has_next_page ?? false)
+      setSearchNextOffset(1)
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false); setMatched(true) }
   }, [platform, buildCdbFiltersParam])
@@ -506,10 +545,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       console.groupEnd()
 
       const activePlatform = campPlatform && ['youtube', 'instagram', 'tiktok'].includes(campPlatform) ? campPlatform : platform
-      const qs = new URLSearchParams({ platform: activePlatform, limit: '100', offset: '0', cdb_sort: 'followers' })
+      const qs = new URLSearchParams({ platform: activePlatform, limit: String(BATCH_SIZE), offset: '0', cdb_sort: 'followers' })
       qs.set('cdb_filters', JSON.stringify(filters))
 
-      console.log('[DirectOutreach] Request URL:', `/api/discovery/club-search?platform=${activePlatform}&limit=100&offset=0&cdb_sort=followers`)
+      console.log('[DirectOutreach] Request URL:', `/api/discovery/club-search?platform=${activePlatform}&limit=${PAGE_SIZE}&offset=0&cdb_sort=followers`)
 
       const res = await fetch(`/api/discovery/club-search?${qs}`)
       window.dispatchEvent(new Event('credits:refresh'))
@@ -534,10 +573,40 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       console.groupEnd()
 
       if (!res.ok) throw new Error(data?.message || 'Creator matching is temporarily unavailable.')
-      setCreators(data?.results || [])
+      const results = data?.results || []
+      setAllCreators(results)
+      setCreators(results)
+      setSearchPage(0)
+      setSearchTotal(0)
+      setSearchTaskId(data?.task_id || null)
+      setSearchHasMore(data?.has_next_page ?? false)
+      setSearchNextOffset(1) // next page number for task pagination
       setMatched(true)
     } catch (e: any) { setError(e.message) }
     finally { setAiMatching(false) }
+  }
+
+  const goToPage = async (page: number) => {
+    if (loading || !searchTaskId) return
+    setLoading(true); setError('')
+    try {
+      const qs = new URLSearchParams({ task_id: searchTaskId, page: String(page), platform })
+      const res = await fetch(`/api/discovery/club-search?${qs}`)
+      window.dispatchEvent(new Event('credits:refresh'))
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.message || 'Failed to load page.')
+      const results = data?.results || []
+      setAllCreators(prev => {
+        // Accumulate all pages for session persistence
+        const existing = new Set(prev.map((c: Creator) => c.id))
+        const newOnes = results.filter((c: Creator) => !existing.has(c.id))
+        return [...prev, ...newOnes]
+      })
+      setCreators(results)
+      setSearchPage(page)
+      setSearchHasMore(data?.has_next_page ?? false)
+    } catch (e: any) { setError(e.message) }
+    finally { setLoading(false) }
   }
 
   useEffect(() => { loadQueue() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -568,8 +637,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     fetch('/api/pricing/config')
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
-        if (data?.creditSystemEnabled && typeof data.prices?.discovery_search === 'number') {
-          setSearchPrice(data.prices.discovery_search)
+        if (data?.creditSystemEnabled) {
+          const price = data.prices?.campaign_ai_match ?? data.prices?.discovery_search
+          if (typeof price === 'number') setSearchPrice(price)
         }
       })
       .catch(() => {})
@@ -1282,7 +1352,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             </section>
           )}
           {matched && (<>
-          <div className="flex items-center justify-between mb-3"><b>{loading ? m.findingCreators : m.creatorsFound.replace('{count}', String(creators.length))}</b><span className="text-sm text-[#7180ad]">{m.sortBy}<b>{m.relevance}</b></span></div>
+          <div className="flex items-center justify-between mb-3"><b>{loading ? m.findingCreators : (zh ? `为您推荐 ${creators.length} 位达人` : `Top ${creators.length} creators for you`)}{searchPage > 0 && ` · ${zh ? `第 ${searchPage + 1} 页` : `Page ${searchPage + 1}`}`}</b><span className="text-sm text-[#7180ad]">{m.sortBy}<b>{m.relevance}</b></span></div>
           <div className={`space-y-3 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
             {creators.map(c => {
               const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
@@ -1396,6 +1466,30 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               )
             })}
           </div>
+          {/* Pagination */}
+          {(searchPage > 0 || searchHasMore) && (
+            <div className="mt-5 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => goToPage(searchPage - 1)}
+                disabled={searchPage === 0 || loading}
+                className="px-5 py-2.5 bg-white/55 text-gray-700 rounded-full text-sm font-semibold hover:bg-white/75 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ← {zh ? '上一页' : 'Previous'}
+              </button>
+              <span className="min-w-20 text-center text-sm font-medium text-gray-500">
+                {zh ? '第' : 'Page'} {searchPage + 1}
+              </span>
+              <button
+                type="button"
+                onClick={() => goToPage(searchPage + 1)}
+                disabled={!searchHasMore || loading}
+                className="px-5 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {zh ? '下一页' : 'Next'} →
+              </button>
+            </div>
+          )}
           </>)}
         </>
       </div>
@@ -1403,7 +1497,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       <aside className="workspace-glass-card rounded-3xl p-5 xl:sticky xl:top-5">
         <div className="flex justify-between items-center"><h2 className="text-xl font-bold">{m.outreachQueue} <span className="text-sm border border-white rounded-lg px-2 py-1 ml-1">{queue.length}</span></h2><span>⌃</span></div>
         <p className="text-sm text-[#7180ad] mt-1">{m.queueDesc}</p>
-        <div className="space-y-4 mt-6 max-h-[430px] overflow-auto pr-1">{queue.length === 0 && <div className="py-10 text-center text-sm text-[#7b87aa]">{m.queueEmpty}</div>}{queue.map(q => <div key={q.id} className="flex items-center gap-3"><CreatorAvatar url={q.avatarUrl} name={q.displayName || q.handle || 'Creator'} size="w-10 h-10" textSize="text-xs" /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{q.displayName || q.handle || 'Creator'}</b><p className="text-xs text-[#7e89aa] truncate">@{q.handle?.replace(/^@/, '')}</p></div><span className={`text-[10px] whitespace-nowrap px-2.5 py-1.5 rounded-lg ${STATUS_STYLE[q.status] || STATUS_STYLE.SHORTLISTED}`}>{q.status.replaceAll('_',' ').toLowerCase()}</span>{q.status === 'SHORTLISTED' && <button onClick={() => removeCreator(q.id)} className="text-[#7180ad]">×</button>}</div>)}</div>
+        <div className="space-y-4 mt-6 max-h-[430px] overflow-auto pr-1">{queue.length === 0 && <div className="py-10 text-center text-sm text-[#7b87aa]">{m.queueEmpty}</div>}{queue.map(q => <div key={q.id} className="flex items-center gap-3"><CreatorAvatar url={q.avatarUrl} name={q.displayName || q.handle || 'Creator'} size="w-10 h-10" textSize="text-xs" /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{q.displayName || q.handle || 'Creator'}</b><p className="text-xs text-[#7e89aa] truncate">@{q.handle?.replace(/^@/, '')}</p></div><span className={`text-[10px] whitespace-nowrap px-2.5 py-1.5 rounded-lg ${STATUS_STYLE[q.status] || STATUS_STYLE.SHORTLISTED}`}>{(zh ? STATUS_LABEL[q.status]?.zh : STATUS_LABEL[q.status]?.en) || q.status.replaceAll('_',' ').toLowerCase()}</span>{q.status === 'SHORTLISTED' && <button onClick={() => removeCreator(q.id)} className="text-[#7180ad]">×</button>}</div>)}</div>
         <div className="mt-6 bg-indigo-50/60 rounded-2xl p-4 text-sm"><b>ⓘ &nbsp;{m.aboutOutreach}</b><p className="text-xs text-[#6775a0] mt-2">{m.aboutOutreachDesc}</p></div>
         <button disabled={!queue.some(q => q.status === 'SHORTLISTED') || queueBusy} onClick={requestOutreach} className="w-full mt-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50">✈ &nbsp; {m.requestOutreach}</button>
         <p className="text-center text-xs text-[#7d88aa] mt-3">{m.reviewQueueNote}</p>
