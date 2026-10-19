@@ -2520,13 +2520,20 @@ export default function DiscoverPanel() {
                       {zh ? '粉丝数' : 'Followers / subscribers'}
                     </span>
                   </label>
+                  {(() => {
+                    const minPresets = [1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000]
+                    const maxPresets = [5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 5000000, 10000000]
+                    const isCustomMin = minFollowers === 'custom' || (minFollowers && !minPresets.includes(Number(minFollowers)))
+                    const isCustomMax = maxFollowers === 'custom' || (maxFollowers && !maxPresets.includes(Number(maxFollowers)))
+                    return (
                   <div className="flex items-center gap-1.5">
-                    {minFollowers === 'custom' ? (
+                    {isCustomMin ? (
                       <input
                         type="number"
                         min={0}
+                        defaultValue={minFollowers === 'custom' ? '' : minFollowers}
                         placeholder={zh ? '最少粉丝' : 'Min followers'}
-                        autoFocus
+                        autoFocus={minFollowers === 'custom'}
                         onBlur={(e) => {
                           const v = e.target.value.trim()
                           setMinFollowers(v && Number(v) > 0 ? v : '')
@@ -2537,6 +2544,7 @@ export default function DiscoverPanel() {
                             const v = (e.target as HTMLInputElement).value.trim()
                             setMinFollowers(v && Number(v) > 0 ? v : '')
                             setFollowerTier('custom')
+                            ;(e.target as HTMLInputElement).blur()
                           }
                         }}
                         className={`w-1/2 ${inputCls}`}
@@ -2548,19 +2556,20 @@ export default function DiscoverPanel() {
                         className={`w-1/2 ${inputCls}`}
                       >
                         <option value="">Min</option>
-                        {[1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000].map((n) => (
+                        {minPresets.map((n) => (
                           <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                         ))}
                         <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
                       </select>
                     )}
                     <span className="text-gray-400 font-medium text-sm">–</span>
-                    {maxFollowers === 'custom' ? (
+                    {isCustomMax ? (
                       <input
                         type="number"
                         min={0}
+                        defaultValue={maxFollowers === 'custom' ? '' : maxFollowers}
                         placeholder={zh ? '最多粉丝' : 'Max followers'}
-                        autoFocus
+                        autoFocus={maxFollowers === 'custom'}
                         onBlur={(e) => {
                           const v = e.target.value.trim()
                           setMaxFollowers(v && Number(v) > 0 ? v : '')
@@ -2571,6 +2580,7 @@ export default function DiscoverPanel() {
                             const v = (e.target as HTMLInputElement).value.trim()
                             setMaxFollowers(v && Number(v) > 0 ? v : '')
                             setFollowerTier('custom')
+                            ;(e.target as HTMLInputElement).blur()
                           }
                         }}
                         className={`w-1/2 ${inputCls}`}
@@ -2582,13 +2592,15 @@ export default function DiscoverPanel() {
                         className={`w-1/2 ${inputCls}`}
                       >
                         <option value="">Max</option>
-                        {[5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 5000000, 10000000].map((n) => (
+                        {maxPresets.map((n) => (
                           <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                         ))}
                         <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
                       </select>
                     )}
                   </div>
+                    )
+                  })()}
                 </div>
                 {/* Last active */}
                 <div>
