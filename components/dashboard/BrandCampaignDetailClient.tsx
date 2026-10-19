@@ -17,7 +17,7 @@ import {
 } from '@/lib/creatordb-filter-fields'
 import Markdown from '@/components/Markdown'
 import CreatorAvatar from '@/components/ui/CreatorAvatar'
-import CollaborationProgress from '@/components/CollaborationProgress'
+import CreatorDetailModal, { useCreatorDetail } from '@/components/discovery/CreatorDetailModal'
 
 type Creator = {
   id: string; platform: string; handle: string | null; display_name: string | null
@@ -244,9 +244,24 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [searchPrice, setSearchPrice] = useState<number | null>(null)
   const [queueBusy, setQueueBusy] = useState(false)
   const [error, setError] = useState('')
-  const [selected, setSelected] = useState<Creator | null>(null)
-  const [detail, setDetail] = useState<any>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
+  const {
+    detailFor: selected,
+    detail,
+    detailLoading,
+    openDetail: openCreatorDetail,
+    closeDetail: closeCreatorDetail,
+    unlockFeature,
+    unlockAudienceBundle,
+    featureUnlocks,
+    featureUnlocked,
+    featureLoading,
+    featureError,
+    featureConfirm,
+    promptUnlock,
+    dismissConfirm,
+    detailError,
+    detailBlocked,
+  } = useCreatorDetail()
   const [outreachModalCreator, setOutreachModalCreator] = useState<Creator | null>(null)
   const [outreachMsg, setOutreachMsg] = useState('')
   const [outreachFiles, setOutreachFiles] = useState<File[]>([])
@@ -577,7 +592,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       if (files) files.forEach((f) => fd.append('files', f))
       const res = await fetch(`/api/campaigns/${campaign.id}/outreach`, { method: 'POST', body: fd })
       const data = await res.json(); if (!res.ok) throw new Error(data.message)
-      setQueue(data.queue); setSelected(null)
+      setQueue(data.queue); closeCreatorDetail()
     } catch (e: any) { setError(e.message || 'Could not add creator') }
     finally { setQueueBusy(false) }
   }
@@ -638,15 +653,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     else setError((await res.json()).message || 'Could not request outreach')
     setQueueBusy(false)
   }
-  const openCreator = async (creator: Creator) => {
-    setSelected(creator); setDetail(null)
-    if (!creator.id.startsWith('club:') || !creator.handle) return
-    setDetailLoading(true)
-    const qs = new URLSearchParams({ platform: creator.platform, handle: creator.handle })
-    const res = await fetch(`/api/discovery/club-enrich?${qs}`)
-    if (res.ok) setDetail(await res.json())
-    setDetailLoading(false)
-  }
+  const openCreator = (creator: Creator) => openCreatorDetail(creator as any)
 
   const queuedIds = useMemo(() => new Set(queue.map(q => q.externalCreatorId)), [queue])
   const budget = campaign.paymentMin ? `$${formatNumber(Number(campaign.paymentMin), locale)}${campaign.paymentMax ? ` – $${formatNumber(Number(campaign.paymentMax), locale)}` : '+'}` : campaign.giftDescription || m.negotiable
@@ -1403,19 +1410,41 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       </aside>
     </div>
 
-    {selected && <div className="fixed inset-0 z-50 bg-[#18204b]/35 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelected(null)}><div className="bg-[#fbfbff] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[88vh] overflow-auto" onClick={e => e.stopPropagation()}>
-      <div className="p-7 flex justify-between"><div className="flex gap-5"><CreatorAvatar url={selected.avatar_url} name={selected.display_name || selected.handle || 'Creator'} size="w-24 h-24" textSize="text-3xl" /><div><h2 className="text-2xl font-bold">{selected.display_name || selected.handle} <span className="text-indigo-500">●</span></h2><p className="text-[#7180ad]">@{selected.handle?.replace(/^@/,'')}</p><p className="text-sm mt-2">{PLATFORM_LABEL[selected.platform]} {selected.country && ` · ${selected.country}`}</p></div></div><button onClick={() => setSelected(null)} className="text-2xl self-start">×</button></div>
-      <div className="px-7 grid grid-cols-2 md:grid-cols-4 gap-3">{[[m.followers,compact(detail?.total_followers ?? selected.follower_count)],[m.modalEngagement,selected.engagement_rate == null ? '—' : `${Number(selected.engagement_rate).toFixed(1)}%`],[m.modalCountry,detail?.location || selected.country || '—'],[m.modalMatchScore,selected.score == null ? '—' : `${Math.round(selected.score)}%`]].map(([k,v]) => <div key={k} className="border border-slate-100 rounded-2xl p-4"><b className="text-xl">{v}</b><p className="text-xs text-[#7d88aa] mt-1">{k}</p></div>)}</div>
-      <div className="p-7"><h3 className="font-bold">{m.modalAbout}</h3><p className="text-sm leading-6 text-[#5f6c95] mt-2">{(detailLoading ? m.loadingProfile : detail?.bio || selected.bio || m.profileFallback).split('\n').filter((l: string) => !/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(l) && !/(?:\+?\d[\d\s\-().]{7,}\d)/.test(l)).join('\n')}</p><div className="flex flex-wrap gap-2 mt-4">{(detail?.niche || selected.niche_tags).slice(0,8).map((t:string) => <span key={t} className="bg-[#2c0beb]/10 text-[#2c0beb] rounded-full px-3 py-1 text-xs">{t}</span>)}</div></div>
-      <div className="px-7 pb-4">
-        <CollaborationProgress
-          status={queue.find(q => q.externalCreatorId === selected.id)?.status || 'SHORTLISTED'}
-          locale={locale}
-          compact
-        />
-      </div>
-      <div className="border-t border-slate-100 p-5 flex items-center gap-3 justify-between"><div className="text-xs text-[#7180ad]">🛡 {m.businessContactNote}<br/>{m.neverSharedNote}</div><button disabled={queuedIds.has(selected.id) || queueBusy} onClick={() => { setOutreachModalCreator(selected); setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : ''); setOutreachFiles(rememberMsg && rememberedFiles.length > 0 ? [...rememberedFiles] : []); setOutreachSent(false); setOutreachError(null) }} className="px-7 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50">{queuedIds.has(selected.id) ? m.addedToQueue : m.addToQueue}</button></div>
-    </div></div>}
+    {selected && (
+      <CreatorDetailModal
+        creator={selected as any}
+        detail={detail}
+        detailLoading={detailLoading}
+        detailError={detailError}
+        detailBlocked={detailBlocked}
+        featureUnlocks={featureUnlocks}
+        featureUnlocked={featureUnlocked}
+        featureLoading={featureLoading}
+        featureError={featureError}
+        featureConfirm={featureConfirm}
+        onClose={closeCreatorDetail}
+        onUnlockFeature={unlockFeature}
+        onUnlockAudienceBundle={unlockAudienceBundle}
+        onPromptUnlock={promptUnlock}
+        onDismissConfirm={dismissConfirm}
+        onDismissFeatureError={() => {}}
+        onOpenRelated={(creator) => openCreator(creator as any)}
+        savedKeys={new Set()}
+        onToggleSave={() => {}}
+        onOpenContact={(creator) => {
+          const c = (creator || selected) as any
+          setOutreachModalCreator(c)
+          setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : '')
+          setOutreachFiles(rememberMsg && rememberedFiles.length > 0 ? [...rememberedFiles] : [])
+          setOutreachSent(false)
+          setOutreachError(null)
+        }}
+        nicheMap={{}}
+        zh={zh}
+        locale={locale}
+        t={t}
+      />
+    )}
 
     {outreachModalCreator && createPortal(
       <div

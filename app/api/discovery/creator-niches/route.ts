@@ -8,8 +8,8 @@ import { creatorDbFetch } from '@/lib/creatordb-usage'
 // Accepts: { creators: [{ platform, handle }] }
 // Returns: { niches: { "instagram:handle": ["id_fashion_All", ...], ... } }
 //
-// Each uncached creator costs 0.3 CreatorDB credits (3 fields × 0.1 each:
-// niches, avatarUrl, bio). Requires Fractional Calls enabled on the API key.
+// Each uncached creator costs 0.2 CreatorDB credits (2 fields × 0.1 each:
+// niches, bio). Requires Fractional Calls enabled on the API key.
 // Results are cached per platform+handle to avoid repeat charges.
 // hasEmail and hasSponsors are NOT fetched here — hasEmail is fetched on
 // demand at outreach time to save credits during discovery browsing.
@@ -41,7 +41,6 @@ function stripContactLines(bio: string | null): string | null {
 
 interface ProfileResult {
   niches: string[]
-  avatarUrl: string | null
   bio: string | null
 }
 
@@ -50,12 +49,12 @@ async function fetchProfileForCreator(
   handle: string,
   userId: string | undefined,
 ): Promise<ProfileResult> {
-  const empty: ProfileResult = { niches: [], avatarUrl: null, bio: null }
+  const empty: ProfileResult = { niches: [], bio: null }
   const platformPath = PLATFORM_PATH[platform]
   if (!platformPath) return empty
 
-  // Fractional profile call: 0.1 credit per field × 3 fields = 0.3 credits per creator
-  const body = { uniqueId: handle, fields: ['niches', 'avatarUrl', 'bio'] }
+  // Fractional profile call: 0.1 credit per field × 2 fields = 0.2 credits per creator
+  const body = { uniqueId: handle, fields: ['niches', 'bio'] }
 
   let lastError: Error | null = null
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -100,9 +99,8 @@ async function fetchProfileForCreator(
       }
 
       const niches: string[] = Array.isArray(data.data?.niches) ? data.data.niches : []
-      const avatarUrl: string | null = typeof data.data?.avatarUrl === 'string' ? data.data.avatarUrl : null
       const bio: string | null = stripContactLines(typeof data.data?.bio === 'string' ? data.data.bio : null)
-      return { niches, avatarUrl, bio }
+      return { niches, bio }
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       if (attempt < MAX_RETRIES) {
@@ -158,7 +156,6 @@ export async function POST(req: NextRequest) {
   const toFetch = unique.filter((c) => !cachedMap.has(`${c.platform}:${c.handle}`))
 
   // Fetch all uncached in parallel
-  const avatars: Record<string, string> = {}
   const bios: Record<string, string> = {}
 
   // Populate bios from cache first
@@ -176,7 +173,6 @@ export async function POST(req: NextRequest) {
         update: { niches: profile.niches, bio: profile.bio, fetchedAt: new Date() },
       }).catch((e) => console.error(`[creator-niches] cache write failed for ${c.platform}:${c.handle}:`, e))
       const key = `${c.platform}:${c.handle}`
-      if (profile.avatarUrl) avatars[key] = profile.avatarUrl
       if (profile.bio) bios[key] = profile.bio
       return { key, niches: profile.niches }
     }),
@@ -195,7 +191,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     niches: nicheResult,
-    avatars,
     bios,
     cached: cached.length,
     fetched: toFetch.length,
