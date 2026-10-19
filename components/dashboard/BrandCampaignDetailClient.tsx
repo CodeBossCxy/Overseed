@@ -637,9 +637,8 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     fetch('/api/pricing/config')
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
-        if (data?.creditSystemEnabled) {
-          const price = data.prices?.campaign_ai_match ?? data.prices?.discovery_search
-          if (typeof price === 'number') setSearchPrice(price)
+        if (data?.creditSystemEnabled && typeof data.prices?.discovery_search === 'number') {
+          setSearchPrice(data.prices.discovery_search)
         }
       })
       .catch(() => {})

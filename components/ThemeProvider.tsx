@@ -80,17 +80,15 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     const isGlobalPage = pathname === '/' || pathname === '/contact' || pathname === '/guidelines' || pathname === '/faq' || pathname === '/terms' || pathname === '/privacy'
 
-    if (isGlobalPage) {
-      document.documentElement.setAttribute('data-theme', 'global')
-      setThemeModeState('global')
-    } else {
-      const viewTheme = session && isBrand ? 'brand' : 'creator'
-      document.documentElement.setAttribute('data-theme', viewTheme)
-      setThemeModeState(viewTheme)
+    const mode = isGlobalPage ? 'global' : (session && isBrand ? 'brand' : 'creator')
+    if (document.documentElement.getAttribute('data-theme') !== mode) {
+      document.documentElement.setAttribute('data-theme', mode)
     }
+    setThemeModeState(mode)
 
     // Update favicon
     const iconHref = (!session || isGlobalPage) ? '/icon-pink.png' : isBrand ? '/icon-blue.png' : '/icon-pink.png'
+    const newFavicon = iconHref + '?v=' + (isGlobalPage ? 'global' : isBrand ? 'brand' : 'creator')
     let link = document.querySelector<HTMLLinkElement>('link[data-dynamic-icon]')
     if (!link) {
       link = document.createElement('link')
@@ -99,7 +97,9 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
       link.setAttribute('data-dynamic-icon', 'true')
       document.head.appendChild(link)
     }
-    link.href = iconHref + '?v=' + (isGlobalPage ? 'global' : isBrand ? 'brand' : 'creator')
+    if (link.href !== newFavicon) {
+      link.href = newFavicon
+    }
   }, [pathname, session, isBrand])
 
   // Expose the chosen colour theme on <html> for every page. The heavy workspace
@@ -107,6 +107,8 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   // so on the public/marketing pages this only publishes --user-theme-gradient,
   // which the homepage hero opts into.
   useEffect(() => {
+    const current = document.documentElement.getAttribute('data-color-theme') ?? 'default'
+    if (current === colorTheme) return
     if (colorTheme === 'default') {
       document.documentElement.removeAttribute('data-color-theme')
     } else {

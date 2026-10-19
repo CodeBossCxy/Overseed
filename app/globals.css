@@ -570,29 +570,121 @@ select {
   }
 }
 
-/* AI Assistant: full-height layout that aligns with the sidebar bottom.
-   The sidebar uses h-screen py-4 → bottom is viewport - 1rem.
-   The content column sits beside it with the same min-h-screen flex parent.
-   We make <main> a flex container so .ai-chat-root fills remaining space,
-   then remove pb-10 so the chat bottom aligns with the sidebar bottom (py-4 = 1rem). */
-.ws-themed-bg main:has(.ai-chat-root) {
+/* ── Flex-based full-height layout system ──
+   Uses 100dvh so mobile browser chrome doesn't push content off-screen.
+   Every layer is a flex container with min-height:0 / overflow:hidden so
+   only the two leaf scroll-areas (.conversation-list, .chat-messages)
+   actually scroll — nothing else. */
+
+/* Application shell — outermost viewport wrapper */
+.app-layout {
+  height: 100dvh;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Main page area (content column beside the nav sidebar) */
+.main-content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* AI Assistant page — fills main-content below the top bar.
+   Horizontal padding comes from <main>; top/bottom padding gives
+   breathing room around the header and below the workspace. */
+.ai-assistant-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: 0.75rem;
+  padding-bottom: clamp(0.75rem, 1vw, 1rem);
+}
+
+/* Chat workspace — the glass card holding sidebar + chat panel */
+.ai-workspace {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  max-width: 1140px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Conversation sidebar (left column inside the glass card) */
+.conversation-sidebar {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  /* Small top gap between header row and chat container */
-  padding-top: clamp(0.5rem, 1vw, 0.875rem);
-  /* Breathing room below the chat — sits slightly above sidebar bottom */
-  padding-bottom: clamp(1.25rem, 1.5vw, 1.5rem);
-  flex: 1;
 }
-/* Make the content column height-constrained like the sidebar when AI chat is present */
-.ws-themed-bg .flex.min-h-screen:has(.ai-chat-root) > .flex-1.flex.flex-col {
-  height: 100vh;
-  max-height: 100vh;
-}
-.ai-chat-root {
+
+/* Only the conversation history list scrolls */
+.conversation-list {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+}
+
+/* Main chat panel (right column inside the glass card) */
+.chat-panel {
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+/* Only the chat messages scroll */
+.chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Composer / input stays pinned at the bottom */
+.chat-composer {
+  flex-shrink: 0;
+}
+
+/* When <main> contains the AI assistant, it becomes a flex column that
+   fills the remaining height instead of scrolling on its own.
+   !important overrides Tailwind utility classes on the <main> element. */
+main:has(.ai-assistant-page) {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+main > .page-enter-animation:has(.ai-assistant-page) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
+
+@media (max-width: 767px) {
+  .ai-workspace .conversation-sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    width: min(300px, 100%);
+    background: rgba(255, 255, 255, 0.96);
+  }
+}
+
+/* The AI assistant page header flows normally — override the global
+   absolute-positioned h1 rule (.ws-themed-bg main h1). */
+.ai-assistant-page h1 {
+  position: static !important;
 }
 
 .workspace-glass-card {
@@ -790,7 +882,12 @@ select {
   @apply my-2;
 }
 .ai-markdown h1 {
-  @apply text-lg font-bold text-gray-900 mt-5 mb-2 pb-1 border-b border-gray-200;
+  /* Reset the absolute page-title positioning from .ws-themed-bg main h1 */
+  position: static !important;
+  font-size: 1.125rem !important;
+  line-height: 1.75rem !important;
+  letter-spacing: normal !important;
+  @apply font-bold text-gray-900 mt-5 mb-2 pb-1 border-b border-gray-200;
 }
 .ai-markdown h2 {
   @apply text-base font-bold text-gray-900 mt-4 mb-2;
@@ -924,5 +1021,27 @@ select {
 @media (min-width: 1024px) and (min-height: 720px) {
   .home-hero-products {
     display: block;
+  }
+}
+
+/* ── Page transition animation ── */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter-animation {
+  animation: page-enter 200ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-animation {
+    animation: none;
   }
 }

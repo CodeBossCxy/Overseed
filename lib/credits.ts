@@ -32,8 +32,6 @@ export const CREDIT_COSTS = {
   analytics: 15,
   // Discovery search beyond the monthly quota (quota itself is free).
   discovery_search_extra: 4,
-  // Campaign AI match (AI analyzes brief + searches creators).
-  campaign_ai_match: 4,
   // Paid feature unlock (audience gender/age/country, brand collaborations).
   // Actual cost varies — callers pass costOverride to deductCredits.
   feature_unlock: 5,

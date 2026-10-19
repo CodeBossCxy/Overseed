@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { MouseEvent } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -172,13 +172,16 @@ export default function WorkspaceLayout({
   const roleLabel = role === 'creator' ? w.creator : w.brand
   const isNavigating = !!pendingHref && pendingHref !== pathname
 
-  const isActive = (item: NavItem) => {
-    if (item.exact) return pathname === item.href
-    // Longest-prefix wins so /dashboard/brand doesn't stay lit on subpages.
-    const matches = navItems.filter((n) => !n.exact && pathname.startsWith(n.href))
-    const longest = matches.sort((a, b) => b.href.length - a.href.length)[0]
-    return longest?.href === item.href
-  }
+  const activeHref = useMemo(() => {
+    const exactMatch = navItems.find((n) => n.exact && pathname === n.href)
+    if (exactMatch) return exactMatch.href
+    const prefixMatches = navItems
+      .filter((n) => !n.exact && pathname.startsWith(n.href))
+      .sort((a, b) => b.href.length - a.href.length)
+    return prefixMatches[0]?.href ?? null
+  }, [pathname, navItems])
+
+  const isActive = (item: NavItem) => item.href === activeHref
 
   const prefetchRoute = useCallback((href: string) => {
     router.prefetch(href)
@@ -208,14 +211,14 @@ export default function WorkspaceLayout({
     setPendingHref(null)
   }, [pathname])
 
-  // Safety valve: if navigation stalls for 5s, force-push and clear the
-  // pending state so the UI doesn't stay stuck with a dimmed skeleton.
+  // Safety valve: if navigation stalls for 2s, force-push and clear the
+  // pending state so the UI doesn't stay stuck.
   useEffect(() => {
     if (!pendingHref) return
     const timeout = window.setTimeout(() => {
       router.push(pendingHref)
       setPendingHref(null)
-    }, 5000)
+    }, 2000)
     return () => window.clearTimeout(timeout)
   }, [pendingHref, router])
 
@@ -353,11 +356,10 @@ export default function WorkspaceLayout({
   )
 
   return (
-    <div className="min-h-screen ws-themed-bg">
-      <div className="flex min-h-screen max-w-[1500px] mx-auto">
-        {/* Desktop sidebar — viewport-height and sticky so it is the same
-            size on every page and stays put while the content scrolls */}
-        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 py-4 pl-4 sticky top-0 h-screen self-start">
+    <div className="app-layout ws-themed-bg">
+      <div className="flex max-w-[1500px] mx-auto w-full h-full">
+        {/* Desktop sidebar */}
+        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 py-4 pl-4">
           <div className="flex flex-col flex-1 min-h-0 rounded-3xl bg-white/55 backdrop-blur border border-white/70 shadow-sm py-4">
             {sidebarContent}
           </div>
@@ -374,9 +376,9 @@ export default function WorkspaceLayout({
         )}
 
         {/* Content */}
-        <div className="relative flex-1 min-w-0 flex flex-col">
+        <div className="main-content relative">
           <div
-            className={`pointer-events-none absolute left-4 right-4 top-0 z-30 h-0.5 overflow-hidden rounded-full bg-white/40 transition-opacity duration-150 sm:left-8 sm:right-8 ${
+            className={`pointer-events-none absolute left-4 right-4 top-0 z-30 h-0.5 overflow-hidden rounded-full bg-white/40 transition-opacity duration-150 sm:left-8 sm:right-8 pointer-events-none ${
               isNavigating ? 'opacity-100' : 'opacity-0'
             }`}
           >
@@ -471,9 +473,7 @@ export default function WorkspaceLayout({
           </div>
 
           <main
-            className={`flex-1 px-4 sm:px-8 pb-10 transition-opacity duration-150 ${
-              isNavigating ? 'opacity-80' : 'opacity-100'
-            }`}
+            className="flex-1 min-h-0 px-4 sm:px-8 pb-10 overflow-y-auto"
             aria-busy={isNavigating}
           >
             {children}

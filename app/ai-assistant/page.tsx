@@ -42,7 +42,8 @@ interface ChatSummary {
 
 export default function AIAssistantPage() {
   const { data: session } = useSession()
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
+  const zh = locale === 'zh'
   const isLoggedIn = !!session
   const userType = (session?.user as any)?.userType
   const isCreator = userType === 'INFLUENCER'
@@ -58,7 +59,7 @@ export default function AIAssistantPage() {
   const [provider, setProvider] = useState<string>('claude-sonnet-5')
   const [chatId, setChatId] = useState<string | null>(null)
   const [chatList, setChatList] = useState<ChatSummary[]>([])
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [progress, setProgress] = useState(0)
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
@@ -72,6 +73,10 @@ export default function AIAssistantPage() {
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const aiAttachmentRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setSidebarOpen(window.matchMedia('(min-width: 768px)').matches)
+  }, [])
 
   const attachToPrompt = async (file: File) => {
     setToolBusy(true)
@@ -147,6 +152,7 @@ export default function AIAssistantPage() {
       if (res.ok) {
         const data = await res.json()
         setChatId(data.id)
+        if (window.matchMedia('(max-width: 767px)').matches) setSidebarOpen(false)
         setProvider(data.provider && AI_MODEL_OPTIONS.some((m) => m.id === data.provider) ? data.provider : 'claude-sonnet-5')
         setMessages(
           data.messages.map((m: any) => ({
@@ -165,6 +171,7 @@ export default function AIAssistantPage() {
   const startNewChat = () => {
     setChatId(null)
     setMessages([])
+    if (window.matchMedia('(max-width: 767px)').matches) setSidebarOpen(false)
   }
 
   const deleteChat = async (id: string, e: React.MouseEvent) => {
@@ -587,55 +594,140 @@ export default function AIAssistantPage() {
     )
   }
 
-  const topBarLeft = (
-    <div className="flex items-center gap-4">
-      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
-      <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60">
-        <button
-          onClick={() => setActiveTab('chat')}
-          className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
-            activeTab === 'chat'
-              ? 'bg-white shadow-sm text-gray-900 font-bold'
-              : 'text-gray-500 font-medium hover:text-gray-700'
-          }`}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-          {t.aiAssistant.tabChat}
-        </button>
-        <button
-          onClick={() => setActiveTab('image')}
-          className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
-            activeTab === 'image'
-              ? 'bg-white shadow-sm text-gray-900 font-bold'
-              : 'text-gray-500 font-medium hover:text-gray-700'
-          }`}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
-          </svg>
-          {t.aiAssistant.tabImage}
-        </button>
-      </div>
-    </div>
-  )
+  // Derive the user's first name for the welcome greeting
+  const userName = (session?.user as any)?.name?.split(' ')[0] || (session?.user as any)?.email?.split('@')[0] || (zh ? '用户' : 'there')
+
+  // Group chat list into time buckets for the sidebar
+  const groupChats = () => {
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const weekStart = new Date(todayStart.getTime() - 6 * 24 * 60 * 60 * 1000)
+    const monthStart = new Date(todayStart.getTime() - 29 * 24 * 60 * 60 * 1000)
+    const groups: { label: string; chats: ChatSummary[] }[] = [
+      { label: zh ? '今天' : 'Today', chats: [] },
+      { label: zh ? '本周' : 'This Week', chats: [] },
+      { label: zh ? '近30天' : 'Last 30 Days', chats: [] },
+      { label: zh ? '更早' : 'Older', chats: [] },
+    ]
+    for (const chat of chatList) {
+      const d = new Date(chat.updatedAt)
+      if (d >= todayStart) groups[0].chats.push(chat)
+      else if (d >= weekStart) groups[1].chats.push(chat)
+      else if (d >= monthStart) groups[2].chats.push(chat)
+      else groups[3].chats.push(chat)
+    }
+    return groups.filter(g => g.chats.length > 0)
+  }
+
+  const suggestionCards = [
+    {
+      title: zh ? '市场进入策略' : 'Market entry strategy',
+      desc: zh ? '获取针对特定地区的洞察和市场推广计划' : 'Get region-specific insights and go-to-market plans',
+      prompt: zh ? '帮我制定进入东南亚市场的策略' : 'Help me build a market entry strategy for Southeast Asia',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+      color: 'bg-teal-100 text-teal-600',
+    },
+    {
+      title: zh ? '创作者合作' : 'Creator collaboration',
+      desc: zh ? '找到创作者、外联模板和最佳实践' : 'Find creators, outreach templates and best practices',
+      prompt: zh ? '帮我找到适合我品牌的创作者合作策略' : 'Help me find the right creator collaboration strategy for my brand',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      color: 'bg-rose-100 text-rose-500',
+    },
+    {
+      title: zh ? '跨境营销活动' : 'Cross-border campaign',
+      desc: zh ? '规划和优化全球营销活动' : 'Plan and optimize global campaigns',
+      prompt: zh ? '帮我规划一个跨境营销活动' : 'Help me plan a cross-border marketing campaign',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      color: 'bg-teal-100 text-teal-600',
+    },
+    {
+      title: zh ? '本地化与洞察' : 'Localization & insights',
+      desc: zh ? '针对不同市场和文化调整您的品牌' : 'Adapt your brand for different markets and cultures',
+      prompt: zh ? '帮我了解如何将品牌本地化适应不同文化' : 'Help me localize my brand for different cultural markets',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      color: 'bg-emerald-100 text-emerald-600',
+    },
+  ]
 
   return (
-    <RoleShell noFooter topBarLeft={topBarLeft}>
-      <div className="ai-chat-root flex flex-col min-h-0">
-        <div className="min-h-0 flex-1 flex overflow-hidden rounded-3xl workspace-glass-card">
+    <RoleShell noFooter>
+      <div className="ai-assistant-page">
+        {/* Page header */}
+        <div className="mb-3 flex-shrink-0">
+          <h1 className="text-3xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
+          <p className="text-gray-500 mt-1">{zh ? '您的全球增长 AI 伙伴' : 'Your AI partner for global growth'}</p>
+        </div>
+
+        {/* Chat / Image Generation toggle — right-aligned, above the workspace */}
+        <div className="flex flex-shrink-0 justify-end mb-3 max-w-[1140px] mx-auto w-full">
+          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+                activeTab === 'chat'
+                  ? 'bg-white shadow-sm text-gray-900 font-bold'
+                  : 'text-gray-500 font-medium hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              {t.aiAssistant.tabChat}
+            </button>
+            <button
+              onClick={() => setActiveTab('image')}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+                activeTab === 'image'
+                  ? 'bg-white shadow-sm text-gray-900 font-bold'
+                  : 'text-gray-500 font-medium hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
+              </svg>
+              {t.aiAssistant.tabImage}
+            </button>
+          </div>
+        </div>
+
+        <div className="ai-workspace rounded-3xl workspace-glass-card">
+
         {/* Image Generation tab */}
         {activeTab === 'image' && <ImageGenerationPanel isProUser={isProUser} />}
 
-        {/* Sidebar */}
+        {/* Conversation sidebar */}
         {activeTab === 'chat' && isProUser && sidebarOpen && (
-          <div className="w-72 flex-shrink-0 bg-white/25 border-r border-white/60 flex flex-col min-h-0">
-            {/* Sidebar header */}
-            <div className="p-4 flex items-center justify-between">
+          <button
+            type="button"
+            className="absolute inset-0 z-10 bg-black/20 md:hidden"
+            aria-label={zh ? '关闭对话列表' : 'Close conversations'}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        {activeTab === 'chat' && isProUser && sidebarOpen && (
+          <div className="conversation-sidebar w-[300px] flex-shrink-0 bg-white/25 border-r border-white/60">
+            {/* New Chat button */}
+            <div className="p-4 flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={startNewChat}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition shadow-sm"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl text-sm font-semibold hover:from-primary-700 hover:to-primary-600 transition shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -643,17 +735,55 @@ export default function AIAssistantPage() {
                 {t.aiAssistant.newChat}
               </button>
               <button
+                type="button"
                 onClick={() => setSidebarOpen(false)}
-                className="ml-2 p-2 rounded-lg hover:bg-gray-200 transition text-gray-400"
+                aria-label={zh ? '关闭对话列表' : 'Close conversations'}
+                className="p-2 rounded-lg text-gray-500 hover:bg-white/70 flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            {/* Chat list */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
+            {/* Search */}
+            <div className="px-4 pb-3 flex-shrink-0">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder={zh ? '搜索对话...' : 'Search conversations...'}
+                  className="w-full pl-8 pr-3 py-2 bg-white/50 border border-white/70 rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-400 focus:bg-white transition"
+                  readOnly
+                />
+              </div>
+            </div>
+
+            {/* Category filter pills */}
+            <div className="px-4 pb-3 flex flex-wrap gap-1.5 flex-shrink-0">
+              {[
+                zh ? '全部' : 'All',
+                zh ? '活动' : 'Campaigns',
+                zh ? '策略' : 'Strategy',
+                zh ? '创作者' : 'Creator',
+              ].map((label, i) => (
+                <button
+                  key={label}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition ${
+                    i === 0
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white/50 text-gray-500 hover:bg-white/80 border border-white/60'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Chat list grouped by time */}
+            <div className="conversation-list px-3 pb-4">
               {chatList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-32 text-gray-400">
                   <svg className="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -662,59 +792,69 @@ export default function AIAssistantPage() {
                   <p className="text-xs">{t.aiAssistant.noConversations}</p>
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {chatList.map((chat) => (
-                    <div
-                      key={chat.id}
-                      onClick={() => editingChatId !== chat.id && loadChat(chat.id)}
-                      className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
-                        chatId === chat.id
-                          ? 'selected-option-glass text-gray-900 font-bold'
-                          : 'hover:bg-white/45 text-gray-700'
-                      }`}
-                    >
-                      <img src={themeIcon} alt="Overseed" className="w-7 h-7 rounded-lg flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        {editingChatId === chat.id ? (
-                          <input
-                            autoFocus
-                            value={editingTitle}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onBlur={submitRename}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') submitRename()
-                              if (e.key === 'Escape') setEditingChatId(null)
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full text-sm font-medium bg-white border border-primary-300 rounded-md px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                          />
-                        ) : (
-                          <p className="text-sm font-medium truncate leading-tight">{chat.title}</p>
-                        )}
-                        <p className="text-[11px] text-gray-400 mt-0.5">{formatDate(chat.updatedAt)}</p>
+                <div className="space-y-4">
+                  {groupChats().map((group) => (
+                    <div key={group.label}>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-2 mb-1.5">{group.label}</p>
+                      <div className="space-y-0.5">
+                        {group.chats.map((chat) => (
+                          <div
+                            key={chat.id}
+                            onClick={() => editingChatId !== chat.id && loadChat(chat.id)}
+                            className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
+                              chatId === chat.id
+                                ? 'selected-option-glass text-gray-900'
+                                : 'hover:bg-white/45 text-gray-700'
+                            }`}
+                          >
+                            <img src={themeIcon} alt="Overseed" className="w-7 h-7 rounded-lg flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              {editingChatId === chat.id ? (
+                                <input
+                                  autoFocus
+                                  value={editingTitle}
+                                  onChange={(e) => setEditingTitle(e.target.value)}
+                                  onBlur={submitRename}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') submitRename()
+                                    if (e.key === 'Escape') setEditingChatId(null)
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-full text-sm font-medium bg-white border border-primary-300 rounded-md px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                />
+                              ) : (
+                                <p className={`text-sm truncate leading-tight ${chatId === chat.id ? 'font-bold' : 'font-medium'}`}>{chat.title}</p>
+                              )}
+                              <p className="text-[11px] text-gray-400 mt-0.5 truncate">{formatDate(chat.updatedAt)}</p>
+                            </div>
+                            <div className="flex-shrink-0 flex items-center">
+                              <span className="text-[10px] text-gray-400 group-hover:hidden">{formatDate(chat.updatedAt)}</span>
+                              {editingChatId !== chat.id && (
+                                <div className="hidden group-hover:flex items-center gap-0.5">
+                                  <button
+                                    onClick={(e) => startRename(chat.id, chat.title, e)}
+                                    className="p-1 rounded-md hover:bg-gray-200 transition text-gray-300 hover:text-gray-600"
+                                    title={t.aiAssistant.rename}
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={(e) => deleteChat(chat.id, e)}
+                                    className="p-1 rounded-md hover:bg-red-50 transition text-gray-300 hover:text-red-500"
+                                    title={t.common.delete}
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      {editingChatId !== chat.id && (
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition flex-shrink-0">
-                          <button
-                            onClick={(e) => startRename(chat.id, chat.title, e)}
-                            className="p-1 rounded-md hover:bg-gray-200 transition text-gray-300 hover:text-gray-600"
-                            title={t.aiAssistant.rename}
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={(e) => deleteChat(chat.id, e)}
-                            className="p-1 rounded-md hover:bg-red-50 transition text-gray-300 hover:text-red-500"
-                            title={t.common.delete}
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -723,14 +863,14 @@ export default function AIAssistantPage() {
 
             {/* Usage tracker */}
             {usagePercent !== null && (
-              <div className="p-4 border-t border-gray-200">
+              <div className="p-4 border-t border-white/50 flex-shrink-0">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-medium text-gray-500">{t.aiAssistant.usageCredits}</span>
                   <span className="text-xs font-semibold text-gray-700">
                     {creditsUsage ? `${creditsUsage.used} / ${creditsUsage.limit}` : `${usagePercent}%`}
                   </span>
                 </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       usagePercent >= 100
@@ -772,13 +912,14 @@ export default function AIAssistantPage() {
         )}
 
         {/* Main chat area (kept mounted so chat state survives tab switches) */}
-        <div className={`flex-1 ${activeTab === 'chat' ? 'flex' : 'hidden'} flex-col min-w-0 min-h-0 border-l border-white/50`}>
+        <div className={`chat-panel ${activeTab === 'chat' ? 'flex' : 'hidden'} min-w-0 relative`}>
           {/* Top bar */}
           <div className="h-14 flex items-center justify-between px-4 border-b border-white/55 bg-white/35 backdrop-blur flex-shrink-0">
             <div className="flex items-center gap-3">
               {isProUser && !sidebarOpen && (
                 <button
                   onClick={() => setSidebarOpen(true)}
+                  aria-label={zh ? '打开对话列表' : 'Open conversations'}
                   className="p-1.5 rounded-lg hover:bg-gray-100 transition text-gray-400"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -786,14 +927,6 @@ export default function AIAssistantPage() {
                   </svg>
                 </button>
               )}
-              <div>
-                <h2 className="text-sm font-semibold text-gray-900">
-                  {chatId ? (chatList.find(c => c.id === chatId)?.title || 'Chat') : t.aiAssistant.title}
-                </h2>
-                {!chatId && (
-                  <p className="text-[11px] text-gray-400 leading-tight">{t.aiAssistant.subtitle}</p>
-                )}
-              </div>
             </div>
 
             {isProUser && (
@@ -831,29 +964,44 @@ export default function AIAssistantPage() {
           )}
 
           {/* Messages */}
-          <div ref={messagesContainerRef} className={`flex-1 min-h-0 ${messages.length > 0 ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+          <div ref={messagesContainerRef} className="chat-messages">
             <div className={`max-w-3xl mx-auto px-4 ${messages.length > 0 ? 'py-6 space-y-6' : 'h-full flex flex-col'}`}>
-              {/* Welcome */}
+
+              {/* Welcome state */}
               {messages.length === 0 && isProUser && (
-                <div className="flex-1 flex justify-center items-center">
-                  <div className="text-center max-w-md">
-                    <div className="w-14 h-14 bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                      <svg className="w-7 h-7 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
-                      </svg>
-                    </div>
-                    <h2 className="text-lg font-semibold text-gray-900 mb-2">{t.aiAssistant.welcome}</h2>
-                    <div className="grid grid-cols-2 gap-2 mt-6">
-                      {[t.aiAssistant.tip1, t.aiAssistant.tip2, t.aiAssistant.tip3, t.aiAssistant.tip4].map((tip, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setInput(tip)}
-                          className="text-left p-3 rounded-xl border border-gray-200 hover:border-primary-200 hover:bg-primary-50/30 transition text-sm text-gray-600 leading-snug"
-                        >
-                          {tip}
-                        </button>
-                      ))}
-                    </div>
+                <div className="flex-1 flex flex-col justify-center items-center py-6 sm:py-10">
+                  <h2 className="text-2xl sm:text-3xl text-center break-words max-w-full font-bold text-gray-900 mb-2">
+                    {zh ? `嗨，${userName} 👋` : `Hi ${userName} 👋`}
+                  </h2>
+                  <p className="text-lg text-gray-500 mb-1">
+                    {zh ? '今天我能帮您做什么？' : 'How can I help you today?'}
+                  </p>
+                  <p className="text-sm text-gray-400 text-center max-w-md mb-10">
+                    {zh
+                      ? '获取全球扩张、创作者营销和品牌增长的洞察、创意和实用策略。'
+                      : 'Get insights, ideas, and practical strategies for global expansion, creator marketing, and brand growth.'}
+                  </p>
+
+                  {/* Suggestion cards 2x2 grid */}
+                  <div className="w-full max-w-2xl grid grid-cols-1 xl:grid-cols-2 gap-3">
+                    {suggestionCards.map((card) => (
+                      <button
+                        key={card.title}
+                        onClick={() => setInput(card.prompt)}
+                        className="flex items-center gap-3 p-4 bg-white/60 hover:bg-white/90 border border-white/80 rounded-2xl text-left transition group shadow-sm hover:shadow-md"
+                      >
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${card.color}`}>
+                          {card.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 leading-tight">{card.title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5 leading-snug">{card.desc}</p>
+                        </div>
+                        <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
@@ -1013,7 +1161,6 @@ export default function AIAssistantPage() {
                 </div>
               )})}
 
-
               {/* Loading */}
               {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                 <div className="flex gap-3">
@@ -1052,37 +1199,61 @@ export default function AIAssistantPage() {
           )}
 
           {/* Input */}
-          <div className="border-t border-gray-100 bg-white px-4 py-3 flex-shrink-0">
+          <div className="chat-composer border-t border-white/55 bg-white/30 backdrop-blur px-4 py-3">
+            <input ref={aiAttachmentRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f) attachToPrompt(f); e.currentTarget.value='' }} />
             <div className="max-w-3xl mx-auto">
-              <div className="flex gap-2 mb-2">
-                <input ref={aiAttachmentRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={e => { const f=e.target.files?.[0]; if(f) attachToPrompt(f); e.currentTarget.value='' }} />
-                <button type="button" disabled={!isProUser || toolBusy} onClick={() => aiAttachmentRef.current?.click()} className="px-3 py-1.5 rounded-full workspace-glass-control text-xs font-semibold disabled:opacity-50">📎 Attach</button>
-                <button type="button" disabled={!isProUser} onClick={() => setActiveTab('image')} className="px-3 py-1.5 rounded-full selected-option-glass text-xs font-semibold disabled:opacity-50">✦ {t.aiAssistant.tabImage}</button>
-              </div>
-              <form onSubmit={handleSubmit} className="relative">
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={t.aiAssistant.placeholder}
-                  disabled={!isProUser || isLoading}
-                  rows={1}
-                  className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent focus:bg-white resize-none disabled:opacity-50 disabled:cursor-not-allowed text-sm transition"
-                  style={{ maxHeight: '120px' }}
-                />
-                <button
-                  type="submit"
-                  disabled={!input.trim() || isLoading || !isProUser}
-                  className="absolute right-2 bottom-2 p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-7-7l7 7-7 7" />
-                  </svg>
-                </button>
+              <form onSubmit={handleSubmit}>
+                <div className="relative bg-white/70 border border-white/80 rounded-2xl shadow-sm overflow-hidden">
+                  <textarea
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t.aiAssistant.placeholder}
+                    disabled={!isProUser || isLoading}
+                    rows={1}
+                    className="w-full px-4 pt-3 pb-12 bg-transparent focus:outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed text-sm text-gray-800 placeholder-gray-400 transition"
+                    style={{ maxHeight: '120px' }}
+                  />
+                  {/* Bottom row of input */}
+                  <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 py-2 border-t border-gray-100/60">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={!isProUser || toolBusy}
+                        onClick={() => aiAttachmentRef.current?.click()}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400 hover:text-gray-600 disabled:opacity-40"
+                        title={zh ? '附件' : 'Attach file'}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!isProUser}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-100/80 hover:bg-gray-200/80 transition text-xs font-medium text-gray-500 disabled:opacity-40"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                        {zh ? '网络搜索' : 'Web search'}
+                      </button>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!input.trim() || isLoading || !isProUser}
+                      className="w-8 h-8 flex items-center justify-center bg-primary-600 text-white rounded-full hover:bg-primary-700 transition disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-7-7l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </form>
               <p className="text-[10px] text-gray-400 text-center mt-2">
-                {AI_MODEL_OPTIONS.find((m) => m.id === provider)?.label || provider} — responses may not always be accurate
+                {AI_MODEL_OPTIONS.find((m) => m.id === provider)?.label || provider} — {zh ? '回答仅供参考，请核实重要信息' : 'responses may not always be accurate'}
               </p>
             </div>
           </div>
