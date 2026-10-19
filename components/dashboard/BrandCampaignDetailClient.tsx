@@ -388,24 +388,65 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       console.log('Pre-set filters — minFollowers:', minFollowers, 'maxFollowers:', maxFollowers, 'country:', creatorCountry)
       console.groupEnd()
 
-      // Auto-fill filters from campaign brief
+      // Use AI to extract search parameters from the campaign brief
+      const campPlatform = (campaign.platforms[0]?.platform.name || '').toLowerCase()
+      const activePlatformForAi = ['tiktok', 'instagram', 'youtube'].includes(campPlatform) ? campPlatform : platform
+
+      // Build a natural-language brief for the AI to parse
+      const briefParts = [
+        campaign.title,
+        `Categories: ${campaign.categories.map(c => c.category.name).join(', ')}`,
+        `Platform: ${activePlatformForAi}`,
+        campaign.description ? `Description: ${campaign.description.slice(0, 500)}` : '',
+        campaign.contentGuidelines ? `Content guidelines: ${campaign.contentGuidelines.slice(0, 200)}` : '',
+        campaign.contentType ? `Content type: ${campaign.contentType}` : '',
+        query.trim() ? `Additional keywords: ${query.trim()}` : '',
+      ].filter(Boolean).join('\n')
+
+      console.log('[DirectOutreach] AI brief for parsing:', briefParts)
+
+      // Call AI to parse the brief into structured filters
+      let aiParsed: any = null
+      try {
+        const parseRes = await fetch('/api/discovery/parse-query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: briefParts }),
+        })
+        if (parseRes.ok) {
+          const parseData = await parseRes.json()
+          aiParsed = parseData?.parsed || null
+          console.log('[DirectOutreach] AI parsed result:', aiParsed)
+        }
+      } catch (e) {
+        console.warn('[DirectOutreach] AI parsing failed, falling back to categories:', e)
+      }
+
       const autoFilters: CdbFilter[] = []
 
-      // Map campaign categories to niches
+      // Use AI-parsed niches (more specific) if available, otherwise fall back to categories
+      const aiNiches = aiParsed?.niches || ''
       const catNames = campaign.categories.map(c => c.category.name).join(', ')
-      if (catNames) {
-        autoFilters.push({ field: 'niches', op: 'in', value: catNames })
+      // Prefer AI niches — they include product-specific terms (e.g. Jewelry, Earring)
+      // Only fall back to broad categories if AI returned nothing
+      const finalNiches = aiNiches || catNames || ''
+      console.log('[DirectOutreach] AI niches:', aiNiches, '| Categories:', catNames, '| Using:', finalNiches)
+      if (finalNiches) {
+        autoFilters.push({ field: 'niches', op: 'in', value: finalNiches })
       }
 
-      // Map campaign platforms
-      const campPlatform = (campaign.platforms[0]?.platform.name || '').toLowerCase()
-      if (['youtube', 'instagram', 'tiktok'].includes(campPlatform)) {
-        setPlatform(campPlatform)
-      }
-
-      // Use query as hashtags if provided
-      if (query.trim()) {
+      // Use AI-parsed keywords as hashtags
+      const aiKeywords = aiParsed?.keywords
+      if (aiKeywords) {
+        autoFilters.push({ field: 'hashtags', op: 'in', value: aiKeywords })
+      } else if (query.trim()) {
         autoFilters.push({ field: 'hashtags', op: 'in', value: query.trim() })
+      }
+
+      // Map campaign platforms (AI may also suggest one)
+      const parsedPlatform = aiParsed?.platform || campPlatform
+      if (['tiktok', 'instagram', 'youtube'].includes(parsedPlatform)) {
+        setPlatform(parsedPlatform)
       }
 
       // Set last active to 3 months for freshness

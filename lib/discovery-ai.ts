@@ -86,7 +86,7 @@ export const PARSE_SYSTEM_PROMPT = `You help brands find the right creators to p
 Reply with ONLY a JSON object, no prose, using exactly these keys (use null when not applicable):
 {
   "keywords": "short English hashtag/topic terms for creator search, comma-separated, 1-4 words each. E.g. 'skincare, beauty tips'. Choose terms creators in this space actually use.",
-  "niches": "English niche/category names, comma-separated. E.g. 'Beauty, Skincare'. Pick the 1-3 most relevant broad categories for this product/request.",
+  "niches": "The most SPECIFIC niche/category for the product, comma-separated, 1-2 terms max. Use the product category, NOT broad parent categories. E.g. for earrings → 'Jewelry, Earring' (NOT 'Fashion'). For a face mask → 'Skincare' (NOT 'Beauty'). For a gaming headset → 'Gaming'. For running shoes → 'Running'. Be specific — broad niches like Fashion, Lifestyle, Beauty return too many irrelevant results.",
   "platform": "youtube" | "instagram" | "tiktok" | null,
   "country": "ISO 3166-1 alpha-2 code of the CREATOR's country, e.g. US" | null,
   "audience_location": "ISO 3166-1 alpha-2 of the target AUDIENCE's country" | null,
@@ -101,8 +101,18 @@ Reply with ONLY a JSON object, no prose, using exactly these keys (use null when
   "audience_age": "13-17" | "18-24" | "25-34" | "35-44" | "45-64" | "65-" | null,
   "min_avg_views": number | null
 }
-IMPORTANT — Fewer filters is better. Every filter narrows the result set; 2-3 well-chosen filters beats 8 specific ones:
-- When the user describes a PRODUCT, infer the best creator niches and keywords for promoting it. A skincare product → niches: "Skincare, Beauty", keywords: "skincare routine". A gaming headset → niches: "Gaming, Tech". Do NOT use product-specific terms as niches.
+IMPORTANT — Fewer filters is better. Every filter narrows the result set; 2-4 well-chosen filters beats 8 specific ones:
+- When the user describes a PRODUCT, use the most SPECIFIC product-level niche. Do NOT add broad parent categories — they dilute results with irrelevant creators. Examples:
+  * Earrings → niches: "Jewelry, Earring" (NOT "Fashion" — too broad)
+  * Protein powder → niches: "Fitness, Nutrition"
+  * Corn silk face mask → niches: "Skincare"
+  * Running shoes → niches: "Running"
+  * Gaming headset → niches: "Gaming"
+  * Lipstick → niches: "Makeup"
+  * Dog food → niches: "Pets, Dog"
+  * Camera lens → niches: "Photography"
+  * Handbag → niches: "Bags, Fashion" (Fashion is OK here because it's the direct category)
+  * Vitamin supplements → niches: "Health, Nutrition"
 - "10万" = 100000, "1万" = 10000, "1M" = 1000000, "1k" = 1000
 - "粉丝1-2万" → min_followers: 10000, max_followers: 20000
 - "美妆" → niches: "Beauty, Makeup", keywords: "beauty, makeup"
@@ -114,8 +124,7 @@ IMPORTANT — Fewer filters is better. Every filter narrows the result set; 2-3 
 - Always translate non-English terms to English for keywords and niches
 - Only set filters the user explicitly mentions or that are clearly implied. Do NOT invent follower ranges, engagement thresholds, audience demographics, or language unless stated.
 - Do NOT set language unless the user explicitly asks for a specific language — many bilingual creators would be excluded.
-- keywords should be SHORT English terms (1-3 words) that creators use as hashtags. Keep to 2-4 terms max.
-- Prefer broad niches (e.g. "Food" not "Food & Beverage, Cooking, Restaurant").`
+- keywords should be SHORT English terms (1-3 words) that creators use as hashtags. Keep to 2-4 terms max.`
 
 // ── LLM call ───────────────────────────────────────────────────────────────────
 
