@@ -545,29 +545,13 @@ select {
 /* One title scale for every creator and brand workspace route. Using the
    workspace shell as the scope also covers full-height pages such as Messages
    that intentionally do not use workspace-page-tight. */
-.ws-themed-bg main {
-  /* Reserve one shared header row. Page content can use any internal width,
-     while its h1 stays locked to the workspace grid. */
-  position: relative;
-  padding-top: 3.25rem;
-}
-
+/* Consistent page-title typography for every workspace route.
+   Titles flow normally — no absolute positioning. */
 .ws-themed-bg main h1 {
-  position: absolute;
-  z-index: 2;
-  top: 0;
-  left: 2rem;
-  margin: 0 !important;
   font-size: 1.875rem !important;
   line-height: 2.25rem !important;
   font-weight: 700 !important;
   letter-spacing: -0.025em;
-}
-
-@media (max-width: 639px) {
-  .ws-themed-bg main h1 {
-    left: 1rem;
-  }
 }
 
 /* ── Flex-based full-height layout system ──
@@ -681,11 +665,6 @@ main > .page-enter-animation:has(.ai-assistant-page) {
   }
 }
 
-/* The AI assistant page header flows normally — override the global
-   absolute-positioned h1 rule (.ws-themed-bg main h1). */
-.ai-assistant-page h1 {
-  position: static !important;
-}
 
 .workspace-glass-card {
   background: rgba(255, 255, 255, 0.30);
@@ -882,12 +861,7 @@ main > .page-enter-animation:has(.ai-assistant-page) {
   @apply my-2;
 }
 .ai-markdown h1 {
-  /* Reset the absolute page-title positioning from .ws-themed-bg main h1 */
-  position: static !important;
-  font-size: 1.125rem !important;
-  line-height: 1.75rem !important;
-  letter-spacing: normal !important;
-  @apply font-bold text-gray-900 mt-5 mb-2 pb-1 border-b border-gray-200;
+  @apply text-lg font-bold text-gray-900 mt-5 mb-2 pb-1 border-b border-gray-200;
 }
 .ai-markdown h2 {
   @apply text-base font-bold text-gray-900 mt-4 mb-2;

@@ -670,13 +670,13 @@ export default function AIAssistantPage() {
     <RoleShell noFooter>
       <div className="ai-assistant-page">
         {/* Page header */}
-        <div className="mb-3 flex-shrink-0">
-          <h1 className="text-3xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
-          <p className="text-gray-500 mt-1">{zh ? '您的全球增长 AI 伙伴' : 'Your AI partner for global growth'}</p>
-        </div>
+        <div className="mb-3 flex flex-shrink-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
+            <p className="text-gray-500 mt-1">{zh ? '您的全球增长 AI 伙伴' : 'Your AI partner for global growth'}</p>
+          </div>
 
-        {/* Chat / Image Generation toggle — right-aligned, above the workspace */}
-        <div className="flex flex-shrink-0 justify-end mb-3 max-w-[1140px] mx-auto w-full">
+        <div className="flex flex-shrink-0 justify-end self-end md:self-center">
           <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60">
             <button
               onClick={() => setActiveTab('chat')}
@@ -705,6 +705,7 @@ export default function AIAssistantPage() {
               {t.aiAssistant.tabImage}
             </button>
           </div>
+        </div>
         </div>
 
         <div className="ai-workspace rounded-3xl workspace-glass-card">

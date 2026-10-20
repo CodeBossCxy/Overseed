@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import OpenAI from 'openai'
+import OpenAI, { toFile } from 'openai'
 import { authOptions } from '@/lib/auth'
 import { getEffectiveTier, isUserVerified } from '@/lib/subscription'
-import { deductCredits, refundDeduction } from '@/lib/credits'
+import { CREDIT_COSTS, deductCredits, refundDeduction } from '@/lib/credits'
 import { uploadFile } from '@/lib/upload'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
 import { chargeCredits } from '@/lib/metering'
 import { walletRefund } from '@/lib/wallet'
+import { imageRequestSchema, MAX_PRODUCT_IMAGES, MAX_PRODUCT_IMAGE_BYTES, PRODUCT_IMAGE_TYPES } from '@/lib/ai-image-options'
 
-export const maxDuration = 60
+export const maxDuration = 180
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
@@ -20,20 +21,39 @@ export async function POST(req: Request) {
   }
   // All tiers may generate images (pricing v3) — credits are the gate.
   const tier = await getEffectiveTier(userId)
-  const { prompt } = await req.json().catch(() => ({ prompt: '' }))
-  if (typeof prompt !== 'string' || prompt.trim().length < 3 || prompt.length > 1500) {
-    return NextResponse.json({ message: 'Describe the image in 3-1500 characters', code: 'VALIDATION_ERROR' }, { status: 400 })
+  let input: unknown
+  let productImages: File[] = []
+  try {
+    if (req.headers.get('content-type')?.includes('multipart/form-data')) {
+      const form = await req.formData()
+      input = Object.fromEntries(form.entries())
+      const uploads = form.getAll('images')
+      if (uploads.some(upload => typeof upload === 'string')) throw new Error('Invalid product image')
+      productImages = uploads as File[]
+    } else {
+      input = await req.json()
+    }
+  } catch {
+    return NextResponse.json({ message: 'Invalid image request', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
+  const parsed = imageRequestSchema.safeParse(input)
+  if (!parsed.success) {
+    return NextResponse.json({ message: 'Use a 3–1500 character description and valid image settings.', code: 'VALIDATION_ERROR' }, { status: 400 })
+  }
+  if (productImages.length > MAX_PRODUCT_IMAGES || productImages.some(image => !PRODUCT_IMAGE_TYPES.includes(image.type) || image.size === 0 || image.size > MAX_PRODUCT_IMAGE_BYTES)) {
+    return NextResponse.json({ message: 'Upload up to 6 JPG, PNG or WebP images, at most 5 MB each.', code: 'VALIDATION_ERROR' }, { status: 400 })
+  }
+  const { prompt, imageType, language, size, quality, count } = parsed.data
   const apiKey = process.env.CHAT_API
   if (!apiKey) return NextResponse.json({ message: 'Image generation is not configured', code: 'UPSTREAM_ERROR' }, { status: 503 })
 
   // Bill image credits up front; refunded if generation fails.
-  const creditRef = `image:${userId}:${Date.now()}`
+  const creditRef = `image:${userId}:${crypto.randomUUID()}`
   if (CREDIT_SYSTEM_ENABLED) {
-    const charge = await chargeCredits(userId, 'image', creditRef)
+    const charge = await chargeCredits(userId, 'image', creditRef, { quantity: count })
     if (!charge.ok) return NextResponse.json(charge.body, { status: charge.status })
   } else {
-    const deduction = await deductCredits(userId, tier, 'image', creditRef)
+    const deduction = await deductCredits(userId, tier, 'image', creditRef, CREDIT_COSTS.image * count)
     if (!deduction.ok) {
       return NextResponse.json(
         {
@@ -49,16 +69,31 @@ export async function POST(req: Request) {
 
   try {
     const client = new OpenAI({ apiKey })
-    const result = await client.images.generate({
+    const imageDirections = {
+      main: 'Create a polished product hero image with a clear focal point and clean composition.',
+      detail: 'Create a product detail image highlighting materials, construction, and important features.',
+      ad: 'Create an engaging advertising visual with a strong product focus and space for campaign messaging.',
+    }
+    const languageNames = { en: 'English', zh: 'Chinese', es: 'Spanish', fr: 'French', de: 'German', ja: 'Japanese' }
+    const generationPrompt = [
+      imageDirections[imageType],
+      prompt,
+      language === 'none' ? 'Do not add any text, lettering, or captions.' : `Any text you add must be in ${languageNames[language]}.`,
+      ...(productImages.length ? ['Use the supplied product photos as references. Preserve the product identity, shape, colors, and details.'] : []),
+    ].join('\n\n')
+    const options = {
       model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2',
-      prompt: prompt.trim(),
-      size: '1024x1024',
-      quality: 'medium',
-    })
-    const encoded = result.data?.[0]?.b64_json
-    if (!encoded) throw new Error('No image returned')
-    const url = await uploadFile(Buffer.from(encoded, 'base64'), 'generated.png', 'image/png', 'ai_generated/')
-    return NextResponse.json({ url })
+      prompt: generationPrompt,
+      size,
+      quality,
+      n: count,
+    }
+    const result = productImages.length
+      ? await client.images.edit({ ...options, image: await Promise.all(productImages.map(async image => toFile(Buffer.from(await image.arrayBuffer()), image.name, { type: image.type }))) })
+      : await client.images.generate(options)
+    if (result.data?.length !== count || result.data.some(image => !image.b64_json)) throw new Error('Incomplete image results returned')
+    const urls = await Promise.all(result.data.map(image => uploadFile(Buffer.from(image.b64_json!, 'base64'), 'generated.png', 'image/png', 'ai_generated/')))
+    return NextResponse.json({ url: urls[0], urls })
   } catch (error: any) {
     try {
       if (CREDIT_SYSTEM_ENABLED) await walletRefund(userId, creditRef)
