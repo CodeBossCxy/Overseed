@@ -4,11 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { type ClubPlatform } from '@/lib/influencers-club'
 import { discoveryAnalytics } from '@/lib/discovery-provider'
-import { deductCredits, hasPriorDeduction, refundDeduction } from '@/lib/credits'
-import { getEffectiveTier } from '@/lib/subscription'
-import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
-import { chargeCredits, hasPriorCharge } from '@/lib/metering'
-import { walletRefund } from '@/lib/wallet'
 
 // TEMP: GET /api/discovery/club-analytics?platform=&handle= — full audience
 // analytics (demographics, languages, geo) for a club creator, brand-only.
@@ -38,35 +33,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'platform and handle required', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
 
-  const ref = `analytics:${platform}:${handle.toLowerCase()}`
-  let alreadyCharged: boolean
-
-  if (CREDIT_SYSTEM_ENABLED) {
-    alreadyCharged = await hasPriorCharge(userId, ref)
-    if (!alreadyCharged) {
-      const charge = await chargeCredits(userId, 'analytics', ref)
-      if (!charge.ok) {
-        return NextResponse.json(charge.body, { status: charge.status })
-      }
-    }
-  } else {
-    alreadyCharged = await hasPriorDeduction(userId, ref)
-    if (!alreadyCharged) {
-      const tier = await getEffectiveTier(userId)
-      const deduction = await deductCredits(userId, tier, 'analytics', ref)
-      if (!deduction.ok) {
-        return NextResponse.json(
-          {
-            message: 'Not enough AI credits for full analytics. Buy a credit pack or wait for your monthly allowance to reset.',
-            code: 'INSUFFICIENT_CREDITS',
-            required: deduction.cost,
-            available: deduction.available,
-          },
-          { status: 402 }
-        )
-      }
-    }
-  }
+  // Analytics is now free at the top level — individual audience sections
+  // (gender, age, country, brand collaborations) are billed per-unlock via
+  // the /api/discovery/creator-unlock endpoint.
 
   // Serve from cache if this user already viewed this creator's analytics
   const cacheKey = { userId, kind: 'analytics', platform, handle: handle.toLowerCase() }
@@ -95,15 +64,6 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json(analytics)
   } catch (err: any) {
-    // Don't charge for a failed first fetch
-    if (!alreadyCharged) {
-      try {
-        if (CREDIT_SYSTEM_ENABLED) await walletRefund(userId, ref)
-        else await refundDeduction(userId, ref)
-      } catch (refundErr) {
-        console.error('Credit refund failed:', refundErr)
-      }
-    }
     return NextResponse.json(
       { message: err?.message || 'Analytics failed', code: 'UPSTREAM_ERROR' },
       { status: 502 }

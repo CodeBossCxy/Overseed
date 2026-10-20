@@ -184,8 +184,6 @@ export const translations = {
         'Each Discovery Search returns 20 creators. Results include core creator information such as follower count, engagement rate and other public profile data.',
       profileOutreachCostNote:
         'Unlock deeper creator profile information including name, location, cross-platform presence, verification status, account type, follower and media counts, bio and niche classification.\n\nYou can also ask Overseed to reach out to the creator on your behalf. If you both view the Creator Profile and request Managed Outreach for the same creator, you are charged only once — 5 credits in total.',
-      analyticsCostNote:
-        'Access deeper creator insights such as engagement and growth details, posting frequency, estimated earnings and audience data.',
       creditFeatureChatStandard: 'AI Chat Standard',
       creditFeatureChatAdvanced: 'AI Chat Advanced',
       creditFeatureImage: 'AI Image',
@@ -2915,7 +2913,6 @@ export const translations = {
       discoveryCostNote: '每次达人搜索返回 20 位达人，结果包含粉丝数、互动率等公开主页核心信息。',
       profileOutreachCostNote:
         '解锁更深入的达人主页信息：姓名、所在地、跨平台账号、认证状态、账号类型、粉丝与内容数量、简介及领域分类。\n\n您也可以让 Overseed 代表您与达人取得联系。同一位达人无论查看主页还是发起托管触达，仅收费一次 — 共 15 额度。',
-      analyticsCostNote: '获取更深入的达人洞察：互动与增长明细、发布频率、预估收入及受众数据。',
       creditFeatureChatStandard: 'AI Chat 标准',
       creditFeatureChatAdvanced: 'AI Chat 高级',
       creditFeatureImage: 'AI Image',

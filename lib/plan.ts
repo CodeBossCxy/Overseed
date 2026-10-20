@@ -59,11 +59,10 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
   },
 }
 
-export type QuotaKind = 'discovery_search' | 'analytics' | 'outreach'
+export type QuotaKind = 'discovery_search' | 'outreach'
 
 const QUOTA_LIMIT_KEY: Record<QuotaKind, keyof PlanLimits> = {
   discovery_search: 'discoverySearchesPerMonth',
-  analytics: 'analyticsPerMonth',
   outreach: 'outreachPerMonth',
 }
 

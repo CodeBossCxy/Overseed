@@ -36,7 +36,6 @@ export async function GET() {
     conversationsToday,
     credits,
     discoveryUsed,
-    analyticsUsed,
     outreachUsed,
   ] = await Promise.all([
     // Campaigns created today
@@ -58,7 +57,6 @@ export async function GET() {
     // AI credit summary (monthly allowance + purchased pool)
     getCreditSummary(userId, tier),
     getQuotaUsed(userId, 'discovery_search'),
-    getQuotaUsed(userId, 'analytics'),
     getQuotaUsed(userId, 'outreach'),
   ])
 
@@ -92,7 +90,6 @@ export async function GET() {
       },
       ...(await creditItems(userId, tier, credits, {
         discoveryUsed,
-        analyticsUsed,
         outreachUsed,
         limits,
       })),
@@ -111,7 +108,6 @@ async function creditItems(
   credits: Awaited<ReturnType<typeof getCreditSummary>>,
   legacy: {
     discoveryUsed: number
-    analyticsUsed: number
     outreachUsed: number
     limits: (typeof PLAN_LIMITS)[keyof typeof PLAN_LIMITS]
   },
@@ -143,12 +139,6 @@ async function creditItems(
       key: 'discoverySearches',
       used: legacy.discoveryUsed,
       limit: legacy.limits.discoverySearchesPerMonth,
-    },
-    {
-      key: 'advancedAnalytics',
-      used: legacy.analyticsUsed,
-      limit: legacy.limits.analyticsPerMonth,
-      enabled: legacy.limits.analyticsPerMonth > 0,
     },
     {
       key: 'managedOutreach',

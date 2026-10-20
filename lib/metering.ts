@@ -18,7 +18,6 @@ import {
 const TIER_GATES: Record<string, SubscriptionTier[]> = {
   // 2026-09-06: opened to all paid tiers (was OUTREACH_PLUS/PRO and PRO-only).
   outreach: ['CAMPAIGN_PLUS', 'OUTREACH_PLUS', 'PRO'],
-  analytics: ['CAMPAIGN_PLUS', 'OUTREACH_PLUS', 'PRO'],
 }
 
 /**
@@ -29,7 +28,6 @@ const CREATOR_DATA_FEATURES = new Set([
   'discovery_search',
   'profile_view',
   'outreach',
-  'analytics',
 ])
 
 export type ChargeFailure = {
@@ -61,10 +59,7 @@ export async function gateFeature(
       ok: false,
       status: 403,
       body: {
-        message:
-          featureKey === 'analytics'
-            ? 'Advanced Analytics is available on paid plans.'
-            : 'Managed Outreach is available on paid plans.',
+        message: 'Managed Outreach is available on paid plans.',
         code: 'PLAN_REQUIRED',
         requiredTiers: allowedTiers,
         tier,

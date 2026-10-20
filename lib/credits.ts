@@ -28,8 +28,7 @@ export const CREDIT_COSTS = {
   chat_standard: 1,
   chat_advanced: 1,
   image: 2,
-  profile_view: 4,
-  analytics: 15,
+  profile_view: 5,
   // Discovery search beyond the monthly quota (quota itself is free).
   discovery_search_extra: 4,
   // Paid feature unlock (audience gender/age/country, brand collaborations).
