@@ -96,30 +96,38 @@ export async function creatorDbFetch(
     usageStatus: creditsUsed === null ? 'not_reported' : 'reported', reportedCreditFields,
     resultCount: Array.isArray(data?.data?.creatorList) ? data.data.creatorList.length : null,
   })
-  // Write to DB for persistent depletion tracking.
+  // Write to DB for persistent depletion tracking (fire-and-forget with timeout).
   // Uses CREATORDB_LOG_DATABASE_URL when set so local + prod share one log.
-  try {
-    const logDb = getLogPrisma()
-    const creditsAfter = numeric(data?.creditsAvailable) ?? numeric(data?.remainingQuota) ?? null
-    const creditsBefore = creditsAfter !== null && creditsUsed !== null ? creditsAfter + creditsUsed : null
-    await logDb.creatorDbCreditLog.create({
-      data: {
-        userId: context.userId ?? null,
-        endpoint,
-        platform: extractPlatform(endpoint),
-        searchFilters: safeParseBody(init.body),
-        creditsUsedThis: creditsUsed,
-        creditsBefore,
-        creditsAfter,
-        traceId: typeof data?.traceId === 'string' ? data.traceId : null,
-        success: response.ok && data?.success === true,
-        resultCount: Array.isArray(data?.data?.creatorList) ? data.data.creatorList.length : null,
-        durationMs: Date.now() - started,
-      },
-    })
-  } catch (dbErr) {
-    console.error('[CreatorDB usage] DB write failed:', dbErr)
-  }
+  // Never block the response — a stale credential or slow DB must not hang enrichment.
+  const logPromise = (async () => {
+    try {
+      const logDb = getLogPrisma()
+      const creditsAfter = numeric(data?.creditsAvailable) ?? numeric(data?.remainingQuota) ?? null
+      const creditsBefore = creditsAfter !== null && creditsUsed !== null ? creditsAfter + creditsUsed : null
+      await Promise.race([
+        logDb.creatorDbCreditLog.create({
+          data: {
+            userId: context.userId ?? null,
+            endpoint,
+            platform: extractPlatform(endpoint),
+            searchFilters: safeParseBody(init.body),
+            creditsUsedThis: creditsUsed,
+            creditsBefore,
+            creditsAfter,
+            traceId: typeof data?.traceId === 'string' ? data.traceId : null,
+            success: response.ok && data?.success === true,
+            resultCount: Array.isArray(data?.data?.creatorList) ? data.data.creatorList.length : null,
+            durationMs: Date.now() - started,
+          },
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('DB log timeout')), 5000)),
+      ])
+    } catch (dbErr) {
+      console.error('[CreatorDB usage] DB write failed:', dbErr)
+    }
+  })()
+  // Don't await — let it complete in the background
+  void logPromise
   // Return a fresh Response with the already-parsed body so downstream
   // callers can still read .json() without "body already consumed" errors.
   return new Response(JSON.stringify(data), {

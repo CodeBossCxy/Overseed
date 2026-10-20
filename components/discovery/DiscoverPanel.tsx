@@ -834,6 +834,16 @@ export default function DiscoverPanel() {
   const searchPrice = creditPrices?.search ?? null
   // effectiveSearchPrice is computed after effectiveFilterCount (below)
 
+  // ── Direct creator lookup ──
+  const [directHandle, setDirectHandle] = useState('')
+  const [directPlatform, setDirectPlatform] = useState<'instagram' | 'tiktok' | 'youtube'>('instagram')
+  const [directLoading, setDirectLoading] = useState(false)
+  const [directError, setDirectError] = useState<string | null>(null)
+  const [directSuggestions, setDirectSuggestions] = useState<Array<{
+    handle: string; display_name: string | null; avatar_url: string | null; follower_count: number | null; platform: string
+  }>>([])
+
+
   // Advanced filters (keyword search via the club API only — the local
   // browse index doesn't support them)
   const [minEngagement, setMinEngagement] = useState('')
@@ -1049,6 +1059,115 @@ export default function DiscoverPanel() {
     promptUnlock,
     dismissConfirm,
   } = useCreatorDetail()
+
+  // ── Direct creator lookup handler ──
+  const handleDirectLookup = async (overrideHandle?: string) => {
+    const raw = (overrideHandle ?? directHandle).trim()
+    let handle = raw
+      .replace(/^@/, '')
+      .replace(/^https?:\/\/(www\.)?(instagram\.com|tiktok\.com|youtube\.com)\/@?/i, '')
+      .replace(/[?#].*$/, '')
+      .replace(/\/.*$/, '')
+      .trim()
+    if (!handle) return
+    const hasSpaces = /\s/.test(handle)
+    setDirectLoading(true)
+    setDirectError(null)
+    setDirectSuggestions([])
+
+    // If the input has no spaces, try exact profile lookup first
+    if (!hasSpaces) {
+      try {
+        const res = await fetch(`/api/discovery/club-enrich?platform=${directPlatform}&handle=${encodeURIComponent(handle.toLowerCase())}`)
+        const data = await res.json()
+        if (res.ok) {
+          const creator: DiscoveredCreator = {
+            id: `cdb:${directPlatform}:${handle}`,
+            platform: directPlatform,
+            handle,
+            display_name: data.display_name || data.nickname || handle,
+            bio: data.bio || null,
+            country: data.country || null,
+            follower_count: data.followers ?? data.follower_count ?? null,
+            engagement_rate: data.engagement_rate ?? null,
+            niche_tags: data.niche_tags || data.tags || [],
+            profile_url: data.profile_url || null,
+            avatar_url: data.avatar_url || data.avatar || null,
+            score: null,
+          }
+          openDetail(creator)
+          setDirectHandle('')
+          setDirectLoading(false)
+          return
+        }
+        if (data.code === 'INSUFFICIENT_CREDITS') {
+          setDirectError(zh ? '积分不足，请充值' : 'Not enough credits')
+          setDirectLoading(false)
+          return
+        }
+        // Exact lookup failed — fall through to fuzzy search
+      } catch {
+        // Network error — fall through to fuzzy search
+      }
+    }
+
+    // Fuzzy search fallback (or primary path if input has spaces)
+    try {
+      const res = await fetch('/api/discovery/creator-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: directPlatform, query: raw }),
+      })
+      const data = await res.json()
+      const results = data.results || []
+      if (results.length > 0) {
+        setDirectSuggestions(results)
+        setDirectError(zh
+          ? `未找到精确匹配，以下是相似的创作者：`
+          : `No exact match found. Did you mean one of these?`)
+      } else {
+        setDirectError(zh
+          ? `未找到与 "${raw}" 相关的创作者，请确认用户名和平台是否正确`
+          : `No creators found matching "${raw}" — please check the username and platform`)
+      }
+    } catch {
+      setDirectError(zh ? '查询失败，请重试' : 'Lookup failed, please try again')
+    } finally {
+      setDirectLoading(false)
+    }
+  }
+
+  // When the user picks a suggestion, go straight to the profile detail —
+  // build a minimal creator and open the modal. The modal's own hook fetches
+  // the full enrichment data (and charges the profile_view credit).
+  const handlePickSuggestion = (suggestion: {
+    handle: string; display_name: string | null; avatar_url: string | null; follower_count: number | null; platform: string
+  }) => {
+    setDirectSuggestions([])
+    setDirectError(null)
+    setDirectHandle('')
+    if (!suggestion.handle) {
+      setDirectError(zh ? '该创作者没有有效的用户名' : 'This creator has no valid handle')
+      return
+    }
+    const creator: DiscoveredCreator = {
+      id: `cdb:${suggestion.platform}:${suggestion.handle}`,
+      platform: suggestion.platform,
+      handle: suggestion.handle,
+      display_name: suggestion.display_name || suggestion.handle,
+      bio: null,
+      country: null,
+      follower_count: suggestion.follower_count,
+      engagement_rate: null,
+      niche_tags: [],
+      profile_url: null,
+      avatar_url: suggestion.avatar_url,
+      score: null,
+    }
+    // Defer openDetail to the next tick so the current click event fully
+    // settles before the modal overlay (which closes on backdrop click) renders.
+    setTimeout(() => openDetail(creator), 0)
+  }
 
   const openDetail = (creator: DiscoveredCreator) =>
     openDetailHook(creator, (creatorId, avatarUrl) => {
@@ -2166,6 +2285,99 @@ export default function DiscoverPanel() {
           <p className="text-sm text-gray-700">{d.campaignFirstTip}</p>
         </div>
       )}
+
+      {/* ── Direct creator lookup ── */}
+      <div className="workspace-glass-toolbar rounded-2xl p-5 mb-4 overflow-visible relative z-10">
+        <p className="text-sm text-gray-600 mb-3">
+          {zh
+            ? '如果你已经知道想要查找的创作者，输入用户名直接查看档案'
+            : 'Already know who you\'re looking for? Enter their username to view their profile directly.'}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Platform pills */}
+          {(['instagram', 'tiktok', 'youtube'] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setDirectPlatform(p)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition ${
+                directPlatform === p
+                  ? 'bg-white font-bold shadow-sm ring-1 ring-gray-200'
+                  : 'bg-gray-100/60 font-medium hover:bg-gray-100 opacity-60'
+              }`}
+            >
+              <PlatformLogo platform={p} size={16} />
+              {p === 'instagram' ? 'Instagram' : p === 'tiktok' ? 'TikTok' : 'YouTube'}
+            </button>
+          ))}
+
+          {/* Handle input */}
+          <div className="flex-1 min-w-[200px] relative">
+            <input
+              type="text"
+              value={directHandle}
+              onChange={(e) => { setDirectHandle(e.target.value); setDirectError(null) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleDirectLookup() } }}
+              placeholder={zh ? '输入用户名或链接，例如 @username' : 'Enter handle or profile URL, e.g. @username'}
+              className="w-full px-4 py-2 workspace-glass-control workspace-glass-control-square text-sm focus:outline-none"
+            />
+          </div>
+
+          {/* Lookup button */}
+          <button
+            type="button"
+            onClick={() => handleDirectLookup()}
+            disabled={directLoading || !directHandle.trim()}
+            className="px-5 py-2 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {directLoading ? (
+              <span className="inline-flex items-center gap-2"><Spinner /> {zh ? '查询中...' : 'Looking up...'}</span>
+            ) : (
+              zh ? '查看档案' : 'View Profile'
+            )}
+          </button>
+        </div>
+
+        {/* Credit cost hint */}
+        <p className="mt-2 text-xs text-gray-400">
+          {zh
+            ? `每次查看新创作者档案消耗 ${creditPrices?.profile ?? 4} 积分，重复查看同一创作者免费`
+            : `${creditPrices?.profile ?? 4} credits per new profile view — repeat views of the same creator are free`}
+        </p>
+
+        {/* Error / suggestion message */}
+        {directError && (
+          <p className={`mt-2 text-xs font-medium ${directSuggestions.length > 0 ? 'text-gray-600' : 'text-red-500'}`}>{directError}</p>
+        )}
+
+        {/* Fuzzy search suggestions */}
+        {directSuggestions.length > 0 && (
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {directSuggestions.map((s) => (
+              <button
+                key={s.handle}
+                type="button"
+                onClick={() => handlePickSuggestion(s)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/60 hover:bg-white/90 border border-white/80 text-left transition shadow-sm hover:shadow-md"
+              >
+                {s.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/api/avatar?url=${encodeURIComponent(s.avatar_url)}`} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0 bg-gray-100" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 text-gray-400 text-xs font-bold">
+                    {(s.display_name || s.handle || '?')[0]?.toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{s.display_name || s.handle}</p>
+                  <p className="text-xs text-gray-500 truncate">@{s.handle}{s.follower_count ? ` · ${s.follower_count >= 1_000_000 ? `${(s.follower_count / 1_000_000).toFixed(1)}M` : s.follower_count >= 1_000 ? `${(s.follower_count / 1_000).toFixed(0)}K` : s.follower_count} followers` : ''}</p>
+                </div>
+                <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Search + filters */}
       <form onSubmit={maintenanceMode ? (e) => e.preventDefault() : submit} className={`workspace-glass-toolbar rounded-2xl p-5 mb-6 overflow-visible relative z-10 ${maintenanceMode ? 'opacity-40 pointer-events-none select-none' : ''}`}>

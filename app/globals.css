@@ -978,16 +978,13 @@ main > .page-enter-animation:has(.ai-assistant-page) {
   }
 }
 
-/* ── Page transition animation ── */
+/* ── Page transition animation ──
+   Opacity-only so the wrapper never holds a residual `transform`, which
+   would create a containing block and break `position: fixed` modals
+   rendered inside page content (e.g. CreatorDetailModal). */
 @keyframes page-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .page-enter-animation {

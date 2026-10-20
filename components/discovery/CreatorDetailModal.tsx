@@ -362,6 +362,7 @@ export function useCreatorDetail(): UseCreatorDetailResult {
     onAvatarUpdate?: (creatorId: string, avatarUrl: string) => void,
   ) => {
     if (!creator.handle) return
+    openedAtRef.current = Date.now()
     setDetailFor(creator)
     setDetailError(null)
     setDetailBlocked(false)
@@ -409,7 +410,12 @@ export function useCreatorDetail(): UseCreatorDetailResult {
     }
   }
 
+  const openedAtRef = useRef(0)
+
   const closeDetail = () => {
+    // Guard: ignore close attempts within 500ms of opening (prevents
+    // stray click events from immediately dismissing the modal).
+    if (Date.now() - openedAtRef.current < 500) return
     setDetailFor(null)
     setDetail(null)
     setDetailError(null)
