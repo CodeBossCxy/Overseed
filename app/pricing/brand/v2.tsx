@@ -127,12 +127,6 @@ export default function BrandPricingBetaPage() {
       hint: zh ? '主页 + 触达，同一达人只收一次' : 'profile + outreach, charged once per creator',
       price: prices.profile_view,
     },
-    {
-      icon: ICONS.chart,
-      label: m.creditFeatureAnalytics || 'Advanced Analytics',
-      hint: null,
-      price: prices.analytics,
-    },
   ]
 
   const aiFeatures = [

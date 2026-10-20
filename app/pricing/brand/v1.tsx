@@ -66,7 +66,7 @@ const EQUIV_LABEL_KEY: Record<string, string> = {
 }
 
 // Features in CREATOR DATABASE section
-const CREATOR_DB_FEATURES = ['discovery_search', 'profile_view', 'analytics'] as const
+const CREATOR_DB_FEATURES = ['discovery_search', 'profile_view'] as const
 // Features in AI FEATURES section
 const AI_FEATURES = ['chat_standard', 'chat_advanced', 'image'] as const
 
@@ -597,18 +597,6 @@ export default function MyPlanPage() {
                 </div>
                 <span className="text-base font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
                   {prices['profile_view'] ?? '—'} {m.creditsUnit}
-                </span>
-              </HoverNoteRow>
-              <HoverNoteRow note={mm.analyticsCostNote} className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5 gap-4">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="min-w-0">
-                    <p className="text-base text-gray-700">{m.creditCostAnalytics.split(' — ')[0]}</p>
-                    <p className="text-sm text-gray-400">{mm.perCreatorUnit}</p>
-                  </div>
-                  <InfoIcon />
-                </div>
-                <span className="text-base font-bold text-gray-900 whitespace-nowrap flex-shrink-0">
-                  {prices['analytics'] ?? '—'} {m.creditsUnit}
                 </span>
               </HoverNoteRow>
             </div>
