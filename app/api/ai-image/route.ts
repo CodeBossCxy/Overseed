@@ -69,22 +69,51 @@ export async function POST(req: Request) {
 
   try {
     const client = new OpenAI({ apiKey })
-    const imageDirections = {
-      main: 'Create a polished product hero image with a clear focal point and clean composition.',
-      detail: 'Create a product detail image highlighting materials, construction, and important features.',
-      ad: 'Create an engaging advertising visual with a strong product focus and space for campaign messaging.',
-    }
-    const languageNames = { en: 'English', zh: 'Chinese', es: 'Spanish', fr: 'French', de: 'German', ja: 'Japanese' }
+    // Professional e-commerce image generation system prompt
+    const systemPrompt = `Create a premium e-commerce product image based on the uploaded reference images.
+
+The real product photos are the source of truth for the product's appearance, structure, proportions, colors, and details. Any rendered or styled reference images should only guide composition, lighting, mood, and photographic style.
+
+Generate an image suitable for e-commerce use with realistic product fidelity, clean composition, professional lighting, refined texture rendering, and strong commercial appeal.
+
+Preserve the actual product design. Do not invent or add details that are not present in the real product. Do not add engraved logos, brand marks, extra gemstones, extra accessories, or altered structures unless explicitly requested.
+
+Follow the requested image purpose, style, and composition direction. Output a standalone image only, not a collage or multi-panel image.
+
+Make sure the final result matches the requested aspect ratio and is visually suitable for online retail use.`
+
+    const imageTypeSuffix = imageType === 'main'
+      ? 'This image should function as a strong product hero image for e-commerce listing.'
+      : 'This image should function as a product detail image for e-commerce, focusing on presentation, styling, usage context, or product detail as appropriate.'
+
+    const languageNames: Record<string, string> = { en: 'English', zh: 'Chinese', es: 'Spanish', fr: 'French', de: 'German', ja: 'Japanese' }
+    const languageDirective = language === 'none'
+      ? 'Do not add any text, lettering, or captions.'
+      : `Any text you add must be in ${languageNames[language]}.`
+
     const generationPrompt = [
-      imageDirections[imageType],
-      prompt,
-      language === 'none' ? 'Do not add any text, lettering, or captions.' : `Any text you add must be in ${languageNames[language]}.`,
-      ...(productImages.length ? ['Use the supplied product photos as references. Preserve the product identity, shape, colors, and details.'] : []),
+      systemPrompt,
+      `Image type: ${imageType === 'main' ? 'main_image' : 'detail_image'}`,
+      `Language mode: ${language === 'none' ? 'text-free' : languageNames[language] || language}`,
+      `User requirements: ${prompt}`,
+      imageTypeSuffix,
+      languageDirective,
     ].join('\n\n')
+    // Map requested sizes to OpenAI-supported sizes
+    // 4:5 (1024x1280) → closest is 1024x1536 (portrait)
+    // 16:9 HD (1280x720) → closest is 1536x1024 (landscape)
+    const SIZE_MAP: Record<string, string> = {
+      '1024x1024': '1024x1024',
+      '1024x1536': '1024x1536',
+      '1536x1024': '1536x1024',
+      '1024x1280': '1024x1536',
+      '1280x720': '1536x1024',
+    }
+    const apiSize = SIZE_MAP[size] || 'auto'
     const options = {
       model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2',
       prompt: generationPrompt,
-      size,
+      size: apiSize as any,
       quality,
       n: count,
     }

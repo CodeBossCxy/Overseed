@@ -148,8 +148,8 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
           </section>
 
           <section className="space-y-5 rounded-2xl border border-white/70 bg-white/35 p-4">
-            <div role="group" aria-label={studio.imageType} className="grid grid-cols-3 gap-1.5">
-              {(['main', 'detail', 'ad'] as const).map(type => (
+            <div role="group" aria-label={studio.imageType} className="grid grid-cols-2 gap-1.5">
+              {(['main', 'detail'] as const).map(type => (
                 <button key={type} type="button" aria-pressed={imageType === type} onClick={() => setImageType(type)} className={`whitespace-nowrap rounded-xl px-1.5 py-2 text-[11px] font-semibold transition ${imageType === type ? 'bg-primary-600 text-white shadow-sm' : 'border border-white/70 bg-white/40 text-gray-600 hover:bg-white/80'}`}>{studio.types[type]}</button>
               ))}
             </div>
@@ -177,7 +177,7 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
               </div>
               <label className="min-w-0 text-xs font-medium text-gray-500" htmlFor="image-size">{studio.ratio}
                 <select id="image-size" value={size} onChange={event => setSize(event.target.value as ImageRequest['size'])} className={controlClass}>
-                  <option value="1024x1024">{studio.square}</option><option value="1024x1536">{studio.portrait}</option><option value="1536x1024">{studio.landscape}</option>
+                  <option value="1024x1024">1:1 {studio.square}</option><option value="1024x1536">3:4 {studio.portrait}</option><option value="1024x1280">4:5</option><option value="1536x1024">16:9 {studio.landscape}</option><option value="1280x720">16:9 HD</option>
                 </select>
               </label>
               <label className="min-w-0 text-xs font-medium text-gray-500" htmlFor="image-quality">{studio.quality}
@@ -187,7 +187,7 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
               </label>
               <label className="min-w-0 text-xs font-medium text-gray-500" htmlFor="image-count">{studio.quantity}
                 <select id="image-count" value={count} onChange={event => setCount(Number(event.target.value))} className={controlClass}>
-                  {[1, 2, 4].map(amount => <option key={amount} value={amount}>{amount} {studio.imagesUnit}</option>)}
+                  {[1, 2, 4, 6].map(amount => <option key={amount} value={amount}>{amount} {studio.imagesUnit}</option>)}
                 </select>
               </label>
             </div>
