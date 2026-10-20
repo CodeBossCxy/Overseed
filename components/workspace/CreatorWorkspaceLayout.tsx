@@ -5,5 +5,5 @@ import WorkspaceLayout from './WorkspaceLayout'
 
 export default function CreatorWorkspaceLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  return <WorkspaceLayout role="creator"><div key={pathname} className="page-enter-animation">{children}</div></WorkspaceLayout>
+  return <WorkspaceLayout role="creator"><div key={pathname} className="page-enter-animation flex flex-col min-h-full">{children}</div></WorkspaceLayout>
 }

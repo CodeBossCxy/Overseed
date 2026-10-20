@@ -356,10 +356,10 @@ export default function WorkspaceLayout({
   )
 
   return (
-    <div className="app-layout ws-themed-bg">
-      <div className="flex max-w-[1500px] mx-auto w-full h-full">
-        {/* Desktop sidebar */}
-        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 py-4 pl-4">
+    <div className="min-h-screen ws-themed-bg">
+      <div className="flex min-h-screen max-w-[1500px] mx-auto">
+        {/* Desktop sidebar — viewport-height sticky so it stays put while content scrolls */}
+        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 py-4 pl-4 sticky top-0 h-screen self-start">
           <div className="flex flex-col flex-1 min-h-0 rounded-3xl bg-white/55 backdrop-blur border border-white/70 shadow-sm py-4">
             {sidebarContent}
           </div>
@@ -376,7 +376,7 @@ export default function WorkspaceLayout({
         )}
 
         {/* Content */}
-        <div className="main-content relative">
+        <div className="relative flex-1 min-w-0 flex flex-col">
           <div
             className={`pointer-events-none absolute left-4 right-4 top-0 z-30 h-0.5 overflow-hidden rounded-full bg-white/40 transition-opacity duration-150 sm:left-8 sm:right-8 pointer-events-none ${
               isNavigating ? 'opacity-100' : 'opacity-0'
@@ -473,7 +473,7 @@ export default function WorkspaceLayout({
           </div>
 
           <main
-            className="flex-1 min-h-0 px-4 sm:px-8 pb-10 overflow-y-auto"
+            className="flex-1 px-4 sm:px-8 pb-10"
             aria-busy={isNavigating}
           >
             {children}

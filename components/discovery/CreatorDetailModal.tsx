@@ -497,6 +497,21 @@ export default function CreatorDetailModal({
 }: CreatorDetailModalProps) {
   const igGradId = useId()
 
+  // Lock body scroll while the modal is open — use overflow:hidden instead
+  // of position:fixed to avoid shifting the coordinate system for the
+  // fixed-positioned overlay.
+  useEffect(() => {
+    const html = document.documentElement
+    const scrollbarWidth = window.innerWidth - html.clientWidth
+    html.style.overflow = 'hidden'
+    // Compensate for scrollbar disappearing to prevent layout shift
+    html.style.paddingRight = `${scrollbarWidth}px`
+    return () => {
+      html.style.overflow = ''
+      html.style.paddingRight = ''
+    }
+  }, [])
+
   const PlatformLogo = ({ platform, size = 20 }: { platform: string; size?: number }) => {
     switch (platform) {
       case 'instagram':
@@ -575,7 +590,7 @@ export default function CreatorDetailModal({
       {/* TEMP: influencers.club creator detail popup */}
       <div
         data-solid
-        className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
         onClick={closeDetail}
       >
         <div

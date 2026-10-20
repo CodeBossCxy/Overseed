@@ -554,35 +554,19 @@ select {
   letter-spacing: -0.025em;
 }
 
-/* ── Flex-based full-height layout system ──
-   Uses 100dvh so mobile browser chrome doesn't push content off-screen.
-   Every layer is a flex container with min-height:0 / overflow:hidden so
-   only the two leaf scroll-areas (.conversation-list, .chat-messages)
-   actually scroll — nothing else. */
+/* ── AI Assistant full-height layout ──
+   The AI assistant page opts into a viewport-locked flex layout so only
+   the conversation list and chat messages scroll — nothing else.
+   Other workspace pages keep normal document-flow scrolling. */
 
-/* Application shell — outermost viewport wrapper */
-.app-layout {
-  height: 100dvh;
-  display: flex;
-  overflow: hidden;
-}
-
-/* Main page area (content column beside the nav sidebar) */
-.main-content {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* AI Assistant page — fills main-content below the top bar.
-   Horizontal padding comes from <main>; top/bottom padding gives
-   breathing room around the header and below the workspace. */
+/* AI Assistant page — locks to remaining viewport height.
+   The sidebar is h-screen sticky, so the content column beside it can
+   also be constrained to viewport height for the chat layout.
+   flex:1 fills the column; max-height prevents it from pushing beyond
+   the viewport (the parent column is min-h-screen, not h-screen). */
 .ai-assistant-page {
   flex: 1;
-  min-height: 0;
+  max-height: calc(100dvh - 4.5rem); /* viewport minus top bar */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -621,6 +605,7 @@ select {
 .chat-panel {
   flex: 1;
   min-height: 0;
+  display: flex;
   flex-direction: column;
 }
 
@@ -636,14 +621,9 @@ select {
   flex-shrink: 0;
 }
 
-/* When <main> contains the AI assistant, it becomes a flex column that
-   fills the remaining height instead of scrolling on its own.
-   !important overrides Tailwind utility classes on the <main> element. */
+/* When <main> contains the AI assistant, strip its bottom padding so
+   the page's own padding-bottom controls the gap. */
 main:has(.ai-assistant-page) {
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
-  padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
 

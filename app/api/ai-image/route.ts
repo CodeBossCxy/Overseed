@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import OpenAI, { toFile } from 'openai'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { getEffectiveTier, isUserVerified } from '@/lib/subscription'
 import { CREDIT_COSTS, deductCredits, refundDeduction } from '@/lib/credits'
 import { uploadFile } from '@/lib/upload'
@@ -122,7 +123,29 @@ Make sure the final result matches the requested aspect ratio and is visually su
       : await client.images.generate(options)
     if (result.data?.length !== count || result.data.some(image => !image.b64_json)) throw new Error('Incomplete image results returned')
     const urls = await Promise.all(result.data.map(image => uploadFile(Buffer.from(image.b64_json!, 'base64'), 'generated.png', 'image/png', 'ai_generated/')))
-    return NextResponse.json({ url: urls[0], urls })
+    // Save generated images to a session — let errors propagate so the
+    // client knows the save failed (images are still returned via `urls`).
+    let sessionId: string | null = null
+    const title = prompt.length > 60 ? prompt.slice(0, 57) + '...' : prompt
+    try {
+      const session = await prisma.aiImageSession.create({
+        data: { userId, title, prompt, imageType, language, size, quality },
+      })
+      sessionId = session.id
+      await Promise.all(
+        urls.map(url =>
+          prisma.aiGeneratedImage.create({
+            data: { userId, sessionId: session.id, url, prompt, imageType, language, size, quality },
+          })
+        )
+      )
+    } catch (err) {
+      console.error('Failed to save image session:', err)
+      // Still return the generated images so the user isn't blocked, but
+      // surface the persistence failure so it can be diagnosed.
+      return NextResponse.json({ url: urls[0], urls, sessionId, saveError: 'Image history could not be saved' })
+    }
+    return NextResponse.json({ url: urls[0], urls, sessionId })
   } catch (error: any) {
     try {
       if (CREDIT_SYSTEM_ENABLED) await walletRefund(userId, creditRef)
