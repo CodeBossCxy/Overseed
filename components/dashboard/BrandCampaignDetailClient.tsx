@@ -976,23 +976,20 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               </span>
             </label>
             <div className="flex items-center gap-1.5">
-              {minFollowers === 'custom' ? (
+              {minFollowers === 'custom' || (minFollowers && !['' ,'1000','5000','10000','25000','50000','100000','250000','500000','1000000'].includes(minFollowers)) ? (
                 <input
                   type="number"
                   min={0}
                   placeholder={zh ? '最少粉丝' : 'Min followers'}
-                  autoFocus
-                  onBlur={(e) => {
-                    const v = e.target.value.trim()
-                    setMinFollowers(v && Number(v) > 0 ? v : '')
+                  autoFocus={minFollowers === 'custom'}
+                  value={minFollowers === 'custom' ? '' : minFollowers}
+                  onChange={(e) => {
+                    setMinFollowers(e.target.value)
                     setFollowerTierMode('custom')
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const v = (e.target as HTMLInputElement).value.trim()
-                      setMinFollowers(v && Number(v) > 0 ? v : '')
-                      setFollowerTierMode('custom')
-                    }
+                  onBlur={(e) => {
+                    const v = e.target.value.trim()
+                    if (!v || Number(v) <= 0) setMinFollowers('')
                   }}
                   className={`flex-1 ${inputCls}`}
                 />
@@ -1010,23 +1007,20 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 </select>
               )}
               <span className="text-gray-400 font-medium text-sm">–</span>
-              {maxFollowers === 'custom' ? (
+              {maxFollowers === 'custom' || (maxFollowers && !['','5000','10000','25000','50000','100000','250000','500000','1000000','5000000','10000000'].includes(maxFollowers)) ? (
                 <input
                   type="number"
                   min={0}
                   placeholder={zh ? '最多粉丝' : 'Max followers'}
-                  autoFocus
-                  onBlur={(e) => {
-                    const v = e.target.value.trim()
-                    setMaxFollowers(v && Number(v) > 0 ? v : '')
+                  autoFocus={maxFollowers === 'custom'}
+                  value={maxFollowers === 'custom' ? '' : maxFollowers}
+                  onChange={(e) => {
+                    setMaxFollowers(e.target.value)
                     setFollowerTierMode('custom')
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const v = (e.target as HTMLInputElement).value.trim()
-                      setMaxFollowers(v && Number(v) > 0 ? v : '')
-                      setFollowerTierMode('custom')
-                    }
+                  onBlur={(e) => {
+                    const v = e.target.value.trim()
+                    if (!v || Number(v) <= 0) setMaxFollowers('')
                   }}
                   className={`flex-1 ${inputCls}`}
                 />

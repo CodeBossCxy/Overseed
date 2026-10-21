@@ -5490,7 +5490,7 @@ export const translations = {
       createCampaignTitle: '创建活动',
       createCampaignDesc: '发起新活动，寻找并与创作者合作推广您的品牌。',
       discoverTitle: '寻找创作者',
-      discoverDesc: '在 TikTok、Instagram 和 YouTube 上搜索百万创作者，支持 AI 智能匹配。',
+      discoverDesc: '在 TikTok、Instagram 和 YouTube 上搜索上亿创作者，支持 AI 智能匹配。',
       aiAssistantTitle: 'AI 助手',
       aiAssistantDesc: '与 AI 对话，获取营销策略、文案创意、市场洞察和图片生成。',
       messagesTitle: '消息',

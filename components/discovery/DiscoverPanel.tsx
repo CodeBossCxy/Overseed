@@ -3266,37 +3266,50 @@ export default function DiscoverPanel() {
                 </span>
               </div>
             )}
-            {/* Multi-select toolbar */}
-            {creators.length > 0 && (
-              <div className="flex items-center justify-between mb-3 px-1">
+            {/* Selection banner — shows when creators are selected */}
+            {selectedCreators.size > 0 && (
+              <div className="flex items-center justify-between mb-3 px-4 py-2.5 rounded-2xl bg-white/50 backdrop-blur border border-white/70 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={selectedCreators.size > 0 && selectedCreators.size === creators.filter(c => c.handle).length}
-                      onChange={(e) => e.target.checked ? selectAllCreators() : deselectAllCreators()}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    {zh ? '全选' : 'Select all'}
-                  </label>
-                  {selectedCreators.size > 0 && (
-                    <span className="text-sm font-medium text-primary-600">
-                      {selectedCreators.size} {zh ? '已选' : 'selected'}
-                    </span>
-                  )}
+                  <span className="text-sm text-gray-700">
+                    {zh
+                      ? `已选择 ${selectedCreators.size} 位达人 · 可进行批量联系`
+                      : `${selectedCreators.size} creator${selectedCreators.size > 1 ? 's' : ''} selected — ready for bulk outreach`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={deselectAllCreators}
+                    className="text-xs text-gray-400 hover:text-gray-600 transition"
+                  >
+                    {zh ? '清除' : 'Clear'}
+                  </button>
                 </div>
-                {selectedCreators.size > 0 && (
+                <div className="flex items-center gap-3">
+                  {/* Avatar stack */}
+                  <div className="flex items-center -space-x-2">
+                    {getSelectedCreatorObjects().slice(0, 3).map((c) => (
+                      <div key={c.id} className="w-7 h-7 rounded-full border-2 border-white overflow-hidden bg-gray-100 flex-shrink-0">
+                        <CreatorAvatar url={c.avatar_url} name={c.display_name || c.handle || '?'} textSize="text-[10px]" />
+                      </div>
+                    ))}
+                  </div>
+                  <span className="text-xs font-medium text-gray-500">
+                    {zh ? `已选择 ${selectedCreators.size} 位达人` : `${selectedCreators.size} selected`}
+                  </span>
+                  {/* Bulk outreach button */}
                   <button
                     type="button"
                     onClick={openBulkOutreach}
-                    className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-full text-sm font-semibold hover:opacity-90 transition shadow-sm"
+                    className="inline-flex items-center gap-2 px-5 py-2 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition shadow-sm"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                     </svg>
-                    {zh ? `向 ${selectedCreators.size} 位达人发送外联` : `Send outreach to ${selectedCreators.size}`}
+                    {zh ? `批量联系` : `Bulk Contact`}
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+                    </svg>
                   </button>
-                )}
+                </div>
               </div>
             )}
             <div
@@ -3315,16 +3328,8 @@ export default function DiscoverPanel() {
                   key={`${searchTaskId ?? activeSearch?.params ?? 'browse'}:${searchPage}:${creator.id}:${creatorIndex}`}
                   className={`workspace-glass-card rounded-2xl p-5 transition-colors ${isCreatorSelected(creator) ? 'ring-2 ring-primary-400 bg-primary-50/30' : ''}`}
                 >
-                  {/* Top section: checkbox + avatar + info + platform link */}
+                  {/* Top section: avatar + info + platform link */}
                   <div className="flex gap-4">
-                    <label className="flex items-start pt-2 cursor-pointer flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={isCreatorSelected(creator)}
-                        onChange={() => toggleSelectCreator(creator)}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                    </label>
                     {/* Avatar with gradient ring */}
                     <div className="flex-shrink-0">
                       <div className="w-[80px] h-[80px] rounded-full p-[3px] bg-gradient-to-br from-yellow-400 via-pink-500 to-purple-600">
@@ -3511,13 +3516,28 @@ export default function DiscoverPanel() {
                       ) : null}
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); openContact(creator) }}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 border border-indigo-200 text-indigo-600 rounded-full text-xs font-semibold hover:bg-indigo-50 transition"
+                        onClick={(e) => { e.stopPropagation(); toggleSelectCreator(creator) }}
+                        className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition ${
+                          isCreatorSelected(creator)
+                            ? 'bg-primary-50 border border-primary-300 text-primary-700'
+                            : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                        }`}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                        </svg>
-                        {zh ? '联系' : 'Contact'}
+                        {isCreatorSelected(creator) ? (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                            {zh ? '已加入待联系' : 'Added to outreach'}
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            {zh ? '联系' : 'Contact'}
+                          </>
+                        )}
                       </button>
                       <button
                         type="button"

@@ -16,9 +16,9 @@ const dmSerifDisplay = DM_Serif_Display({
   variable: '--font-display',
 })
 const notoSansSC = Noto_Sans_SC({
-  subsets: ['latin'],
   weight: ['300', '400', '500', '700', '900'],
   variable: '--font-noto-sans-sc',
+  preload: false,
 })
 const manrope = Manrope({
   subsets: ['latin'],

@@ -27,6 +27,34 @@ interface ProductImage {
   preview: string
 }
 
+// Persist generation state across navigation so the user sees a "still generating"
+// indicator when returning to the page mid-generation.
+const GENERATING_KEY = 'overseed:image-generating'
+
+function markGenerating(sessionCount: number) {
+  try {
+    sessionStorage.setItem(GENERATING_KEY, JSON.stringify({ at: Date.now(), sessionCount }))
+  } catch {}
+}
+
+function clearGenerating() {
+  try { sessionStorage.removeItem(GENERATING_KEY) } catch {}
+}
+
+function getGeneratingState(): { at: number; sessionCount: number } | null {
+  try {
+    const raw = sessionStorage.getItem(GENERATING_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    // Expire after 10 minutes
+    if (Date.now() - parsed.at > 10 * 60 * 1000) {
+      sessionStorage.removeItem(GENERATING_KEY)
+      return null
+    }
+    return parsed
+  } catch { return null }
+}
+
 function Sparkles({ className = 'w-5 h-5' }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24" aria-hidden="true">
@@ -35,7 +63,7 @@ function Sparkles({ className = 'w-5 h-5' }: { className?: string }) {
   )
 }
 
-export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean }) {
+export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange }: { isProUser: boolean; activeTab?: 'chat' | 'image'; onTabChange?: (tab: 'chat' | 'image') => void }) {
   const { t, locale } = useLanguage()
   const zh = locale === 'zh'
   const ai = t.aiAssistant
@@ -78,6 +106,63 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
     if (!isProUser || sessionsLoaded) return
     loadSessions()
   }, [isProUser, sessionsLoaded, loadSessions])
+
+  // Detect in-progress generation after remount (user navigated away and back)
+  useEffect(() => {
+    if (!isProUser || !sessionsLoaded || busy) return
+    const gen = getGeneratingState()
+    if (!gen) return
+
+    // If sessions grew since we started generating, the generation completed
+    if (sessions.length > gen.sessionCount) {
+      clearGenerating()
+      return
+    }
+
+    // Otherwise, show busy state and poll until new session appears
+    setBusy(true)
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/ai-image/history')
+        if (!res.ok) return
+        const data = await res.json()
+        const newSessions: SessionSummary[] = data.sessions || []
+        if (newSessions.length > gen.sessionCount) {
+          // Generation completed — load the newest session
+          setSessions(newSessions)
+          clearGenerating()
+          setBusy(false)
+          const newest = newSessions[0]
+          if (newest) {
+            setActiveSessionId(newest.id)
+            // Load its images
+            const sRes = await fetch(`/api/ai-image/history?sessionId=${newest.id}`)
+            if (sRes.ok) {
+              const sData = await sRes.json()
+              if (sData.session?.images) {
+                setImages(sData.session.images.map((i: any) => ({ id: i.id, url: i.url, prompt: i.prompt })))
+              }
+            }
+          }
+          clearInterval(interval)
+          window.dispatchEvent(new Event('credits:refresh'))
+        }
+      } catch {}
+    }, 5000) // Poll every 5 seconds
+
+    // Also check if the generating flag expired
+    const timeout = setTimeout(() => {
+      clearInterval(interval)
+      clearGenerating()
+      setBusy(false)
+    }, 10 * 60 * 1000) // 10 minute max
+
+    return () => {
+      clearInterval(interval)
+      clearTimeout(timeout)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isProUser, sessionsLoaded])
 
   const loadSession = async (sessionId: string) => {
     try {
@@ -161,6 +246,7 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
     setBusy(true)
     setError(null)
     setInsufficientCredits(false)
+    markGenerating(sessions.length)
     const submittedPrompt = prompt.trim()
     try {
       const form = new FormData()
@@ -187,8 +273,10 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
         setActiveSessionId(data.sessionId)
         loadSessions() // Refresh session list
       }
+      clearGenerating()
     } catch (err) {
       setError(err instanceof Error ? err.message : ai.imageFailed)
+      clearGenerating()
     } finally {
       setBusy(false)
       window.dispatchEvent(new Event('credits:refresh'))
@@ -211,16 +299,26 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
       {/* Session history sidebar */}
       {isProUser && sidebarOpen && (
         <div className="hidden md:flex w-[220px] flex-shrink-0 flex-col border-r border-white/60 bg-white/15 min-h-0">
-          <div className="p-3 flex-shrink-0">
+          <div className="h-14 px-3 flex-shrink-0 flex items-center gap-2">
             <button
               type="button"
               onClick={startNewSession}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl text-xs font-semibold hover:from-primary-700 hover:to-primary-600 transition shadow-sm"
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl text-xs font-semibold hover:from-primary-700 hover:to-primary-600 transition shadow-sm"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               {zh ? '新建生成' : 'New Generation'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/70 transition text-gray-400 flex-shrink-0"
+              aria-label={zh ? '收起侧栏' : 'Collapse sidebar'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3">
@@ -269,15 +367,15 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
 
       {/* Settings panel */}
       <aside aria-label={studio.settings} className="flex w-full flex-shrink-0 flex-col border-b border-white/60 bg-white/20 md:min-h-0 md:w-[300px] md:border-b-0 md:border-r lg:w-[320px]">
+        <div className="h-14 flex items-center justify-between px-4 border-b border-white/55 bg-white/25 flex-shrink-0">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-gray-900">{studio.productImages}</h2>
+            <p className="text-xs text-gray-500">{studio.uploadSubtitle}</p>
+          </div>
+          <span className="text-xs text-gray-500 tabular-nums flex-shrink-0">{products.length}/{MAX_PRODUCT_IMAGES}</span>
+        </div>
         <fieldset disabled={disabled} className="min-w-0 space-y-4 p-4 md:min-h-0 md:flex-1 md:overflow-y-auto">
           <section className="rounded-2xl border border-white/70 bg-white/35 p-4">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-gray-900">{studio.productImages}</h2>
-                <p className="mt-1 text-xs text-gray-500">{studio.uploadSubtitle}</p>
-              </div>
-              <span className="text-xs text-gray-500 tabular-nums">{products.length}/{MAX_PRODUCT_IMAGES}</span>
-            </div>
             <input ref={fileInputRef} id="product-images" type="file" aria-label={studio.productImages} accept={PRODUCT_IMAGE_TYPES.join(',')} multiple className="sr-only" onChange={event => { addProducts(Array.from(event.target.files || [])); event.target.value = '' }} />
             <button
               type="button"
@@ -330,26 +428,39 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
                 <option value="en">English</option><option value="zh">中文</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="ja">日本語</option>
               </select>
             </label>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               <div className="min-w-0">
-                <p className="text-xs font-medium text-gray-500">{studio.model}</p>
-                <div className="mt-2 flex min-h-[42px] items-center gap-2 rounded-xl border border-white/70 bg-white/35 px-3 text-xs font-medium text-gray-700"><Sparkles className="h-4 w-4 flex-shrink-0 text-primary-500" />Overseed AI</div>
+                <p className="text-xs font-medium text-gray-500 mb-1.5">{studio.model}</p>
+                <div className="flex h-[42px] items-center gap-2 rounded-xl border border-white/70 bg-white/35 px-3 text-xs font-medium text-gray-700"><Sparkles className="h-4 w-4 flex-shrink-0 text-primary-500" />Overseed AI</div>
               </div>
-              <label className="min-w-0 text-xs font-medium text-gray-500" htmlFor="image-size">{studio.ratio}
-                <select id="image-size" value={size} onChange={event => setSize(event.target.value as ImageRequest['size'])} className={controlClass}>
-                  <option value="1024x1024">1:1 {studio.square}</option><option value="1024x1536">3:4 {studio.portrait}</option><option value="1024x1280">4:5</option><option value="1536x1024">16:9 {studio.landscape}</option><option value="1280x720">16:9 HD</option>
+              <div className="min-w-0">
+                <label className="text-xs font-medium text-gray-500 mb-1.5 block" htmlFor="image-size">{studio.ratio}</label>
+                <select id="image-size" value={size} onChange={event => setSize(event.target.value as ImageRequest['size'])} className={`${controlClass} !mt-0 h-[42px]`}>
+                  <option value="1024x1024">{zh ? '1:1 正方形' : '1:1 Square'}</option>
+                  <option value="683x1024">{zh ? '2:3 竖版' : '2:3 Portrait'}</option>
+                  <option value="1024x683">{zh ? '3:2 横版' : '3:2 Landscape'}</option>
+                  <option value="768x1024">{zh ? '3:4 竖版' : '3:4 Portrait'}</option>
+                  <option value="1024x768">{zh ? '4:3 横版' : '4:3 Landscape'}</option>
+                  <option value="820x1024">{zh ? '4:5 竖版' : '4:5 Portrait'}</option>
+                  <option value="1024x820">{zh ? '5:4 横版' : '5:4 Landscape'}</option>
+                  <option value="576x1024">{zh ? '9:16 手机竖屏' : '9:16 Mobile'}</option>
+                  <option value="1024x576">{zh ? '16:9 宽屏' : '16:9 Widescreen'}</option>
+                  <option value="1024x439">{zh ? '21:9 超宽屏' : '21:9 Ultra-wide'}</option>
+                  <option value="1024x256">{zh ? '4:1 超宽横版' : '4:1 Banner'}</option>
                 </select>
-              </label>
-              <label className="min-w-0 text-xs font-medium text-gray-500" htmlFor="image-quality">{studio.quality}
-                <select id="image-quality" value={quality} onChange={event => setQuality(event.target.value as ImageRequest['quality'])} className={controlClass}>
+              </div>
+              <div className="min-w-0">
+                <label className="text-xs font-medium text-gray-500 mb-1.5 block" htmlFor="image-quality">{studio.quality}</label>
+                <select id="image-quality" value={quality} onChange={event => setQuality(event.target.value as ImageRequest['quality'])} className={`${controlClass} !mt-0 h-[42px]`}>
                   <option value="low">{studio.draft}</option><option value="medium">{studio.standard}</option><option value="high">{studio.high}</option>
                 </select>
-              </label>
-              <label className="min-w-0 text-xs font-medium text-gray-500" htmlFor="image-count">{studio.quantity}
-                <select id="image-count" value={count} onChange={event => setCount(Number(event.target.value))} className={controlClass}>
+              </div>
+              <div className="min-w-0">
+                <label className="text-xs font-medium text-gray-500 mb-1.5 block" htmlFor="image-count">{studio.quantity}</label>
+                <select id="image-count" value={count} onChange={event => setCount(Number(event.target.value))} className={`${controlClass} !mt-0 h-[42px]`}>
                   {[1, 2, 4, 6].map(amount => <option key={amount} value={amount}>{amount} {studio.imagesUnit}</option>)}
                 </select>
-              </label>
+              </div>
             </div>
           </section>
         </fieldset>
@@ -364,20 +475,54 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
 
       {/* Results panel */}
       <section aria-label={studio.results} aria-busy={busy} className="flex min-h-[360px] min-w-0 flex-1 flex-shrink-0 flex-col bg-white/10 md:min-h-0">
-        <div className="flex flex-shrink-0 items-center gap-3 border-b border-white/55 bg-white/25 px-5 py-4">
+        <div className="h-14 flex flex-shrink-0 items-center gap-3 border-b border-white/55 bg-white/25 px-5">
           {/* Toggle sidebar button (desktop only) */}
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? 'M11 19l-7-7 7-7m8 14l-7-7 7-7' : 'M13 5l7 7-7 7M5 5l7 7-7 7'} />
-            </svg>
-          </button>
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-100/60 text-primary-600"><Sparkles /></span>
-          <div><h2 className="text-sm font-semibold text-gray-900">{studio.results}</h2><p className="mt-0.5 text-xs text-gray-500">{studio.resultsSubtitle}</p></div>
-          {images.length > 0 && <span className="ml-auto rounded-full border border-white/70 bg-white/50 px-2.5 py-1 text-xs text-gray-500">{images.length}</span>}
+          {!sidebarOpen && (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="hidden md:flex h-8 w-8 items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          )}
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-100/60 text-primary-600"><Sparkles className="w-4 h-4" /></span>
+          <div className="flex-1 min-w-0"><h2 className="text-sm font-semibold text-gray-900">{studio.results}</h2><p className="mt-0.5 text-xs text-gray-500">{studio.resultsSubtitle}</p></div>
+          {images.length > 0 && <span className="rounded-full border border-white/70 bg-white/50 px-2.5 py-1 text-xs text-gray-500">{images.length}</span>}
+          {onTabChange && (
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60 ml-2">
+              <button
+                type="button"
+                onClick={() => onTabChange('chat')}
+                className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+                  activeTab === 'chat'
+                    ? 'bg-white shadow-sm text-gray-900 font-bold'
+                    : 'text-gray-500 font-medium hover:text-gray-700'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                {zh ? '聊天' : 'Chat'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onTabChange('image')}
+                className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+                  activeTab === 'image'
+                    ? 'bg-white shadow-sm text-gray-900 font-bold'
+                    : 'text-gray-500 font-medium hover:text-gray-700'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
+                </svg>
+                {zh ? '图片生成' : 'Image Generation'}
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5" aria-live="polite">
           {images.length === 0 && !busy ? (
@@ -388,7 +533,23 @@ export default function ImageGenerationPanel({ isProUser }: { isProUser: boolean
             </div>
           ) : (
             <div className="mx-auto w-full max-w-3xl space-y-4">
-              {busy && <div role="status" className="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/40 p-5 text-sm text-gray-500"><Sparkles className="h-5 w-5 animate-pulse text-primary-500" />{ai.generatingImage}</div>}
+              {busy && (
+                <div role="status" className="rounded-2xl border border-primary-200/50 bg-gradient-to-r from-primary-50/60 to-white p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="relative">
+                      <Sparkles className="h-6 w-6 text-primary-500 animate-pulse" />
+                      <span className="absolute inset-0 rounded-full animate-ping bg-primary-400/20" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{zh ? '正在生成图片...' : 'Generating images...'}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{zh ? '这可能需要几分钟，您可以浏览其他页面' : 'This may take a few minutes. You can browse other pages.'}</p>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-gray-200/70 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-primary-400 to-primary-600 rounded-full animate-[indeterminate_2s_ease-in-out_infinite]" style={{ width: '40%' }} />
+                  </div>
+                </div>
+              )}
               {images.map(image => (
                 <article key={image.id} className="overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-sm">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

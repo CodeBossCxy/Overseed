@@ -349,15 +349,16 @@ select {
 }
 
 :root {
-  /* Glassy primary CTA: translucent, softened light blues (lower saturation +
-     alpha so the blurred backdrop shows through) */
-  --primary-button-gradient:
-    linear-gradient(92deg, rgba(154, 180, 224, 0.9) 0%, rgba(146, 171, 217, 0.88) 54%, rgba(134, 160, 210, 0.86) 100%);
-  --primary-button-gradient-hover:
-    linear-gradient(92deg, rgba(142, 170, 218, 0.96) 0%, rgba(133, 160, 211, 0.94) 52%, rgba(121, 149, 204, 0.92) 100%);
+  /* Primary CTA — matches the homepage "Get Started" / "立即开始" button:
+     solid muted blue with an inner white glow and deep blue drop shadow. */
+  --primary-button-bg: #6f9bd0;
+  --primary-button-bg-hover: #5f8fc6;
   --primary-button-shadow:
-    0 9px 20px rgba(120, 150, 200, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38);
+    inset 0 1px 10px rgba(255, 255, 255, 0.6),
+    0 18px 36px rgba(74, 124, 184, 0.35);
+  --primary-button-shadow-hover:
+    inset 0 1px 10px rgba(255, 255, 255, 0.65),
+    0 20px 40px rgba(74, 124, 184, 0.4);
 }
 
 :is(a, button)[class*="text-white"]:is(
@@ -371,12 +372,10 @@ select {
   [class*="from-amber-500"]
 ) {
   color: #ffffff !important;
-  background: var(--primary-button-gradient) !important;
-  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  background: var(--primary-button-bg) !important;
+  border: none !important;
   border-radius: 999px !important;
   box-shadow: var(--primary-button-shadow) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   font-weight: 500;
 }
 
@@ -390,10 +389,8 @@ select {
   [class*="from-pink-500"],
   [class*="from-amber-500"]
 ):hover:not(:disabled) {
-  background: var(--primary-button-gradient-hover) !important;
-  box-shadow:
-    0 10px 22px rgba(120, 150, 200, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.42) !important;
+  background: var(--primary-button-bg-hover) !important;
+  box-shadow: var(--primary-button-shadow-hover) !important;
   transform: translateY(-1px);
 }
 
@@ -432,6 +429,7 @@ select {
 ) {
   transform: none;
   box-shadow: none !important;
+  opacity: 0.5;
 }
 
 .overseed-logo-ink {
@@ -566,25 +564,26 @@ select {
    the viewport (the parent column is min-h-screen, not h-screen). */
 .ai-assistant-page {
   flex: 1;
-  max-height: calc(100dvh - 4.5rem); /* viewport minus top bar */
+  max-height: calc(100dvh - 4rem); /* viewport minus top bar */
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
   overflow: hidden;
-  padding-top: 0.75rem;
-  padding-bottom: clamp(0.75rem, 1vw, 1rem);
+  padding: 1.5rem 0;
 }
 
-/* Chat workspace — the glass card holding sidebar + chat panel */
+/* Chat workspace — holds sidebar + chat panel as two separate cards */
 .ai-workspace {
   position: relative;
-  flex: 1;
-  min-height: 0;
   display: flex;
-  overflow: hidden;
-  max-width: 1140px;
+  gap: 0.75rem;
   width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+  /* Fill most of the available height but leave equal breathing room */
+  height: min(calc(100dvh - 7rem), 820px);
+  min-height: 400px;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 /* Conversation sidebar (left column inside the glass card) */
@@ -601,12 +600,13 @@ select {
   overflow-y: auto;
 }
 
-/* Main chat panel (right column inside the glass card) */
+/* Main chat panel (right column — its own glass card) */
 .chat-panel {
   flex: 1;
   min-height: 0;
-  display: flex;
   flex-direction: column;
+  border-radius: 1.5rem;
+  overflow: hidden;
 }
 
 /* Only the chat messages scroll */
@@ -624,6 +624,7 @@ select {
 /* When <main> contains the AI assistant, strip its bottom padding so
    the page's own padding-bottom controls the gap. */
 main:has(.ai-assistant-page) {
+  padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
 
@@ -995,4 +996,10 @@ main > .page-enter-animation:has(.ai-assistant-page) {
   .page-enter-animation {
     animation: none;
   }
+}
+
+/* Indeterminate progress bar for image generation */
+@keyframes indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
 }

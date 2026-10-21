@@ -24,6 +24,15 @@ const AI_MODEL_OPTIONS = [
   { id: 'kimi-k3', label: 'Kimi · Standard Creative' },
 ]
 
+const AI_MODES = [
+  { id: 'auto', icon: '✦', label: 'Auto', labelZh: '自动', desc: 'Automatically selects the best model', descZh: '自动选择最佳模型', model: 'claude-sonnet-5', recommended: true },
+  { id: 'quick', icon: '⚡', label: 'Quick', labelZh: '快速', desc: 'Fast answers for everyday questions', descZh: '日常问题快速回答', model: 'deepseek-v4-flash' },
+  { id: 'creative', icon: '✧', label: 'Creative', labelZh: '创意', desc: 'Marketing, branding & content creation', descZh: '营销、品牌和内容创作', model: 'kimi-k3' },
+  { id: 'reasoning', icon: '◈', label: 'Reasoning', labelZh: '推理', desc: 'Complex analysis & strategic thinking', descZh: '复杂分析和战略思考', model: 'claude-sonnet-5' },
+  { id: 'documents', icon: '▤', label: 'Documents', labelZh: '文档', desc: 'Read, summarize & analyze documents', descZh: '阅读、总结和分析文档', model: 'kimi-k2.6' },
+  { id: 'general', icon: '◎', label: 'All-Purpose', labelZh: '通用', desc: 'General business assistance', descZh: '通用商业助手', model: 'gpt-5.6-luna' },
+] as const
+
 interface Message {
   id: string
   dbId?: string // database ID for persisted messages
@@ -69,6 +78,15 @@ export default function AIAssistantPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [toolBusy, setToolBusy] = useState(false)
   const [activeTab, setActiveTab] = useState<'chat' | 'image'>('chat')
+  const [aiMode, setAiMode] = useState<string>('auto')
+  const [modePickerOpen, setModePickerOpen] = useState(false)
+  const [showAdvancedModels, setShowAdvancedModels] = useState(false)
+  const modePickerRef = useRef<HTMLDivElement>(null)
+  const [folders, setFolders] = useState<{ id: string; name: string; chatIds: string[] }[]>([])
+  const [activeFolder, setActiveFolder] = useState<string | null>(null) // null = "All"
+  const [addingFolder, setAddingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -77,6 +95,43 @@ export default function AIAssistantPage() {
   useEffect(() => {
     setSidebarOpen(window.matchMedia('(min-width: 768px)').matches)
   }, [])
+
+  const [modePickerPos, setModePickerPos] = useState<{ left: number; bottom: number } | null>(null)
+  const modeButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Close mode picker on click outside
+  useEffect(() => {
+    if (!modePickerOpen) return
+    const handler = (e: MouseEvent) => {
+      if (modePickerRef.current && !modePickerRef.current.contains(e.target as Node) &&
+          modeButtonRef.current && !modeButtonRef.current.contains(e.target as Node)) {
+        setModePickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [modePickerOpen])
+
+  const toggleModePicker = () => {
+    if (!modePickerOpen && modeButtonRef.current) {
+      const rect = modeButtonRef.current.getBoundingClientRect()
+      setModePickerPos({ left: rect.left, bottom: window.innerHeight - rect.top + 8 })
+    }
+    setModePickerOpen(!modePickerOpen)
+  }
+
+  const selectMode = (modeId: string, modelId?: string) => {
+    setAiMode(modeId)
+    if (modelId) setProvider(modelId)
+    else {
+      const mode = AI_MODES.find(m => m.id === modeId)
+      if (mode) setProvider(mode.model)
+    }
+    setModePickerOpen(false)
+    setShowAdvancedModels(false)
+  }
+
+  const currentMode = AI_MODES.find(m => m.id === aiMode)
 
   const attachToPrompt = async (file: File) => {
     setToolBusy(true)
@@ -597,7 +652,7 @@ export default function AIAssistantPage() {
   // Derive the user's first name for the welcome greeting
   const userName = (session?.user as any)?.name?.split(' ')[0] || (session?.user as any)?.email?.split('@')[0] || (zh ? '用户' : 'there')
 
-  // Group chat list into time buckets for the sidebar
+  // Group chat list into time buckets for the sidebar, filtered by active folder
   const groupChats = () => {
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -609,7 +664,9 @@ export default function AIAssistantPage() {
       { label: zh ? '近30天' : 'Last 30 Days', chats: [] },
       { label: zh ? '更早' : 'Older', chats: [] },
     ]
-    for (const chat of chatList) {
+    const folder = activeFolder ? folders.find(f => f.id === activeFolder) : null
+    const filtered = folder ? chatList.filter(c => folder.chatIds.includes(c.id)) : chatList
+    for (const chat of filtered) {
       const d = new Date(chat.updatedAt)
       if (d >= todayStart) groups[0].chats.push(chat)
       else if (d >= weekStart) groups[1].chats.push(chat)
@@ -669,49 +726,10 @@ export default function AIAssistantPage() {
   return (
     <RoleShell noFooter>
       <div className="ai-assistant-page">
-        {/* Page header */}
-        <div className="mb-3 flex flex-shrink-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold text-gray-900">{t.aiAssistant.title}</h1>
-            <p className="text-gray-500 mt-1">{zh ? '您的全球增长 AI 伙伴' : 'Your AI partner for global growth'}</p>
-          </div>
-
-        <div className="flex flex-shrink-0 justify-end self-end md:self-center">
-          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60">
-            <button
-              onClick={() => setActiveTab('chat')}
-              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
-                activeTab === 'chat'
-                  ? 'bg-white shadow-sm text-gray-900 font-bold'
-                  : 'text-gray-500 font-medium hover:text-gray-700'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              {t.aiAssistant.tabChat}
-            </button>
-            <button
-              onClick={() => setActiveTab('image')}
-              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
-                activeTab === 'image'
-                  ? 'bg-white shadow-sm text-gray-900 font-bold'
-                  : 'text-gray-500 font-medium hover:text-gray-700'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
-              </svg>
-              {t.aiAssistant.tabImage}
-            </button>
-          </div>
-        </div>
-        </div>
-
-        <div className="ai-workspace rounded-3xl workspace-glass-card">
+        <div className="ai-workspace rounded-3xl overflow-hidden">
 
         {/* Image Generation tab */}
-        {activeTab === 'image' && <ImageGenerationPanel isProUser={isProUser} />}
+        {activeTab === 'image' && <ImageGenerationPanel isProUser={isProUser} activeTab={activeTab} onTabChange={setActiveTab} />}
 
         {/* Conversation sidebar */}
         {activeTab === 'chat' && isProUser && sidebarOpen && (
@@ -723,33 +741,10 @@ export default function AIAssistantPage() {
           />
         )}
         {activeTab === 'chat' && isProUser && sidebarOpen && (
-          <div className="conversation-sidebar w-[300px] flex-shrink-0 bg-white/25 border-r border-white/60">
-            {/* New Chat button */}
-            <div className="p-4 flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={startNewChat}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl text-sm font-semibold hover:from-primary-700 hover:to-primary-600 transition shadow-sm"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                {t.aiAssistant.newChat}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(false)}
-                aria-label={zh ? '关闭对话列表' : 'Close conversations'}
-                className="p-2 rounded-lg text-gray-500 hover:bg-white/70 flex-shrink-0"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="px-4 pb-3 flex-shrink-0">
-              <div className="relative">
+          <div className="conversation-sidebar w-[300px] flex-shrink-0 workspace-glass-card rounded-3xl overflow-hidden">
+            {/* Search + close arrow row */}
+            <div className="px-3 pt-3 pb-1.5 flex items-center gap-2 flex-shrink-0">
+              <div className="relative flex-1">
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
@@ -760,31 +755,114 @@ export default function AIAssistantPage() {
                   readOnly
                 />
               </div>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label={zh ? '关闭对话列表' : 'Close conversations'}
+                className="p-2 rounded-lg text-gray-500 hover:bg-white/70 flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
             </div>
 
-            {/* Category filter pills */}
-            <div className="px-4 pb-3 flex flex-wrap gap-1.5 flex-shrink-0">
-              {[
-                zh ? '全部' : 'All',
-                zh ? '活动' : 'Campaigns',
-                zh ? '策略' : 'Strategy',
-                zh ? '创作者' : 'Creator',
-              ].map((label, i) => (
+            {/* Folder tabs */}
+            <div className="px-3 pb-1 flex items-center gap-1.5 flex-shrink-0 overflow-x-auto scrollbar-hide">
+              <button
+                onClick={() => setActiveFolder(null)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition whitespace-nowrap ${
+                  activeFolder === null
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-white/50 text-gray-500 hover:bg-white/80 border border-white/60'
+                }`}
+                onDragOver={(e) => { e.preventDefault(); setDragOverFolder('__all__') }}
+                onDragLeave={() => setDragOverFolder(null)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDragOverFolder(null)
+                  const droppedChatId = e.dataTransfer.getData('text/plain')
+                  if (droppedChatId) {
+                    // Remove from all folders (move back to "All" / unfiled)
+                    setFolders(prev => prev.map(f => ({ ...f, chatIds: f.chatIds.filter(id => id !== droppedChatId) })))
+                  }
+                }}
+              >
+                {zh ? '全部' : 'All'}
+              </button>
+              {folders.map((folder) => (
                 <button
-                  key={label}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition ${
-                    i === 0
+                  key={folder.id}
+                  onClick={() => setActiveFolder(activeFolder === folder.id ? null : folder.id)}
+                  className={`group/folder relative px-3 py-1 rounded-full text-xs font-medium transition whitespace-nowrap ${
+                    activeFolder === folder.id
                       ? 'bg-primary-600 text-white'
+                      : dragOverFolder === folder.id
+                      ? 'bg-primary-100 text-primary-700 border border-primary-300'
                       : 'bg-white/50 text-gray-500 hover:bg-white/80 border border-white/60'
                   }`}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverFolder(folder.id) }}
+                  onDragLeave={() => setDragOverFolder(null)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDragOverFolder(null)
+                    const droppedChatId = e.dataTransfer.getData('text/plain')
+                    if (droppedChatId) {
+                      setFolders(prev => prev.map(f => ({
+                        ...f,
+                        chatIds: f.id === folder.id
+                          ? (f.chatIds.includes(droppedChatId) ? f.chatIds : [...f.chatIds, droppedChatId])
+                          : f.chatIds.filter(id => id !== droppedChatId),
+                      })))
+                    }
+                  }}
                 >
-                  {label}
+                  {folder.name}
+                  <span
+                    className="ml-1 hidden group-hover/folder:inline-block text-[10px] opacity-60 hover:opacity-100 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setFolders(prev => prev.filter(f => f.id !== folder.id))
+                      if (activeFolder === folder.id) setActiveFolder(null)
+                    }}
+                    title={zh ? '删除文件夹' : 'Remove folder'}
+                  >
+                    ×
+                  </span>
                 </button>
               ))}
+              {addingFolder ? (
+                <input
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onBlur={() => { setAddingFolder(false); setNewFolderName('') }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newFolderName.trim()) {
+                      setFolders(prev => [...prev, { id: Date.now().toString(), name: newFolderName.trim(), chatIds: [] }])
+                      setAddingFolder(false)
+                      setNewFolderName('')
+                    }
+                    if (e.key === 'Escape') { setAddingFolder(false); setNewFolderName('') }
+                  }}
+                  className="px-2 py-1 rounded-full text-xs bg-white border border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-500 w-20"
+                  placeholder={zh ? '名称' : 'Name'}
+                />
+              ) : (
+                <button
+                  onClick={() => setAddingFolder(true)}
+                  className="p-1 rounded-full text-gray-400 hover:bg-white/70 hover:text-gray-600 transition flex-shrink-0"
+                  title={zh ? '添加文件夹' : 'Add folder'}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              )}
             </div>
 
             {/* Chat list grouped by time */}
-            <div className="conversation-list px-3 pb-4">
+            <div className="conversation-list px-3 pt-1 pb-4">
               {chatList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-32 text-gray-400">
                   <svg className="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -793,14 +871,16 @@ export default function AIAssistantPage() {
                   <p className="text-xs">{t.aiAssistant.noConversations}</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {groupChats().map((group) => (
                     <div key={group.label}>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-2 mb-1.5">{group.label}</p>
+                      <p className="text-[10px] font-medium text-gray-300 uppercase tracking-wider px-2 mb-1 mt-1">{group.label}</p>
                       <div className="space-y-0.5">
                         {group.chats.map((chat) => (
                           <div
                             key={chat.id}
+                            draggable
+                            onDragStart={(e) => { e.dataTransfer.setData('text/plain', chat.id); e.dataTransfer.effectAllowed = 'move' }}
                             onClick={() => editingChatId !== chat.id && loadChat(chat.id)}
                             className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
                               chatId === chat.id
@@ -862,58 +942,23 @@ export default function AIAssistantPage() {
               )}
             </div>
 
-            {/* Usage tracker */}
-            {usagePercent !== null && (
-              <div className="p-4 border-t border-white/50 flex-shrink-0">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-medium text-gray-500">{t.aiAssistant.usageCredits}</span>
-                  <span className="text-xs font-semibold text-gray-700">
-                    {creditsUsage ? `${creditsUsage.used} / ${creditsUsage.limit}` : `${usagePercent}%`}
-                  </span>
-                </div>
-                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      usagePercent >= 100
-                        ? 'bg-red-500'
-                        : usagePercent >= 80
-                        ? 'bg-amber-500'
-                        : usagePercent >= 50
-                        ? 'bg-yellow-400'
-                        : 'bg-emerald-500'
-                    }`}
-                    style={{ width: `${usagePercent}%` }}
-                  />
-                </div>
-                <p className="text-[10px] text-gray-400 mt-1.5">
-                  {usagePercent >= 100
-                    ? t.aiAssistant.usageExhausted
-                    : usagePercent >= 80
-                    ? t.aiAssistant.usageHigh
-                    : usagePercent >= 50
-                    ? t.aiAssistant.usageMedium
-                    : t.aiAssistant.usageLow}
-                </p>
-                {creditsUsage && creditsUsage.purchased > 0 && (
-                  <p className="text-[10px] text-primary-500 font-semibold mt-0.5">
-                    +{creditsUsage.purchased} {t.aiAssistant.purchasedCredits}
-                  </p>
-                )}
-                {usagePercent >= 80 && (
-                  <a
-                    href="/pricing/brand"
-                    className="inline-block text-[10px] font-semibold text-primary-600 hover:underline mt-1"
-                  >
-                    {t.aiAssistant.buyCreditsCta}
-                  </a>
-                )}
-              </div>
-            )}
+            {/* New Chat button at bottom */}
+            <div className="p-4 border-t border-white/50 flex-shrink-0">
+              <button
+                onClick={startNewChat}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl text-sm font-semibold hover:from-primary-700 hover:to-primary-600 transition shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {t.aiAssistant.newChat}
+              </button>
+            </div>
           </div>
         )}
 
         {/* Main chat area (kept mounted so chat state survives tab switches) */}
-        <div className={`chat-panel ${activeTab === 'chat' ? 'flex' : 'hidden'} min-w-0 relative`}>
+        <div className={`chat-panel ${activeTab === 'chat' ? 'flex' : 'hidden'} min-w-0 relative workspace-glass-card`}>
           {/* Top bar */}
           <div className="h-14 flex items-center justify-between px-4 border-b border-white/55 bg-white/35 backdrop-blur flex-shrink-0">
             <div className="flex items-center gap-3">
@@ -930,21 +975,34 @@ export default function AIAssistantPage() {
               )}
             </div>
 
-            {isProUser && (
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <select
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                  className="px-3 py-1.5 workspace-glass-control text-xs font-medium text-gray-800 focus:outline-none cursor-pointer"
-                  title="AI model"
-                >
-                  {AI_MODEL_OPTIONS.map((m) => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+                  activeTab === 'chat'
+                    ? 'bg-white shadow-sm text-gray-900 font-bold'
+                    : 'text-gray-500 font-medium hover:text-gray-700'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                {t.aiAssistant.tabChat}
+              </button>
+              <button
+                onClick={() => setActiveTab('image')}
+                className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
+                  activeTab === 'image'
+                    ? 'bg-white shadow-sm text-gray-900 font-bold'
+                    : 'text-gray-500 font-medium hover:text-gray-700'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
+                </svg>
+                {t.aiAssistant.tabImage}
+              </button>
+            </div>
           </div>
 
           {/* Progress bar */}
@@ -1230,6 +1288,105 @@ export default function AIAssistantPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                       </button>
+                      {isProUser && (
+                        <>
+                          <button
+                            ref={modeButtonRef}
+                            type="button"
+                            onClick={toggleModePicker}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-100/80 hover:bg-gray-200/80 transition text-xs font-medium text-gray-600 cursor-pointer"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                            <span>{currentMode?.icon}</span>
+                            <span>{zh ? currentMode?.labelZh : currentMode?.label}</span>
+                            <svg className={`w-3 h-3 text-gray-400 transition-transform ${modePickerOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+
+                          {modePickerOpen && modePickerPos && (
+                            <div
+                              ref={modePickerRef}
+                              className="fixed w-72 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-[9999]"
+                              style={{ left: modePickerPos.left, bottom: modePickerPos.bottom }}
+                            >
+                              <div className="px-4 pt-4 pb-2">
+                                <p className="text-xs font-semibold text-gray-900">{zh ? '选择 AI 模式' : 'Choose AI Mode'}</p>
+                              </div>
+                              <div className="px-2 pb-2">
+                                {AI_MODES.map((mode) => (
+                                  <button
+                                    key={mode.id}
+                                    type="button"
+                                    onClick={() => selectMode(mode.id)}
+                                    className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition ${
+                                      aiMode === mode.id
+                                        ? 'bg-primary-50 text-primary-700'
+                                        : 'hover:bg-gray-50 text-gray-700'
+                                    }`}
+                                  >
+                                    <span className="text-base mt-0.5 w-5 text-center flex-shrink-0">{mode.icon}</span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className={`text-sm font-semibold ${aiMode === mode.id ? 'text-primary-700' : 'text-gray-900'}`}>{zh ? mode.labelZh : mode.label}</span>
+                                        {'recommended' in mode && mode.recommended && (
+                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-primary-100 text-primary-600">{zh ? '推荐' : 'Recommended'}</span>
+                                        )}
+                                      </div>
+                                      <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{zh ? mode.descZh : mode.desc}</p>
+                                    </div>
+                                    {aiMode === mode.id && (
+                                      <svg className="w-4 h-4 text-primary-600 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="border-t border-gray-100">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAdvancedModels(!showAdvancedModels)}
+                                  className="w-full flex items-center gap-2 px-5 py-3 text-xs font-medium text-gray-500 hover:bg-gray-50 transition"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  </svg>
+                                  {zh ? '高级模型选择' : 'Advanced Model Selection'}
+                                  <svg className={`w-3 h-3 ml-auto transition-transform ${showAdvancedModels ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                                {showAdvancedModels && (
+                                  <div className="px-2 pb-2">
+                                    {AI_MODEL_OPTIONS.map((m) => (
+                                      <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={() => selectMode('advanced', m.id)}
+                                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs transition ${
+                                          provider === m.id && aiMode === 'advanced'
+                                            ? 'bg-primary-50 text-primary-700 font-semibold'
+                                            : 'text-gray-600 hover:bg-gray-50'
+                                        }`}
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0" />
+                                        {m.label}
+                                        {provider === m.id && aiMode === 'advanced' && (
+                                          <svg className="w-3.5 h-3.5 text-primary-600 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                       <button
                         type="button"
                         disabled={!isProUser}
@@ -1254,12 +1411,12 @@ export default function AIAssistantPage() {
                 </div>
               </form>
               <p className="text-[10px] text-gray-400 text-center mt-2">
-                {AI_MODEL_OPTIONS.find((m) => m.id === provider)?.label || provider} — {zh ? '回答仅供参考，请核实重要信息' : 'responses may not always be accurate'}
+                {currentMode ? `${currentMode.icon} ${zh ? currentMode.labelZh : currentMode.label}` : AI_MODEL_OPTIONS.find((m) => m.id === provider)?.label || provider} — {zh ? '回答仅供参考，请核实重要信息' : 'responses may not always be accurate'}
               </p>
             </div>
           </div>
         </div>
-        </div>
+        </div> {/* end ai-workspace */}
       </div>
     </RoleShell>
   )

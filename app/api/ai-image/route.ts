@@ -100,15 +100,22 @@ Make sure the final result matches the requested aspect ratio and is visually su
       imageTypeSuffix,
       languageDirective,
     ].join('\n\n')
-    // Map requested sizes to OpenAI-supported sizes
-    // 4:5 (1024x1280) → closest is 1024x1536 (portrait)
-    // 16:9 HD (1280x720) → closest is 1536x1024 (landscape)
+    // Map requested sizes to OpenAI-supported sizes (1024x1024, 1024x1536, 1536x1024).
+    // Portrait ratios → 1024x1536, landscape ratios → 1536x1024, square → 1024x1024.
     const SIZE_MAP: Record<string, string> = {
-      '1024x1024': '1024x1024',
-      '1024x1536': '1024x1536',
-      '1536x1024': '1536x1024',
-      '1024x1280': '1024x1536',
-      '1280x720': '1536x1024',
+      '1024x1024': '1024x1024', // 1:1
+      '683x1024': '1024x1536',  // 2:3 → portrait
+      '1024x683': '1536x1024',  // 3:2 → landscape
+      '768x1024': '1024x1536',  // 3:4 → portrait
+      '1024x768': '1536x1024',  // 4:3 → landscape
+      '820x1024': '1024x1536',  // 4:5 → portrait
+      '1024x820': '1536x1024',  // 5:4 → landscape
+      '576x1024': '1024x1536',  // 9:16 → portrait
+      '1024x576': '1536x1024',  // 16:9 → landscape
+      '1024x439': '1536x1024',  // 21:9 → landscape
+      '1024x256': '1536x1024',  // 4:1 → landscape
+      '1024x1536': '1024x1536', // 2:3 high-res
+      '1536x1024': '1536x1024', // 3:2 high-res
     }
     const apiSize = SIZE_MAP[size] || 'auto'
     const options = {
