@@ -223,19 +223,9 @@ export default function BrandProfilePage() {
     <BrandWorkspaceLayout>
       <div className="max-w-4xl mx-auto workspace-page-tight pb-8">
         {/* Header + actions */}
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{p.title}</h1>
-            <p className="text-gray-500 mt-1">{p.subtitle}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowPreview(true)}
-              className="px-4 py-2.5 bg-white shadow-sm rounded-xl text-sm font-semibold text-gray-700 hover:text-primary-700 transition"
-            >
-              {p.previewProfile}
-            </button>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">{p.title}</h1>
+          <p className="text-gray-500 mt-1">{p.subtitle}</p>
         </div>
 
         {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>}
@@ -274,13 +264,21 @@ export default function BrandProfilePage() {
               <h2 className="font-bold text-gray-900">{p.publicProfile}</h2>
               <p className="text-xs text-gray-500 mt-1">{p.publicProfileNote}</p>
             </div>
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="px-5 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold shadow-sm hover:bg-primary-700 transition disabled:opacity-50"
-            >
-              {isSaving ? p.saving : p.saveChanges}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPreview(true)}
+                className="px-4 py-2.5 border border-gray-200 bg-white rounded-full text-sm font-semibold text-gray-600 hover:text-primary-700 hover:border-primary-200 transition"
+              >
+                {p.previewProfile}
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-5 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold shadow-sm hover:bg-primary-700 transition disabled:opacity-50"
+              >
+                {isSaving ? p.saving : p.saveChanges}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-5">
