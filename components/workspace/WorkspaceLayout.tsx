@@ -9,6 +9,8 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatNumber } from '@/lib/i18n/formatNumber'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import LanguageSetupModal from '@/components/workspace/LanguageSetupModal'
+import WelcomeTutorialModal from '@/components/workspace/WelcomeTutorialModal'
+import ProductTour from '@/components/tour/ProductTour'
 
 // Workspace shell per the July 2026 workspace spec: floating left sidebar
 // with icon nav + user chip, and a content area with a top-right utility
@@ -168,6 +170,15 @@ export default function WorkspaceLayout({
           { href: '/pricing/brand', label: w.myPlan, icon: ICONS.shield },
         ]
 
+  // Tour spotlight identifiers for key nav items
+  const TOUR_IDS: Record<string, string> = {
+    '/dashboard/brand/discover': 'discover',
+    '/ai-assistant': 'ai-assistant',
+    '/dashboard/messages': 'messages',
+    '/browse': 'browse-campaigns',
+    '/dashboard/influencer/applications': 'my-applications',
+  }
+
   const profileHref = role === 'creator' ? '/dashboard/influencer/profile' : '/dashboard/brand/profile'
   const roleLabel = role === 'creator' ? w.creator : w.brand
   const isNavigating = !!pendingHref && pendingHref !== pathname
@@ -267,6 +278,7 @@ export default function WorkspaceLayout({
               onMouseEnter={() => prefetchRoute(item.href)}
               onFocus={() => prefetchRoute(item.href)}
               aria-current={active ? 'page' : undefined}
+              {...(TOUR_IDS[item.href] ? { 'data-tour': TOUR_IDS[item.href] } : {})}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition ${
                 highlighted
                   ? 'selected-option-glass text-gray-900 font-bold'
@@ -286,6 +298,32 @@ export default function WorkspaceLayout({
           )
         })}
       </nav>
+
+      {/* Tour launcher */}
+      <div className="px-3 mb-1">
+        <button
+          onClick={() => window.dispatchEvent(new Event('tour:start'))}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-white/40 backdrop-blur border border-white/60 shadow-sm hover:bg-white/60 transition group"
+        >
+          {/* Sparkle icon in circle */}
+          <span className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4.5 h-4.5 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+            </svg>
+          </span>
+          {/* Text */}
+          <span className="min-w-0 flex-1 text-left leading-tight">
+            <span className="block text-sm font-bold text-gray-900">{locale === 'zh' ? '产品教程' : 'Product Tour'}</span>
+            <span className="block text-[11px] text-gray-500">{locale === 'zh' ? '快速了解 (30秒)' : 'Take a quick tour (30s)'}</span>
+          </span>
+          {/* Arrow circle */}
+          <span className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-600 transition">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </span>
+        </button>
+      </div>
 
       {/* Account chip: avatar · name · role, with an upward menu */}
       <div className="relative m-3">
@@ -360,7 +398,7 @@ export default function WorkspaceLayout({
       <div className="flex min-h-screen max-w-[1500px] mx-auto">
         {/* Desktop sidebar — viewport-height sticky so it stays put while content scrolls */}
         <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 py-4 pl-4 sticky top-0 h-screen self-start">
-          <div className="flex flex-col flex-1 min-h-0 rounded-3xl bg-white/55 backdrop-blur border border-white/70 shadow-sm py-4">
+          <div data-tour="sidebar" className="flex flex-col flex-1 min-h-0 rounded-3xl bg-white/55 backdrop-blur border border-white/70 shadow-sm py-4">
             {sidebarContent}
           </div>
         </aside>
@@ -400,6 +438,7 @@ export default function WorkspaceLayout({
               {role === 'brand' && (
                 <Link
                   href="/dashboard/brand/campaigns/new"
+                  data-tour="create-campaign"
                   className="hidden sm:inline-flex h-10 items-center gap-2 px-5 rounded-full bg-primary-600 text-white text-sm font-bold shadow-sm hover:bg-primary-700 transition"
                 >
                   <span aria-hidden className="text-lg leading-none">+</span>
@@ -408,6 +447,7 @@ export default function WorkspaceLayout({
               )}
               {/* Credits chip */}
               {session?.user && credits != null && (
+                <span data-tour="credits-chip">
                 <CreditsChip
                   total={credits.total}
                   subscription={credits.subscription}
@@ -416,6 +456,7 @@ export default function WorkspaceLayout({
                   nextExpiry={credits.nextExpiry}
                   wt={w as Record<string, string>}
                 />
+                </span>
               )}
               {/* Subscription status */}
               <Link
@@ -483,6 +524,10 @@ export default function WorkspaceLayout({
 
       {/* Mandatory first-login Language & Region setup */}
       <LanguageSetupModal />
+      {/* Welcome tutorial for first-time users (after language setup) */}
+      <WelcomeTutorialModal />
+      {/* Interactive product tour — triggers after onboarding or via Settings replay */}
+      <ProductTour role={role} />
     </div>
   )
 }

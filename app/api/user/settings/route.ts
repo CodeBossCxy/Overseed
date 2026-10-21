@@ -14,6 +14,8 @@ export async function GET() {
     where: { id: (session.user as any).id },
     select: {
       languageSetupAt: true,
+      tutorialCompletedAt: true,
+      productTourCompletedAt: true,
       preferredLanguage: true,
       preferredContentLanguage: true,
       timeZone: true,
@@ -23,7 +25,12 @@ export async function GET() {
     },
   })
   if (!user) return NextResponse.json({ error: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
-  return NextResponse.json({ ...user, needsLanguageSetup: !user.languageSetupAt })
+  return NextResponse.json({
+    ...user,
+    needsLanguageSetup: !user.languageSetupAt,
+    needsTutorial: !user.tutorialCompletedAt && !!user.languageSetupAt,
+    needsProductTour: !user.productTourCompletedAt && !!user.tutorialCompletedAt && !!user.languageSetupAt,
+  })
 }
 
 export async function PATCH(request: Request) {
@@ -158,6 +165,30 @@ export async function PATCH(request: Request) {
     await prisma.user.update({
       where: { id: userId },
       data: { languageSetupAt: new Date() },
+    })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'completeTutorial') {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tutorialCompletedAt: new Date() },
+    })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'completeProductTour') {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { productTourCompletedAt: new Date() },
+    })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'resetProductTour') {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { productTourCompletedAt: null },
     })
     return NextResponse.json({ success: true })
   }

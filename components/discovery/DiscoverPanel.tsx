@@ -2287,7 +2287,7 @@ export default function DiscoverPanel() {
       )}
 
       {/* ── Direct creator lookup ── */}
-      <div className="workspace-glass-toolbar rounded-2xl p-5 mb-4 overflow-visible relative z-10">
+      <div data-tour="direct-lookup" className="workspace-glass-toolbar rounded-2xl p-5 mb-4 overflow-visible relative z-10">
         <p className="text-sm text-gray-600 mb-3">
           {zh
             ? '如果你已经知道想要查找的创作者，输入用户名直接查看档案'
@@ -2380,7 +2380,7 @@ export default function DiscoverPanel() {
       </div>
 
       {/* Search + filters */}
-      <form onSubmit={maintenanceMode ? (e) => e.preventDefault() : submit} className={`workspace-glass-toolbar rounded-2xl p-5 mb-6 overflow-visible relative z-10 ${maintenanceMode ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+      <form data-tour="ai-search" onSubmit={maintenanceMode ? (e) => e.preventDefault() : submit} className={`workspace-glass-toolbar rounded-2xl p-5 mb-6 overflow-visible relative z-10 ${maintenanceMode ? 'opacity-40 pointer-events-none select-none' : ''}`}>
         {/* Platform selector — above the search field */}
         <div className="flex flex-wrap gap-2 mb-4">
           {PLATFORMS.map((p) => (
@@ -2481,7 +2481,7 @@ export default function DiscoverPanel() {
         )}
 
         {/* ── Structured filter sections ── */}
-        <div className="mt-4">
+        <div data-tour="search-filters" className="mt-4">
           {/* Filter header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -2877,10 +2877,10 @@ export default function DiscoverPanel() {
                       min={0}
                       value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('shortAvgViews').value : ''}
                       onChange={(e) => updateCreatorDbFilter('shortAvgViews', { op: '>', value: e.target.value })}
-                      placeholder={zh ? '如 5000 次播放' : 'e.g. 5000 views'}
-                      className={`w-full ${inputCls}`}
+                      placeholder={zh ? '如 5,000' : 'e.g. 5,000'}
+                      className={`w-full pr-20 ${inputCls}`}
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 次播放' : '≥ views'}</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">{zh ? '≥ 次播放' : '≥ views'}</span>
                   </div>
                 </div>
                 {/* Average engagement rate */}
@@ -2899,9 +2899,9 @@ export default function DiscoverPanel() {
                       value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('shortEngagementRate').value : ''}
                       onChange={(e) => updateCreatorDbFilter('shortEngagementRate', { op: '>', value: e.target.value })}
                       placeholder={zh ? '如 2.5%' : 'e.g. 2.5%'}
-                      className={`w-full ${inputCls}`}
+                      className={`w-full pr-12 ${inputCls}`}
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">≥ %</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">≥ %</span>
                   </div>
                 </div>
                 {/* Followers growth (30d) */}
@@ -2918,10 +2918,10 @@ export default function DiscoverPanel() {
                       min={0}
                       value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('followerGrowth30d').value : ''}
                       onChange={(e) => updateCreatorDbFilter('followerGrowth30d', { op: '>', value: e.target.value })}
-                      placeholder={zh ? '如 500 新增粉丝' : 'e.g. 500 new followers'}
-                      className={`w-full ${inputCls}`}
+                      placeholder={zh ? '如 500' : 'e.g. 500'}
+                      className={`w-full pr-16 ${inputCls}`}
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 新粉丝' : '≥ new'}</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">{zh ? '≥ 新粉丝' : '≥ new'}</span>
                   </div>
                 </div>
                 {/* Content count (30d) */}
@@ -2938,10 +2938,10 @@ export default function DiscoverPanel() {
                       min={0}
                       value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('contentsIn30Days').value : ''}
                       onChange={(e) => updateCreatorDbFilter('contentsIn30Days', { op: '>', value: e.target.value })}
-                      placeholder={zh ? '如 5 条内容' : 'e.g. 5 posts'}
-                      className={`w-full ${inputCls}`}
+                      placeholder={zh ? '如 5' : 'e.g. 5'}
+                      className={`w-full pr-14 ${inputCls}`}
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 条' : '≥ posts'}</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">{zh ? '≥ 条' : '≥ posts'}</span>
                   </div>
                 </div>
               </div>
@@ -3203,7 +3203,7 @@ export default function DiscoverPanel() {
       })()}
 
       {!unavailable && (searchResult || isLoading) && (
-        <>
+        <div data-tour="search-results">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <button
@@ -3584,7 +3584,7 @@ export default function DiscoverPanel() {
             {d.dataAttribution}
           </p>
           */}
-        </>
+        </div>
       )}
 
       {/* TEMP: influencers.club creator detail popup — remove with the other

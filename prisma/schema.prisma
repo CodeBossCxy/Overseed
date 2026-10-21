@@ -246,6 +246,8 @@ model User {
   autoTranslateUGC   Boolean  @default(true)
   // Stamped once the mandatory first-login Language & Region setup is done
   languageSetupAt    DateTime?
+  tutorialCompletedAt    DateTime?
+  productTourCompletedAt DateTime?
   colorTheme         String   @default("default")
   preferredContentLanguage String?
   timeZone                 String?

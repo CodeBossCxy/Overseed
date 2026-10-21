@@ -1,0 +1,101 @@
+/* Overseed product tour — driver.js overrides to match the glass-morphism design */
+
+.driver-popover.overseed-tour-popover {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border-radius: 1.25rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  padding: 1.25rem 1.5rem !important;
+  max-width: 340px !important;
+}
+
+.driver-popover.overseed-tour-popover .driver-popover-title {
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  color: #1f2937 !important;
+  line-height: 1.4 !important;
+  margin-bottom: 0.375rem !important;
+}
+
+.driver-popover.overseed-tour-popover .driver-popover-description {
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  color: #6b7280 !important;
+  line-height: 1.5 !important;
+}
+
+.driver-popover.overseed-tour-popover .driver-popover-progress-text {
+  font-size: 0.75rem !important;
+  color: #9ca3af !important;
+}
+
+.driver-popover.overseed-tour-popover .driver-popover-footer {
+  margin-top: 1rem !important;
+}
+
+.driver-popover.overseed-tour-popover .driver-popover-footer button {
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  border-radius: 999px !important;
+  padding: 0.5rem 1.25rem !important;
+  transition: all 150ms ease !important;
+  border: none !important;
+  cursor: pointer !important;
+}
+
+/* Next / Done button */
+.driver-popover.overseed-tour-popover .driver-popover-next-btn {
+  background: var(--primary-button-gradient) !important;
+  color: #ffffff !important;
+  box-shadow: var(--primary-button-shadow) !important;
+}
+
+.driver-popover.overseed-tour-popover .driver-popover-next-btn:hover {
+  background: var(--primary-button-gradient-hover) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Back button */
+.driver-popover.overseed-tour-popover .driver-popover-prev-btn {
+  background: rgba(255, 255, 255, 0.7) !important;
+  color: #4b5563 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.driver-popover.overseed-tour-popover .driver-popover-prev-btn:hover {
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Close / Skip button */
+.driver-popover.overseed-tour-popover .driver-popover-close-btn {
+  color: #9ca3af !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.driver-popover.overseed-tour-popover .driver-popover-close-btn:hover {
+  color: #4b5563 !important;
+}
+
+/* Arrow */
+.driver-popover.overseed-tour-popover .driver-popover-arrow {
+  border: 5px solid rgba(255, 255, 255, 0.92) !important;
+}
+
+/* Overlay */
+.driver-overlay {
+  background: rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Highlighted stage */
+.driver-active-element {
+  border-radius: 12px !important;
+}

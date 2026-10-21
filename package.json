@@ -29,6 +29,7 @@
     "@types/pdfkit": "^0.17.5",
     "bcryptjs": "^2.4.3",
     "docx": "^9.6.1",
+    "driver.js": "^1.10.2",
     "exceljs": "^4.4.0",
     "fastest-levenshtein": "^1.0.16",
     "file-saver": "^2.0.5",

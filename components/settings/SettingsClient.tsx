@@ -728,6 +728,25 @@ export default function SettingsClient({ user }: { user: SettingsUser }) {
             }
           />
 
+          {/* Help & Tour */}
+          <div className="mt-5 pt-4 border-t border-gray-100">
+            <p className="text-sm font-semibold text-gray-800 mb-1">{t.productTour?.replayTour || 'Product Tour'}</p>
+            <p className="text-xs text-gray-500 mb-3">{t.productTour?.replayTourDesc || 'Walk through the key features again.'}</p>
+            <button
+              onClick={async () => {
+                await fetch('/api/user/settings', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'resetProductTour' }),
+                })
+                window.dispatchEvent(new Event('tour:start'))
+              }}
+              className="px-4 py-2 border border-gray-200 bg-white rounded-xl hover:bg-gray-50 transition text-sm font-medium text-primary-600"
+            >
+              {t.productTour?.replayTour || 'Replay Product Tour'} ›
+            </button>
+          </div>
+
           {/* Danger zone */}
           <div className="mt-5 pt-4 border-t border-red-100">
             <p className="text-sm font-semibold text-red-600 mb-1">{st.dangerZone}</p>
