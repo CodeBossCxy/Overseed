@@ -88,11 +88,15 @@ export const authOptions: NextAuthOptions = {
       // openid-client defaults to 3500ms, which this network's round-trips
       // to Google can exceed (RPError: outgoing request timed out).
       httpOptions: { timeout: 15000 },
+      // Allow sign-in even when an account with the same email was created
+      // via a different provider (e.g. email/password or WeChat).
+      allowDangerousEmailAccountLinking: true,
     }),
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID || '',
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET || '',
       httpOptions: { timeout: 15000 },
+      allowDangerousEmailAccountLinking: true,
     }),
     WeChatProvider({
       clientId: process.env.WECHAT_APP_ID || '',
@@ -141,51 +145,52 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile, credentials }) {
       // Auto-link OAuth accounts to existing users with the same email.
-      // Wrapped in try-catch so a DB error never blocks sign-in entirely.
-      try {
+      // The PrismaAdapter handles account creation for new users automatically.
+      // This callback handles the edge case where a user registered via email
+      // and later signs in with Google (same email) — link the OAuth account.
       if (account?.provider && account.provider !== 'credentials' && user.email) {
-        const existingUser = await prisma.user.findUnique({
-          where: { email: user.email },
-        })
-        if (existingUser) {
-          // Check if this OAuth account is already linked
-          const existingAccount = await prisma.account.findUnique({
-            where: {
-              provider_providerAccountId: {
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-              },
-            },
+        try {
+          const existingUser = await prisma.user.findUnique({
+            where: { email: user.email },
           })
-          if (!existingAccount) {
-            // Link the OAuth account to the existing user
-            await prisma.account.create({
-              data: {
-                userId: existingUser.id,
-                type: account.type,
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-                refresh_token: account.refresh_token,
-                access_token: account.access_token,
-                expires_at: account.expires_at,
-                token_type: account.token_type,
-                scope: account.scope,
-                id_token: account.id_token,
-                session_state: account.session_state as string | undefined,
+          if (existingUser) {
+            const existingAccount = await prisma.account.findUnique({
+              where: {
+                provider_providerAccountId: {
+                  provider: account.provider,
+                  providerAccountId: account.providerAccountId,
+                },
               },
             })
+            if (!existingAccount) {
+              await prisma.account.create({
+                data: {
+                  userId: existingUser.id,
+                  type: account.type,
+                  provider: account.provider,
+                  providerAccountId: account.providerAccountId,
+                  refresh_token: account.refresh_token,
+                  access_token: account.access_token,
+                  expires_at: account.expires_at,
+                  token_type: account.token_type,
+                  scope: account.scope,
+                  id_token: account.id_token,
+                  session_state: account.session_state as string | undefined,
+                },
+              }).catch(() => {
+                // Unique constraint — adapter may have already created it
+              })
+            }
+            if (!existingUser.image && (user as any).image) {
+              await prisma.user.update({
+                where: { id: existingUser.id },
+                data: { image: (user as any).image },
+              }).catch(() => {})
+            }
           }
-          // Update user image/name from OAuth if missing
-          if (!existingUser.image && (user as any).image) {
-            await prisma.user.update({
-              where: { id: existingUser.id },
-              data: { image: (user as any).image },
-            })
-          }
+        } catch (err) {
+          console.error('[auth] signIn account-link failed (non-blocking):', err)
         }
-      }
-      } catch (err) {
-        console.error('[auth] signIn callback error (non-blocking):', err)
       }
       return true
     },
