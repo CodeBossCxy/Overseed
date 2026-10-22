@@ -138,6 +138,19 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
   },
+  cookies: process.env.NODE_ENV === 'production' ? {
+    sessionToken: {
+      name: '__Secure-next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+        // Set domain to .overseed.net so cookie works on both www and non-www
+        domain: '.overseed.net',
+      },
+    },
+  } : undefined,
   pages: {
     signIn: '/auth/signin',
     error: '/auth/error',
