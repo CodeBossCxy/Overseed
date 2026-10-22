@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { MAX_PRODUCT_IMAGES, MAX_PRODUCT_IMAGE_BYTES, PRODUCT_IMAGE_TYPES, type ImageRequest } from '@/lib/ai-image-options'
+import { fireAiToast, requestNotificationPermission } from '@/lib/ai-toast'
 
 interface GeneratedImage {
   id: string
@@ -90,6 +91,8 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  // When browsing a previous session while generating, store it separately
+  const [browsingSession, setBrowsingSession] = useState<{ id: string; images: GeneratedImage[] } | null>(null)
 
   const loadSessions = useCallback(async () => {
     try {
@@ -171,24 +174,34 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
         const data = await res.json()
         const s = data.session
         if (s) {
-          setActiveSessionId(s.id)
-          setPrompt(s.prompt || '')
-          setImageType(s.imageType || 'main')
-          setLanguage(s.language || 'none')
-          setSize(s.size || '1024x1024')
-          setQuality(s.quality || 'medium')
-          setImages(s.images?.map((i: any) => ({ id: i.id, url: i.url, prompt: i.prompt })) || [])
+          const sessionImages = s.images?.map((i: any) => ({ id: i.id, url: i.url, prompt: i.prompt })) || []
+          if (busy) {
+            // While generating, show previous session as a separate view without disrupting the generation
+            setBrowsingSession({ id: s.id, images: sessionImages })
+          } else {
+            setBrowsingSession(null)
+            setActiveSessionId(s.id)
+            setPrompt(s.prompt || '')
+            setImageType(s.imageType || 'main')
+            setLanguage(s.language || 'none')
+            setSize(s.size || '1024x1024')
+            setQuality(s.quality || 'medium')
+            setImages(sessionImages)
+          }
         }
       }
     } catch {}
   }
 
   const startNewSession = () => {
-    setActiveSessionId(null)
-    setImages([])
-    setPrompt('')
-    setProducts([])
-    setError(null)
+    setBrowsingSession(null)
+    if (!busy) {
+      setActiveSessionId(null)
+      setImages([])
+      setPrompt('')
+      setProducts([])
+      setError(null)
+    }
   }
 
   const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
@@ -247,6 +260,7 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
     setError(null)
     setInsufficientCredits(false)
     markGenerating(sessions.length)
+    requestNotificationPermission()
     const submittedPrompt = prompt.trim()
     try {
       const form = new FormData()
@@ -273,12 +287,22 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
         setActiveSessionId(data.sessionId)
         loadSessions() // Refresh session list
       }
+      // Toast if user navigated away
+      if (!document.hasFocus() || !window.location.pathname.startsWith('/ai-assistant')) {
+        fireAiToast({
+          type: 'image',
+          title: zh ? '图片生成完成' : 'Images Ready',
+          body: submittedPrompt.slice(0, 80) + (submittedPrompt.length > 80 ? '...' : ''),
+          href: '/ai-assistant',
+        })
+      }
       clearGenerating()
     } catch (err) {
       setError(err instanceof Error ? err.message : ai.imageFailed)
       clearGenerating()
     } finally {
       setBusy(false)
+      setBrowsingSession(null) // Return to the generation view when done
       window.dispatchEvent(new Event('credits:refresh'))
     }
   }
@@ -525,15 +549,39 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
           )}
         </div>
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5" aria-live="polite">
-          {images.length === 0 && !busy ? (
+          {/* While generating, if user is browsing a previous session, show a back-to-generation banner */}
+          {busy && browsingSession && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setBrowsingSession(null)}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-primary-50 text-primary-700 text-xs font-medium hover:bg-primary-100 transition border border-primary-200/50"
+              >
+                <svg className="w-3.5 h-3.5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                {zh ? '← 返回正在生成中的请求' : '← Back to generating request'}
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />
+              </button>
+            </div>
+          )}
+          {(() => {
+            // Determine which images to display
+            const displayImages = browsingSession ? browsingSession.images : images
+            const showBusy = busy && !browsingSession
+            const showEmpty = displayImages.length === 0 && !showBusy
+
+            if (showEmpty) return (
             <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
               <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-3xl border border-white/70 bg-primary-100/40 text-primary-400"><Sparkles className="h-9 w-9" /></div>
               <h3 className="text-base font-semibold text-gray-800">{ai.imageEmptyTitle}</h3>
               <p className="mt-2 max-w-xs text-sm leading-relaxed text-gray-500">{studio.emptyHint}</p>
             </div>
-          ) : (
+          )
+
+            return (
             <div className="mx-auto w-full max-w-3xl space-y-4">
-              {busy && (
+              {showBusy && (
                 <div role="status" className="rounded-2xl border border-primary-200/50 bg-gradient-to-r from-primary-50/60 to-white p-5">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="relative">
@@ -550,21 +598,38 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
                   </div>
                 </div>
               )}
-              {images.map(image => (
-                <article key={image.id} className="overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={image.url} alt={image.prompt} className="max-h-[480px] w-full object-contain" />
-                  <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
-                    <p className="min-w-0 flex-1 break-words text-xs leading-relaxed text-gray-600">{image.prompt}</p>
-                    <div className="flex items-center gap-2">
-                      <a href={image.url} target="_blank" rel="noreferrer" download className="workspace-glass-control rounded-full px-3 py-1.5 text-xs font-semibold text-gray-700">{ai.downloadImage} ↓</a>
-                      <button type="button" onClick={() => deleteImage(image.id)} className="workspace-glass-control rounded-full px-3 py-1.5 text-xs font-semibold text-red-500 hover:text-red-700">×</button>
+              {(() => {
+                // Group consecutive images by prompt
+                const groups: { prompt: string; items: typeof displayImages }[] = []
+                for (const img of displayImages) {
+                  const last = groups[groups.length - 1]
+                  if (last && last.prompt === img.prompt) {
+                    last.items.push(img)
+                  } else {
+                    groups.push({ prompt: img.prompt, items: [img] })
+                  }
+                }
+                return groups.map((group, gi) => (
+                  <div key={gi} className="space-y-2">
+                    <div className={group.items.length > 1 ? 'grid grid-cols-2 gap-2' : ''}>
+                      {group.items.map(image => (
+                        <article key={image.id} className="group/img relative overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-sm">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={image.url} alt={image.prompt} className="w-full object-contain" style={{ maxHeight: group.items.length > 1 ? '320px' : '480px' }} />
+                          <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover/img:opacity-100 transition">
+                            <a href={image.url} target="_blank" rel="noreferrer" download className="px-2.5 py-1.5 bg-white/90 backdrop-blur-sm rounded-full text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-white">{ai.downloadImage} ↓</a>
+                            {!browsingSession && <button type="button" onClick={() => deleteImage(image.id)} className="w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full text-red-400 shadow-sm hover:text-red-600 hover:bg-white text-sm">×</button>}
+                          </div>
+                        </article>
+                      ))}
                     </div>
+                    <p className="text-xs text-gray-500 leading-relaxed px-1">{group.prompt}</p>
                   </div>
-                </article>
-              ))}
+                ))
+              })()}
             </div>
-          )}
+          )
+          })()}
         </div>
         <p className="flex-shrink-0 px-5 pb-4 text-center text-[10px] text-gray-400">{ai.imageDisclaimer}</p>
       </section>

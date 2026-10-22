@@ -10,6 +10,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useTheme } from '@/components/ThemeProvider'
 import ImageGenerationPanel from '@/components/ai/ImageGenerationPanel'
+import { fireAiToast, requestNotificationPermission } from '@/lib/ai-toast'
 
 
 // Keep in sync with lib/ai-models.ts (client components can't import it
@@ -133,6 +134,8 @@ export default function AIAssistantPage() {
 
   const currentMode = AI_MODES.find(m => m.id === aiMode)
 
+  const [attachments, setAttachments] = useState<{ id: string; name: string; url: string; preview: string; type: string }[]>([])
+
   const attachToPrompt = async (file: File) => {
     setToolBusy(true)
     try {
@@ -140,10 +143,19 @@ export default function AIAssistantPage() {
       const res = await fetch('/api/messages/upload', { method: 'POST', body: form })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || 'Upload failed')
-      setInput(prev => `${prev}${prev ? '\n\n' : ''}Attached file: [${data.name}](${data.url})`)
+      const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+      setAttachments(prev => [...prev, { id: Date.now().toString(), name: data.name, url: data.url, preview, type: file.type }])
       inputRef.current?.focus()
     } catch (error: any) { alert(error.message || 'Upload failed') }
     finally { setToolBusy(false) }
+  }
+
+  const removeAttachment = (id: string) => {
+    setAttachments(prev => {
+      const removed = prev.find(a => a.id === id)
+      if (removed?.preview) URL.revokeObjectURL(removed.preview)
+      return prev.filter(a => a.id !== id)
+    })
   }
 
   const startProgress = () => {
@@ -268,17 +280,25 @@ export default function AIAssistantPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading || !isProUser) return
+    if ((!input.trim() && attachments.length === 0) || isLoading || !isProUser) return
+    requestNotificationPermission()
+
+    // Build content with attachment references
+    const attachmentText = attachments.map(a => `Attached file: [${a.name}](${a.url})`).join('\n')
+    const fullContent = [input.trim(), attachmentText].filter(Boolean).join('\n\n')
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: fullContent,
       timestamp: new Date(),
     }
 
     setMessages((prev) => [...prev, userMessage])
     setInput('')
+    // Clean up preview URLs
+    attachments.forEach(a => { if (a.preview) URL.revokeObjectURL(a.preview) })
+    setAttachments([])
     setIsLoading(true)
     startProgress()
 
@@ -431,6 +451,16 @@ export default function AIAssistantPage() {
       flushContent()
 
       loadChatList()
+
+      // Toast if user navigated away from AI assistant
+      if (!document.hasFocus() || !window.location.pathname.startsWith('/ai-assistant')) {
+        fireAiToast({
+          type: 'chat',
+          title: zh ? 'AI 回复完成' : 'AI Response Ready',
+          body: contentSoFar.slice(0, 80) + (contentSoFar.length > 80 ? '...' : ''),
+          href: '/ai-assistant',
+        })
+      }
     } catch {
       setMessages((prev) => {
         const exists = prev.some((m) => m.id === assistantId)
@@ -1263,6 +1293,35 @@ export default function AIAssistantPage() {
             <div className="max-w-3xl mx-auto">
               <form onSubmit={handleSubmit}>
                 <div className="relative bg-white/70 border border-white/80 rounded-2xl shadow-sm overflow-hidden">
+                  {/* Attachment previews */}
+                  {attachments.length > 0 && (
+                    <div className="flex gap-2 px-3 pt-3 pb-1 overflow-x-auto">
+                      {attachments.map((att) => (
+                        <div key={att.id} className="relative flex-shrink-0 group/att">
+                          {att.preview ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={att.preview} alt={att.name} className="w-16 h-16 rounded-xl object-cover border border-gray-200" />
+                          ) : (
+                            <div className="w-16 h-16 rounded-xl border border-gray-200 bg-gray-50 flex flex-col items-center justify-center">
+                              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <span className="text-[8px] text-gray-400 mt-0.5 max-w-[56px] truncate">{att.name}</span>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(att.id)}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-700/80 text-white flex items-center justify-center opacity-0 group-hover/att:opacity-100 transition hover:bg-gray-900"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <textarea
                     ref={inputRef}
                     value={input}

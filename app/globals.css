@@ -1003,3 +1003,9 @@ main > .page-enter-animation:has(.ai-assistant-page) {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(350%); }
 }
+
+/* Toast slide-in from right */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}

@@ -10,6 +10,7 @@ import { formatNumber } from '@/lib/i18n/formatNumber'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import LanguageSetupModal from '@/components/workspace/LanguageSetupModal'
 import WelcomeTutorialModal from '@/components/workspace/WelcomeTutorialModal'
+import AiToastRenderer from '@/components/workspace/AiToastRenderer'
 import ProductTour from '@/components/tour/ProductTour'
 
 // Workspace shell per the July 2026 workspace spec: floating left sidebar
@@ -299,6 +300,17 @@ export default function WorkspaceLayout({
         })}
       </nav>
 
+      {/* Language toggle — visible in sidebar only on mobile (hidden from top bar on small screens) */}
+      <div className="px-3 mb-1 sm:hidden">
+        <button
+          onClick={() => setLocale(locale === 'en' ? 'zh' : 'en')}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-white/60 hover:text-gray-900 transition"
+        >
+          <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">🌐</span>
+          <span>{locale === 'en' ? 'Switch to 中文' : 'Switch to English'}</span>
+        </button>
+      </div>
+
       {/* Tour launcher */}
       <div className="px-3 mb-1">
         <button
@@ -307,7 +319,7 @@ export default function WorkspaceLayout({
         >
           {/* Sparkle icon in circle */}
           <span className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4.5 h-4.5 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
+            <svg className="w-5 h-5 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
               <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
             </svg>
           </span>
@@ -328,9 +340,10 @@ export default function WorkspaceLayout({
       {/* Account chip: avatar · name · role, with an upward menu */}
       <div className="relative m-3">
         {accountOpen && (
+          <>
+          <div className="fixed inset-0 z-30" onClick={() => setAccountOpen(false)} />
           <div
             data-solid className="absolute bottom-full mb-2 left-0 right-0 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-40"
-            onMouseLeave={() => setAccountOpen(false)}
           >
             <Link
               href={profileHref}
@@ -361,6 +374,7 @@ export default function WorkspaceLayout({
               {t.nav.logout}
             </button>
           </div>
+          </>
         )}
         <button
           onClick={() => setAccountOpen((o) => !o)}
@@ -458,10 +472,10 @@ export default function WorkspaceLayout({
                 />
                 </span>
               )}
-              {/* Subscription status */}
+              {/* Subscription status — hidden on small mobile to avoid overflow */}
               <Link
                 href={role === 'creator' ? '/dashboard/upgrade' : '/pricing/brand'}
-                className={`h-10 px-5 rounded-full text-sm font-bold flex items-center transition workspace-top-pill ${
+                className={`hidden sm:flex h-10 px-5 rounded-full text-sm font-bold items-center transition workspace-top-pill ${
                   isPaid
                     ? 'selected-option-glass text-gray-900 hover:bg-white/70'
                     : 'bg-white shadow-sm text-gray-600 hover:text-gray-900'
@@ -470,10 +484,10 @@ export default function WorkspaceLayout({
               >
                 {tierBadgeLabel}
               </Link>
-              {/* Language */}
+              {/* Language — hidden on very small screens, visible in mobile sidebar instead */}
               <button
                 onClick={() => setLocale(locale === 'en' ? 'zh' : 'en')}
-                className="h-10 px-3 rounded-full bg-white shadow-sm text-sm font-medium text-gray-600 hover:text-gray-900 transition"
+                className="hidden sm:flex h-10 px-3 rounded-full bg-white shadow-sm text-sm font-medium text-gray-600 hover:text-gray-900 transition"
                 title="Language"
               >
                 🌐 {locale === 'en' ? 'EN' : '中文'}
@@ -528,6 +542,8 @@ export default function WorkspaceLayout({
       <WelcomeTutorialModal />
       {/* Interactive product tour — triggers after onboarding or via Settings replay */}
       <ProductTour role={role} />
+      {/* AI completion toasts */}
+      <AiToastRenderer />
     </div>
   )
 }
@@ -622,7 +638,7 @@ function NotificationDropdown({
   }
 
   return (
-    <div className="absolute right-0 top-12 z-50 w-[360px] bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+    <div className="absolute right-0 top-12 z-50 w-[calc(100vw-2rem)] sm:w-[360px] max-w-[360px] bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <h3 className="font-bold text-sm">{zh ? '通知' : 'Notifications'}</h3>
