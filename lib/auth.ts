@@ -140,13 +140,32 @@ export const authOptions: NextAuthOptions = {
   },
   cookies: process.env.NODE_ENV === 'production' ? {
     sessionToken: {
-      name: '__Secure-next-auth.session-token',
+      name: 'next-auth.session-token',
       options: {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'lax' as const,
         path: '/',
         secure: true,
-        // Set domain to .overseed.net so cookie works on both www and non-www
+        domain: '.overseed.net',
+      },
+    },
+    callbackUrl: {
+      name: 'next-auth.callback-url',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        path: '/',
+        secure: true,
+        domain: '.overseed.net',
+      },
+    },
+    csrfToken: {
+      name: 'next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        path: '/',
+        secure: true,
         domain: '.overseed.net',
       },
     },
