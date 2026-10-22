@@ -138,38 +138,23 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
   },
-  cookies: process.env.NODE_ENV === 'production' ? {
-    sessionToken: {
-      name: 'next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax' as const,
-        path: '/',
-        secure: true,
-        domain: '.overseed.net',
-      },
-    },
-    callbackUrl: {
-      name: 'next-auth.callback-url',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax' as const,
-        path: '/',
-        secure: true,
-        domain: '.overseed.net',
-      },
-    },
-    csrfToken: {
-      name: 'next-auth.csrf-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax' as const,
-        path: '/',
-        secure: true,
-        domain: '.overseed.net',
-      },
-    },
-  } : undefined,
+  cookies: process.env.NODE_ENV === 'production' ? (() => {
+    const shared = {
+      httpOnly: true,
+      sameSite: 'lax' as const,
+      path: '/',
+      secure: true,
+      domain: '.overseed.net',
+    }
+    return {
+      sessionToken:     { name: 'next-auth.session-token',       options: { ...shared } },
+      callbackUrl:      { name: 'next-auth.callback-url',        options: { ...shared } },
+      csrfToken:        { name: 'next-auth.csrf-token',          options: { ...shared } },
+      pkceCodeVerifier: { name: 'next-auth.pkce.code_verifier',  options: { ...shared, maxAge: 900 } },
+      state:            { name: 'next-auth.state',               options: { ...shared, maxAge: 900 } },
+      nonce:            { name: 'next-auth.nonce',               options: { ...shared } },
+    }
+  })() : undefined,
   pages: {
     signIn: '/auth/signin',
     error: '/auth/error',
