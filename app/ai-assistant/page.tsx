@@ -135,6 +135,7 @@ export default function AIAssistantPage() {
   const currentMode = AI_MODES.find(m => m.id === aiMode)
 
   const [attachments, setAttachments] = useState<{ id: string; name: string; url: string; preview: string; type: string }[]>([])
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false)
 
   const attachToPrompt = async (file: File) => {
     setToolBusy(true)
@@ -313,7 +314,7 @@ export default function AIAssistantPage() {
       const res = await fetch('/api/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: chatHistory, provider, chatId }),
+        body: JSON.stringify({ messages: chatHistory, provider, chatId, enableSearch: webSearchEnabled }),
       })
 
       if (!res.ok) {
@@ -1449,7 +1450,12 @@ export default function AIAssistantPage() {
                       <button
                         type="button"
                         disabled={!isProUser}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-100/80 hover:bg-gray-200/80 transition text-xs font-medium text-gray-500 disabled:opacity-40"
+                        onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg transition text-xs font-medium disabled:opacity-40 ${
+                          webSearchEnabled
+                            ? 'bg-primary-100 text-primary-700 border border-primary-200'
+                            : 'bg-gray-100/80 hover:bg-gray-200/80 text-gray-500'
+                        }`}
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />

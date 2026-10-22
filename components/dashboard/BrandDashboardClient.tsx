@@ -417,7 +417,6 @@ export default function BrandDashboardClient({
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-gray-900">
                   {t.workspace.aiAssistant}
-                  <span className="ml-2 px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded text-[10px] font-bold align-middle">BETA</span>
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">{d.aiGreeting}</p>
               </div>

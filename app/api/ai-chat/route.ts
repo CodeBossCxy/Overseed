@@ -10,6 +10,7 @@ import { deductCredits, refundDeduction } from '@/lib/credits'
 import { CREDIT_SYSTEM_ENABLED } from '@/lib/config'
 import { chargeCredits } from '@/lib/metering'
 import { walletRefund } from '@/lib/wallet'
+import { webSearch } from '@/lib/web-search'
 
 // Pricing v4 cost bounds for advanced (GPT/Claude-class) chat: cap output
 // tokens and trim input context so the per-message cost stays bounded.
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
   // the assistant now (pricing v3) — the credit balance is the gate.
   const subscriptionTier = await getEffectiveTier(userId)
 
-  const { messages: rawMessages, provider, chatId } = await req.json()
+  const { messages: rawMessages, provider, chatId, enableSearch } = await req.json()
   if (!rawMessages || !Array.isArray(rawMessages)) {
     return NextResponse.json({ error: 'Messages are required', code: 'VALIDATION_ERROR' }, { status: 400 })
   }
@@ -180,6 +181,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Web search augmentation
+    let searchContext = ''
+    if (enableSearch) {
+      const lastUserMsg = messages[messages.length - 1]
+      if (lastUserMsg?.role === 'user') {
+        const searchResults = await webSearch(lastUserMsg.content)
+        if (searchResults) {
+          searchContext = `\n\nWEB SEARCH RESULTS (use these to provide up-to-date information):\n${searchResults}\n\nIMPORTANT: When using search results, cite the source by including the link. If the search results are not relevant to the question, ignore them and answer from your own knowledge.`
+        }
+      }
+    }
+    const effectiveSystemPrompt = SYSTEM_PROMPT + searchContext
+
     // Stream response
     const encoder = new TextEncoder()
     let fullContent = ''
@@ -199,7 +213,7 @@ export async function POST(req: NextRequest) {
             const response = await client.messages.create({
               model: modelDef.model,
               max_tokens: ADVANCED_MAX_TOKENS,
-              system: SYSTEM_PROMPT,
+              system: effectiveSystemPrompt,
               stream: true,
               messages: messages.map((m: any) => ({
                 role: m.role as 'user' | 'assistant',
@@ -229,7 +243,7 @@ export async function POST(req: NextRequest) {
               stream: true,
               stream_options: { include_usage: true },
               messages: [
-                { role: 'system' as const, content: SYSTEM_PROMPT },
+                { role: 'system' as const, content: effectiveSystemPrompt },
                 ...messages.map((m: any) => ({
                   role: m.role as 'user' | 'assistant',
                   content: m.content as string,
@@ -259,7 +273,7 @@ export async function POST(req: NextRequest) {
               },
               body: JSON.stringify({
                 model: modelDef.model,
-                instructions: SYSTEM_PROMPT,
+                instructions: effectiveSystemPrompt,
                 input: messages.map((m: any) => ({
                   role: m.role as 'user' | 'assistant',
                   content: m.content,
