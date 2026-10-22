@@ -79,8 +79,44 @@ function WeChatProvider(options: {
   }
 }
 
+// Wrap PrismaAdapter so that a single DB failure (e.g. Neon cold-start timeout)
+// never crashes the entire OAuth flow. With JWT strategy the adapter is only used
+// for user/account CRUD — sessions are handled by the JWT itself.
+function resilientAdapter() {
+  const base = PrismaAdapter(prisma) as any
+  const wrap = <T>(fn: (...args: any[]) => Promise<T>, fallback: T, label: string) =>
+    async (...args: any[]): Promise<T> => {
+      try {
+        return await fn(...args)
+      } catch (err) {
+        console.error(`[auth][adapter] ${label} failed:`, err)
+        return fallback
+      }
+    }
+  return {
+    ...base,
+    getUserByAccount: wrap(base.getUserByAccount, null, 'getUserByAccount'),
+    getUserByEmail: wrap(base.getUserByEmail, null, 'getUserByEmail'),
+    getUser: wrap(base.getUser, null, 'getUser'),
+    linkAccount: wrap(base.linkAccount, undefined, 'linkAccount'),
+    createUser: async (data: any) => {
+      try {
+        return await base.createUser(data)
+      } catch (err) {
+        console.error('[auth][adapter] createUser failed:', err)
+        // If creation fails, try to find the user by email — they may already exist
+        try {
+          const existing = await prisma.user.findUnique({ where: { email: data.email } })
+          if (existing) return existing
+        } catch {}
+        throw err // Re-throw if we truly can't resolve the user
+      }
+    },
+  }
+}
+
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
+  adapter: resilientAdapter(),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || '',
@@ -202,6 +238,28 @@ export const authOptions: NextAuthOptions = {
         token.activeView = (user as any).activeView || null
         token.subscriptionTier = (user as any).subscriptionTier || 'FREE'
         token.tierRefreshedAt = Date.now()
+
+        // For OAuth sign-in: if the adapter couldn't load full user data from DB,
+        // the user object may only have the OAuth profile fields. Load from DB.
+        if (account?.provider && account.provider !== 'credentials' && !(user as any).userType) {
+          try {
+            const dbUser = await prisma.user.findUnique({
+              where: { email: user.email! },
+              select: { id: true, userType: true, activeView: true, subscriptionTier: true, brandProfile: { select: { brandVerificationStatus: true } } },
+            })
+            if (dbUser) {
+              token.id = dbUser.id
+              token.sub = dbUser.id
+              token.userType = dbUser.userType
+              token.activeView = dbUser.activeView || null
+              token.subscriptionTier = dbUser.subscriptionTier || 'FREE'
+              token.brandVerificationStatus = dbUser.brandProfile?.brandVerificationStatus || null
+            }
+          } catch (err) {
+            console.warn('[auth] jwt OAuth user lookup failed:', err)
+          }
+        }
+
         // Load brand verification status for brand users (ADMIN acts as brand)
         try {
           if ((user as any).userType === 'BRAND' || (user as any).userType === 'ADMIN') {
