@@ -140,7 +140,9 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account, profile, credentials }) {
-      // Auto-link OAuth accounts to existing users with the same email
+      // Auto-link OAuth accounts to existing users with the same email.
+      // Wrapped in try-catch so a DB error never blocks sign-in entirely.
+      try {
       if (account?.provider && account.provider !== 'credentials' && user.email) {
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email },
@@ -182,6 +184,9 @@ export const authOptions: NextAuthOptions = {
           }
         }
       }
+      } catch (err) {
+        console.error('[auth] signIn callback error (non-blocking):', err)
+      }
       return true
     },
     async jwt({ token, user, account, trigger }) {
@@ -192,12 +197,17 @@ export const authOptions: NextAuthOptions = {
         token.subscriptionTier = (user as any).subscriptionTier || 'FREE'
         token.tierRefreshedAt = Date.now()
         // Load brand verification status for brand users (ADMIN acts as brand)
-        if ((user as any).userType === 'BRAND' || (user as any).userType === 'ADMIN') {
-          const bp = await prisma.brandProfile.findUnique({
-            where: { userId: user.id },
-            select: { brandVerificationStatus: true },
-          })
-          token.brandVerificationStatus = bp?.brandVerificationStatus || 'PENDING'
+        try {
+          if ((user as any).userType === 'BRAND' || (user as any).userType === 'ADMIN') {
+            const bp = await prisma.brandProfile.findUnique({
+              where: { userId: user.id },
+              select: { brandVerificationStatus: true },
+            })
+            token.brandVerificationStatus = bp?.brandVerificationStatus || 'PENDING'
+          }
+        } catch (err) {
+          console.warn('[auth] jwt initial load failed:', err)
+          token.brandVerificationStatus = 'PENDING'
         }
       }
       // Keep JWT claims in sync with the DB: refresh on explicit
@@ -244,28 +254,30 @@ export const authOptions: NextAuthOptions = {
       // Beta: first 20 signups get Growth Plus (OUTREACH_PLUS), later ones
       // Campaign Plus (invite code was validated client-side before OAuth).
       // The adapter has already created this user, so exclude them from the
-      // promo count.
-      const { defaultSignupTier, grantPromoSignupCredits } = await import('@/lib/signup-tier')
-      const tier = await defaultSignupTier({ userAlreadyCounted: true })
-      if (user.id) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { subscriptionTier: tier },
-        })
-        // Growth Plus promo includes the tier's 900 monthly credits
-        await grantPromoSignupCredits(user.id, tier)
-      }
-      // Notify the internal team (fire-and-forget; the provider name isn't
-      // available in this event, so the method is reported as 'oauth')
-      if (user.email) {
-        const { sendNewUserSignupEmail } = await import('@/lib/email')
-        void sendNewUserSignupEmail({
-          name: user.name,
-          email: user.email,
-          userType: (user as any).userType || 'INFLUENCER',
-          method: 'oauth',
-          tier,
-        })
+      // promo count. Wrapped in try-catch so a failure never blocks sign-in.
+      try {
+        const { defaultSignupTier, grantPromoSignupCredits } = await import('@/lib/signup-tier')
+        const tier = await defaultSignupTier({ userAlreadyCounted: true })
+        if (user.id) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { subscriptionTier: tier },
+          })
+          await grantPromoSignupCredits(user.id, tier)
+        }
+        // Notify the internal team (fire-and-forget)
+        if (user.email) {
+          const { sendNewUserSignupEmail } = await import('@/lib/email')
+          void sendNewUserSignupEmail({
+            name: user.name,
+            email: user.email,
+            userType: (user as any).userType || 'INFLUENCER',
+            method: 'oauth',
+            tier,
+          })
+        }
+      } catch (err) {
+        console.error('[auth] createUser event failed (non-blocking):', err)
       }
     },
   },
