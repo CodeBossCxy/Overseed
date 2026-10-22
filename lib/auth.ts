@@ -144,6 +144,7 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account, profile, credentials }) {
+      console.log('[auth] signIn callback:', { provider: account?.provider, email: user.email, userId: user.id })
       // Auto-link OAuth accounts to existing users with the same email.
       // The PrismaAdapter handles account creation for new users automatically.
       // This callback handles the edge case where a user registered via email
@@ -287,4 +288,13 @@ export const authOptions: NextAuthOptions = {
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: true,
+  logger: {
+    error(code, metadata) {
+      console.error('[next-auth][error]', code, JSON.stringify(metadata, null, 2))
+    },
+    warn(code) {
+      console.warn('[next-auth][warn]', code)
+    },
+  },
 }

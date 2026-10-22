@@ -487,7 +487,7 @@ export default function WorkspaceLayout({
               {/* Language — hidden on very small screens, visible in mobile sidebar instead */}
               <button
                 onClick={() => setLocale(locale === 'en' ? 'zh' : 'en')}
-                className="hidden sm:flex h-10 px-3 rounded-full bg-white shadow-sm text-sm font-medium text-gray-600 hover:text-gray-900 transition"
+                className="hidden sm:flex items-center justify-center gap-1 h-10 px-3 rounded-full bg-white shadow-sm text-sm font-medium text-gray-600 hover:text-gray-900 transition"
                 title="Language"
               >
                 🌐 {locale === 'en' ? 'EN' : '中文'}
