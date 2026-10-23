@@ -66,6 +66,7 @@ function NavDropdown({ label, items, isGlobal, isLanding }: { label: string; ite
       <button
         onClick={() => setOpen(!open)}
         className={`flex items-center gap-1 transition font-normal ${buttonClass}`}
+        suppressHydrationWarning
       >
         {label}
         <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,7 +145,7 @@ function LanguageDropdown({
     <div ref={ref} className="relative mr-2 sm:mr-3">
       <button onClick={() => setOpen(!open)} className={triggerClass} title={title}>
         <GlobeIcon className={isLanding ? 'h-4 w-4 text-[#2d314e]' : 'w-5 h-5'} />
-        <span className={locale === 'zh' ? 'font-cn' : undefined}>{current}</span>
+        <span className={locale === 'zh' ? 'font-cn' : undefined} suppressHydrationWarning>{current}</span>
         <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -340,7 +341,7 @@ export default function Header() {
               <LandingLogo />
             )}
             {!isLandingPage && (
-              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-400 text-amber-900 rounded uppercase">{t.nav.beta}</span>
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-400 text-amber-900 rounded uppercase" suppressHydrationWarning>{t.nav.beta}</span>
             )}
           </Link>
 
@@ -358,6 +359,7 @@ export default function Header() {
                         ? 'text-sm text-gray-200 hover:text-[#ff769f]'
                         : 'text-sm text-gray-700 hover:text-primary-600'
                   }`}
+                  suppressHydrationWarning
                 >
                   {menu.label}
                 </Link>
@@ -442,7 +444,7 @@ export default function Header() {
                     href="/auth/signin"
                     className={`px-4 py-2 rounded-md transition text-sm ${isGlobal ? 'text-gray-200 hover:bg-[#456fa3]/15' : 'text-gray-700 hover:bg-gray-100'}`}
                   >
-                    {t.nav.login}
+                    <span suppressHydrationWarning>{t.nav.login}</span>
                   </Link>
                 )}
                 <Link
@@ -452,6 +454,7 @@ export default function Header() {
                       ? 'inline-flex min-h-[56px] items-center gap-4 rounded-full border border-white/80 bg-[#f8fbff]/75 px-8 text-base font-normal text-[#2d314e] shadow-[inset_0_1px_12px_rgba(255,255,255,0.95),0_14px_30px_rgba(81,124,174,0.16)] transition hover:bg-white'
                       : 'px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 transition text-sm'
                   }
+                  suppressHydrationWarning
                 >
                   {t.nav.signup}
                   {isLandingPage && <HeaderArrowIcon />}

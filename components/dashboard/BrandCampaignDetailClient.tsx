@@ -744,20 +744,20 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         <div className="flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold flex items-center justify-center">1</span>
           <div className="text-left">
-            <span className="text-xs font-semibold text-gray-800">{zh ? '受众' : 'Audience'}</span>
-            <span className="ml-2 text-[10px] text-gray-400">{zh ? '你想触达谁？' : 'Who do you want to reach?'}</span>
+            <span className="text-xs font-semibold text-gray-800">{d.audienceSection}</span>
+            <span className="ml-2 text-[10px] text-gray-400">{d.audienceDesc}</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.audience ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       {openFilterSections.audience && (
-        <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+        <div className="px-3 pb-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Audience location */}
           <div>
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                {zh ? '受众所在地' : 'Audience location'}
+                {d.audienceLocation}
               </span>
             </label>
             <MultiSelectFilter
@@ -767,7 +767,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 value: code,
                 label: (t.signupBusiness.countries as Record<string, string>)[key] || code,
               }))}
-              placeholder={zh ? '全部地区' : 'Anywhere'}
+              placeholder={d.audienceLocationPlaceholder}
               inputCls={inputCls}
             />
           </div>
@@ -776,7 +776,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M12 22l5-10 5 10"/><path d="M14 18h6"/></svg>
-                {zh ? '语言' : 'Language'}
+                {d.audienceLanguage}
               </span>
             </label>
             <MultiSelectFilter
@@ -786,7 +786,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 value,
                 label: langLabel,
               }))}
-              placeholder={zh ? '全部语言' : 'All languages'}
+              placeholder={d.audienceLanguagePlaceholder}
               inputCls={inputCls}
             />
           </div>
@@ -795,7 +795,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                {zh ? '受众年龄' : 'Audience age'}
+                {d.audienceAge}
               </span>
             </label>
             <MultiSelectFilter
@@ -805,7 +805,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 value: age,
                 label: age,
               }))}
-              placeholder={zh ? '全部' : 'Any'}
+              placeholder={d.anyOption}
               inputCls={inputCls}
             />
           </div>
@@ -814,7 +814,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a8.38 8.38 0 0 1 13 0"/></svg>
-                {zh ? '性别构成' : 'Gender'}
+                {d.audienceGender}
               </span>
             </label>
             {['instagram', 'tiktok', 'youtube'].includes(platform) ? (() => {
@@ -843,7 +843,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                   />
                   <div className="flex justify-between text-[10px] text-gray-500">
                     <span style={{ color: isActive ? '#ec4899' : undefined }}>
-                      {zh ? '女' : 'F'} {isActive ? `${femalePct}%+` : ''}
+                      {d.genderFemaleShort} {isActive ? `${femalePct}%+` : ''}
                     </span>
                     <button
                       type="button"
@@ -853,10 +853,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                       }}
                       className="text-[10px] text-gray-400 hover:text-gray-600"
                     >
-                      {isActive ? (zh ? '重置' : 'Reset') : (zh ? '任意' : 'Any')}
+                      {isActive ? d.genderReset : d.genderAny}
                     </button>
                     <span style={{ color: isActive ? '#3b82f6' : undefined }}>
-                      {isActive ? `${100 - femalePct}%+` : ''} {zh ? '男' : 'M'}
+                      {isActive ? `${100 - femalePct}%+` : ''} {d.genderMaleShort}
                     </span>
                   </div>
                 </div>
@@ -867,9 +867,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 onChange={(e) => updateCdbFilter('audienceGender', { value: e.target.value })}
                 className={`w-full ${inputCls}`}
               >
-                <option value="">{zh ? '全部' : 'Any'}</option>
-                <option value="female">{zh ? '女性为主' : 'Mostly female'}</option>
-                <option value="male">{zh ? '男性为主' : 'Mostly male'}</option>
+                <option value="">{d.anyOption}</option>
+                <option value="female">{m.mostlyFemale}</option>
+                <option value="male">{m.mostlyMale}</option>
               </select>
             )}
           </div>
@@ -883,20 +883,20 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         <div className="flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center">2</span>
           <div className="text-left">
-            <span className="text-xs font-semibold text-gray-800">{zh ? '创作者' : 'Creator'}</span>
-            <span className="ml-2 text-[10px] text-gray-400">{zh ? '寻找合适的创作者类型' : 'Find the right type of creators'}</span>
+            <span className="text-xs font-semibold text-gray-800">{d.creatorSection}</span>
+            <span className="ml-2 text-[10px] text-gray-400">{d.creatorDesc}</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.creator ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       {openFilterSections.creator && (
-        <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+        <div className="px-3 pb-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Platform */}
           <div>
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                {zh ? '平台' : 'Platform'}
+                {m.platformLabel}
               </span>
             </label>
             <select value={platform} onChange={e => setPlatform(e.target.value)} className={`w-full ${inputCls}`}>
@@ -910,7 +910,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                {zh ? '创作者所在国' : "Creator's country"}
+                {d.creatorCountry}
               </span>
             </label>
             <MultiSelectFilter
@@ -920,7 +920,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 value: code,
                 label: (t.signupBusiness.countries as Record<string, string>)[key] || code,
               }))}
-              placeholder={zh ? '全部国家' : 'Any country'}
+              placeholder={d.creatorCountryPlaceholder}
               inputCls={inputCls}
             />
           </div>
@@ -929,7 +929,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                {zh ? '认证账号' : 'Verified account'}
+                {d.verifiedAccount}
               </span>
             </label>
             <select
@@ -937,9 +937,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               onChange={(e) => updateCdbFilter('isAccountVerified', { value: e.target.value })}
               className={`w-full ${inputCls}`}
             >
-              <option value="">{zh ? '全部' : 'Any'}</option>
-              <option value="true">{zh ? '是' : 'Yes'}</option>
-              <option value="false">{zh ? '否' : 'No'}</option>
+              <option value="">{d.anyOption}</option>
+              <option value="true">{d.verifiedYes}</option>
+              <option value="false">{d.verifiedNo}</option>
             </select>
           </div>
           {/* Hashtags */}
@@ -947,14 +947,14 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <span className="text-[10px] font-bold text-gray-400">#</span>
-                {zh ? '标签（可选）' : 'Hashtags (optional)'}
+                {d.hashtags}
               </span>
             </label>
             <input
               type="text"
               value={cdbFilterFor('hashtags').value}
               onChange={(e) => updateCdbFilter('hashtags', { op: 'in', value: e.target.value })}
-              placeholder={zh ? '如 #护肤, #旅行' : 'e.g. #skincare, #travel'}
+              placeholder={d.hashtagsPlaceholder}
               className={`w-full ${inputCls}`}
             />
           </div>
@@ -968,11 +968,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             zh={zh}
           />
           {/* Followers / subscribers */}
-          <div className="col-span-2">
+          <div className="col-span-2 lg:col-span-2">
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                {zh ? '粉丝数' : 'Followers / subscribers'}
+                {d.followersLabel}
               </span>
             </label>
             <div className="flex items-center gap-1.5">
@@ -980,7 +980,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 <input
                   type="number"
                   min={0}
-                  placeholder={zh ? '最少粉丝' : 'Min followers'}
+                  placeholder={d.minFollowersPlaceholder}
                   autoFocus={minFollowers === 'custom'}
                   value={minFollowers === 'custom' ? '' : minFollowers}
                   onChange={(e) => {
@@ -999,11 +999,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                   onChange={(e) => { setMinFollowers(e.target.value); setFollowerTierMode('custom') }}
                   className={`flex-1 ${inputCls}`}
                 >
-                  <option value="">{zh ? '不限' : 'Any'}</option>
+                  <option value="">{d.anyOption}</option>
                   {[1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000].map((n) => (
                     <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                   ))}
-                  <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
+                  <option value="custom">{d.customOption}</option>
                 </select>
               )}
               <span className="text-gray-400 font-medium text-sm">–</span>
@@ -1011,7 +1011,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 <input
                   type="number"
                   min={0}
-                  placeholder={zh ? '最多粉丝' : 'Max followers'}
+                  placeholder={d.maxFollowersPlaceholder}
                   autoFocus={maxFollowers === 'custom'}
                   value={maxFollowers === 'custom' ? '' : maxFollowers}
                   onChange={(e) => {
@@ -1030,11 +1030,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                   onChange={(e) => { setMaxFollowers(e.target.value); setFollowerTierMode('custom') }}
                   className={`flex-1 ${inputCls}`}
                 >
-                  <option value="">{zh ? '不限' : 'Any'}</option>
+                  <option value="">{d.anyOption}</option>
                   {[5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 5000000, 10000000].map((n) => (
                     <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                   ))}
-                  <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
+                  <option value="custom">{d.customOption}</option>
                 </select>
               )}
             </div>
@@ -1044,7 +1044,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                {zh ? '最近活跃' : 'Last active'}
+                {d.lastActive}
               </span>
             </label>
             <select
@@ -1059,11 +1059,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               }}
               className={`w-full ${inputCls}`}
             >
-              <option value="">{zh ? '全部' : 'Any'}</option>
-              <option value="90">{zh ? '近3个月活跃' : 'Within 3 months'}</option>
-              <option value="180">{zh ? '近6个月活跃' : 'Within 6 months'}</option>
-              <option value="365">{zh ? '近1年活跃' : 'Within 1 year'}</option>
-              <option value="-365">{zh ? '超过1年未活跃' : 'Over 1 year ago'}</option>
+              <option value="">{d.anyOption}</option>
+              <option value="90">{d.last3months}</option>
+              <option value="180">{d.last6months}</option>
+              <option value="365">{d.last1year}</option>
+              <option value="-365">{d.over1year}</option>
             </select>
           </div>
         </div>
@@ -1076,32 +1076,32 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         <div className="flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold flex items-center justify-center">3</span>
           <div className="text-left">
-            <span className="text-xs font-semibold text-gray-800">{zh ? '数据表现' : 'Performance'}</span>
-            <span className="ml-2 text-[10px] text-gray-400">{zh ? '关注真实影响力的创作者' : 'Focus on creators with real impact'}</span>
+            <span className="text-xs font-semibold text-gray-800">{d.performanceSection}</span>
+            <span className="ml-2 text-[10px] text-gray-400">{d.performanceDesc}</span>
           </div>
         </div>
         <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.performance ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       {openFilterSections.performance && (
-        <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+        <div className="px-3 pb-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Average short views */}
           <div>
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                {zh ? '平均短视频播放量' : 'Average short views'}
+                {d.avgViews}
               </span>
             </label>
-            <div className="relative">
+            <div className="flex items-center gap-1">
               <input
                 type="number"
                 min={0}
                 value={cdbFilterFor('shortAvgViews').value}
                 onChange={(e) => updateCdbFilter('shortAvgViews', { op: '>', value: e.target.value })}
-                placeholder={zh ? '如 5,000' : 'e.g. 5,000'}
-                className={`w-full ${inputCls}`}
+                placeholder={d.avgViewsPlaceholder}
+                className={`min-w-0 flex-1 ${inputCls}`}
               />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 次播放' : '≥ views'}</span>
+              <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">{d.avgViewsSuffix}</span>
             </div>
           </div>
           {/* Average engagement rate */}
@@ -1109,20 +1109,20 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
-                {zh ? '平均互动率' : 'Average engagement rate'}
+                {d.avgEngagement}
               </span>
             </label>
-            <div className="relative">
+            <div className="flex items-center gap-1">
               <input
                 type="number"
                 step="0.1"
                 min={0}
                 value={cdbFilterFor('shortEngagementRate').value}
                 onChange={(e) => updateCdbFilter('shortEngagementRate', { op: '>', value: e.target.value })}
-                placeholder={zh ? '如 2.5%' : 'e.g. 2.5%'}
-                className={`w-full ${inputCls}`}
+                placeholder={d.avgEngagementPlaceholder}
+                className={`min-w-0 flex-1 ${inputCls}`}
               />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">≥ %</span>
+              <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">≥ %</span>
             </div>
           </div>
           {/* Followers growth (30d) */}
@@ -1130,19 +1130,19 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-                {zh ? '粉丝增长 (30天)' : 'Followers growth (30d)'}
+                {d.followerGrowth}
               </span>
             </label>
-            <div className="relative">
+            <div className="flex items-center gap-1">
               <input
                 type="number"
                 min={0}
                 value={cdbFilterFor('followerGrowth30d').value}
                 onChange={(e) => updateCdbFilter('followerGrowth30d', { op: '>', value: e.target.value })}
-                placeholder={zh ? '如 500' : 'e.g. 500'}
-                className={`w-full ${inputCls}`}
+                placeholder={d.followerGrowthPlaceholder}
+                className={`min-w-0 flex-1 ${inputCls}`}
               />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 新粉丝' : '≥ new'}</span>
+              <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">{d.followerGrowthSuffix}</span>
             </div>
           </div>
           {/* Content count (30d) */}
@@ -1150,19 +1150,19 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <label className={labelCls}>
               <span className="inline-flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                {zh ? '近30天发布数' : 'Posts in last 30d'}
+                {d.postsIn30d}
               </span>
             </label>
-            <div className="relative">
+            <div className="flex items-center gap-1">
               <input
                 type="number"
                 min={0}
                 value={cdbFilterFor('contentsIn30Days').value}
                 onChange={(e) => updateCdbFilter('contentsIn30Days', { op: '>', value: e.target.value })}
-                placeholder={zh ? '如 5' : 'e.g. 5'}
-                className={`w-full ${inputCls}`}
+                placeholder={d.postsIn30dPlaceholder}
+                className={`min-w-0 flex-1 ${inputCls}`}
               />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{zh ? '≥ 条' : '≥ posts'}</span>
+              <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">{d.postsIn30dSuffix}</span>
             </div>
           </div>
         </div>
@@ -1345,7 +1345,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             </section>
           )}
           {matched && (<>
-          <div className="flex items-center justify-between mb-3"><b>{loading ? m.findingCreators : (zh ? `为您推荐 ${creators.length} 位达人` : `Top ${creators.length} creators for you`)}{searchPage > 0 && ` · ${zh ? `第 ${searchPage + 1} 页` : `Page ${searchPage + 1}`}`}</b><span className="text-sm text-[#7180ad]">{m.sortBy}<b>{m.relevance}</b></span></div>
+          <div className="flex items-center justify-between mb-3"><b>{loading ? m.findingCreators : m.creatorsForYou.replace('{count}', String(creators.length))}{searchPage > 0 && ` · ${m.pageNum.replace('{n}', String(searchPage + 1))}`}</b><span className="text-sm text-[#7180ad]">{m.sortBy}<b>{m.relevance}</b></span></div>
           <div className={`space-y-3 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
             {creators.map(c => {
               const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
@@ -1378,7 +1378,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                               type="button"
                               onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(c.handle?.replace(/^@/, '') || '') }}
                               className="text-gray-300 hover:text-gray-500 flex-shrink-0"
-                              title={zh ? '复制' : 'Copy handle'}
+                              title={d.resultsCopyHandle}
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -1422,8 +1422,8 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
                     </svg>
-                    <span className="text-lg font-bold text-gray-900">{c.follower_count != null ? new Intl.NumberFormat(zh ? 'zh-CN' : 'en-US').format(c.follower_count) : '—'}</span>
-                    <span className="text-sm text-gray-400">{zh ? '粉丝' : 'followers'}</span>
+                    <span className="text-lg font-bold text-gray-900">{c.follower_count != null ? new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US').format(c.follower_count) : '—'}</span>
+                    <span className="text-sm text-gray-400">{d.followers}</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <button
@@ -1434,7 +1434,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                       </svg>
-                      {zh ? '查看资料' : 'View Profile'}
+                      {d.resultsViewProfile}
                     </button>
                     <button
                       type="button"
@@ -1451,7 +1451,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                       </svg>
-                      {queuedIds.has(c.id) ? (zh ? '已添加' : m.added) : (zh ? '联系' : 'Contact')}
+                      {queuedIds.has(c.id) ? m.added : d.resultsContact}
                     </button>
                   </div>
                 </div>
@@ -1468,10 +1468,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 disabled={searchPage === 0 || loading}
                 className="px-5 py-2.5 bg-white/55 text-gray-700 rounded-full text-sm font-semibold hover:bg-white/75 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                ← {zh ? '上一页' : 'Previous'}
+                ← {m.prevPage}
               </button>
               <span className="min-w-20 text-center text-sm font-medium text-gray-500">
-                {zh ? '第' : 'Page'} {searchPage + 1}
+                {m.pageNum.replace('{n}', String(searchPage + 1))}
               </span>
               <button
                 type="button"
@@ -1479,7 +1479,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 disabled={!searchHasMore || loading}
                 className="px-5 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {zh ? '下一页' : 'Next'} →
+                {m.nextPageBtn} →
               </button>
             </div>
           )}
@@ -1543,30 +1543,28 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           {outreachSent ? (
             <div className="text-center py-6">
               <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl">✓</div>
-              <h3 className="text-lg font-bold text-gray-900 mt-4">{zh ? '已添加到外联队列' : 'Added to outreach queue'}</h3>
+              <h3 className="text-lg font-bold text-gray-900 mt-4">{m.addedToOutreachQueue}</h3>
               <p className="text-sm text-gray-500 mt-1.5">
-                {zh
-                  ? `${outreachModalCreator.display_name || outreachModalCreator.handle} 已添加到队列。点击"请求 Overseed 外联"后我们将代您联系。`
-                  : `${outreachModalCreator.display_name || outreachModalCreator.handle} has been added to the queue. Click "Request Overseed Outreach" when ready and we'll reach out on your behalf.`}
+                {m.addedToQueueDesc.replace('{name}', outreachModalCreator.display_name || outreachModalCreator.handle || '')}
               </p>
               <button onClick={() => setOutreachModalCreator(null)} className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">
-                {zh ? '完成' : 'Done'}
+                {m.done}
               </button>
             </div>
           ) : (
             <>
               <h3 className="text-lg font-bold text-gray-900">
-                {zh ? '联系 ' : 'Contact '}{outreachModalCreator.display_name || outreachModalCreator.handle}
+                {m.contactCreatorPrefix}{outreachModalCreator.display_name || outreachModalCreator.handle}
               </h3>
               <p className="text-xs text-gray-500 mt-1">
-                {zh ? '由 Overseed 代为发送 — 创作者可以直接回复您的消息。' : 'Delivered by Overseed — the creator can reply directly to your message.'}
+                {m.outreachDeliveredBy}
               </p>
               <textarea
                 value={outreachMsg}
                 onChange={(e) => setOutreachMsg(e.target.value)}
                 rows={6}
                 maxLength={2000}
-                placeholder={zh ? '写下您的合作邀请消息...' : 'Write your collaboration message...'}
+                placeholder={m.writeMsgPlaceholder}
                 className="mt-4 w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
                 style={{ border: '1px solid #e5e7eb' }}
               />
@@ -1590,15 +1588,15 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                   </div>
                 )}
                 <label className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 cursor-pointer">
-                  <span className="text-base leading-none">＋</span> {zh ? '添加图片或文件' : 'Add photos or files'}
+                  <span className="text-base leading-none">＋</span> {m.addPhotosOrFiles}
                   <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" className="hidden" onChange={(e) => { addOutreachFiles(e.target.files); e.target.value = '' }} />
                 </label>
-                <span className="ml-2 text-[11px] text-gray-400">{zh ? '图片或PDF · 最多3个 · 共4MB' : 'Images or PDF · up to 3 files · 4MB combined'}</span>
+                <span className="ml-2 text-[11px] text-gray-400">{m.filesHint}</span>
               </div>
 
               <label className="flex items-center gap-2 mt-4 cursor-pointer">
                 <input type="checkbox" checked={rememberMsg} onChange={(e) => setRememberMsg(e.target.checked)} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                <span className="text-sm text-gray-600">{zh ? '记住此消息用于下一位创作者' : 'Remember this message for the next creator'}</span>
+                <span className="text-sm text-gray-600">{m.rememberMsg}</span>
               </label>
 
               {outreachError && (
@@ -1607,10 +1605,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
 
               <div className="flex items-center justify-end gap-3 mt-5">
                 <button onClick={() => setOutreachModalCreator(null)} disabled={outreachSending} className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">
-                  {zh ? '取消' : 'Cancel'}
+                  {m.cancelBtn}
                 </button>
                 <button onClick={sendOutreach} disabled={outreachSending || outreachMsg.trim().length < 10} className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                  {outreachSending ? (zh ? '发送中…' : 'Sending…') : (zh ? '发送消息' : 'Send message')}
+                  {outreachSending ? m.sendingMsg : m.sendMessage}
                 </button>
               </div>
             </>

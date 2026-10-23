@@ -287,7 +287,7 @@ export default function WorkspaceLayout({
               }`}
             >
               <NavIcon d={item.icon} />
-              <span className="truncate flex-1">{item.label}</span>
+              <span className="truncate flex-1" suppressHydrationWarning>{item.label}</span>
               {pending ? (
                 <span className="h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 border-gray-300 border-t-gray-900 animate-spin" />
               ) : item.href === '/dashboard/messages' && unread > 0 && (
@@ -307,7 +307,7 @@ export default function WorkspaceLayout({
           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-white/60 hover:text-gray-900 transition"
         >
           <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">🌐</span>
-          <span>{locale === 'en' ? 'Switch to 中文' : 'Switch to English'}</span>
+          <span suppressHydrationWarning>{locale === 'en' ? 'Switch to 中文' : 'Switch to English'}</span>
         </button>
       </div>
 
@@ -315,25 +315,12 @@ export default function WorkspaceLayout({
       <div className="px-3 mb-1">
         <button
           onClick={() => window.dispatchEvent(new Event('tour:start'))}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-white/40 backdrop-blur border border-white/60 shadow-sm hover:bg-white/60 transition group"
+          className="w-full flex items-center justify-center gap-2 h-10 px-5 rounded-full bg-primary-600 text-white text-sm font-bold shadow-sm hover:bg-primary-700 transition"
         >
-          {/* Sparkle icon in circle */}
-          <span className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
-            <svg className="w-5 h-5 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
-            </svg>
-          </span>
-          {/* Text */}
-          <span className="min-w-0 flex-1 text-left leading-tight">
-            <span className="block text-sm font-bold text-gray-900">{locale === 'zh' ? '产品教程' : 'Product Tour'}</span>
-            <span className="block text-[11px] text-gray-500">{locale === 'zh' ? '快速了解 (30秒)' : 'Take a quick tour (30s)'}</span>
-          </span>
-          {/* Arrow circle */}
-          <span className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-600 transition">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-            </svg>
-          </span>
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+          </svg>
+          <span suppressHydrationWarning>{locale === 'zh' ? '产品教程' : 'Product Tour'}</span>
         </button>
       </div>
 
@@ -392,7 +379,7 @@ export default function WorkspaceLayout({
             <span className="block text-sm font-bold text-gray-900 truncate">
               {role === 'creator' ? `@${userName.replace(/\s+/g, '').toLowerCase()}` : userName}
             </span>
-            <span className="block text-xs text-gray-500">
+            <span className="block text-xs text-gray-500" suppressHydrationWarning>
               {role === 'creator' ? roleLabel : t.brand.dashboard.brandAdmin}
             </span>
           </span>
@@ -456,7 +443,7 @@ export default function WorkspaceLayout({
                   className="hidden sm:inline-flex h-10 items-center gap-2 px-5 rounded-full bg-primary-600 text-white text-sm font-bold shadow-sm hover:bg-primary-700 transition"
                 >
                   <span aria-hidden className="text-lg leading-none">+</span>
-                  {t.nav?.createCampaign || 'Create Campaign'}
+                  <span suppressHydrationWarning>{t.nav?.createCampaign || 'Create Campaign'}</span>
                 </Link>
               )}
               {/* Credits chip */}
@@ -481,6 +468,7 @@ export default function WorkspaceLayout({
                     : 'bg-white shadow-sm text-gray-600 hover:text-gray-900'
                 }`}
                 title={w.myPlan}
+                suppressHydrationWarning
               >
                 {tierBadgeLabel}
               </Link>
@@ -490,7 +478,7 @@ export default function WorkspaceLayout({
                 className="hidden sm:flex items-center justify-center gap-1 h-10 px-3 rounded-full bg-white shadow-sm text-sm font-medium text-gray-600 hover:text-gray-900 transition"
                 title="Language"
               >
-                🌐 {locale === 'en' ? 'EN' : '中文'}
+                <span suppressHydrationWarning>🌐 {locale === 'en' ? 'EN' : '中文'}</span>
               </button>
               <div className="relative">
                 <button
@@ -514,7 +502,7 @@ export default function WorkspaceLayout({
                       notifications={notifications}
                       unreadCount={notifUnread}
                       unreadMessages={unread}
-                      locale={locale}
+                      wt={w as Record<string, string>}
                       onMarkAllRead={async () => {
                         await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) })
                         fetchNotifications()
@@ -612,42 +600,41 @@ function NotificationDropdown({
   notifications,
   unreadCount,
   unreadMessages,
-  locale,
+  wt,
   onMarkAllRead,
   onClose,
 }: {
   notifications: any[]
   unreadCount: number
   unreadMessages: number
-  locale: string
+  wt: Record<string, string>
   onMarkAllRead: () => void
   onClose: () => void
 }) {
-  const zh = locale === 'zh'
   const router = useRouter()
 
   const timeAgo = (date: string) => {
     const diff = Date.now() - new Date(date).getTime()
     const mins = Math.floor(diff / 60000)
-    if (mins < 1) return zh ? '刚刚' : 'just now'
-    if (mins < 60) return zh ? `${mins}分钟前` : `${mins}m ago`
+    if (mins < 1) return wt.timeJustNow
+    if (mins < 60) return wt.timeMinAgo?.replace('{n}', String(mins))
     const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return zh ? `${hrs}小时前` : `${hrs}h ago`
+    if (hrs < 24) return wt.timeHrAgo?.replace('{n}', String(hrs))
     const days = Math.floor(hrs / 24)
-    return zh ? `${days}天前` : `${days}d ago`
+    return wt.timeDayAgo?.replace('{n}', String(days))
   }
 
   return (
     <div className="absolute right-0 top-12 z-50 w-[calc(100vw-2rem)] sm:w-[360px] max-w-[360px] bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <h3 className="font-bold text-sm">{zh ? '通知' : 'Notifications'}</h3>
+        <h3 className="font-bold text-sm">{wt.notifTitle}</h3>
         {unreadCount > 0 && (
           <button
             onClick={onMarkAllRead}
             className="text-xs text-primary-600 hover:text-primary-700 font-medium"
           >
-            {zh ? '全部标为已读' : 'Mark all read'}
+            {wt.notifMarkAllRead}
           </button>
         )}
       </div>
@@ -665,7 +652,7 @@ function NotificationDropdown({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-blue-900">
-              {zh ? `${unreadMessages} 条未读消息` : `${unreadMessages} unread message${unreadMessages > 1 ? 's' : ''}`}
+              {(unreadMessages > 1 ? wt.notifUnreadMessagesPlural : wt.notifUnreadMessages)?.replace('{n}', String(unreadMessages))}
             </p>
           </div>
           <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -678,7 +665,7 @@ function NotificationDropdown({
       <div className="max-h-[380px] overflow-y-auto">
         {notifications.length === 0 && (
           <div className="py-10 text-center text-sm text-gray-400">
-            {zh ? '暂无通知' : 'No notifications yet'}
+            {wt.notifEmpty}
           </div>
         )}
         {notifications.map((n) => (

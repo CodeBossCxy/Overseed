@@ -52,15 +52,20 @@
 }
 
 /* Next / Done button */
-.driver-popover.overseed-tour-popover .driver-popover-next-btn {
-  background: var(--primary-button-gradient) !important;
+.driver-popover.overseed-tour-popover .driver-popover-footer .driver-popover-next-btn,
+.driver-popover .driver-popover-footer .driver-popover-next-btn {
+  background: #4f46e5 !important;
+  background-image: linear-gradient(135deg, #4f46e5, #6366f1) !important;
   color: #ffffff !important;
-  box-shadow: var(--primary-button-shadow) !important;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3) !important;
 }
 
-.driver-popover.overseed-tour-popover .driver-popover-next-btn:hover {
-  background: var(--primary-button-gradient-hover) !important;
+.driver-popover.overseed-tour-popover .driver-popover-footer .driver-popover-next-btn:hover,
+.driver-popover .driver-popover-footer .driver-popover-next-btn:hover {
+  background: #4338ca !important;
+  background-image: linear-gradient(135deg, #4338ca, #4f46e5) !important;
   transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4) !important;
 }
 
 /* Back button */

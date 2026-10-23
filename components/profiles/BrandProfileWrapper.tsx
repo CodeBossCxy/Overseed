@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import CampaignRowCard from '@/components/campaigns/CampaignRowCard'
 import UGCTranslateToggle from '@/components/UGCTranslateToggle'
+import TranslatableText from '@/components/TranslatableText'
 
 interface BrandProfileWrapperProps {
   initialBrand: any
@@ -91,7 +92,11 @@ export default function BrandProfileWrapper({ initialBrand }: BrandProfileWrappe
                 </span>
               )}
             </div>
-            {brand.description && <p className="text-sm text-gray-600 mt-2 max-w-2xl">{brand.description}</p>}
+            {brand.description && (
+              <TranslatableText text={brand.description}>
+                {(text) => <p className="text-sm text-gray-600 mt-2 max-w-2xl">{text}</p>}
+              </TranslatableText>
+            )}
             {(industries.length > 0 || (brand.countries || []).length > 0) && (
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {industries.map((ind: string) => (

@@ -520,7 +520,7 @@ export default function MessagesPage() {
                 </button>
               </div>
               <div className="flex gap-3">
-                {([['all', (t.messages as any)?.tabAll || 'All'], ['unread', (t.messages as any)?.tabUnread || 'Unread'], ['favorites', (t.messages as any)?.tabFavorites || 'Favorites'], ...(isBrand ? [['outreach', locale === 'zh' ? '触达记录' : 'Outreach'] as const] : [])] as const).map(([key, label]) => (
+                {([['all', (t.messages as any)?.tabAll || 'All'], ['unread', (t.messages as any)?.tabUnread || 'Unread'], ['favorites', (t.messages as any)?.tabFavorites || 'Favorites'], ...(isBrand ? [['outreach', (t.messages as any)?.tabOutreach || 'Outreach'] as const] : [])] as const).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => setListFilter(key)}
@@ -958,15 +958,15 @@ export default function MessagesPage() {
                   <div className="workspace-glass-card rounded-2xl p-5">
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
-                        <p className="text-xs text-gray-400">{locale === 'zh' ? '活动' : 'Campaign'}</p>
+                        <p className="text-xs text-gray-400">{(t.messages as any)?.outreachCampaign || 'Campaign'}</p>
                         <p className="font-medium text-gray-800">{selectedOutreachItem.campaignTitle}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400">{locale === 'zh' ? '平台' : 'Platform'}</p>
+                        <p className="text-xs text-gray-400">{(t.messages as any)?.outreachPlatform || 'Platform'}</p>
                         <p className="font-medium text-gray-800 capitalize">{selectedOutreachItem.creatorPlatform}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400">{locale === 'zh' ? '日期' : 'Date'}</p>
+                        <p className="text-xs text-gray-400">{(t.messages as any)?.outreachDate || 'Date'}</p>
                         <p className="font-medium text-gray-800">
                           {new Date(selectedOutreachItem.updatedAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
@@ -977,7 +977,7 @@ export default function MessagesPage() {
                   {selectedOutreachItem.lastMessage && (
                     <div className="workspace-glass-card rounded-2xl p-5">
                       <h3 className="font-bold text-sm text-gray-900 mb-2">
-                        {locale === 'zh' ? '发送的消息' : 'Message Sent'}
+                        {(t.messages as any)?.outreachMessageSent || 'Message Sent'}
                       </h3>
                       <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">
                         {selectedOutreachItem.lastMessage.content}

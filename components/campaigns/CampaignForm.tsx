@@ -33,7 +33,7 @@ export default function CampaignForm({
   isEditing = false,
 }: CampaignFormProps) {
   const router = useRouter()
-  const { t, locale } = useLanguage()
+  const { t } = useLanguage()
   const cf = t.campaignForm
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -902,24 +902,7 @@ export default function CampaignForm({
 
   const stepLabels = [cf.stepBasicInfo, cf.stepCompensation, cf.stepRequirements]
   const nextStepLabel = step < 3 ? stepLabels[step] : null
-  const zh = locale === 'zh'
-
-  // Tips for the sidebar
-  const tips = zh
-    ? [
-        '明确说明目标和受众',
-        '包含关键产品细节或要点',
-        '选择相关的类别',
-        '设置合理的截止日期',
-        '在下一步提供清晰的合作要求',
-      ]
-    : [
-        'Be specific about your goals and target audience',
-        'Include key product details or talking points',
-        'Choose relevant categories',
-        'Set a realistic application deadline',
-        'Provide clear collaboration requirements in the next step',
-      ]
+  const tips = [cf.tip1, cf.tip2, cf.tip3, cf.tip4, cf.tip5]
 
   return (
     <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
@@ -938,17 +921,13 @@ export default function CampaignForm({
       {/* Page header */}
       <div className="mb-6">
         <p className="text-xs font-bold tracking-widest text-primary-600 uppercase mb-1">
-          {zh ? '创建活动' : 'CREATE CAMPAIGN'}
+          {cf.createCampaignHeader}
         </p>
         <h1 className="text-3xl font-bold text-gray-900">
-          {isEditing
-            ? (zh ? '编辑活动' : 'Edit Campaign')
-            : (zh ? '创建新活动' : 'Create a New Campaign')}
+          {isEditing ? cf.editCampaign : cf.createNewCampaign}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          {zh
-            ? '设置达人合作活动，让 AI 帮你找到最合适的达人。'
-            : 'Set up a creator collaboration campaign and let AI help you find the best creators.'}
+          {cf.campaignDesc}
         </p>
       </div>
 
@@ -1002,10 +981,10 @@ export default function CampaignForm({
             <h2 className="text-lg font-semibold text-gray-900 mb-1">{stepLabels[step - 1]}</h2>
             <p className="text-sm text-gray-400 mb-6">
               {step === 1
-                ? (zh ? '告诉我们关于您活动的信息。' : 'Tell us about your campaign.')
+                ? cf.stepBasicsDesc
                 : step === 2
-                  ? (zh ? '设置达人的报酬方式。' : 'Set up how creators will be compensated.')
-                  : (zh ? '定义内容和平台要求。' : 'Define content and platform requirements.')}
+                  ? cf.stepCompensationDesc
+                  : cf.stepRequirementsDesc}
             </p>
             {step === 1 && renderStep1()}
             {step === 2 && renderStep2()}
@@ -1068,8 +1047,8 @@ export default function CampaignForm({
                 </svg>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">{zh ? '活动预览' : 'Campaign Preview'}</h3>
-                <p className="text-xs text-gray-400">{zh ? '达人将看到这样的活动展示。' : 'This is how your campaign will appear to creators.'}</p>
+                <h3 className="text-sm font-semibold text-gray-900">{cf.campaignPreview}</h3>
+                <p className="text-xs text-gray-400">{cf.previewDesc}</p>
               </div>
             </div>
             <div className="rounded-xl border border-gray-100 p-4 space-y-3">
@@ -1084,7 +1063,7 @@ export default function CampaignForm({
                   )}
                 </div>
                 <span className="text-sm font-semibold text-gray-900 truncate">
-                  {formData.title || (zh ? '活动标题' : 'Campaign Title')}
+                  {formData.title || cf.titlePlaceholder}
                 </span>
               </div>
               <div className="space-y-1.5">
@@ -1096,16 +1075,16 @@ export default function CampaignForm({
                 <span className="inline-flex items-center gap-1">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" /></svg>
                   {formData.categoryIds.length > 0
-                    ? categories.find((c) => c.id === formData.categoryIds[0])?.name || (zh ? '类别' : 'Category')
-                    : (zh ? '类别' : 'Category')}
+                    ? categories.find((c) => c.id === formData.categoryIds[0])?.name || cf.category
+                    : cf.category}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
-                  {formData.totalSlots || 10} {zh ? '个名额' : 'spots'}
+                  {formData.totalSlots || 10} {cf.spots}
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
-                  {formData.deadline || (zh ? '截止日期' : 'Deadline')}
+                  {formData.deadline || cf.deadline}
                 </span>
               </div>
             </div>
@@ -1116,7 +1095,7 @@ export default function CampaignForm({
             <div className="flex items-start gap-3 mb-4">
               <span className="text-xl">💡</span>
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">{zh ? '成功活动的小技巧' : 'Tips for a successful campaign'}</h3>
+                <h3 className="text-sm font-semibold text-gray-900">{cf.tipsTitle}</h3>
               </div>
             </div>
             <ul className="space-y-2.5">

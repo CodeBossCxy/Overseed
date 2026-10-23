@@ -64,8 +64,9 @@ const STEPS = [
 
 export default function WelcomeTutorialModal() {
   const { data: session } = useSession()
-  const { locale } = useLanguage()
+  const { locale, t } = useLanguage()
   const zh = locale === 'zh'
+  const pt = t.productTour
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
   const [closing, setClosing] = useState(false)
@@ -84,7 +85,7 @@ export default function WelcomeTutorialModal() {
 
   const current = STEPS[step]
   const isLast = step === STEPS.length - 1
-  const t = (s: { en: string; zh: string }) => zh ? s.zh : s.en
+  const tr = (s: { en: string; zh: string }) => zh ? s.zh : s.en
 
   const complete = async () => {
     setClosing(true)
@@ -128,9 +129,9 @@ export default function WelcomeTutorialModal() {
         <div className="p-6 sm:p-8">
           <div className="text-center mb-6">
             <span className="text-4xl">{current.icon}</span>
-            <h2 className="text-xl font-bold text-gray-900 mt-3">{t(current.title)}</h2>
-            <p className="text-sm text-primary-600 font-medium mt-1">{t(current.subtitle)}</p>
-            <p className="text-sm text-gray-500 mt-3 leading-relaxed">{t(current.description)}</p>
+            <h2 className="text-xl font-bold text-gray-900 mt-3">{tr(current.title)}</h2>
+            <p className="text-sm text-primary-600 font-medium mt-1">{tr(current.subtitle)}</p>
+            <p className="text-sm text-gray-500 mt-3 leading-relaxed">{tr(current.description)}</p>
             {'visual' in current && current.visual}
           </div>
 
@@ -155,7 +156,7 @@ export default function WelcomeTutorialModal() {
             className="text-sm text-gray-400 hover:text-gray-600 transition"
             disabled={closing}
           >
-            {zh ? '跳过' : 'Skip'}
+            {pt.skip}
           </button>
           <div className="flex items-center gap-3">
             {step > 0 && (
@@ -163,7 +164,7 @@ export default function WelcomeTutorialModal() {
                 onClick={() => setStep(s => s - 1)}
                 className="px-5 py-2.5 border border-gray-200 rounded-full text-sm font-semibold text-gray-600 hover:bg-gray-50 transition"
               >
-                {zh ? '上一步' : 'Back'}
+                {pt.prev}
               </button>
             )}
             <button
@@ -171,7 +172,7 @@ export default function WelcomeTutorialModal() {
               disabled={closing}
               className="px-6 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold shadow-sm hover:bg-primary-700 transition disabled:opacity-50"
             >
-              {isLast ? (zh ? '开始使用' : 'Get Started') : (zh ? '下一步' : 'Next')}
+              {isLast ? pt.done : pt.next}
             </button>
           </div>
         </div>

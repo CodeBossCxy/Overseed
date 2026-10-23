@@ -173,6 +173,12 @@ export default function ProductTour({ role }: ProductTourProps) {
       doneBtnText: pt.done,
       nextBtnText: pt.next,
       prevBtnText: pt.prev,
+      onPopoverRender: (popover) => {
+        const nextBtn = popover.nextButton as HTMLElement | undefined
+        if (nextBtn) {
+          nextBtn.style.cssText = 'background:#4f46e5;color:#fff;border:none;border-radius:999px;padding:0.5rem 1.25rem;font-weight:700;font-size:0.8125rem;box-shadow:0 1px 3px rgba(79,70,229,0.3);cursor:pointer;'
+        }
+      },
       onNextClick: async (_el, step, opts) => {
         const idx = opts.state.activeIndex ?? 0
         // When advancing past the "Find Your Creator" nav step, navigate

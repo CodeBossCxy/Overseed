@@ -163,12 +163,12 @@ function AutoplayEmbed({
 function RelatedCreatorChip({
   handle,
   platform,
-  zh,
+  clickToViewLabel,
   onOpen,
 }: {
   handle: string
   platform: string
-  zh: boolean
+  clickToViewLabel: string
   onOpen: (creator: DiscoveredCreator) => void
 }) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
@@ -209,7 +209,7 @@ function RelatedCreatorChip({
           className="fixed z-[100] px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] font-medium shadow-lg whitespace-nowrap pointer-events-none -translate-x-1/2 -translate-y-full"
           style={{ left: tooltip.x, top: tooltip.y - 6 }}
         >
-          {zh ? '点击查看 · 5 积分' : 'Click to view · 5 credits'}
+          {clickToViewLabel}
         </span>
       )}
     </span>
@@ -663,7 +663,7 @@ export default function CreatorDetailModal({
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                   </svg>
-                  {zh ? '联系达人' : 'Contact the creator'}
+                  {t.creatorDetail.contactCreator}
                 </button>
                 {(() => {
                   const h = (detailFor.handle || '').replace(/^@/, '').toLowerCase()
@@ -688,7 +688,7 @@ export default function CreatorDetailModal({
           <div className="flex-1 overflow-y-auto">
             {detailLoading && (
               <p className="py-10 text-center text-sm text-gray-500">
-                {zh ? '加载中…' : 'Loading creator details…'}
+                {t.creatorDetail.loading}
               </p>
             )}
             {detailError && (
@@ -704,10 +704,10 @@ export default function CreatorDetailModal({
                 {/* ── Key stats grid ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {[
-                    { label: zh ? '粉丝' : 'Followers', value: formatFollowers(detail.total_followers ?? detailFor.follower_count, locale) },
-                    { label: zh ? '互动率' : 'Engagement', value: detail.engagement_percent != null ? `${Number(detail.engagement_percent).toFixed(2)}%` : '—' },
-                    { label: zh ? '总内容数' : 'Total Posts', value: detail.total_contents != null ? Number(detail.total_contents).toLocaleString() : '—' },
-                    { label: zh ? '每月发帖' : 'Posts / 30d', value: detail.posting_frequency_recent_months != null ? String(detail.posting_frequency_recent_months) : '—' },
+                    { label: t.creatorDetail.followers, value: formatFollowers(detail.total_followers ?? detailFor.follower_count, locale) },
+                    { label: t.creatorDetail.engagement, value: detail.engagement_percent != null ? `${Number(detail.engagement_percent).toFixed(2)}%` : '—' },
+                    { label: t.creatorDetail.totalPosts, value: detail.total_contents != null ? Number(detail.total_contents).toLocaleString() : '—' },
+                    { label: t.creatorDetail.postsPer30d, value: detail.posting_frequency_recent_months != null ? String(detail.posting_frequency_recent_months) : '—' },
                   ].map((s) => (
                     <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2">
                       <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
@@ -719,7 +719,7 @@ export default function CreatorDetailModal({
                 {/* ── Follower Growth 7/30/90d ── */}
                 {detail.follower_growth && typeof detail.follower_growth === 'object' && (
                   <div className="mt-3 border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2.5">
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">{zh ? '粉丝增长' : 'Follower Growth'}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium mb-1.5">{t.creatorDetail.followerGrowth}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1">
                       {Object.entries(detail.follower_growth).map(([k, v]) => (
                         typeof v === 'number' && (
@@ -738,10 +738,10 @@ export default function CreatorDetailModal({
                 {/* ── Performance metrics ── */}
                 <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {[
-                    { label: zh ? '平均观看' : 'Avg Views', value: detail.avg_views },
-                    { label: zh ? '中位观看' : 'Median Views', value: detail.median_views },
-                    { label: zh ? '平均点赞' : 'Avg Likes', value: detail.avg_likes },
-                    { label: zh ? '中位点赞' : 'Median Likes', value: detail.median_likes },
+                    { label: t.creatorDetail.avgViews, value: detail.avg_views },
+                    { label: t.creatorDetail.medianViews, value: detail.median_views },
+                    { label: t.creatorDetail.avgLikes, value: detail.avg_likes },
+                    { label: t.creatorDetail.medianLikes, value: detail.median_likes },
                   ].filter((s) => s.value != null).map((s) => (
                     <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2">
                       <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
@@ -754,8 +754,8 @@ export default function CreatorDetailModal({
                 {(detail.views_30d || detail.views_90d) && (
                   <div className="mt-3 grid grid-cols-2 gap-2.5">
                     {[
-                      { label: zh ? '30天观看' : '30d Views', data: detail.views_30d },
-                      { label: zh ? '90天观看' : '90d Views', data: detail.views_90d },
+                      { label: t.creatorDetail.views30d, data: detail.views_30d },
+                      { label: t.creatorDetail.views90d, data: detail.views_90d },
                     ].filter((s) => s.data).map((s) => (
                       <div key={s.label} className="border border-gray-100 bg-gray-50/60 rounded-xl px-3 py-2">
                         <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{s.label}</p>
@@ -773,7 +773,7 @@ export default function CreatorDetailModal({
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                     </svg>
-                    <p className="text-sm font-bold text-gray-900">{zh ? '简介' : 'About'}</p>
+                    <p className="text-sm font-bold text-gray-900">{t.creatorDetail.about}</p>
                   </div>
 
                   {detail.bio && (
@@ -807,13 +807,13 @@ export default function CreatorDetailModal({
                     {detail.last_publish_time && (
                       <span className="inline-flex items-center gap-1 text-gray-500">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
-                        {zh ? '最后发帖' : 'Last post'}: {new Date(Number(detail.last_publish_time)).toLocaleDateString()}
+                        {t.creatorDetail.lastPost}: {new Date(Number(detail.last_publish_time)).toLocaleDateString()}
                       </span>
                     )}
                     {detail.has_email && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded-full font-medium">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        {zh ? '可通过 Overseed 联系' : 'Reachable from Overseed'}
+                        {t.creatorDetail.reachableFromOverseed}
                       </span>
                     )}
                   </div>
@@ -827,7 +827,7 @@ export default function CreatorDetailModal({
                 {detail.recent_posts?.length > 0 && (
                   <div className="mt-5">
                     <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">
-                      {detail.recent_posts[0]?.label ? detail.recent_posts[0].label.replace('Latest ', zh ? '最近的' : 'Recent ') + 's' : (zh ? '最近内容' : 'Recent Content')}
+                      {detail.recent_posts[0]?.label ? detail.recent_posts[0].label.replace('Latest ', t.creatorDetail.recentContentPrefix) + 's' : t.creatorDetail.recentContent}
                     </p>
                     <div className="grid grid-cols-3 gap-2">
                       {detail.recent_posts.map((post: any, i: number) => (
@@ -861,7 +861,7 @@ export default function CreatorDetailModal({
                 {/* ── Related Creators ── */}
                 {detail.related_creators?.length > 0 && (
                   <div className="mt-5">
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">{zh ? '相关达人' : 'Related Creators'}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mb-2">{t.creatorDetail.relatedCreators}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {detail.related_creators.map((rc: any, i: number) => {
                         const rcHandle = typeof rc === 'string' ? rc : (rc.uniqueId || rc.channelId || rc.handle || '')
@@ -871,7 +871,7 @@ export default function CreatorDetailModal({
                             key={`${rcHandle}-${i}`}
                             handle={rcHandle}
                             platform={detailFor!.platform}
-                            zh={zh}
+                            clickToViewLabel={t.creatorDetail.clickToView}
                             onOpen={(creator) => onOpenRelated?.(creator)}
                           />
                         )
@@ -900,9 +900,9 @@ export default function CreatorDetailModal({
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-bold text-gray-900">{zh ? '受众洞察' : 'Audience Insights'}</h4>
+                  <h4 className="text-sm font-bold text-gray-900">{t.creatorDetail.audienceInsights}</h4>
                   <p className="text-[11px] text-gray-400">
-                    {zh ? '获取详细受众分析。每项解锁需 4 积分。' : 'Unlock detailed audience demographics per section.'}
+                    {t.creatorDetail.audienceInsightsDesc}
                   </p>
                 </div>
                 {/* Unlock All bundle button — hidden when all 3 are already unlocked */}
@@ -916,7 +916,7 @@ export default function CreatorDetailModal({
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                     </svg>
-                    {zh ? `全部解锁 · ${AUDIENCE_BUNDLE_COST} 积分` : `Unlock All · ${AUDIENCE_BUNDLE_COST} credits`}
+                    {t.creatorDetail.unlockAll.replace('{n}', String(AUDIENCE_BUNDLE_COST))}
                   </button>
                 )}
               </div>
@@ -925,9 +925,9 @@ export default function CreatorDetailModal({
                 {/* ── Gender ── */}
                 {featureUnlocked.has('audience_gender') && featureUnlocks.audience_gender ? (
                   <div className="bg-white/80 border border-white rounded-xl p-3 shadow-sm">
-                    <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '性别' : 'Gender'}</p>
+                    <p className="text-xs font-semibold text-gray-700 mb-2">{t.creatorDetail.gender}</p>
                     {featureUnlocks.audience_gender._empty ? (
-                      <p className="text-[11px] text-gray-400 italic">{zh ? '暂无数据' : 'No data'}</p>
+                      <p className="text-[11px] text-gray-400 italic">{t.creatorDetail.noData}</p>
                     ) : (() => {
                       const g = featureUnlocks.audience_gender
                       const male = Math.round((g.maleRatio ?? 0) * 100)
@@ -956,11 +956,11 @@ export default function CreatorDetailModal({
                           <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-600">
                             <span className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-blue-500" />
-                              {zh ? '男' : 'Male'} {male}%
+                              {t.creatorDetail.male} {male}%
                             </span>
                             <span className="flex items-center gap-1">
                               <span className="w-2 h-2 rounded-full bg-pink-400" />
-                              {zh ? '女' : 'Female'} {female}%
+                              {t.creatorDetail.female} {female}%
                             </span>
                           </div>
                         </div>
@@ -969,7 +969,7 @@ export default function CreatorDetailModal({
                   </div>
                 ) : (
                   <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
-                    <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '性别' : 'Gender'}</p>
+                    <p className="text-xs font-semibold text-gray-700 mb-2">{t.creatorDetail.gender}</p>
                     {/* Blurred preview donut */}
                     <div className="flex items-center justify-center h-16 opacity-40 blur-[2px] select-none pointer-events-none">
                       <svg viewBox="0 0 80 80" className="w-16 h-16">
@@ -988,7 +988,7 @@ export default function CreatorDetailModal({
                       disabled={featureLoading != null}
                       className="relative z-10 w-full mt-1 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                     >
-                      {zh ? `解锁 · ${FEATURE_COSTS.audience_gender} 积分` : `Unlock for ${FEATURE_COSTS.audience_gender} credits`}
+                      {t.creatorDetail.unlockFor.replace('{n}', String(FEATURE_COSTS.audience_gender))}
                     </button>
                   </div>
                 )}
@@ -996,9 +996,9 @@ export default function CreatorDetailModal({
                 {/* ── Age ── */}
                 {featureUnlocked.has('audience_age') && featureUnlocks.audience_age ? (
                   <div className="bg-white/80 border border-white rounded-xl p-3 shadow-sm">
-                    <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '年龄' : 'Age'}</p>
+                    <p className="text-xs font-semibold text-gray-700 mb-2">{t.creatorDetail.age}</p>
                     {featureUnlocks.audience_age._empty ? (
-                      <p className="text-[11px] text-gray-400 italic">{zh ? '暂无数据' : 'No data'}</p>
+                      <p className="text-[11px] text-gray-400 italic">{t.creatorDetail.noData}</p>
                     ) : (
                     <div className="space-y-1">
                       {(featureUnlocks.audience_age.ages || []).map((a: any, i: number) => {
@@ -1018,7 +1018,7 @@ export default function CreatorDetailModal({
                   </div>
                 ) : (
                   <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
-                    <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '年龄' : 'Age'}</p>
+                    <p className="text-xs font-semibold text-gray-700 mb-2">{t.creatorDetail.age}</p>
                     {/* Blurred preview bars */}
                     <div className="space-y-1.5 opacity-40 blur-[2px] select-none pointer-events-none">
                       {[65, 45, 80, 30, 20].map((w, i) => (
@@ -1040,7 +1040,7 @@ export default function CreatorDetailModal({
                       disabled={featureLoading != null}
                       className="relative z-10 w-full mt-1 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                     >
-                      {zh ? `解锁 · ${FEATURE_COSTS.audience_age} 积分` : `Unlock for ${FEATURE_COSTS.audience_age} credits`}
+                      {t.creatorDetail.unlockFor.replace('{n}', String(FEATURE_COSTS.audience_age))}
                     </button>
                   </div>
                 )}
@@ -1048,9 +1048,9 @@ export default function CreatorDetailModal({
                 {/* ── Top Countries ── */}
                 {featureUnlocked.has('audience_country') && featureUnlocks.audience_country ? (
                   <div className="bg-white/80 border border-white rounded-xl p-3 shadow-sm">
-                    <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '受众地区' : 'Top Countries'}</p>
+                    <p className="text-xs font-semibold text-gray-700 mb-2">{t.creatorDetail.country}</p>
                     {featureUnlocks.audience_country._empty ? (
-                      <p className="text-[11px] text-gray-400 italic">{zh ? '暂无数据' : 'No data'}</p>
+                      <p className="text-[11px] text-gray-400 italic">{t.creatorDetail.noData}</p>
                     ) : (
                     <div className="space-y-1">
                       {(featureUnlocks.audience_country.countries || []).map((c: any, i: number) => {
@@ -1070,7 +1070,7 @@ export default function CreatorDetailModal({
                   </div>
                 ) : (
                   <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
-                    <p className="text-xs font-semibold text-gray-700 mb-2">{zh ? '受众地区' : 'Top Countries'}</p>
+                    <p className="text-xs font-semibold text-gray-700 mb-2">{t.creatorDetail.country}</p>
                     {/* Blurred preview with flag-like blocks */}
                     <div className="space-y-1.5 opacity-40 blur-[2px] select-none pointer-events-none">
                       {[70, 50, 35, 20].map((w, i) => (
@@ -1092,7 +1092,7 @@ export default function CreatorDetailModal({
                       disabled={featureLoading != null}
                       className="relative z-10 w-full mt-1 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                     >
-                      {zh ? `解锁 · ${FEATURE_COSTS.audience_country} 积分` : `Unlock for ${FEATURE_COSTS.audience_country} credits`}
+                      {t.creatorDetail.unlockFor.replace('{n}', String(FEATURE_COSTS.audience_country))}
                     </button>
                   </div>
                 )}
@@ -1105,24 +1105,24 @@ export default function CreatorDetailModal({
                 <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" />
                 </svg>
-                <h4 className="text-sm font-bold text-gray-900">{zh ? '品牌合作记录' : 'Brand Collaborations'}</h4>
+                <h4 className="text-sm font-bold text-gray-900">{t.creatorDetail.brandCollaborations}</h4>
                 <span className="text-xs text-gray-400 ml-1">
-                  {zh ? '查看赞助品牌、合作内容和表现数据。' : 'Sponsoring brands, sponsored content & performance data.'}
+                  {t.creatorDetail.brandCollaborationsDesc}
                 </span>
                 {detail.has_brand_deals && (
                   <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full ml-auto">
-                    {zh ? '有赞助内容 ✓' : 'Has Sponsored Content ✓'}
+                    {t.creatorDetail.hasSponsoredContent}
                   </span>
                 )}
               </div>
 
               {!detail.has_brand_deals ? (
-                <p className="mt-3 text-sm text-gray-400 italic">{zh ? '未检测到赞助内容。' : 'No sponsored content found.'}</p>
+                <p className="mt-3 text-sm text-gray-400 italic">{t.creatorDetail.noSponsoredContent}</p>
               ) : detailFor.platform === 'tiktok' ? (
-                <p className="mt-3 text-sm text-gray-400 italic">{zh ? '该达人有赞助内容，但 TikTok 平台暂不支持查看品牌详情。' : 'This creator has sponsored content, but brand details are not available for TikTok.'}</p>
+                <p className="mt-3 text-sm text-gray-400 italic">{t.creatorDetail.tiktokNoBrandDetails}</p>
               ) : featureUnlocked.has('brand_collaborations') && featureUnlocks.brand_collaborations ? (
                 featureUnlocks.brand_collaborations._empty || !(featureUnlocks.brand_collaborations.sponsors?.length) ? (
-                  <p className="mt-3 text-sm text-gray-400 italic">{zh ? '该达人暂无品牌合作数据。' : 'No brand collaboration data available for this creator.'}</p>
+                  <p className="mt-3 text-sm text-gray-400 italic">{t.creatorDetail.noBrandCollabData}</p>
                 ) : (
                 <div className="space-y-4 mt-3">
                   {(featureUnlocks.brand_collaborations.sponsors || []).map((sponsor: any, si: number) => (
@@ -1139,7 +1139,7 @@ export default function CreatorDetailModal({
                         </div>
                         {sponsor.url && (
                           <a href={sponsor.url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-500 hover:underline flex-shrink-0">
-                            {zh ? '查看' : 'View'} ↗
+                            {t.creatorDetail.view} ↗
                           </a>
                         )}
                       </div>
@@ -1147,7 +1147,7 @@ export default function CreatorDetailModal({
                       {/* Sponsored content posts */}
                       {sponsor.posts?.length > 0 && (
                         <div className="px-4 py-3 border-t border-gray-100">
-                          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-2">{zh ? '赞助内容' : 'Sponsored Content'}</p>
+                          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-2">{t.creatorDetail.sponsoredContent}</p>
                           <div className="grid grid-cols-3 gap-2">
                             {sponsor.posts.slice(0, 3).map((post: any, pi: number) => (
                               <a
@@ -1177,15 +1177,15 @@ export default function CreatorDetailModal({
                       {/* Brand performance summary */}
                       {sponsor.performance && (sponsor.performance.avgLikes != null || sponsor.performance.avgViews != null) && (
                         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
-                          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-2">{zh ? '品牌表现' : 'Performance Summary'}</p>
+                          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-2">{t.creatorDetail.performanceSummary}</p>
                           <div className="grid grid-cols-3 gap-2">
                             {[
-                              { label: zh ? '平均点赞' : 'Avg Likes', value: sponsor.performance.avgLikes },
-                              { label: zh ? '平均评论' : 'Avg Comments', value: sponsor.performance.avgComments },
-                              { label: zh ? '平均观看' : 'Avg Views', value: sponsor.performance.avgViews },
-                              { label: zh ? '平均互动率' : 'Avg Eng. Rate', value: sponsor.performance.avgEngagementRate, pct: true },
-                              { label: zh ? '中位点赞' : 'Median Likes', value: sponsor.performance.medianLikes },
-                              { label: zh ? '中位观看' : 'Median Views', value: sponsor.performance.medianViews },
+                              { label: t.creatorDetail.brandAvgLikes, value: sponsor.performance.avgLikes },
+                              { label: t.creatorDetail.brandAvgComments, value: sponsor.performance.avgComments },
+                              { label: t.creatorDetail.brandAvgViews, value: sponsor.performance.avgViews },
+                              { label: t.creatorDetail.brandAvgEngRate, value: sponsor.performance.avgEngagementRate, pct: true },
+                              { label: t.creatorDetail.brandMedianLikes, value: sponsor.performance.medianLikes },
+                              { label: t.creatorDetail.brandMedianViews, value: sponsor.performance.medianViews },
                             ].filter((s) => s.value != null).map((s) => (
                               <div key={s.label} className="text-center">
                                 <p className="text-[9px] text-gray-400 uppercase">{s.label}</p>
@@ -1225,7 +1225,7 @@ export default function CreatorDetailModal({
                       disabled={featureLoading != null}
                       className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                     >
-                      {zh ? `解锁品牌合作 · ${FEATURE_COSTS.brand_collaborations} 积分` : `Unlock for ${FEATURE_COSTS.brand_collaborations} credits`}
+                      {t.creatorDetail.unlockBrandCollabs.replace('{n}', String(FEATURE_COSTS.brand_collaborations))}
                     </button>
                   </div>
                 </div>
@@ -1244,7 +1244,7 @@ export default function CreatorDetailModal({
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                 </svg>
-                {zh ? '联系达人' : 'Contact the creator'}
+                {t.creatorDetail.contactCreator}
               </button>
               {detailFor.profile_url && (
                 <a
@@ -1278,12 +1278,10 @@ export default function CreatorDetailModal({
               </svg>
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-1">
-              {zh ? '解锁' : 'Unlock'} {FEATURE_LABELS[featureConfirm][zh ? 0 : 1]}
+              {t.creatorDetail.unlock} {FEATURE_LABELS[featureConfirm][zh ? 0 : 1]}
             </h3>
             <p className="text-sm text-gray-500 mb-5">
-              {zh
-                ? `此操作将扣除 ${FEATURE_COSTS[featureConfirm]} 积分。解锁后可永久查看该达人的此项数据。`
-                : `This will use ${FEATURE_COSTS[featureConfirm]} credits. Once unlocked, you can view this data for this creator anytime.`}
+              {t.creatorDetail.confirmUnlockDesc.replace('{n}', String(FEATURE_COSTS[featureConfirm]))}
             </p>
             <div className="flex gap-3">
               <button
@@ -1291,7 +1289,7 @@ export default function CreatorDetailModal({
                 disabled={featureLoading != null}
                 className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition disabled:opacity-50"
               >
-                {zh ? '取消' : 'Cancel'}
+                {t.creatorDetail.cancel}
               </button>
               <button
                 onClick={() => featureConfirm === 'audience_bundle' ? unlockAudienceBundle() : unlockFeature(featureConfirm)}
@@ -1299,8 +1297,8 @@ export default function CreatorDetailModal({
                 className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
               >
                 {featureLoading
-                  ? (zh ? '解锁中…' : 'Unlocking…')
-                  : (zh ? `确认 · ${FEATURE_COSTS[featureConfirm]} 积分` : `Confirm · ${FEATURE_COSTS[featureConfirm]} credits`)}
+                  ? t.creatorDetail.unlocking
+                  : t.creatorDetail.confirmUnlock.replace('{n}', String(FEATURE_COSTS[featureConfirm]))}
               </button>
             </div>
           </div>

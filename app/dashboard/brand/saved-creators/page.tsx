@@ -70,6 +70,13 @@ export default function SavedCreatorsPage() {
   const [sort, setSort] = useState<'recent' | 'followers'>('recent')
   const [page, setPage] = useState(1)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [selectedCreators, setSelectedCreators] = useState<Set<string>>(new Set())
+  const [bulkOutreachOpen, setBulkOutreachOpen] = useState(false)
+  const [bulkMsg, setBulkMsg] = useState('')
+  const [bulkFiles, setBulkFiles] = useState<File[]>([])
+  const [bulkSending, setBulkSending] = useState(false)
+  const [bulkSent, setBulkSent] = useState(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -289,6 +296,55 @@ export default function SavedCreatorsPage() {
     }
   }
 
+  const toggleSelectCreator = (id: string) => {
+    setSelectedCreators(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const getSelectedCreatorObjects = () => {
+    return visible.filter(row => selectedCreators.has(row._id))
+  }
+
+  const sendBulkOutreach = async () => {
+    if (bulkSending || selectedCreators.size === 0) return
+    setBulkSending(true)
+    setBulkError(null)
+    try {
+      const creators = getSelectedCreatorObjects().map(c => ({
+        platform: c.platforms[0] || 'unknown',
+        handle: c.handle || c.name,
+        display_name: c.name,
+        avatar_url: c.avatarUrl || '',
+        followerCount: c.followers || 0,
+        engagementRate: c.engagement || 0,
+        country: c.country || '',
+        nicheTags: c.niche ? [c.niche] : [],
+        bio: c.bio || '',
+        profileUrl: c.profileUrl || '',
+      }))
+      const form = new FormData()
+      form.set('creators', JSON.stringify(creators))
+      form.set('message', bulkMsg)
+      bulkFiles.forEach(f => form.append('files', f))
+      const res = await fetch('/api/outreach/submit', { method: 'POST', body: form })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.message || 'Failed to send outreach')
+      }
+      setBulkSent(true)
+      setSelectedCreators(new Set())
+      setTimeout(() => { setBulkOutreachOpen(false); setBulkSent(false); setBulkMsg(''); setBulkFiles([]) }, 2000)
+    } catch (e: any) {
+      setBulkError(e.message)
+    } finally {
+      setBulkSending(false)
+    }
+  }
+
   const savedAgo = (iso: string) => {
     const days = Math.round((Date.now() - new Date(iso).getTime()) / 86400000)
     const rtf = new Intl.RelativeTimeFormat(locale === 'zh' ? 'zh' : 'en', { numeric: 'auto' })
@@ -421,6 +477,40 @@ export default function SavedCreatorsPage() {
 
         <p className="text-sm text-gray-500 font-medium mb-4">{visible.length} {s.count}</p>
 
+        {/* Bulk selection bar */}
+        {selectedCreators.size > 0 && (
+          <div className="mb-4 workspace-glass-card rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">
+                {selectedCreators.size} {zh ? '位创作者已选择 — 准备批量联系' : `creator${selectedCreators.size > 1 ? 's' : ''} selected — ready for bulk outreach`}
+              </span>
+              <button
+                onClick={() => setSelectedCreators(new Set())}
+                className="text-sm text-gray-500 hover:text-gray-700 transition"
+              >
+                {zh ? '清除' : 'Clear'}
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2">
+                {getSelectedCreatorObjects().slice(0, 3).map(c => (
+                  <CreatorAvatar key={c._id} url={c.avatarUrl} name={c.name} size="w-8 h-8" textSize="text-xs" className="ring-2 ring-white" />
+                ))}
+              </div>
+              <span className="text-sm text-gray-500">{selectedCreators.size} {zh ? '已选' : 'selected'}</span>
+              <button
+                onClick={() => setBulkOutreachOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-primary-600 text-white text-sm font-bold hover:bg-primary-700 transition shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                {zh ? '批量联系' : 'Bulk Contact'} ↗
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Grid */}
         {loading ? (
           <div className="workspace-glass-card rounded-2xl p-10 text-center text-gray-400 text-sm">…</div>
@@ -438,7 +528,7 @@ export default function SavedCreatorsPage() {
                 <div className="flex items-center justify-between mb-3 gap-2">
                   <span className="text-xs text-gray-400 flex-shrink-0">{savedAgo(row.savedAt)}</span>
                   {row._type === 'discovery' && (
-                    <span className="text-[10px] px-2 py-0.5 bg-violet-50 text-violet-600 rounded-full font-medium">{zh ? '发现' : 'Discovery'}</span>
+                    <span className="text-[10px] px-2 py-0.5 bg-violet-50 text-violet-600 rounded-full font-medium">{s.discoveryBadge}</span>
                   )}
                   {folders.length > 0 && row._type === 'registered' && row.influencerId && (
                     <select
@@ -520,12 +610,25 @@ export default function SavedCreatorsPage() {
                       {s.viewProfile}
                     </span>
                   )}
-                  <Link
-                    href="/dashboard/messages"
-                    className="text-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full text-sm font-semibold hover:bg-gray-50 transition"
+                  <button
+                    onClick={() => toggleSelectCreator(row._id)}
+                    className={`text-center px-4 py-2 rounded-full text-sm font-semibold transition ${
+                      selectedCreators.has(row._id)
+                        ? 'bg-primary-50 border border-primary-300 text-primary-700'
+                        : 'bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                    }`}
                   >
-                    {s.message}
-                  </Link>
+                    {selectedCreators.has(row._id) ? (
+                      <span className="flex items-center justify-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        {zh ? '已添加联系' : 'Added to outreach'}
+                      </span>
+                    ) : (
+                      <span>+ {zh ? '联系' : 'Contact'}</span>
+                    )}
+                  </button>
                 </div>
               </div>
             ))}
@@ -565,6 +668,88 @@ export default function SavedCreatorsPage() {
           </div>
         )}
       </div>
+      {/* Bulk outreach modal */}
+      {bulkOutreachOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !bulkSending && setBulkOutreachOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">
+                {zh ? `批量联系 ${selectedCreators.size} 位创作者` : `Bulk Contact ${selectedCreators.size} Creator${selectedCreators.size > 1 ? 's' : ''}`}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {zh ? '发送统一的联系消息给所有选中的创作者' : 'Send a unified outreach message to all selected creators'}
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              {bulkSent ? (
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="font-semibold text-gray-900">{zh ? '联系请求已发送！' : 'Outreach sent!'}</p>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    value={bulkMsg}
+                    onChange={e => setBulkMsg(e.target.value)}
+                    maxLength={2000}
+                    rows={5}
+                    placeholder={zh ? '输入您的联系消息...' : 'Write your outreach message...'}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+                  />
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>{bulkMsg.length}/2000</span>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={e => setBulkFiles(prev => [...prev, ...Array.from(e.target.files || [])])}
+                      />
+                      <span className="text-primary-600 hover:text-primary-700 font-medium">
+                        + {zh ? '添加附件' : 'Attach files'}
+                      </span>
+                    </label>
+                  </div>
+                  {bulkFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {bulkFiles.map((f, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-lg text-xs text-gray-600">
+                          {f.name}
+                          <button onClick={() => setBulkFiles(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {bulkError && <p className="text-xs text-red-600">{bulkError}</p>}
+                </>
+              )}
+            </div>
+            {!bulkSent && (
+              <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setBulkOutreachOpen(false)}
+                  disabled={bulkSending}
+                  className="px-5 py-2 rounded-full text-sm font-semibold text-gray-600 hover:bg-gray-100 transition"
+                >
+                  {zh ? '取消' : 'Cancel'}
+                </button>
+                <button
+                  onClick={sendBulkOutreach}
+                  disabled={bulkSending || !bulkMsg.trim()}
+                  className="px-6 py-2 rounded-full bg-primary-600 text-white text-sm font-bold hover:bg-primary-700 transition disabled:opacity-50 shadow-sm"
+                >
+                  {bulkSending ? (zh ? '发送中...' : 'Sending...') : (zh ? '发送联系请求' : 'Send Outreach')}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </BrandWorkspaceLayout>
   )
 }

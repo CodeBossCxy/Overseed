@@ -291,10 +291,20 @@ export async function getTranslatedEntity<T extends { id: string; originalLangua
     for (const field of missingFields) {
       const originalText = (entity as Record<string, unknown>)[field]
       if (typeof originalText === 'string' && originalText.trim()) {
+        // Detect actual content language to avoid translating text that's already
+        // in the target language (e.g. Chinese content with originalLanguage='en')
+        const cjkCount = (originalText.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length
+        const cjkRatio = cjkCount / originalText.length
+        const actualLang = cjkRatio > 0.15 ? 'zh' : cjkRatio < 0.05 && /[a-zA-Z]/.test(originalText) ? 'en' : null
+        if (actualLang && actualLang === targetLanguage) {
+          // Content is already in the target language — skip translation
+          continue
+        }
+        const sourceLang = actualLang || originalLang
         const translatedText = await translateText(
           originalText,
           targetLanguage,
-          originalLang
+          sourceLang
         )
 
         await addTranslation({

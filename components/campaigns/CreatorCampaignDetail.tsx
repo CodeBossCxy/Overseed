@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/i18n/formatDate'
 import { formatNumber } from '@/lib/i18n/formatNumber'
 import { PlatformIcon } from './CampaignRowCard'
 import Markdown from '@/components/Markdown'
+import TranslatableText from '@/components/TranslatableText'
 
 type Props = {
   campaign: any
@@ -217,7 +218,11 @@ export default function CreatorCampaignDetail({
         <section className="workspace-glass-card rounded-3xl p-6">
           <h2 className="text-xl font-bold">{t.campaign.aboutThisCampaign}</h2>
           {campaign.description
-            ? <Markdown className="mt-2 text-sm leading-6 text-[#59678f]">{campaign.description}</Markdown>
+            ? (
+              <TranslatableText text={campaign.description}>
+                {(text) => <Markdown className="mt-2 text-sm leading-6 text-[#59678f]">{text}</Markdown>}
+              </TranslatableText>
+            )
             : <p className="mt-2 text-sm leading-6 text-[#59678f]">{t.campaign.noCampaignDescriptionYet}</p>}
           <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-sm text-amber-800">
             🛡 &nbsp;{t.brand.campaigns.antiFraud} <Link href="/contact" className="font-semibold underline">{t.brand.campaigns.reportNow}</Link>

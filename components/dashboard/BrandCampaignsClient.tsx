@@ -35,7 +35,6 @@ const STATUS_OPTIONS = ['DRAFT', 'PENDING_REVIEW', 'ACTIVE', 'COMPLETED', 'CANCE
 export default function BrandCampaignsClient({ campaigns, isVerified, brandId }: { campaigns: Campaign[]; isVerified: boolean; brandId: string }) {
   const { t, locale } = useLanguage()
   const c = t.brand.campaigns
-  const zh = locale === 'zh'
 
   const router = useRouter()
 
@@ -225,7 +224,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          {zh ? '我的活动' : 'My Campaigns'}
+          {c.myCampaigns}
         </button>
         <button
           type="button"
@@ -236,7 +235,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          {zh ? '全部活动' : 'All Campaigns'}
+          {c.allCampaigns}
         </button>
       </div>
 
@@ -313,7 +312,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
               <Link
                 key={cp.id}
                 href={cp.brandId === brandId ? `/dashboard/brand/campaigns/${cp.id}` : `/campaign/${cp.id}`}
-                aria-label={`${cp.brandId === brandId ? c.manageCampaign : (zh ? '查看' : 'View')}: ${cp.title}`}
+                aria-label={`${cp.brandId === brandId ? c.manageCampaign : c.view}: ${cp.title}`}
                 className={`group workspace-glass-card workspace-glass-option rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8 min-h-[108px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
                   isDraft ? 'border-2 border-dashed border-gray-300 bg-gray-50/50 saturate-[.85]' : ''
                 }`}

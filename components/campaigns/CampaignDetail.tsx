@@ -7,6 +7,7 @@ import Image from 'next/image'
 import CompensationBadge from './CompensationBadge'
 import CampaignStats from './CampaignStats'
 import Markdown from '@/components/Markdown'
+import TranslatableText from '@/components/TranslatableText'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatDate } from '@/lib/i18n/formatDate'
 import { formatNumber } from '@/lib/i18n/formatNumber'
@@ -199,7 +200,9 @@ export default function CampaignDetail({
             <h2 className="text-xl font-semibold mb-4">{t.campaign.aboutThisCampaign}</h2>
             <div className="prose max-w-none">
               {campaign.description
-                ? <Markdown className="text-gray-700">{campaign.description}</Markdown>
+                ? <TranslatableText text={campaign.description}>
+                    {(text) => <Markdown className="text-gray-700">{text}</Markdown>}
+                  </TranslatableText>
                 : <p className="text-gray-700">{t.campaign.noDescription}</p>}
               {/* Anti-fraud notice — shown under every campaign per spec */}
               <div className="mt-4 bg-amber-50/80 border border-amber-100 rounded-xl p-3 text-sm text-amber-800">
@@ -264,7 +267,9 @@ export default function CampaignDetail({
           {campaign.contentGuidelines && (
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold mb-4">{t.campaign.contentGuidelines}</h2>
-              <p className="text-gray-700 whitespace-pre-wrap">{campaign.contentGuidelines}</p>
+              <TranslatableText text={campaign.contentGuidelines || ''}>
+                {(text) => <p className="text-gray-700 whitespace-pre-wrap">{text}</p>}
+              </TranslatableText>
 
               {(campaign.hashtagsRequired || campaign.mentionsRequired) && (
                 <div className="mt-4 space-y-2">

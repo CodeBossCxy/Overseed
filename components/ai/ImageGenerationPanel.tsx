@@ -66,7 +66,6 @@ function Sparkles({ className = 'w-5 h-5' }: { className?: string }) {
 
 export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange }: { isProUser: boolean; activeTab?: 'chat' | 'image'; onTabChange?: (tab: 'chat' | 'image') => void }) {
   const { t, locale } = useLanguage()
-  const zh = locale === 'zh'
   const ai = t.aiAssistant
   const studio = ai.imageStudio
   const [prompt, setPrompt] = useState('')
@@ -281,7 +280,7 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
       setImages(previous => [...newImages, ...previous])
       if (data.saveError) {
         console.warn('Image history save failed:', data.saveError)
-        setError(zh ? '图片已生成，但历史记录保存失败' : 'Images generated, but history could not be saved')
+        setError(studio.historySaveFailed)
       }
       if (data.sessionId) {
         setActiveSessionId(data.sessionId)
@@ -291,7 +290,7 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
       if (!document.hasFocus() || !window.location.pathname.startsWith('/ai-assistant')) {
         fireAiToast({
           type: 'image',
-          title: zh ? '图片生成完成' : 'Images Ready',
+          title: studio.imagesReady,
           body: submittedPrompt.slice(0, 80) + (submittedPrompt.length > 80 ? '...' : ''),
           href: '/ai-assistant',
         })
@@ -312,10 +311,10 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
     const now = new Date()
     const diffMs = now.getTime() - d.getTime()
     const diffDays = Math.floor(diffMs / 86400000)
-    if (diffDays === 0) return zh ? '今天' : 'Today'
-    if (diffDays === 1) return zh ? '昨天' : 'Yesterday'
-    if (diffDays < 7) return zh ? `${diffDays}天前` : `${diffDays}d ago`
-    return d.toLocaleDateString(zh ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' })
+    if (diffDays === 0) return studio.today
+    if (diffDays === 1) return studio.yesterday
+    if (diffDays < 7) return studio.daysAgo.replace('{n}', String(diffDays))
+    return d.toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' })
   }
 
   return (
@@ -332,13 +331,13 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              {zh ? '新建生成' : 'New Generation'}
+              {studio.newGeneration}
             </button>
             <button
               type="button"
               onClick={() => setSidebarOpen(false)}
               className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/70 transition text-gray-400 flex-shrink-0"
-              aria-label={zh ? '收起侧栏' : 'Collapse sidebar'}
+              aria-label={studio.collapseSidebar}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -347,7 +346,7 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3">
             {sessions.length === 0 ? (
-              <p className="text-center text-xs text-gray-400 py-8">{zh ? '暂无生成记录' : 'No generations yet'}</p>
+              <p className="text-center text-xs text-gray-400 py-8">{studio.noGenerations}</p>
             ) : (
               <div className="space-y-0.5">
                 {sessions.map(s => (
@@ -370,7 +369,7 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-[11px] font-medium truncate leading-tight">{s.title}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">{s.imageCount} {zh ? '张' : 'img'} · {formatDate(s.createdAt)}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{s.imageCount} {studio.imgCount} · {formatDate(s.createdAt)}</p>
                     </div>
                     <button
                       type="button"
@@ -460,17 +459,17 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
               <div className="min-w-0">
                 <label className="text-xs font-medium text-gray-500 mb-1.5 block" htmlFor="image-size">{studio.ratio}</label>
                 <select id="image-size" value={size} onChange={event => setSize(event.target.value as ImageRequest['size'])} className={`${controlClass} !mt-0 h-[42px]`}>
-                  <option value="1024x1024">{zh ? '1:1 正方形' : '1:1 Square'}</option>
-                  <option value="683x1024">{zh ? '2:3 竖版' : '2:3 Portrait'}</option>
-                  <option value="1024x683">{zh ? '3:2 横版' : '3:2 Landscape'}</option>
-                  <option value="768x1024">{zh ? '3:4 竖版' : '3:4 Portrait'}</option>
-                  <option value="1024x768">{zh ? '4:3 横版' : '4:3 Landscape'}</option>
-                  <option value="820x1024">{zh ? '4:5 竖版' : '4:5 Portrait'}</option>
-                  <option value="1024x820">{zh ? '5:4 横版' : '5:4 Landscape'}</option>
-                  <option value="576x1024">{zh ? '9:16 手机竖屏' : '9:16 Mobile'}</option>
-                  <option value="1024x576">{zh ? '16:9 宽屏' : '16:9 Widescreen'}</option>
-                  <option value="1024x439">{zh ? '21:9 超宽屏' : '21:9 Ultra-wide'}</option>
-                  <option value="1024x256">{zh ? '4:1 超宽横版' : '4:1 Banner'}</option>
+                  <option value="1024x1024">{studio.square1x1}</option>
+                  <option value="683x1024">{studio.portrait2x3}</option>
+                  <option value="1024x683">{studio.landscape3x2}</option>
+                  <option value="768x1024">{studio.portrait3x4}</option>
+                  <option value="1024x768">{studio.landscape4x3}</option>
+                  <option value="820x1024">{studio.portrait4x5}</option>
+                  <option value="1024x820">{studio.landscape5x4}</option>
+                  <option value="576x1024">{studio.mobile9x16}</option>
+                  <option value="1024x576">{studio.widescreen16x9}</option>
+                  <option value="1024x439">{studio.ultrawide21x9}</option>
+                  <option value="1024x256">{studio.banner4x1}</option>
                 </select>
               </div>
               <div className="min-w-0">
@@ -529,7 +528,7 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                {zh ? '聊天' : 'Chat'}
+                {studio.tabChat}
               </button>
               <button
                 type="button"
@@ -543,7 +542,7 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21z" />
                 </svg>
-                {zh ? '图片生成' : 'Image Generation'}
+                {studio.tabImageGen}
               </button>
             </div>
           )}
@@ -560,7 +559,7 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
                 <svg className="w-3.5 h-3.5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                {zh ? '← 返回正在生成中的请求' : '← Back to generating request'}
+                {studio.backToGenerating}
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />
               </button>
             </div>
@@ -589,8 +588,8 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
                       <span className="absolute inset-0 rounded-full animate-ping bg-primary-400/20" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">{zh ? '正在生成图片...' : 'Generating images...'}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{zh ? '这可能需要几分钟，您可以浏览其他页面' : 'This may take a few minutes. You can browse other pages.'}</p>
+                      <p className="text-sm font-semibold text-gray-800">{studio.generatingImages}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{studio.generatingDesc}</p>
                     </div>
                   </div>
                   <div className="h-1.5 bg-gray-200/70 rounded-full overflow-hidden">

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import CampaignCard from '../campaigns/CampaignCard'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatMonthYear } from '@/lib/i18n/formatDate'
+import TranslatableText from '@/components/TranslatableText'
 
 interface BrandProfileProps {
   brand: {
@@ -105,7 +106,9 @@ export default function BrandProfile({ brand }: BrandProfileProps) {
           {brand.description && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold mb-2">About</h2>
-              <p className="text-gray-700 whitespace-pre-wrap">{brand.description}</p>
+              <TranslatableText text={brand.description}>
+                {(text) => <p className="text-gray-700 whitespace-pre-wrap">{text}</p>}
+              </TranslatableText>
             </div>
           )}
 

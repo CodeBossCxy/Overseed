@@ -1009,3 +1009,19 @@ main > .page-enter-animation:has(.ai-assistant-page) {
   from { opacity: 0; transform: translateX(100%); }
   to   { opacity: 1; transform: translateX(0); }
 }
+
+/* Product tour — force Next/Done button to match primary button style.
+   Must live in globals.css to guarantee it loads after driver.js defaults. */
+button.driver-popover-next-btn {
+  background: #4f46e5 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 999px !important;
+  padding: 0.5rem 1.25rem !important;
+  font-weight: 700 !important;
+  font-size: 0.8125rem !important;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3) !important;
+}
+button.driver-popover-next-btn:hover {
+  background: #4338ca !important;
+}

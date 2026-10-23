@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/i18n/formatDate'
 import { formatNumber } from '@/lib/i18n/formatNumber'
 
 import PlatformIcon from '@/components/PlatformIcon'
+import TranslatableText from '@/components/TranslatableText'
 
 export { PlatformIcon }
 
@@ -59,7 +60,11 @@ export default function CampaignRowCard({ campaign: c, saved = false, onToggleSa
       <div className="min-w-0">
         <span className="text-base font-semibold text-gray-900 group-hover:text-primary-700 transition block truncate">{c.title}</span>
         <p className="text-xs text-gray-500 truncate">{[category ? (t.categoryNames[category] || category) : null, platforms.map((p:any) => p.platform.name).join(', ') || null].filter(Boolean).join(' · ')}</p>
-        {c.description && <p className="text-xs text-gray-500 mt-1.5 leading-relaxed line-clamp-2 max-w-[300px]">{c.description}</p>}
+        {c.description && (
+          <TranslatableText text={c.description}>
+            {(text) => <p className="text-xs text-gray-500 mt-1.5 leading-relaxed line-clamp-2 max-w-[300px]">{text}</p>}
+          </TranslatableText>
+        )}
       </div>
     </div>
 

@@ -457,7 +457,7 @@ export default function AIAssistantPage() {
       if (!document.hasFocus() || !window.location.pathname.startsWith('/ai-assistant')) {
         fireAiToast({
           type: 'chat',
-          title: zh ? 'AI 回复完成' : 'AI Response Ready',
+          title: t.aiAssistant.toastTitle,
           body: contentSoFar.slice(0, 80) + (contentSoFar.length > 80 ? '...' : ''),
           href: '/ai-assistant',
         })
@@ -681,7 +681,7 @@ export default function AIAssistantPage() {
   }
 
   // Derive the user's first name for the welcome greeting
-  const userName = (session?.user as any)?.name?.split(' ')[0] || (session?.user as any)?.email?.split('@')[0] || (zh ? '用户' : 'there')
+  const userName = (session?.user as any)?.name?.split(' ')[0] || (session?.user as any)?.email?.split('@')[0] || t.aiAssistant.userFallback
 
   // Group chat list into time buckets for the sidebar, filtered by active folder
   const groupChats = () => {
@@ -690,10 +690,10 @@ export default function AIAssistantPage() {
     const weekStart = new Date(todayStart.getTime() - 6 * 24 * 60 * 60 * 1000)
     const monthStart = new Date(todayStart.getTime() - 29 * 24 * 60 * 60 * 1000)
     const groups: { label: string; chats: ChatSummary[] }[] = [
-      { label: zh ? '今天' : 'Today', chats: [] },
-      { label: zh ? '本周' : 'This Week', chats: [] },
-      { label: zh ? '近30天' : 'Last 30 Days', chats: [] },
-      { label: zh ? '更早' : 'Older', chats: [] },
+      { label: t.aiAssistant.groupToday, chats: [] },
+      { label: t.aiAssistant.groupThisWeek, chats: [] },
+      { label: t.aiAssistant.groupLast30, chats: [] },
+      { label: t.aiAssistant.groupOlder, chats: [] },
     ]
     const folder = activeFolder ? folders.find(f => f.id === activeFolder) : null
     const filtered = folder ? chatList.filter(c => folder.chatIds.includes(c.id)) : chatList
@@ -709,9 +709,9 @@ export default function AIAssistantPage() {
 
   const suggestionCards = [
     {
-      title: zh ? '市场进入策略' : 'Market entry strategy',
-      desc: zh ? '获取针对特定地区的洞察和市场推广计划' : 'Get region-specific insights and go-to-market plans',
-      prompt: zh ? '帮我制定进入东南亚市场的策略' : 'Help me build a market entry strategy for Southeast Asia',
+      title: t.aiAssistant.card1Title,
+      desc: t.aiAssistant.card1Desc,
+      prompt: t.aiAssistant.card1Prompt,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -720,9 +720,9 @@ export default function AIAssistantPage() {
       color: 'bg-teal-100 text-teal-600',
     },
     {
-      title: zh ? '创作者合作' : 'Creator collaboration',
-      desc: zh ? '找到创作者、外联模板和最佳实践' : 'Find creators, outreach templates and best practices',
-      prompt: zh ? '帮我找到适合我品牌的创作者合作策略' : 'Help me find the right creator collaboration strategy for my brand',
+      title: t.aiAssistant.card2Title,
+      desc: t.aiAssistant.card2Desc,
+      prompt: t.aiAssistant.card2Prompt,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -731,9 +731,9 @@ export default function AIAssistantPage() {
       color: 'bg-rose-100 text-rose-500',
     },
     {
-      title: zh ? '跨境营销活动' : 'Cross-border campaign',
-      desc: zh ? '规划和优化全球营销活动' : 'Plan and optimize global campaigns',
-      prompt: zh ? '帮我规划一个跨境营销活动' : 'Help me plan a cross-border marketing campaign',
+      title: t.aiAssistant.card3Title,
+      desc: t.aiAssistant.card3Desc,
+      prompt: t.aiAssistant.card3Prompt,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -742,9 +742,9 @@ export default function AIAssistantPage() {
       color: 'bg-teal-100 text-teal-600',
     },
     {
-      title: zh ? '本地化与洞察' : 'Localization & insights',
-      desc: zh ? '针对不同市场和文化调整您的品牌' : 'Adapt your brand for different markets and cultures',
-      prompt: zh ? '帮我了解如何将品牌本地化适应不同文化' : 'Help me localize my brand for different cultural markets',
+      title: t.aiAssistant.card4Title,
+      desc: t.aiAssistant.card4Desc,
+      prompt: t.aiAssistant.card4Prompt,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -767,7 +767,7 @@ export default function AIAssistantPage() {
           <button
             type="button"
             className="absolute inset-0 z-10 bg-black/20 md:hidden"
-            aria-label={zh ? '关闭对话列表' : 'Close conversations'}
+            aria-label={t.aiAssistant.closeConversations}
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -781,7 +781,7 @@ export default function AIAssistantPage() {
                 </svg>
                 <input
                   type="text"
-                  placeholder={zh ? '搜索对话...' : 'Search conversations...'}
+                  placeholder={t.aiAssistant.searchPlaceholder}
                   className="w-full pl-8 pr-3 py-2 bg-white/50 border border-white/70 rounded-lg text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-400 focus:bg-white transition"
                   readOnly
                 />
@@ -789,7 +789,7 @@ export default function AIAssistantPage() {
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
-                aria-label={zh ? '关闭对话列表' : 'Close conversations'}
+                aria-label={t.aiAssistant.closeConversations}
                 className="p-2 rounded-lg text-gray-500 hover:bg-white/70 flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -819,7 +819,7 @@ export default function AIAssistantPage() {
                   }
                 }}
               >
-                {zh ? '全部' : 'All'}
+                {t.aiAssistant.folderAll}
               </button>
               {folders.map((folder) => (
                 <button
@@ -856,7 +856,7 @@ export default function AIAssistantPage() {
                       setFolders(prev => prev.filter(f => f.id !== folder.id))
                       if (activeFolder === folder.id) setActiveFolder(null)
                     }}
-                    title={zh ? '删除文件夹' : 'Remove folder'}
+                    title={t.aiAssistant.removeFolder}
                   >
                     ×
                   </span>
@@ -877,13 +877,13 @@ export default function AIAssistantPage() {
                     if (e.key === 'Escape') { setAddingFolder(false); setNewFolderName('') }
                   }}
                   className="px-2 py-1 rounded-full text-xs bg-white border border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-500 w-20"
-                  placeholder={zh ? '名称' : 'Name'}
+                  placeholder={t.aiAssistant.folderNamePlaceholder}
                 />
               ) : (
                 <button
                   onClick={() => setAddingFolder(true)}
                   className="p-1 rounded-full text-gray-400 hover:bg-white/70 hover:text-gray-600 transition flex-shrink-0"
-                  title={zh ? '添加文件夹' : 'Add folder'}
+                  title={t.aiAssistant.addFolder}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -996,7 +996,7 @@ export default function AIAssistantPage() {
               {isProUser && !sidebarOpen && (
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  aria-label={zh ? '打开对话列表' : 'Open conversations'}
+                  aria-label={t.aiAssistant.openConversations}
                   className="p-1.5 rounded-lg hover:bg-gray-100 transition text-gray-400"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1061,15 +1061,13 @@ export default function AIAssistantPage() {
               {messages.length === 0 && isProUser && (
                 <div className="flex-1 flex flex-col justify-center items-center py-6 sm:py-10">
                   <h2 className="text-2xl sm:text-3xl text-center break-words max-w-full font-bold text-gray-900 mb-2">
-                    {zh ? `嗨，${userName} 👋` : `Hi ${userName} 👋`}
+                    {t.aiAssistant.welcomeGreeting.replace('{name}', userName)}
                   </h2>
                   <p className="text-lg text-gray-500 mb-1">
-                    {zh ? '今天我能帮您做什么？' : 'How can I help you today?'}
+                    {t.aiAssistant.welcomeSubtitle}
                   </p>
                   <p className="text-sm text-gray-400 text-center max-w-md mb-10">
-                    {zh
-                      ? '获取全球扩张、创作者营销和品牌增长的洞察、创意和实用策略。'
-                      : 'Get insights, ideas, and practical strategies for global expansion, creator marketing, and brand growth.'}
+                    {t.aiAssistant.welcomeDesc}
                   </p>
 
                   {/* Suggestion cards 2x2 grid */}
@@ -1342,7 +1340,7 @@ export default function AIAssistantPage() {
                         disabled={!isProUser || toolBusy}
                         onClick={() => aiAttachmentRef.current?.click()}
                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400 hover:text-gray-600 disabled:opacity-40"
-                        title={zh ? '附件' : 'Attach file'}
+                        title={t.aiAssistant.attachFile}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1371,7 +1369,7 @@ export default function AIAssistantPage() {
                               style={{ left: modePickerPos.left, bottom: modePickerPos.bottom }}
                             >
                               <div className="px-4 pt-4 pb-2">
-                                <p className="text-xs font-semibold text-gray-900">{zh ? '选择 AI 模式' : 'Choose AI Mode'}</p>
+                                <p className="text-xs font-semibold text-gray-900">{t.aiAssistant.chooseAiMode}</p>
                               </div>
                               <div className="px-2 pb-2">
                                 {AI_MODES.map((mode) => (
@@ -1390,7 +1388,7 @@ export default function AIAssistantPage() {
                                       <div className="flex items-center gap-2">
                                         <span className={`text-sm font-semibold ${aiMode === mode.id ? 'text-primary-700' : 'text-gray-900'}`}>{zh ? mode.labelZh : mode.label}</span>
                                         {'recommended' in mode && mode.recommended && (
-                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-primary-100 text-primary-600">{zh ? '推荐' : 'Recommended'}</span>
+                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-primary-100 text-primary-600">{t.aiAssistant.recommended}</span>
                                         )}
                                       </div>
                                       <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{zh ? mode.descZh : mode.desc}</p>
@@ -1413,7 +1411,7 @@ export default function AIAssistantPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                   </svg>
-                                  {zh ? '高级模型选择' : 'Advanced Model Selection'}
+                                  {t.aiAssistant.advancedModelSelection}
                                   <svg className={`w-3 h-3 ml-auto transition-transform ${showAdvancedModels ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                   </svg>
@@ -1460,7 +1458,7 @@ export default function AIAssistantPage() {
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                         </svg>
-                        {zh ? '网络搜索' : 'Web search'}
+                        {t.aiAssistant.webSearch}
                       </button>
                     </div>
                     <button
@@ -1476,7 +1474,7 @@ export default function AIAssistantPage() {
                 </div>
               </form>
               <p className="text-[10px] text-gray-400 text-center mt-2">
-                {currentMode ? `${currentMode.icon} ${zh ? currentMode.labelZh : currentMode.label}` : AI_MODEL_OPTIONS.find((m) => m.id === provider)?.label || provider} — {zh ? '回答仅供参考，请核实重要信息' : 'responses may not always be accurate'}
+                {currentMode ? `${currentMode.icon} ${zh ? currentMode.labelZh : currentMode.label}` : AI_MODEL_OPTIONS.find((m) => m.id === provider)?.label || provider} — {t.aiAssistant.disclaimer}
               </p>
             </div>
           </div>

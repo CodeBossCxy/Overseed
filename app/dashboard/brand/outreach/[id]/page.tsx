@@ -81,8 +81,9 @@ interface Campaign {
 
 export default function OutreachDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { locale } = useLanguage()
+  const { t, locale } = useLanguage()
   const zh = locale === 'zh'
+  const o = t.brand.outreach
 
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [loading, setLoading] = useState(true)
@@ -114,9 +115,9 @@ export default function OutreachDetailPage() {
     return (
       <BrandWorkspaceLayout>
         <div className="text-center py-20">
-          <p className="text-red-500 mb-4">{error || 'Campaign not found'}</p>
+          <p className="text-red-500 mb-4">{error || o.errorNotFound}</p>
           <Link href="/dashboard/brand/outreach" className="text-primary-600 hover:underline">
-            {zh ? '返回列表' : 'Back to list'}
+            {o.backToList}
           </Link>
         </div>
       </BrandWorkspaceLayout>
@@ -137,7 +138,7 @@ export default function OutreachDetailPage() {
           <svg className="w-4 h-4 transition group-hover:-translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
-          {zh ? '所有外联' : 'All Outreach'}
+          {o.backToAll}
         </Link>
 
         {/* ── Header card ── */}
@@ -156,9 +157,9 @@ export default function OutreachDetailPage() {
                 <div className="min-w-0">
                   <h1 className="text-xl font-bold text-gray-900 truncate">{campaign.title}</h1>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {zh ? '创建于' : 'Created'} {formatDate(campaign.createdAt, locale)}
+                    {o.createdLabel} {formatDate(campaign.createdAt, locale)}
                     {campaign.completedAt && (
-                      <> &middot; {zh ? '完成于' : 'Completed'} {formatDate(campaign.completedAt, locale)}</>
+                      <> &middot; {o.completedLabel} {formatDate(campaign.completedAt, locale)}</>
                     )}
                   </p>
                 </div>
@@ -170,16 +171,16 @@ export default function OutreachDetailPage() {
 
             {/* Stats strip */}
             <div className="mt-5 flex items-center gap-2 flex-wrap">
-              <StatPill label={zh ? '目标' : 'Target'} value={campaign.quantity} color="text-gray-700" bg="bg-gray-100" />
-              <StatPill label={zh ? '已发送' : 'Sent'} value={sentCount} color="text-emerald-700" bg="bg-emerald-50" />
+              <StatPill label={o.statTarget} value={campaign.quantity} color="text-gray-700" bg="bg-gray-100" />
+              <StatPill label={o.statSent} value={sentCount} color="text-emerald-700" bg="bg-emerald-50" />
               {failedCount > 0 && (
-                <StatPill label={zh ? '失败' : 'Failed'} value={failedCount} color="text-red-600" bg="bg-red-50" />
+                <StatPill label={o.statFailed} value={failedCount} color="text-red-600" bg="bg-red-50" />
               )}
               {pendingCount > 0 && (
-                <StatPill label={zh ? '待处理' : 'Pending'} value={pendingCount} color="text-amber-700" bg="bg-amber-50" />
+                <StatPill label={o.statPending} value={pendingCount} color="text-amber-700" bg="bg-amber-50" />
               )}
               {campaign.creditsCost > 0 && (
-                <StatPill label={zh ? '积分' : 'Credits'} value={campaign.creditsCost} color="text-primary-700" bg="bg-primary-50" icon="⚡" />
+                <StatPill label={o.statCredits} value={campaign.creditsCost} color="text-primary-700" bg="bg-primary-50" icon="⚡" />
               )}
             </div>
           </div>
@@ -190,7 +191,7 @@ export default function OutreachDetailPage() {
           {/* Brief — spans 2 cols */}
           <div className="lg:col-span-2 workspace-glass-card rounded-3xl p-5">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-              {zh ? '外联内容' : 'Outreach Brief'}
+              {o.briefTitle}
             </h3>
             <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
               {campaign.briefMessage}
@@ -200,7 +201,7 @@ export default function OutreachDetailPage() {
           {/* Quick actions */}
           <div className="workspace-glass-card rounded-3xl p-5 flex flex-col gap-3">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
-              {zh ? '操作' : 'Actions'}
+              {o.actionsTitle}
             </h3>
             <Link
               href="/dashboard/messages"
@@ -209,7 +210,7 @@ export default function OutreachDetailPage() {
               <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
               </svg>
-              {zh ? '查看消息' : 'View Messages'}
+              {o.viewMessages}
             </Link>
           </div>
         </div>
@@ -218,15 +219,15 @@ export default function OutreachDetailPage() {
         <div className="workspace-glass-card rounded-3xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-              {zh ? '创作者列表' : 'Recipients'}
+              {o.recipientsTitle}
             </h2>
             <span className="text-xs font-medium text-gray-400 bg-white/60 px-2.5 py-1 rounded-full">
-              {campaign.recipients.length} {zh ? '位创作者' : 'creators'}
+              {campaign.recipients.length} {o.creatorsCount}
             </span>
           </div>
 
           {campaign.recipients.length === 0 ? (
-            <p className="text-center text-gray-400 py-12 text-sm">{zh ? '暂无创作者' : 'No recipients yet'}</p>
+            <p className="text-center text-gray-400 py-12 text-sm">{o.noRecipients}</p>
           ) : (
             <div className="divide-y divide-gray-100/80">
               {campaign.recipients.map((r) => {
@@ -264,13 +265,13 @@ export default function OutreachDetailPage() {
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
                         {r.followerCount ? (
-                          <span>{formatFollowers(r.followerCount)} {zh ? '粉丝' : 'followers'}</span>
+                          <span>{formatFollowers(r.followerCount)} {o.followers}</span>
                         ) : null}
                         {r.engagementRate != null && Number(r.engagementRate) > 0 && (
-                          <span>{Number(r.engagementRate).toFixed(1)}% {zh ? '互动' : 'eng.'}</span>
+                          <span>{Number(r.engagementRate).toFixed(1)}% {o.engagement}</span>
                         )}
                         {r.matchScore != null && (
-                          <span className="text-primary-500 font-medium">{zh ? '匹配' : 'Match'} {Number(r.matchScore)}%</span>
+                          <span className="text-primary-500 font-medium">{o.matchLabel} {Number(r.matchScore)}%</span>
                         )}
                       </div>
                     </div>

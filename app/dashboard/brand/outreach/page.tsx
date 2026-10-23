@@ -29,8 +29,9 @@ const STATUS_BADGE: Record<string, { en: string; zh: string; cls: string }> = {
 }
 
 export default function OutreachListPage() {
-  const { locale } = useLanguage()
+  const { t, locale } = useLanguage()
   const zh = locale === 'zh'
+  const o = t.brand.outreach
   const [items, setItems] = useState<OutreachItem[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -60,15 +61,13 @@ export default function OutreachListPage() {
         {/* ---- Page header ---- */}
         <div>
           <p className="text-xs font-bold tracking-widest text-primary-600 uppercase mb-1">
-            {zh ? '批量触达' : 'MASS OUTREACH'}
+            {o.pageKicker}
           </p>
           <h1 className="text-3xl font-bold text-gray-900">
-            {zh ? '批量触达' : 'Mass Outreach'}
+            {o.pageTitle}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {zh
-              ? '向达人大规模发送个性化合作邀请。'
-              : 'Send personalized collaboration invitations to creators at scale.'}
+            {o.pageSubtitle}
           </p>
         </div>
 
@@ -81,12 +80,10 @@ export default function OutreachListPage() {
               </svg>
               <div>
                 <h3 className="text-base font-bold text-amber-800">
-                  {zh ? '批量触达功能维护中' : 'Mass Outreach Under Maintenance'}
+                  {o.maintenanceTitle}
                 </h3>
                 <p className="text-sm text-amber-700 mt-1">
-                  {zh
-                    ? '我们正在升级批量触达引擎，以提供更精准的创作者匹配和更丰富的数据。功能恢复后，我们将通过邮件通知所有用户。感谢您的耐心等待！'
-                    : 'We are upgrading our mass outreach engine to deliver more accurate creator matching and richer data. We will notify all users via email when the feature is back. Thank you for your patience!'}
+                  {o.maintenanceDesc}
                 </p>
               </div>
             </div>
@@ -97,12 +94,10 @@ export default function OutreachListPage() {
         <div className={`relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary-50 via-orange-50 to-rose-50 border border-primary-100 px-8 py-10 md:px-12 md:py-12 ${maintenanceMode ? 'opacity-40 pointer-events-none select-none' : ''}`}>
           <div className="max-w-lg relative z-10">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 leading-snug">
-              {zh ? '将创意变成合作' : 'Turn ideas into partnerships'}
+              {o.heroTitle}
             </h2>
             <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-              {zh
-                ? '发起批量触达，让 AI 为您的品牌找到最匹配的达人并发送个性化邀请。'
-                : 'Launch a mass outreach and let AI find the best creators for your brand.'}
+              {o.heroDesc}
             </p>
           </div>
           {/* Decorative circles */}
@@ -114,10 +109,10 @@ export default function OutreachListPage() {
         {!hasItems && (
           <div>
             <h2 className="text-xl font-bold text-gray-900">
-              {zh ? '如何运作' : 'How it works'}
+              {o.howItWorksTitle}
             </h2>
             <p className="text-sm text-gray-500 mt-1 mb-6">
-              {zh ? '从想法到触达，只需几步。' : 'Get from idea to outreach in a few simple steps.'}
+              {o.howItWorksSubtitle}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
@@ -128,10 +123,8 @@ export default function OutreachListPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                     </svg>
                   ),
-                  en: 'Define your outreach',
-                  enDesc: 'Set your goals, audience and preferences.',
-                  zh: '定义您的触达',
-                  zhDesc: '设定目标、受众和偏好。',
+                  title: o.step1Title,
+                  desc: o.step1Desc,
                 },
                 {
                   n: 2,
@@ -140,10 +133,8 @@ export default function OutreachListPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                     </svg>
                   ),
-                  en: 'AI finds the best creators',
-                  enDesc: 'Our AI matches you with relevant creators at scale.',
-                  zh: 'AI 寻找最佳达人',
-                  zhDesc: 'AI 为您大规模匹配相关达人。',
+                  title: o.step2Title,
+                  desc: o.step2Desc,
                 },
                 {
                   n: 3,
@@ -152,10 +143,8 @@ export default function OutreachListPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
                     </svg>
                   ),
-                  en: 'Send personalized invites',
-                  enDesc: 'Reach out with tailored messages in one click.',
-                  zh: '发送个性化邀请',
-                  zhDesc: '一键发送定制化消息。',
+                  title: o.step3Title,
+                  desc: o.step3Desc,
                 },
                 {
                   n: 4,
@@ -164,10 +153,8 @@ export default function OutreachListPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
                     </svg>
                   ),
-                  en: 'Track and manage',
-                  enDesc: 'Monitor responses and move creators to the next step.',
-                  zh: '跟踪与管理',
-                  zhDesc: '监控回复并推进合作。',
+                  title: o.step4Title,
+                  desc: o.step4Desc,
                 },
               ].map((s) => (
                 <div key={s.n} className="workspace-glass-card rounded-2xl p-5 space-y-3">
@@ -177,8 +164,8 @@ export default function OutreachListPage() {
                     </span>
                     {s.icon}
                   </div>
-                  <p className="text-sm font-semibold text-gray-900">{zh ? s.zh : s.en}</p>
-                  <p className="text-xs text-gray-500 leading-relaxed">{zh ? s.zhDesc : s.enDesc}</p>
+                  <p className="text-sm font-semibold text-gray-900">{s.title}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed">{s.desc}</p>
                 </div>
               ))}
             </div>
@@ -194,14 +181,14 @@ export default function OutreachListPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">
-                {zh ? '最近的触达' : 'Recent Outreach'}
+                {o.recentTitle}
               </h2>
               {items.length > 5 && (
                 <Link
                   href="/dashboard/brand/outreach"
                   className="text-sm text-primary-600 font-medium hover:underline inline-flex items-center gap-1"
                 >
-                  {zh ? '查看全部' : 'View All'} →
+                  {o.viewAll} →
                 </Link>
               )}
             </div>
@@ -210,11 +197,11 @@ export default function OutreachListPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
-                    <th className="px-5 py-3 font-medium">{zh ? '触达名称' : 'Outreach Name'}</th>
-                    <th className="px-5 py-3 font-medium">{zh ? '目标受众' : 'Target Audience'}</th>
-                    <th className="px-5 py-3 font-medium text-right">{zh ? '已触达' : 'Creators Reached'}</th>
-                    <th className="px-5 py-3 font-medium text-right">{zh ? '状态' : 'Status'}</th>
-                    <th className="px-5 py-3 font-medium text-right">{zh ? '创建时间' : 'Created At'}</th>
+                    <th className="px-5 py-3 font-medium">{o.colName}</th>
+                    <th className="px-5 py-3 font-medium">{o.colAudience}</th>
+                    <th className="px-5 py-3 font-medium text-right">{o.colReached}</th>
+                    <th className="px-5 py-3 font-medium text-right">{o.colStatus}</th>
+                    <th className="px-5 py-3 font-medium text-right">{o.colCreatedAt}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -239,7 +226,7 @@ export default function OutreachListPage() {
                         </td>
                         <td className="px-5 py-4 text-gray-600">
                           {platformLabel[c.platform] || c.platform}
-                          {c.quantity > 0 && ` · ${c.quantity} ${zh ? '位' : 'creators'}`}
+                          {c.quantity > 0 && ` · ${c.quantity} ${o.creatorsUnit}`}
                         </td>
                         <td className="px-5 py-4 text-right font-semibold text-gray-700">
                           {c.totalSent > 0 ? c.totalSent.toLocaleString() : '—'}

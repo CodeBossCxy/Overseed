@@ -27,26 +27,39 @@ function syncLocaleEnvironment(locale: Locale) {
   document.cookie = `locale=${locale};path=/;max-age=31536000;samesite=lax`
 }
 
+/**
+ * Detect the best initial locale without any flicker:
+ * 1. localStorage (returning user)
+ * 2. navigator.language (first-time visitor — respects OS/browser language)
+ * 3. fallback to 'en'
+ */
+function detectInitialLocale(): Locale {
+  if (typeof window === 'undefined') return 'en'
+  const saved = localStorage.getItem('locale')
+  if (saved === 'en' || saved === 'zh') return saved
+  const browserLang = (navigator.language || '').split('-')[0].toLowerCase()
+  return browserLang === 'zh' ? 'zh' : 'en'
+}
+
+function detectInitialAutoTranslate(): boolean {
+  if (typeof window === 'undefined') return true
+  const saved = localStorage.getItem('autoTranslateUGC')
+  return saved !== null ? saved === 'true' : true
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>('en')
-  const [autoTranslateUGC, setAutoTranslateUGCState] = useState(true)
-  const [isUGCTranslated, setIsUGCTranslated] = useState(true)
+  // Lazy initializers run synchronously on first render — no FOWL
+  const [locale, setLocaleState] = useState<Locale>(detectInitialLocale)
+  const initialAutoTranslate = detectInitialAutoTranslate()
+  const [autoTranslateUGC, setAutoTranslateUGCState] = useState(initialAutoTranslate)
+  const [isUGCTranslated, setIsUGCTranslated] = useState(initialAutoTranslate)
   const { data: session, status } = useSession()
   const hasFetchedRef = useRef(false)
 
-  // Load locale and autoTranslateUGC from localStorage immediately
+  // Sync <html lang> and cookie on mount (synchronous state already correct)
   useEffect(() => {
-    const savedLocale = localStorage.getItem('locale') as Locale
-    if (savedLocale && (savedLocale === 'en' || savedLocale === 'zh')) {
-      setLocaleState(savedLocale)
-    }
-    syncLocaleEnvironment(savedLocale === 'zh' ? 'zh' : 'en')
-    const savedAutoTranslate = localStorage.getItem('autoTranslateUGC')
-    if (savedAutoTranslate !== null) {
-      const val = savedAutoTranslate === 'true'
-      setAutoTranslateUGCState(val)
-      setIsUGCTranslated(val)
-    }
+    syncLocaleEnvironment(locale)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // When user is logged in, fetch their preferences from the database

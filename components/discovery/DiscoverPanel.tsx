@@ -236,6 +236,8 @@ export function NicheAutocomplete({
   platform: string; value: string; onChange: (v: string) => void
   labelCls: string; inputCls: string; zh: boolean
 }) {
+  const { t: _t } = useLanguage()
+  const _d = _t.brand.discover
   const [query, setQuery] = useState(value)
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -289,7 +291,7 @@ export function NicheAutocomplete({
       <label className={labelCls}>
         <span className="inline-flex items-center gap-1">
           <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-          {zh ? '领域' : 'Niches'}
+          {_d.nichesLabel}
         </span>
       </label>
       <input
@@ -297,13 +299,13 @@ export function NicheAutocomplete({
         value={query}
         onChange={handleInput}
         onFocus={handleFocus}
-        placeholder={zh ? '如 Fashion, Beauty' : 'e.g. Fashion, Beauty'}
+        placeholder={_d.nichesPlaceholder}
         className={`w-full ${inputCls}`}
       />
       {open && (
         <div className="absolute z-50 mt-1 w-full bg-white/100 rounded-lg shadow-lg border border-gray-200 max-h-52 overflow-y-auto" style={{ backdropFilter: 'none', background: '#ffffff' }}>
           {filtered.length === 0 && (
-            <div className="px-3 py-2 text-xs text-gray-400">{zh ? '无匹配领域' : 'No matching niches'}</div>
+            <div className="px-3 py-2 text-xs text-gray-400">{_d.nichesNoMatch}</div>
           )}
           {filtered.map((niche, i) => (
             <button
@@ -725,6 +727,7 @@ function RelatedCreatorChip({
   zh: boolean
   onOpen: (creator: DiscoveredCreator) => void
 }) {
+  const { t: _tChip } = useLanguage()
   const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null)
 
   return (
@@ -763,7 +766,7 @@ function RelatedCreatorChip({
           className="fixed z-[100] px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-[11px] font-medium shadow-lg whitespace-nowrap pointer-events-none -translate-x-1/2 -translate-y-full"
           style={{ left: tooltip.x, top: tooltip.y - 6 }}
         >
-          {zh ? '点击查看 · 5 积分' : 'Click to view · 5 credits'}
+          {_tChip.brand.discover.relatedCreatorTooltip}
         </span>
       )}
     </span>
@@ -1101,7 +1104,7 @@ export default function DiscoverPanel() {
           return
         }
         if (data.code === 'INSUFFICIENT_CREDITS') {
-          setDirectError(zh ? '积分不足，请充值' : 'Not enough credits')
+          setDirectError(d.directInsufficientCredits)
           setDirectLoading(false)
           return
         }
@@ -1122,16 +1125,12 @@ export default function DiscoverPanel() {
       const results = data.results || []
       if (results.length > 0) {
         setDirectSuggestions(results)
-        setDirectError(zh
-          ? `未找到精确匹配，以下是相似的创作者：`
-          : `No exact match found. Did you mean one of these?`)
+        setDirectError(d.directNoExactMatch)
       } else {
-        setDirectError(zh
-          ? `未找到与 "${raw}" 相关的创作者，请确认用户名和平台是否正确`
-          : `No creators found matching "${raw}" — please check the username and platform`)
+        setDirectError(d.directNoCreatorsFound.replace('{raw}', raw))
       }
     } catch {
-      setDirectError(zh ? '查询失败，请重试' : 'Lookup failed, please try again')
+      setDirectError(d.directLookupFailed)
     } finally {
       setDirectLoading(false)
     }
@@ -1147,7 +1146,7 @@ export default function DiscoverPanel() {
     setDirectError(null)
     setDirectHandle('')
     if (!suggestion.handle) {
-      setDirectError(zh ? '该创作者没有有效的用户名' : 'This creator has no valid handle')
+      setDirectError(d.directNoValidHandle)
       return
     }
     const creator: DiscoveredCreator = {
@@ -2266,12 +2265,10 @@ export default function DiscoverPanel() {
             </svg>
             <div>
               <h3 className="text-base font-bold text-amber-800">
-                {locale === 'zh' ? '创作者搜索功能维护中' : 'Creator Search Under Maintenance'}
+                {d.maintenanceTitle}
               </h3>
               <p className="text-sm text-amber-700 mt-1">
-                {locale === 'zh'
-                  ? '我们正在升级创作者搜索引擎，以提供更好的搜索结果和更多的创作者数据。功能恢复后，我们将通过邮件通知所有用户。感谢您的耐心等待！'
-                  : 'We are upgrading our creator search engine to deliver better results and richer creator data. We will notify all users via email when the feature is back. Thank you for your patience!'}
+                {d.maintenanceDesc}
               </p>
             </div>
           </div>
@@ -2289,9 +2286,7 @@ export default function DiscoverPanel() {
       {/* ── Direct creator lookup ── */}
       <div data-tour="direct-lookup" className="workspace-glass-toolbar rounded-2xl p-5 mb-4 overflow-visible relative z-10">
         <p className="text-sm text-gray-600 mb-3">
-          {zh
-            ? '如果你已经知道想要查找的创作者，输入用户名直接查看档案'
-            : 'Already know who you\'re looking for? Enter their username to view their profile directly.'}
+          {d.directLookupIntro}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {/* Platform pills */}
@@ -2318,7 +2313,7 @@ export default function DiscoverPanel() {
               value={directHandle}
               onChange={(e) => { setDirectHandle(e.target.value); setDirectError(null) }}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleDirectLookup() } }}
-              placeholder={zh ? '输入用户名或链接，例如 @username' : 'Enter handle or profile URL, e.g. @username'}
+              placeholder={d.directHandlePlaceholder}
               className="w-full px-4 py-2 workspace-glass-control workspace-glass-control-square text-sm focus:outline-none"
             />
           </div>
@@ -2331,18 +2326,16 @@ export default function DiscoverPanel() {
             className="px-5 py-2 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {directLoading ? (
-              <span className="inline-flex items-center gap-2"><Spinner /> {zh ? '查询中...' : 'Looking up...'}</span>
+              <span className="inline-flex items-center gap-2"><Spinner /> {d.directLookingUp}</span>
             ) : (
-              zh ? '查看档案' : 'View Profile'
+              d.directViewProfile
             )}
           </button>
         </div>
 
         {/* Credit cost hint */}
         <p className="mt-2 text-xs text-gray-400">
-          {zh
-            ? `每次查看新创作者档案消耗 ${creditPrices?.profile ?? 4} 积分，重复查看同一创作者免费`
-            : `${creditPrices?.profile ?? 4} credits per new profile view — repeat views of the same creator are free`}
+          {d.directCreditHint.replace('{n}', String(creditPrices?.profile ?? 4))}
         </p>
 
         {/* Error / suggestion message */}
@@ -2486,7 +2479,7 @@ export default function DiscoverPanel() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="8" y1="18" x2="16" y2="18"/></svg>
-              <span className="text-sm font-semibold text-gray-800">{zh ? '筛选条件' : 'Filters'}</span>
+              <span className="text-sm font-semibold text-gray-800">{d.filtersLabel}</span>
             </div>
             <button
               type="button"
@@ -2497,7 +2490,7 @@ export default function DiscoverPanel() {
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-              {zh ? '重置全部' : 'Reset all'}
+              {d.resetAll}
             </button>
           </div>
 
@@ -2507,20 +2500,20 @@ export default function DiscoverPanel() {
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold flex items-center justify-center">1</span>
                 <div className="text-left">
-                  <span className="text-xs font-semibold text-gray-800">{zh ? '受众' : 'Audience'}</span>
-                  <span className="ml-2 text-[10px] text-gray-400">{zh ? '你想触达谁？' : 'Who do you want to reach?'}</span>
+                  <span className="text-xs font-semibold text-gray-800">{d.audienceSection}</span>
+                  <span className="ml-2 text-[10px] text-gray-400">{d.audienceDesc}</span>
                 </div>
               </div>
               <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.audience ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
             </button>
             {openFilterSections.audience && (
-              <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+              <div className="px-3 pb-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Audience location */}
                 <div>
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                      {zh ? '受众所在地' : 'Audience location'}
+                      {d.audienceLocation}
                     </span>
                   </label>
                   <MultiSelectFilter
@@ -2530,7 +2523,7 @@ export default function DiscoverPanel() {
                       value: code,
                       label: (t.signupBusiness.countries as Record<string, string>)[key] || code,
                     }))}
-                    placeholder={zh ? '全部地区' : 'Anywhere'}
+                    placeholder={d.audienceLocationPlaceholder}
                     inputCls={inputCls}
                   />
                 </div>
@@ -2539,7 +2532,7 @@ export default function DiscoverPanel() {
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M12 22l5-10 5 10"/><path d="M14 18h6"/></svg>
-                      {zh ? '语言' : 'Language'}
+                      {d.audienceLanguage}
                     </span>
                   </label>
                   <MultiSelectFilter
@@ -2549,7 +2542,7 @@ export default function DiscoverPanel() {
                       value,
                       label: langLabel,
                     }))}
-                    placeholder={zh ? '全部语言' : 'All languages'}
+                    placeholder={d.audienceLanguagePlaceholder}
                     inputCls={inputCls}
                   />
                 </div>
@@ -2558,7 +2551,7 @@ export default function DiscoverPanel() {
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                      {zh ? '受众年龄' : 'Audience age'}
+                      {d.audienceAge}
                     </span>
                   </label>
                   {['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? (
@@ -2584,7 +2577,7 @@ export default function DiscoverPanel() {
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a8.38 8.38 0 0 1 13 0"/></svg>
-                      {zh ? '性别构成' : 'Gender'}
+                      {d.audienceGender}
                     </span>
                   </label>
                   {['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? (() => {
@@ -2614,7 +2607,7 @@ export default function DiscoverPanel() {
                         />
                         <div className="flex justify-between text-[10px] text-gray-500">
                           <span style={{ color: isActive ? '#ec4899' : undefined }}>
-                            {zh ? '女' : 'F'} {isActive ? `${femalePct}%+` : ''}
+                            {d.genderFemaleShort} {isActive ? `${femalePct}%+` : ''}
                           </span>
                           <button
                             type="button"
@@ -2624,10 +2617,10 @@ export default function DiscoverPanel() {
                             }}
                             className="text-[10px] text-gray-400 hover:text-gray-600"
                           >
-                            {isActive ? (zh ? '重置' : 'Reset') : (zh ? '任意' : 'Any')}
+                            {isActive ? d.genderReset : d.genderAny}
                           </button>
                           <span style={{ color: isActive ? '#3b82f6' : undefined }}>
-                            {isActive ? `${100 - femalePct}%+` : ''} {zh ? '男' : 'M'}
+                            {isActive ? `${100 - femalePct}%+` : ''} {d.genderMaleShort}
                           </span>
                         </div>
                       </div>
@@ -2654,20 +2647,20 @@ export default function DiscoverPanel() {
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center">2</span>
                 <div className="text-left">
-                  <span className="text-xs font-semibold text-gray-800">{zh ? '创作者' : 'Creator'}</span>
-                  <span className="ml-2 text-[10px] text-gray-400">{zh ? '寻找合适的创作者类型' : 'Find the right type of creators'}</span>
+                  <span className="text-xs font-semibold text-gray-800">{d.creatorSection}</span>
+                  <span className="ml-2 text-[10px] text-gray-400">{d.creatorDesc}</span>
                 </div>
               </div>
               <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.creator ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
             </button>
             {openFilterSections.creator && (
-              <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+              <div className="px-3 pb-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Creator's country */}
                 <div>
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      {zh ? '创作者所在国' : "Creator's country"}
+                      {d.creatorCountry}
                     </span>
                   </label>
                   <MultiSelectFilter
@@ -2677,7 +2670,7 @@ export default function DiscoverPanel() {
                       value: code,
                       label: (t.signupBusiness.countries as Record<string, string>)[key] || code,
                     }))}
-                    placeholder={zh ? '全部国家' : 'Any country'}
+                    placeholder={d.creatorCountryPlaceholder}
                     inputCls={inputCls}
                   />
                 </div>
@@ -2686,7 +2679,7 @@ export default function DiscoverPanel() {
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                      {zh ? '认证账号' : 'Verified account'}
+                      {d.verifiedAccount}
                     </span>
                   </label>
                   <select
@@ -2695,8 +2688,8 @@ export default function DiscoverPanel() {
                     className={`w-full ${inputCls}`}
                   >
                     <option value="">{d.anyOption}</option>
-                    <option value="true">{zh ? '是' : 'Yes'}</option>
-                    <option value="false">{zh ? '否' : 'No'}</option>
+                    <option value="true">{d.verifiedYes}</option>
+                    <option value="false">{d.verifiedNo}</option>
                   </select>
                 </div>
                 {/* Hashtags */}
@@ -2704,14 +2697,14 @@ export default function DiscoverPanel() {
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <span className="text-[10px] font-bold text-gray-400">#</span>
-                      {zh ? '标签（可选）' : 'Hashtags (optional)'}
+                      {d.hashtags}
                     </span>
                   </label>
                   <input
                     type="text"
                     value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('hashtags').value : ''}
                     onChange={(e) => updateCreatorDbFilter('hashtags', { value: e.target.value })}
-                    placeholder={zh ? '如 #护肤, #旅行' : 'e.g. #skincare, #travel'}
+                    placeholder={d.hashtagsPlaceholder}
                     className={`w-full ${inputCls}`}
                   />
                 </div>
@@ -2724,12 +2717,12 @@ export default function DiscoverPanel() {
                   inputCls={inputCls}
                   zh={zh}
                 />
-                {/* Followers / subscribers */}
-                <div>
+                {/* Followers / subscribers — spans 2 cols so the min-max range fits */}
+                <div className="col-span-2 lg:col-span-1">
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                      {zh ? '粉丝数' : 'Followers / subscribers'}
+                      {d.followersLabel}
                     </span>
                   </label>
                   {(() => {
@@ -2744,7 +2737,7 @@ export default function DiscoverPanel() {
                         type="number"
                         min={0}
                         defaultValue={minFollowers === 'custom' ? '' : minFollowers}
-                        placeholder={zh ? '最少粉丝' : 'Min followers'}
+                        placeholder={d.minFollowersPlaceholder}
                         autoFocus={minFollowers === 'custom'}
                         onBlur={(e) => {
                           const v = e.target.value.trim()
@@ -2771,7 +2764,7 @@ export default function DiscoverPanel() {
                         {minPresets.map((n) => (
                           <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                         ))}
-                        <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
+                        <option value="custom">{d.customOption}</option>
                       </select>
                     )}
                     <span className="text-gray-400 font-medium text-sm">–</span>
@@ -2780,7 +2773,7 @@ export default function DiscoverPanel() {
                         type="number"
                         min={0}
                         defaultValue={maxFollowers === 'custom' ? '' : maxFollowers}
-                        placeholder={zh ? '最多粉丝' : 'Max followers'}
+                        placeholder={d.maxFollowersPlaceholder}
                         autoFocus={maxFollowers === 'custom'}
                         onBlur={(e) => {
                           const v = e.target.value.trim()
@@ -2807,7 +2800,7 @@ export default function DiscoverPanel() {
                         {maxPresets.map((n) => (
                           <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                         ))}
-                        <option value="custom">{zh ? '自定义...' : 'Custom...'}</option>
+                        <option value="custom">{d.customOption}</option>
                       </select>
                     )}
                   </div>
@@ -2819,7 +2812,7 @@ export default function DiscoverPanel() {
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                      {zh ? '最近活跃' : 'Last active'}
+                      {d.lastActive}
                     </span>
                   </label>
                   <select
@@ -2839,10 +2832,10 @@ export default function DiscoverPanel() {
                     className={`w-full ${inputCls}`}
                   >
                     <option value="">{d.anyOption}</option>
-                    <option value="90">{zh ? '近3个月活跃' : 'Within 3 months'}</option>
-                    <option value="180">{zh ? '近6个月活跃' : 'Within 6 months'}</option>
-                    <option value="365">{zh ? '近1年活跃' : 'Within 1 year'}</option>
-                    <option value="-365">{zh ? '超过1年未活跃' : 'Over 1 year ago'}</option>
+                    <option value="90">{d.last3months}</option>
+                    <option value="180">{d.last6months}</option>
+                    <option value="365">{d.last1year}</option>
+                    <option value="-365">{d.over1year}</option>
                   </select>
                 </div>
               </div>
@@ -2855,32 +2848,32 @@ export default function DiscoverPanel() {
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold flex items-center justify-center">3</span>
                 <div className="text-left">
-                  <span className="text-xs font-semibold text-gray-800">{zh ? '数据表现' : 'Performance'}</span>
-                  <span className="ml-2 text-[10px] text-gray-400">{zh ? '关注真实影响力的创作者' : 'Focus on creators with real impact'}</span>
+                  <span className="text-xs font-semibold text-gray-800">{d.performanceSection}</span>
+                  <span className="ml-2 text-[10px] text-gray-400">{d.performanceDesc}</span>
                 </div>
               </div>
               <svg className={`w-4 h-4 text-gray-400 transition-transform ${openFilterSections.performance ? '' : '-rotate-90'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
             </button>
             {openFilterSections.performance && (
-              <div className="px-3 pb-3 grid grid-cols-4 gap-3">
+              <div className="px-3 pb-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Average short views */}
                 <div>
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                      {zh ? '平均短视频播放量' : 'Average short views'}
+                      {d.avgViews}
                     </span>
                   </label>
-                  <div className="relative">
+                  <div className="flex items-center gap-1">
                     <input
                       type="number"
                       min={0}
                       value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('shortAvgViews').value : ''}
                       onChange={(e) => updateCreatorDbFilter('shortAvgViews', { op: '>', value: e.target.value })}
-                      placeholder={zh ? '如 5,000' : 'e.g. 5,000'}
-                      className={`w-full pr-20 ${inputCls}`}
+                      placeholder={d.avgViewsPlaceholder}
+                      className={`min-w-0 flex-1 ${inputCls}`}
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">{zh ? '≥ 次播放' : '≥ views'}</span>
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">{d.avgViewsSuffix}</span>
                   </div>
                 </div>
                 {/* Average engagement rate */}
@@ -2888,20 +2881,20 @@ export default function DiscoverPanel() {
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
-                      {zh ? '平均互动率' : 'Average engagement rate'}
+                      {d.avgEngagement}
                     </span>
                   </label>
-                  <div className="relative">
+                  <div className="flex items-center gap-1">
                     <input
                       type="number"
                       step="0.1"
                       min={0}
                       value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('shortEngagementRate').value : ''}
                       onChange={(e) => updateCreatorDbFilter('shortEngagementRate', { op: '>', value: e.target.value })}
-                      placeholder={zh ? '如 2.5%' : 'e.g. 2.5%'}
-                      className={`w-full pr-12 ${inputCls}`}
+                      placeholder={d.avgEngagementPlaceholder}
+                      className={`min-w-0 flex-1 ${inputCls}`}
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">≥ %</span>
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">≥ %</span>
                   </div>
                 </div>
                 {/* Followers growth (30d) */}
@@ -2909,19 +2902,19 @@ export default function DiscoverPanel() {
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-                      {zh ? '粉丝增长 (30天)' : 'Followers growth (30d)'}
+                      {d.followerGrowth}
                     </span>
                   </label>
-                  <div className="relative">
+                  <div className="flex items-center gap-1">
                     <input
                       type="number"
                       min={0}
                       value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('followerGrowth30d').value : ''}
                       onChange={(e) => updateCreatorDbFilter('followerGrowth30d', { op: '>', value: e.target.value })}
-                      placeholder={zh ? '如 500' : 'e.g. 500'}
-                      className={`w-full pr-16 ${inputCls}`}
+                      placeholder={d.followerGrowthPlaceholder}
+                      className={`min-w-0 flex-1 ${inputCls}`}
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">{zh ? '≥ 新粉丝' : '≥ new'}</span>
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">{d.followerGrowthSuffix}</span>
                   </div>
                 </div>
                 {/* Content count (30d) */}
@@ -2929,19 +2922,19 @@ export default function DiscoverPanel() {
                   <label className={labelCls}>
                     <span className="inline-flex items-center gap-1">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                      {zh ? '近30天发布数' : 'Posts in last 30d'}
+                      {d.postsIn30d}
                     </span>
                   </label>
-                  <div className="relative">
+                  <div className="flex items-center gap-1">
                     <input
                       type="number"
                       min={0}
                       value={['instagram', 'tiktok', 'youtube'].includes(activePlatform) ? creatorDbFilterFor('contentsIn30Days').value : ''}
                       onChange={(e) => updateCreatorDbFilter('contentsIn30Days', { op: '>', value: e.target.value })}
-                      placeholder={zh ? '如 5' : 'e.g. 5'}
-                      className={`w-full pr-14 ${inputCls}`}
+                      placeholder={d.postsIn30dPlaceholder}
+                      className={`min-w-0 flex-1 ${inputCls}`}
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">{zh ? '≥ 条' : '≥ posts'}</span>
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">{d.postsIn30dSuffix}</span>
                   </div>
                 </div>
               </div>
@@ -2957,7 +2950,7 @@ export default function DiscoverPanel() {
                 onChange={(e) => setSort(e.target.value as 'relevance' | 'followers' | 'recent')}
                 className={inputCls}
               >
-                <option value="relevance">{zh ? '相关度' : 'Relevance'}</option>
+                <option value="relevance">{d.sortRelevance}</option>
                 <option value="followers">{d.sortFollowers}</option>
                 <option value="recent">{d.sortRecent}</option>
               </select>
@@ -2966,16 +2959,12 @@ export default function DiscoverPanel() {
 
           {creatorDbFilterExtraCost && (
             <p className="mt-2 text-xs font-medium text-amber-600">
-              {zh
-                ? `使用了 ${effectiveFilterCount} 个筛选条件（超过 10 个），本次搜索将消耗 2 倍积分。`
-                : `Using ${effectiveFilterCount} filters (over 10) — this search costs 2× credits.`}
+              {d.filterExtraCost.replace('{n}', String(effectiveFilterCount))}
             </p>
           )}
           {creatorDbFilterLimitExceeded && (
             <p className="mt-2 text-xs font-semibold text-red-600">
-              {zh
-                ? '筛选条件已超过 20 个。请清空至少一个条件后再提交。'
-                : 'Filter limit exceeded (20 max). Clear at least one before submitting.'}
+              {d.filterLimitExceeded}
             </p>
           )}
 
@@ -2993,17 +2982,17 @@ export default function DiscoverPanel() {
                 <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${showLatestPost ? 'translate-x-4' : ''}`} />
               </div>
               <span className="text-xs font-medium text-gray-600">
-                {zh ? '显示最新帖子' : 'Show latest post'}
+                {d.showLatestPost}
               </span>
               {searchPrice != null && (
                 <span className="text-[11px] text-amber-600 font-medium ml-1">
-                  +{searchPrice * 2} {zh ? '积分' : 'credits'}
+                  +{searchPrice * 2} {d.creditsUnit}
                 </span>
               )}
             </label>
             {effectiveSearchPrice != null && showLatestPost && (
               <span className="text-[11px] text-amber-600 font-medium">
-                {zh ? `${effectiveSearchPrice} 积分/次搜索` : `${effectiveSearchPrice} credits/search`}
+                {d.creditsPerSearch.replace('{n}', String(effectiveSearchPrice))}
               </span>
             )}
           </div>
@@ -3060,8 +3049,8 @@ export default function DiscoverPanel() {
                 className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1"
               >
                 {historyOpen
-                  ? (zh ? '收起' : 'Show less')
-                  : (zh ? `查看全部 ${historyTasks!.length} 条` : `View all ${historyTasks!.length}`)}
+                  ? d.showLess
+                  : d.viewAllCount.replace('{n}', String(historyTasks!.length))}
                 <svg
                   className={`w-3.5 h-3.5 transition-transform ${historyOpen ? 'rotate-180' : ''}`}
                   fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
@@ -3143,8 +3132,8 @@ export default function DiscoverPanel() {
           <div className="workspace-glass-card rounded-2xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-semibold">{zh ? '浏览过的达人' : 'Viewed profiles'}</h2>
-                <p className="text-sm text-gray-400 mt-0.5">{zh ? '点击可免费再次查看达人资料' : 'Click to view again for free'}</p>
+                <h2 className="text-lg font-semibold">{d.viewedProfiles}</h2>
+                <p className="text-sm text-gray-400 mt-0.5">{d.viewedProfilesHint}</p>
               </div>
               {viewedProfiles.length > PREVIEW_COUNT && (
                 <button
@@ -3153,8 +3142,8 @@ export default function DiscoverPanel() {
                   className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1"
                 >
                   {viewedProfilesExpanded
-                    ? (zh ? '收起' : 'Show less')
-                    : (zh ? `查看全部 ${viewedProfiles.length} 位` : `View all ${viewedProfiles.length}`)}
+                    ? d.showLess
+                    : d.viewAllProfiles.replace('{n}', String(viewedProfiles.length))}
                   <svg
                     className={`w-3.5 h-3.5 transition-transform ${viewedProfilesExpanded ? 'rotate-180' : ''}`}
                     fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
@@ -3214,10 +3203,10 @@ export default function DiscoverPanel() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
-                {zh ? '搜索历史' : 'Search history'}
+                {d.resultsSearchHistory}
               </button>
               <h2 className="text-lg font-semibold">
-                {isLoading ? d.loadingCreators : (zh ? `为您推荐 ${creators.length} 位达人` : `Top ${creators.length} creators for you`)}
+                {isLoading ? d.loadingCreators : d.resultsTopCreators.replace('{n}', String(creators.length))}
               </h2>
             </div>
             <div className="flex items-center gap-3">
@@ -3227,14 +3216,14 @@ export default function DiscoverPanel() {
                 </p>
               )}
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-500">{zh ? '排序:' : 'Sort by:'}</span>
+                <span className="text-xs text-gray-500">{d.resultsSortBy}</span>
                 <select
                   value={sortByRelevance ? 'relevance' : 'followers'}
                   onChange={(e) => setSortByRelevance(e.target.value === 'relevance')}
                   className="text-xs font-semibold text-gray-700 bg-transparent border-none cursor-pointer focus:outline-none"
                 >
-                  <option value="followers">{zh ? '最多粉丝' : 'Most followers'}</option>
-                  <option value="relevance">{zh ? '相关度' : 'Relevance'}</option>
+                  <option value="followers">{d.resultsSortFollowers}</option>
+                  <option value="relevance">{d.resultsSortRelevance}</option>
                 </select>
               </div>
             </div>
@@ -3271,16 +3260,14 @@ export default function DiscoverPanel() {
               <div className="flex items-center justify-between mb-3 px-4 py-2.5 rounded-2xl bg-white/50 backdrop-blur border border-white/70 shadow-sm">
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-gray-700">
-                    {zh
-                      ? `已选择 ${selectedCreators.size} 位达人 · 可进行批量联系`
-                      : `${selectedCreators.size} creator${selectedCreators.size > 1 ? 's' : ''} selected — ready for bulk outreach`}
+                    {d.outreachSelectedBanner.replace('{n}', String(selectedCreators.size)).replace('{s}', selectedCreators.size > 1 ? 's' : '')}
                   </span>
                   <button
                     type="button"
                     onClick={deselectAllCreators}
                     className="text-xs text-gray-400 hover:text-gray-600 transition"
                   >
-                    {zh ? '清除' : 'Clear'}
+                    {d.resultsClear}
                   </button>
                 </div>
                 <div className="flex items-center gap-3">
@@ -3293,7 +3280,7 @@ export default function DiscoverPanel() {
                     ))}
                   </div>
                   <span className="text-xs font-medium text-gray-500">
-                    {zh ? `已选择 ${selectedCreators.size} 位达人` : `${selectedCreators.size} selected`}
+                    {d.outreachSelectedCount.replace('{n}', String(selectedCreators.size))}
                   </span>
                   {/* Bulk outreach button */}
                   <button
@@ -3304,7 +3291,7 @@ export default function DiscoverPanel() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                     </svg>
-                    {zh ? `批量联系` : `Bulk Contact`}
+                    {d.outreachBulkContact}
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
                     </svg>
@@ -3358,7 +3345,7 @@ export default function DiscoverPanel() {
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(creator.handle?.replace(/^@/, '') || '') }}
                                 className="text-gray-300 hover:text-gray-500 flex-shrink-0"
-                                title={zh ? '复制' : 'Copy handle'}
+                                title={d.resultsCopyHandle}
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -3377,7 +3364,7 @@ export default function DiscoverPanel() {
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-50 transition flex-shrink-0"
                           >
                             <PlatformLogo platform={creator.platform} size={16} />
-                            {zh ? `${PLATFORM_LABELS[creator.platform] || creator.platform}` : `View on ${PLATFORM_LABELS[creator.platform] || creator.platform}`}
+                            {d.openOnPlatform.replace('{platform}', PLATFORM_LABELS[creator.platform] || creator.platform)}
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
                             </svg>
@@ -3498,7 +3485,7 @@ export default function DiscoverPanel() {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                           </svg>
-                          {zh ? '查看资料' : 'View Profile'}
+                          {d.resultsViewProfile}
                         </button>
                       ) : creator.profile_url ? (
                         <a
@@ -3511,7 +3498,7 @@ export default function DiscoverPanel() {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                           </svg>
-                          {zh ? '查看资料' : 'View Profile'}
+                          {d.resultsViewProfile}
                         </a>
                       ) : null}
                       <button
@@ -3528,14 +3515,14 @@ export default function DiscoverPanel() {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                             </svg>
-                            {zh ? '已加入待联系' : 'Added to outreach'}
+                            {d.resultsAddedToOutreach}
                           </>
                         ) : (
                           <>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
-                            {zh ? '联系' : 'Contact'}
+                            {d.resultsContact}
                           </>
                         )}
                       </button>
@@ -3548,7 +3535,7 @@ export default function DiscoverPanel() {
                             ? 'bg-amber-50 border-amber-200 text-amber-600'
                             : 'bg-orange-50/50 border-gray-200 text-gray-400 hover:text-amber-600 hover:border-amber-200'
                         }`}
-                        title={isSaved ? (zh ? '取消收藏' : 'Unsave') : (zh ? '收藏' : 'Save')}
+                        title={isSaved ? d.resultsUnsave : d.resultsSave}
                       >
                         <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
@@ -3656,12 +3643,10 @@ export default function DiscoverPanel() {
                   ✓
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mt-4">
-                  {zh ? '消息已发送' : 'Message sent'}
+                  {d.messageSent}
                 </h3>
                 <p className="text-sm text-gray-500 mt-1.5">
-                  {zh
-                    ? `您的消息已提交。我们的团队将代您联系 ${detail?.name || detailFor.display_name || detailFor.handle}，回复将出现在您的 Overseed 消息中心。`
-                    : `Your request has been submitted. Our team will reach out to ${detail?.name || detailFor.display_name || detailFor.handle} on your behalf. Replies will appear in your Overseed Messages.`}
+                  {d.messageSentDesc.replace('{name}', String(detail?.name || detailFor.display_name || detailFor.handle))}
                 </p>
                 <button
                   onClick={() => setContactOpen(false)}
@@ -3783,30 +3768,28 @@ export default function DiscoverPanel() {
             {bulkSent ? (
               <div className="text-center py-6">
                 <div className="w-14 h-14 mx-auto rounded-full flex items-center justify-center text-2xl" style={{ backgroundColor: '#ecfdf5', color: '#10b981' }}>✓</div>
-                <h3 className="text-lg font-bold mt-4" style={{ color: '#111827' }}>{zh ? '外联已提交' : 'Outreach submitted'}</h3>
+                <h3 className="text-lg font-bold mt-4" style={{ color: '#111827' }}>{d.outreachSubmitted}</h3>
                 <p className="text-sm mt-1.5" style={{ color: '#6b7280' }}>
-                  {zh
-                    ? `已向 ${getSelectedCreatorObjects().length || selectedCreators.size} 位达人提交外联请求。我们的团队将代您联系。`
-                    : `Outreach request submitted. Our team will reach out to the creators on your behalf.`}
+                  {d.outreachSubmittedDesc}
                 </p>
                 <button onClick={() => setBulkOutreachOpen(false)} className="mt-6 px-6 py-2.5 rounded-xl text-sm font-semibold transition" style={{ backgroundColor: '#111827', color: '#ffffff' }}>
-                  {zh ? '完成' : 'Done'}
+                  {d.outreachDone}
                 </button>
               </div>
             ) : (
               <>
                 <h3 className="text-lg font-bold" style={{ color: '#111827' }}>
-                  {zh ? `向 ${selectedCreators.size} 位达人发送外联` : `Send outreach to ${selectedCreators.size} creators`}
+                  {d.outreachToCreators.replace('{n}', String(selectedCreators.size))}
                 </h3>
                 <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
-                  {zh ? '由 Overseed 代为发送 — 创作者可以直接回复您的消息。' : 'Delivered by Overseed — creators can reply directly to your message.'}
+                  {d.outreachDeliveredBy}
                 </p>
                 <textarea
                   value={bulkMsg}
                   onChange={(e) => setBulkMsg(e.target.value)}
                   rows={6}
                   maxLength={2000}
-                  placeholder={zh ? '写下您的合作邀请消息...' : 'Write your collaboration message...'}
+                  placeholder={d.outreachMsgPlaceholder}
                   className="mt-4 w-full px-4 py-3 rounded-xl text-sm focus:outline-none resize-none"
                   style={{ border: '1px solid #e5e7eb' }}
                 />
@@ -3831,16 +3814,16 @@ export default function DiscoverPanel() {
                     </div>
                   )}
                   <label className="inline-flex items-center gap-1.5 text-sm font-medium cursor-pointer" style={{ color: '#4f46e5' }}>
-                    <span className="text-base leading-none">＋</span> {zh ? '添加图片或文件' : 'Add photos or files'}
+                    <span className="text-base leading-none">＋</span> {d.outreachAddFiles}
                     <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" className="hidden" onChange={(e) => { addBulkFiles(e.target.files); e.target.value = '' }} />
                   </label>
-                  <span className="ml-2 text-[11px]" style={{ color: '#9ca3af' }}>{zh ? '图片或PDF · 最多3个 · 共4MB' : 'Images or PDF · up to 3 files · 4MB combined'}</span>
+                  <span className="ml-2 text-[11px]" style={{ color: '#9ca3af' }}>{d.outreachFilesHint}</span>
                 </div>
 
                 {/* Remember message */}
                 <label className="flex items-center gap-2 mt-4 cursor-pointer">
                   <input type="checkbox" checked={bulkRememberMsg} onChange={(e) => setBulkRememberMsg(e.target.checked)} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                  <span className="text-sm" style={{ color: '#4b5563' }}>{zh ? '记住此消息用于下次' : 'Remember this message for next time'}</span>
+                  <span className="text-sm" style={{ color: '#4b5563' }}>{d.outreachRememberMsg}</span>
                 </label>
 
                 {bulkError && (
@@ -3849,10 +3832,10 @@ export default function DiscoverPanel() {
 
                 <div className="flex items-center justify-end gap-3 mt-5">
                   <button onClick={() => setBulkOutreachOpen(false)} disabled={bulkSending} className="px-5 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-50" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
-                    {zh ? '取消' : 'Cancel'}
+                    {d.outreachCancel}
                   </button>
                   <button onClick={sendBulkOutreach} disabled={bulkSending || bulkMsg.trim().length < 10} className="px-6 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: 'linear-gradient(to right, #4f46e5, #e11d48)', color: '#ffffff' }}>
-                    {bulkSending ? (zh ? '发送中…' : 'Sending…') : (zh ? '发送外联' : 'Send outreach')}
+                    {bulkSending ? d.outreachSending : d.outreachSend}
                   </button>
                 </div>
               </>
