@@ -162,8 +162,8 @@ export default function WorkspaceLayout({
       : [
           { href: '/dashboard/brand', label: w.dashboard, exact: true, icon: ICONS.home },
           { href: '/dashboard/brand/campaigns', label: w.myCampaigns, icon: ICONS.briefcase },
-          { href: '/dashboard/brand/saved-creators', label: t.brand.savedCreators.title, icon: ICONS.bookmark },
           { href: '/dashboard/brand/discover', label: t.nav.findInfluencer, icon: ICONS.search },
+          { href: '/dashboard/brand/saved-creators', label: t.brand.savedCreators.title, icon: ICONS.bookmark },
           { href: '/dashboard/messages', label: w.messages, icon: ICONS.chat },
           { href: '/dashboard/brand/profile', label: w.brandProfile, icon: ICONS.user },
           { href: '/ai-assistant', label: w.aiAssistant, icon: ICONS.sparkles },
@@ -484,6 +484,7 @@ export default function WorkspaceLayout({
                 <button
                   onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifications() }}
                   className="relative w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-600 hover:text-gray-900 transition"
+                  suppressHydrationWarning
                   title={locale === 'zh' ? '通知' : 'Notifications'}
                 >
                   {(unread > 0 || notifUnread > 0) && (

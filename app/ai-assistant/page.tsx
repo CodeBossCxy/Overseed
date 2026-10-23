@@ -768,6 +768,7 @@ export default function AIAssistantPage() {
             type="button"
             className="absolute inset-0 z-10 bg-black/20 md:hidden"
             aria-label={t.aiAssistant.closeConversations}
+            suppressHydrationWarning
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -790,6 +791,7 @@ export default function AIAssistantPage() {
                 type="button"
                 onClick={() => setSidebarOpen(false)}
                 aria-label={t.aiAssistant.closeConversations}
+                suppressHydrationWarning
                 className="p-2 rounded-lg text-gray-500 hover:bg-white/70 flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -997,6 +999,7 @@ export default function AIAssistantPage() {
                 <button
                   onClick={() => setSidebarOpen(true)}
                   aria-label={t.aiAssistant.openConversations}
+                  suppressHydrationWarning
                   className="p-1.5 rounded-lg hover:bg-gray-100 transition text-gray-400"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

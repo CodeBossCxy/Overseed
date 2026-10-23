@@ -32,10 +32,10 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 
 const FEATURE_COSTS: Record<string, number> = {
-  audience_gender: 12,
-  audience_age: 12,
-  audience_country: 12,
-  audience_bundle: 30,
+  audience_gender: 4,
+  audience_age: 4,
+  audience_country: 4,
+  audience_bundle: 10,
   brand_collaborations: 6,
 }
 
@@ -48,7 +48,7 @@ const FEATURE_LABELS: Record<string, [string, string]> = {
 }
 
 const AUDIENCE_BUNDLE_FEATURES = ['audience_gender', 'audience_age', 'audience_country'] as const
-const AUDIENCE_BUNDLE_COST = 30
+const AUDIENCE_BUNDLE_COST = 10
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 export function proxyAvatarUrl(url: string | null): string | null {
@@ -120,13 +120,35 @@ function AutoplayEmbed({
       case 'youtube':
         return `https://www.youtube.com/embed/${contentId}?autoplay=1&mute=1&loop=1&playlist=${contentId}&controls=0&modestbranding=1&rel=0&showinfo=0`
       case 'tiktok':
-        return `https://www.tiktok.com/player/v1/${contentId}?autoplay=1&mute=1&music_info=0&description=0&rel=0&loop=1`
+        // TikTok embeds frequently show "Video currently unavailable" — use thumbnail + link instead
+        return null
       case 'instagram':
         return null
       default:
         return null
     }
   }, [platform, contentId])
+
+  const linkUrl = contentUrl || (platform === 'tiktok' && contentId ? `https://www.tiktok.com/video/${contentId}` : null)
+
+  const thumbnail = (
+    <>
+      {coverImageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={proxyAvatarUrl(coverImageUrl) || coverImageUrl}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+      )}
+      <div className="absolute bottom-3 left-3 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+        <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </div>
+    </>
+  )
 
   return (
     <div ref={containerRef} className="relative w-full h-full rounded-xl overflow-hidden bg-gray-100">
@@ -138,23 +160,12 @@ function AutoplayEmbed({
           allowFullScreen
           loading="lazy"
         />
+      ) : linkUrl ? (
+        <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+          {thumbnail}
+        </a>
       ) : (
-        <>
-          {coverImageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={proxyAvatarUrl(coverImageUrl) || coverImageUrl}
-              alt=""
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
-          )}
-          <div className="absolute bottom-3 left-3 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
-            <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-        </>
+        thumbnail
       )}
     </div>
   )
@@ -656,15 +667,6 @@ export default function CreatorDetailModal({
               </div>
               {/* Top-right actions */}
               <div className="flex items-center gap-2 pt-3 flex-shrink-0">
-                <button
-                  onClick={() => openContact()}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                  </svg>
-                  {t.creatorDetail.contactCreator}
-                </button>
                 {(() => {
                   const h = (detailFor.handle || '').replace(/^@/, '').toLowerCase()
                   const k = `${detailFor.platform}:${h}`
@@ -968,17 +970,17 @@ export default function CreatorDetailModal({
                     })()}
                   </div>
                 ) : (
-                  <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
+                  <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden flex flex-col">
                     <p className="text-xs font-semibold text-gray-700 mb-2">{t.creatorDetail.gender}</p>
                     {/* Blurred preview donut */}
-                    <div className="flex items-center justify-center h-16 opacity-40 blur-[2px] select-none pointer-events-none">
+                    <div className="flex-1 flex items-center justify-center opacity-40 blur-[2px] select-none pointer-events-none">
                       <svg viewBox="0 0 80 80" className="w-16 h-16">
                         <circle cx="40" cy="40" r="30" fill="none" stroke="#c7d2fe" strokeWidth="12" strokeDasharray="120 69" />
                         <circle cx="40" cy="40" r="30" fill="none" stroke="#e9d5ff" strokeWidth="12" strokeDasharray="69 120" strokeDashoffset="-120" />
                       </svg>
                     </div>
                     {/* Lock overlay */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
+                    <div className="absolute inset-0 bottom-10 flex flex-col items-center justify-center bg-white/60">
                       <svg className="w-5 h-5 text-gray-400 mb-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                       </svg>
@@ -986,7 +988,7 @@ export default function CreatorDetailModal({
                     <button
                       onClick={() => promptUnlock('audience_gender')}
                       disabled={featureLoading != null}
-                      className="relative z-10 w-full mt-1 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+                      className="relative z-10 w-full mt-auto px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                     >
                       {t.creatorDetail.unlockFor.replace('{n}', String(FEATURE_COSTS.audience_gender))}
                     </button>
@@ -1017,10 +1019,10 @@ export default function CreatorDetailModal({
                     )}
                   </div>
                 ) : (
-                  <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
+                  <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden flex flex-col">
                     <p className="text-xs font-semibold text-gray-700 mb-2">{t.creatorDetail.age}</p>
                     {/* Blurred preview bars */}
-                    <div className="space-y-1.5 opacity-40 blur-[2px] select-none pointer-events-none">
+                    <div className="flex-1 space-y-1.5 opacity-40 blur-[2px] select-none pointer-events-none">
                       {[65, 45, 80, 30, 20].map((w, i) => (
                         <div key={i} className="flex items-center gap-1.5">
                           <div className="w-10 h-2 bg-gray-200 rounded" />
@@ -1030,7 +1032,7 @@ export default function CreatorDetailModal({
                         </div>
                       ))}
                     </div>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
+                    <div className="absolute inset-0 bottom-10 flex flex-col items-center justify-center bg-white/60">
                       <svg className="w-5 h-5 text-gray-400 mb-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                       </svg>
@@ -1038,7 +1040,7 @@ export default function CreatorDetailModal({
                     <button
                       onClick={() => promptUnlock('audience_age')}
                       disabled={featureLoading != null}
-                      className="relative z-10 w-full mt-1 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+                      className="relative z-10 w-full mt-auto px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                     >
                       {t.creatorDetail.unlockFor.replace('{n}', String(FEATURE_COSTS.audience_age))}
                     </button>
@@ -1069,10 +1071,10 @@ export default function CreatorDetailModal({
                     )}
                   </div>
                 ) : (
-                  <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden">
+                  <div className="relative bg-white/80 border border-white rounded-xl p-3 shadow-sm overflow-hidden flex flex-col">
                     <p className="text-xs font-semibold text-gray-700 mb-2">{t.creatorDetail.country}</p>
                     {/* Blurred preview with flag-like blocks */}
-                    <div className="space-y-1.5 opacity-40 blur-[2px] select-none pointer-events-none">
+                    <div className="flex-1 space-y-1.5 opacity-40 blur-[2px] select-none pointer-events-none">
                       {[70, 50, 35, 20].map((w, i) => (
                         <div key={i} className="flex items-center gap-1.5">
                           <div className="w-5 h-3 bg-gray-200 rounded-sm" />
@@ -1082,7 +1084,7 @@ export default function CreatorDetailModal({
                         </div>
                       ))}
                     </div>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
+                    <div className="absolute inset-0 bottom-10 flex flex-col items-center justify-center bg-white/60">
                       <svg className="w-5 h-5 text-gray-400 mb-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                       </svg>
@@ -1090,7 +1092,7 @@ export default function CreatorDetailModal({
                     <button
                       onClick={() => promptUnlock('audience_country')}
                       disabled={featureLoading != null}
-                      className="relative z-10 w-full mt-1 px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+                      className="relative z-10 w-full mt-auto px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
                     >
                       {t.creatorDetail.unlockFor.replace('{n}', String(FEATURE_COSTS.audience_country))}
                     </button>
@@ -1236,26 +1238,16 @@ export default function CreatorDetailModal({
 
           {/* Footer actions */}
           {detail && (
-            <div className="px-6 py-3.5 border-t border-gray-100 flex-shrink-0 flex items-center gap-3">
+            <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 text-center">
               <button
                 onClick={() => openContact()}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition"
+                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-gray-900 text-white rounded-full text-sm font-semibold hover:bg-black transition"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                </svg>
-                {t.creatorDetail.contactCreator}
+                {t.creatorDetail.contactViaOverseed} ↗
               </button>
-              {detailFor.profile_url && (
-                <a
-                  href={detailFor.profile_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-gray-200 bg-white text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition"
-                >
-                  {d.openOnPlatform.replace('{platform}', PLATFORM_LABELS[detailFor.platform] || detailFor.platform)} ↗
-                </a>
-              )}
+              <p className="text-xs text-gray-400 mt-2 italic">
+                {t.creatorDetail.contactViaOverseedDesc}
+              </p>
             </div>
           )}
         </div>

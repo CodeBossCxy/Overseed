@@ -250,6 +250,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [creators, setCreators] = useState<Creator[]>([])
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [loading, setLoading] = useState(false)
+  // Saved/favorited creators
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
+  const [savingKey, setSavingKey] = useState<string | null>(null)
   // No creators are shown until the brand runs the AI match (or a manual
   // search) — discovery is metered, so nothing auto-loads.
   const [matched, setMatched] = useState(false)
@@ -281,7 +284,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     detailError,
     detailBlocked,
   } = useCreatorDetail()
-  const [outreachModalCreator, setOutreachModalCreator] = useState<Creator | null>(null)
+  // Multi-select outreach (like discovery page)
+  const [selectedForOutreach, setSelectedForOutreach] = useState<Set<string>>(new Set())
+  const [outreachModalOpen, setOutreachModalOpen] = useState(false)
   const [outreachMsg, setOutreachMsg] = useState('')
   const [outreachFiles, setOutreachFiles] = useState<File[]>([])
   const [outreachSending, setOutreachSending] = useState(false)
@@ -611,6 +616,60 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
 
   useEffect(() => { loadQueue() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load saved/favorited creator keys
+  useEffect(() => {
+    fetch('/api/saved-creators/discovery?keysOnly=1')
+      .then((res) => (res.ok ? res.json() : { keys: [] }))
+      .then((data) => setSavedKeys(new Set(data.keys || [])))
+      .catch(() => {})
+  }, [])
+
+  const toggleSaveCreator = async (creator: Creator) => {
+    const handle = (creator.handle || '').replace(/^@/, '').toLowerCase()
+    if (!handle) return
+    const key = `${creator.platform}:${handle}`
+    if (savingKey === key) return
+    setSavingKey(key)
+    const wasSaved = savedKeys.has(key)
+    setSavedKeys((prev) => {
+      const next = new Set(prev)
+      wasSaved ? next.delete(key) : next.add(key)
+      return next
+    })
+    try {
+      const res = wasSaved
+        ? await fetch(`/api/saved-creators/discovery?platform=${encodeURIComponent(creator.platform)}&handle=${encodeURIComponent(handle)}`, { method: 'DELETE' })
+        : await fetch('/api/saved-creators/discovery', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              platform: creator.platform,
+              handle,
+              displayName: creator.display_name,
+              avatarUrl: creator.avatar_url,
+              followerCount: creator.follower_count,
+              engagementRate: creator.engagement_rate != null ? Number(creator.engagement_rate) : null,
+              nicheTags: creator.niche_tags || [],
+            }),
+          })
+      if (!res.ok) {
+        setSavedKeys((prev) => {
+          const next = new Set(prev)
+          wasSaved ? next.add(key) : next.delete(key)
+          return next
+        })
+      }
+    } catch {
+      setSavedKeys((prev) => {
+        const next = new Set(prev)
+        wasSaved ? next.add(key) : next.delete(key)
+        return next
+      })
+    } finally {
+      setSavingKey(null)
+    }
+  }
+
   // Fetch niche tags for displayed creators (same mechanism as DiscoverPanel)
   useEffect(() => {
     if (creators.length === 0) return
@@ -686,21 +745,55 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     setOutreachFiles(next)
   }
 
+  const toggleSelectForOutreach = (c: Creator) => {
+    const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
+    if (!handle) return
+    const key = `${c.platform}:${handle}`
+    setSelectedForOutreach(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
+  const isSelectedForOutreach = (c: Creator) => {
+    const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
+    return handle ? selectedForOutreach.has(`${c.platform}:${handle}`) : false
+  }
+
+  const getSelectedCreatorObjects = (): Creator[] =>
+    creators.filter(c => {
+      const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
+      return handle ? selectedForOutreach.has(`${c.platform}:${handle}`) : false
+    })
+
+  const openBulkOutreach = () => {
+    setOutreachModalOpen(true)
+    setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : '')
+    setOutreachFiles(rememberMsg && rememberedFiles.length > 0 ? [...rememberedFiles] : [])
+    setOutreachSent(false)
+    setOutreachError(null)
+  }
+
   const sendOutreach = async () => {
-    if (!outreachModalCreator || outreachMsg.trim().length < 10) return
+    const selected = getSelectedCreatorObjects()
+    if (selected.length === 0 || outreachMsg.trim().length < 10) return
     setOutreachSending(true)
     setOutreachError(null)
     try {
-      const fd = new FormData()
-      fd.set('creator', JSON.stringify(outreachModalCreator))
-      fd.set('message', outreachMsg.trim())
-      outreachFiles.forEach((f) => fd.append('files', f))
-      const res = await fetch(`/api/campaigns/${campaign.id}/outreach`, { method: 'POST', body: fd })
-      const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.message || `Server error (${res.status})`)
-      if (!data) throw new Error('Empty response from server')
-      setQueue(data.queue)
+      // Send each selected creator to the campaign outreach endpoint
+      for (const c of selected) {
+        const fd = new FormData()
+        fd.set('creator', JSON.stringify(c))
+        fd.set('message', outreachMsg.trim())
+        outreachFiles.forEach((f) => fd.append('files', f))
+        const res = await fetch(`/api/campaigns/${campaign.id}/outreach`, { method: 'POST', body: fd })
+        const data = await res.json().catch(() => null)
+        if (!res.ok) throw new Error(data?.message || `Failed for @${c.handle}`)
+        setQueue(data.queue)
+      }
       setOutreachSent(true)
+      setSelectedForOutreach(new Set())
       if (rememberMsg) {
         setRememberedMsg(outreachMsg.trim())
         setRememberedFiles([...outreachFiles])
@@ -714,13 +807,6 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const removeCreator = async (id: string) => {
     const res = await fetch(`/api/campaigns/${campaign.id}/outreach?outreachId=${encodeURIComponent(id)}`, { method: 'DELETE' })
     if (res.ok) setQueue((await res.json()).queue)
-  }
-  const requestOutreach = async () => {
-    setQueueBusy(true)
-    const res = await fetch(`/api/campaigns/${campaign.id}/outreach`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'request' }) })
-    if (res.ok) setQueue((await res.json()).queue)
-    else setError((await res.json()).message || 'Could not request outreach')
-    setQueueBusy(false)
   }
   const openCreator = (creator: Creator) => openCreatorDetail(creator as any)
 
@@ -1345,6 +1431,37 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             </section>
           )}
           {matched && (<>
+          {/* Selection bar for bulk outreach */}
+          {selectedForOutreach.size > 0 && (
+            <div className="mb-3 flex items-center justify-between gap-3 p-3 rounded-2xl bg-primary-50/70 border border-primary-200/50">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex -space-x-2 flex-shrink-0">
+                  {getSelectedCreatorObjects().slice(0, 4).map((c, i) => (
+                    <div key={i} className="w-8 h-8 rounded-full bg-white border-2 border-primary-100 overflow-hidden flex-shrink-0">
+                      <CreatorAvatar url={c.avatar_url} name={c.display_name || c.handle || '?'} size="w-full h-full" textSize="text-xs" />
+                    </div>
+                  ))}
+                </div>
+                <span className="text-sm font-semibold text-primary-800">
+                  {selectedForOutreach.size} {zh ? '位达人已选择' : `creator${selectedForOutreach.size > 1 ? 's' : ''} selected`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedForOutreach(new Set())}
+                  className="text-xs text-primary-500 hover:text-primary-700 font-medium"
+                >
+                  {zh ? '清除' : 'Clear'}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={openBulkOutreach}
+                className="px-5 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold shadow-sm hover:bg-primary-700 transition flex-shrink-0"
+              >
+                {zh ? '批量联系' : 'Send Outreach'}
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between mb-3"><b>{loading ? m.findingCreators : m.creatorsForYou.replace('{count}', String(creators.length))}{searchPage > 0 && ` · ${m.pageNum.replace('{n}', String(searchPage + 1))}`}</b><span className="text-sm text-[#7180ad]">{m.sortBy}<b>{m.relevance}</b></span></div>
           <div className={`space-y-3 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
             {creators.map(c => {
@@ -1438,21 +1555,48 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                     </button>
                     <button
                       type="button"
-                      disabled={queuedIds.has(c.id) || queueBusy}
-                      onClick={() => {
-                        setOutreachModalCreator(c)
-                        setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : '')
-                        setOutreachFiles([])
-                        setOutreachSent(false)
-                        setOutreachError(null)
-                      }}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 border border-indigo-200 text-indigo-600 rounded-full text-sm font-semibold hover:bg-indigo-50 transition disabled:opacity-50"
+                      disabled={queuedIds.has(c.id)}
+                      onClick={() => toggleSelectForOutreach(c)}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition disabled:opacity-50 ${
+                        isSelectedForOutreach(c)
+                          ? 'bg-primary-600 text-white shadow-sm'
+                          : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                      }`}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
-                      {queuedIds.has(c.id) ? m.added : d.resultsContact}
+                      {isSelectedForOutreach(c) ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                      )}
+                      {queuedIds.has(c.id) ? m.added : isSelectedForOutreach(c) ? (zh ? '已选择' : 'Selected') : d.resultsContact}
                     </button>
+                    {/* Save / Bookmark */}
+                    {(() => {
+                      const h = (c.handle || '').replace(/^@/, '').toLowerCase()
+                      const k = h ? `${c.platform}:${h}` : ''
+                      const isSaved = k ? savedKeys.has(k) : false
+                      return k ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSaveCreator(c)}
+                          disabled={savingKey === k}
+                          className={`w-11 h-11 rounded-full flex items-center justify-center transition flex-shrink-0 ${
+                            isSaved
+                              ? 'bg-amber-50 text-amber-500'
+                              : 'bg-[#f5f3f0] text-[#2a2f3e] hover:text-amber-500 hover:bg-amber-50'
+                          }`}
+                          title={isSaved ? (zh ? '取消收藏' : 'Remove from Saved') : (zh ? '收藏' : 'Save Creator')}
+                        >
+                          <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                          </svg>
+                        </button>
+                      ) : null
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1492,8 +1636,6 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         <p className="text-sm text-[#7180ad] mt-1">{m.queueDesc}</p>
         <div className="space-y-4 mt-6 max-h-[430px] overflow-auto pr-1">{queue.length === 0 && <div className="py-10 text-center text-sm text-[#7b87aa]">{m.queueEmpty}</div>}{queue.map(q => <div key={q.id} className="flex items-center gap-3"><CreatorAvatar url={q.avatarUrl} name={q.displayName || q.handle || 'Creator'} size="w-10 h-10" textSize="text-xs" /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{q.displayName || q.handle || 'Creator'}</b><p className="text-xs text-[#7e89aa] truncate">@{q.handle?.replace(/^@/, '')}</p></div><span className={`text-[10px] whitespace-nowrap px-2.5 py-1.5 rounded-lg ${STATUS_STYLE[q.status] || STATUS_STYLE.SHORTLISTED}`}>{(zh ? STATUS_LABEL[q.status]?.zh : STATUS_LABEL[q.status]?.en) || q.status.replaceAll('_',' ').toLowerCase()}</span>{q.status === 'SHORTLISTED' && <button onClick={() => removeCreator(q.id)} className="text-[#7180ad]">×</button>}</div>)}</div>
         <div className="mt-6 bg-indigo-50/60 rounded-2xl p-4 text-sm"><b>ⓘ &nbsp;{m.aboutOutreach}</b><p className="text-xs text-[#6775a0] mt-2">{m.aboutOutreachDesc}</p></div>
-        <button disabled={!queue.some(q => q.status === 'SHORTLISTED') || queueBusy} onClick={requestOutreach} className="w-full mt-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50">✈ &nbsp; {m.requestOutreach}</button>
-        <p className="text-center text-xs text-[#7d88aa] mt-3">{m.reviewQueueNote}</p>
       </aside>
     </div>
 
@@ -1516,14 +1658,12 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         onDismissConfirm={dismissConfirm}
         onDismissFeatureError={() => {}}
         onOpenRelated={(creator) => openCreator(creator as any)}
-        savedKeys={new Set()}
-        onToggleSave={() => {}}
+        savedKeys={savedKeys}
+        onToggleSave={(creator) => toggleSaveCreator(creator as any)}
         onOpenContact={(creator) => {
           const c = (creator || selected) as any
-          setOutreachModalCreator(c)
-          setOutreachMsg(rememberMsg && rememberedMsg ? rememberedMsg : '')
-          setOutreachFiles(rememberMsg && rememberedFiles.length > 0 ? [...rememberedFiles] : [])
-          setOutreachSent(false)
+          if (c) toggleSelectForOutreach(c)
+          closeCreatorDetail()
           setOutreachError(null)
         }}
         nicheMap={{}}
@@ -1533,11 +1673,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       />
     )}
 
-    {outreachModalCreator && createPortal(
+    {outreachModalOpen && createPortal(
       <div
         className="fixed inset-0 z-[60] flex items-center justify-center p-4"
         style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
-        onClick={() => !outreachSending && setOutreachModalCreator(null)}
+        onClick={() => !outreachSending && setOutreachModalOpen(false)}
       >
         <div className="rounded-3xl shadow-2xl max-w-lg w-full p-7" style={{ backgroundColor: '#ffffff' }} onClick={(e) => e.stopPropagation()}>
           {outreachSent ? (
@@ -1545,20 +1685,30 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl">✓</div>
               <h3 className="text-lg font-bold text-gray-900 mt-4">{m.addedToOutreachQueue}</h3>
               <p className="text-sm text-gray-500 mt-1.5">
-                {m.addedToQueueDesc.replace('{name}', outreachModalCreator.display_name || outreachModalCreator.handle || '')}
+                {zh ? `${getSelectedCreatorObjects().length || ''} 位达人触达已发送，Overseed 团队将代您联系` : 'Outreach sent! The Overseed team will reach out on your behalf.'}
               </p>
-              <button onClick={() => setOutreachModalCreator(null)} className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">
+              <button onClick={() => setOutreachModalOpen(false)} className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">
                 {m.done}
               </button>
             </div>
           ) : (
             <>
               <h3 className="text-lg font-bold text-gray-900">
-                {m.contactCreatorPrefix}{outreachModalCreator.display_name || outreachModalCreator.handle}
+                {zh ? `联系 ${selectedForOutreach.size} 位达人` : `Contact ${selectedForOutreach.size} Creator${selectedForOutreach.size > 1 ? 's' : ''}`}
               </h3>
-              <p className="text-xs text-gray-500 mt-1">
-                {m.outreachDeliveredBy}
-              </p>
+              <p className="text-xs text-gray-500 mt-1">{m.outreachDeliveredBy}</p>
+
+              {/* Selected creators preview */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {getSelectedCreatorObjects().map(c => (
+                  <span key={c.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-full text-xs text-gray-700">
+                    <CreatorAvatar url={c.avatar_url} name={c.display_name || c.handle || '?'} size="w-5 h-5" textSize="text-[8px]" />
+                    {c.display_name || `@${c.handle}`}
+                    <button type="button" onClick={() => toggleSelectForOutreach(c)} className="text-gray-400 hover:text-gray-600">×</button>
+                  </span>
+                ))}
+              </div>
+
               <textarea
                 value={outreachMsg}
                 onChange={(e) => setOutreachMsg(e.target.value)}
@@ -1604,11 +1754,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               )}
 
               <div className="flex items-center justify-end gap-3 mt-5">
-                <button onClick={() => setOutreachModalCreator(null)} disabled={outreachSending} className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">
+                <button onClick={() => setOutreachModalOpen(false)} disabled={outreachSending} className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">
                   {m.cancelBtn}
                 </button>
-                <button onClick={sendOutreach} disabled={outreachSending || outreachMsg.trim().length < 10} className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                  {outreachSending ? m.sendingMsg : m.sendMessage}
+                <button onClick={sendOutreach} disabled={outreachSending || outreachMsg.trim().length < 10 || selectedForOutreach.size === 0} className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                  {outreachSending ? m.sendingMsg : `${m.sendMessage} (${selectedForOutreach.size})`}
                 </button>
               </div>
             </>
