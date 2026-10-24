@@ -64,6 +64,227 @@ function Sparkles({ className = 'w-5 h-5' }: { className?: string }) {
   )
 }
 
+/* ── Fast blob-based download (works for cross-origin images) ── */
+async function downloadImage(url: string, filename: string) {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(blobUrl)
+  } catch {
+    // Fallback: open in new tab
+    window.open(url, '_blank')
+  }
+}
+
+/* ── Small download icon button ── */
+function DownloadBtn({ url, idx, label, className = '' }: { url: string; idx: number; label: string; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); downloadImage(url, `overseed-image-${idx + 1}.png`) }}
+      className={`flex items-center justify-center rounded-full transition ${className}`}
+      title={label}
+    >
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+      </svg>
+    </button>
+  )
+}
+
+/* ── ChatGPT-style image gallery: large preview + thumbnail strip ── */
+function ImageGallery({
+  images,
+  browsingSession,
+  onDelete,
+  downloadLabel,
+}: {
+  images: GeneratedImage[]
+  browsingSession: boolean
+  onDelete: (id: string) => void
+  downloadLabel: string
+}) {
+  const [activeIdx, setActiveIdx] = useState(0)
+  const [lightbox, setLightbox] = useState(false)
+
+  // Reset selection when images change
+  useEffect(() => { setActiveIdx(0) }, [images.length])
+
+  if (images.length === 0) return null
+
+  const current = images[Math.min(activeIdx, images.length - 1)]
+
+  return (
+    <>
+      <div className="space-y-3">
+        {/* ── Main preview ── */}
+        <div
+          className="relative group/main rounded-2xl border border-white/70 bg-white/40 shadow-sm overflow-hidden cursor-zoom-in"
+          onClick={() => setLightbox(true)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={current.url}
+            alt={current.prompt}
+            className="w-full object-contain transition-opacity duration-200"
+            style={{ maxHeight: '480px' }}
+          />
+          {/* Overlay controls */}
+          <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 group-hover/main:opacity-100 transition">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); downloadImage(current.url, `overseed-image-${activeIdx + 1}.png`) }}
+              className="px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-full text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-white"
+            >
+              {downloadLabel} ↓
+            </button>
+            {!browsingSession && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDelete(current.id) }}
+                className="w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full text-red-400 shadow-sm hover:text-red-600 hover:bg-white text-sm"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {/* Zoom hint */}
+          <div className="absolute bottom-3 right-3 opacity-0 group-hover/main:opacity-100 transition pointer-events-none">
+            <span className="px-2 py-1 bg-black/50 backdrop-blur-sm rounded-full text-[10px] text-white/80 font-medium flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
+            </span>
+          </div>
+          {/* Image counter */}
+          {images.length > 1 && (
+            <div className="absolute top-3 left-3 px-2 py-1 bg-black/40 backdrop-blur-sm rounded-full text-[10px] text-white/90 font-medium">
+              {activeIdx + 1} / {images.length}
+            </div>
+          )}
+        </div>
+
+        {/* ── Thumbnail strip with per-image download ── */}
+        {images.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto pb-1 px-0.5 scrollbar-none">
+            {images.map((img, i) => (
+              <div key={img.id} className="relative group/thumb flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveIdx(i)}
+                  className={`rounded-xl overflow-hidden border-2 transition-all ${
+                    i === activeIdx
+                      ? 'border-primary-500 ring-2 ring-primary-200 scale-105'
+                      : 'border-white/70 hover:border-gray-300 opacity-70 hover:opacity-100'
+                  }`}
+                  style={{ width: '72px', height: '72px' }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                </button>
+                <DownloadBtn
+                  url={img.url}
+                  idx={i}
+                  label={downloadLabel}
+                  className="absolute -bottom-1 -right-1 w-6 h-6 bg-white/90 shadow-sm text-gray-500 hover:text-primary-600 hover:bg-white opacity-0 group-hover/thumb:opacity-100 z-10"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Prompt text */}
+        <p className="text-xs text-gray-500 leading-relaxed px-1">{current.prompt}</p>
+      </div>
+
+      {/* ── Fullscreen lightbox ── */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setLightbox(false)}
+        >
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={() => setLightbox(false)}
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-xl transition z-10"
+          >
+            ×
+          </button>
+
+          {/* Navigation arrows */}
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setActiveIdx((activeIdx - 1 + images.length) % images.length) }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition z-10"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setActiveIdx((activeIdx + 1) % images.length) }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition z-10"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+              </button>
+            </>
+          )}
+
+          {/* Full-size image */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={current.url}
+            alt={current.prompt}
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+          />
+
+          {/* Bottom bar: thumbnails + download */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            {images.length > 1 && images.map((img, i) => (
+              <button
+                key={img.id}
+                type="button"
+                onClick={() => setActiveIdx(i)}
+                className={`flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                  i === activeIdx
+                    ? 'border-white scale-110'
+                    : 'border-white/30 opacity-60 hover:opacity-100'
+                }`}
+                style={{ width: '48px', height: '48px' }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.url} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => downloadImage(current.url, `overseed-image-${activeIdx + 1}.png`)}
+              className="ml-2 px-4 py-2 bg-white/90 backdrop-blur rounded-full text-xs font-semibold text-gray-800 shadow hover:bg-white transition"
+            >
+              {downloadLabel} ↓
+            </button>
+          </div>
+
+          {/* Counter */}
+          {images.length > 1 && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/40 backdrop-blur-sm rounded-full text-xs text-white/90 font-medium">
+              {activeIdx + 1} / {images.length}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange }: { isProUser: boolean; activeTab?: 'chat' | 'image'; onTabChange?: (tab: 'chat' | 'image') => void }) {
   const { t, locale } = useLanguage()
   const ai = t.aiAssistant
@@ -597,35 +818,12 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
                   </div>
                 </div>
               )}
-              {(() => {
-                // Group consecutive images by prompt
-                const groups: { prompt: string; items: typeof displayImages }[] = []
-                for (const img of displayImages) {
-                  const last = groups[groups.length - 1]
-                  if (last && last.prompt === img.prompt) {
-                    last.items.push(img)
-                  } else {
-                    groups.push({ prompt: img.prompt, items: [img] })
-                  }
-                }
-                return groups.map((group, gi) => (
-                  <div key={gi} className="space-y-2">
-                    <div className={group.items.length > 1 ? 'grid grid-cols-2 gap-2' : ''}>
-                      {group.items.map(image => (
-                        <article key={image.id} className="group/img relative overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-sm">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={image.url} alt={image.prompt} className="w-full object-contain" style={{ maxHeight: group.items.length > 1 ? '320px' : '480px' }} />
-                          <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover/img:opacity-100 transition">
-                            <a href={image.url} target="_blank" rel="noreferrer" download className="px-2.5 py-1.5 bg-white/90 backdrop-blur-sm rounded-full text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-white">{ai.downloadImage} ↓</a>
-                            {!browsingSession && <button type="button" onClick={() => deleteImage(image.id)} className="w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full text-red-400 shadow-sm hover:text-red-600 hover:bg-white text-sm">×</button>}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500 leading-relaxed px-1">{group.prompt}</p>
-                  </div>
-                ))
-              })()}
+              <ImageGallery
+                images={displayImages}
+                browsingSession={!!browsingSession}
+                onDelete={deleteImage}
+                downloadLabel={ai.downloadImage}
+              />
             </div>
           )
           })()}

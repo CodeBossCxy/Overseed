@@ -207,11 +207,11 @@ export function MultiSelectFilter({
         </div>
       )}
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-52 overflow-y-auto" style={{ background: '#ffffff' }}>
+        <div className="absolute z-50 mt-1.5 w-full bg-white rounded-2xl shadow-lg border border-gray-200 max-h-52 overflow-y-auto py-1" style={{ background: '#ffffff' }}>
           {options.map((opt) => (
             <label
               key={opt.value}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer first:rounded-t-xl last:rounded-b-xl"
             >
               <input
                 type="checkbox"
@@ -303,7 +303,7 @@ export function NicheAutocomplete({
         className={`w-full ${inputCls}`}
       />
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white/100 rounded-lg shadow-lg border border-gray-200 max-h-52 overflow-y-auto" style={{ backdropFilter: 'none', background: '#ffffff' }}>
+        <div className="absolute z-50 mt-1.5 w-full bg-white/100 rounded-2xl shadow-lg border border-gray-200 max-h-52 overflow-y-auto py-1" style={{ backdropFilter: 'none', background: '#ffffff' }}>
           {filtered.length === 0 && (
             <div className="px-3 py-2 text-xs text-gray-400">{_d.nichesNoMatch}</div>
           )}
@@ -312,7 +312,7 @@ export function NicheAutocomplete({
               key={`${niche.name}-${i}`}
               type="button"
               onClick={() => selectNiche(niche.name)}
-              className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center justify-between"
+              className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center justify-between first:rounded-t-xl last:rounded-b-xl"
             >
               <span className="truncate">{niche.name}</span>
               <span className="text-[10px] text-gray-400 ml-2 flex-shrink-0">{formatCount(niche.channelCount)}</span>
@@ -883,6 +883,14 @@ export default function DiscoverPanel() {
   // Track whether current filters were set by AI parsing (vs manually by user)
   // so we know to clear them when the search box text changes.
   const aiFiltersActiveRef = useRef(false)
+  // AI-inferred filters are kept separate from user-visible filter state.
+  // They power the backend query but are never shown in the filter UI.
+  const aiInferredRef = useRef<{
+    country?: string
+    minFollowers?: string
+    maxFollowers?: string
+    creatorDbFilters: CreatorDbFilterInput[]
+  }>({ creatorDbFilters: [] })
   const activeCreatorDbFilters = creatorDbFilters.filter((filter) => filter.value.trim() !== '')
   // Count effective filters including basic filters that will be injected
   // into cdb_filters (followers, country, engagement) when creatorDbFilters
@@ -1486,6 +1494,15 @@ export default function DiscoverPanel() {
       setSearchPage(saved.page)
       setSearchHasMore(saved.hasMore)
       setSearchTaskId(saved.taskId ?? null)
+      // Restore AI-inferred filters into the ref (not into UI state)
+      try {
+        const aiRaw = sessionStorage.getItem(SEARCH_STATE_KEY + ':ai')
+        if (aiRaw) {
+          const aiSaved = JSON.parse(aiRaw)
+          aiInferredRef.current = aiSaved
+          aiFiltersActiveRef.current = true
+        }
+      } catch {}
     }
     setRestored(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1610,50 +1627,47 @@ export default function DiscoverPanel() {
       const newTaskId: string | null = data?.task_id ?? taskId ?? null
       setSearchTaskId(newTaskId)
 
-      // ── Populate filter UI from AI-parsed query ──
-      // When the server used AI to convert a free-form query into structured
-      // filters, reflect those filters in the UI so the user can adjust them.
+      // ── Store AI-parsed filters for backend use only ──
+      // AI-inferred filters power the search query but are NOT shown in the
+      // visible filter UI. User-defined filters remain untouched.
       if (data?.ai_parsed && page === 0) {
         const ai = data.ai_parsed
-        // Switch platform tab if AI detected a different one
+        // Switch platform tab if AI detected a different one (this is OK to show)
         if (ai.platform && ['instagram', 'tiktok', 'youtube'].includes(ai.platform)) {
           setPlatforms([ai.platform])
         }
-        // Country
-        if (ai.country) setCountry(ai.country)
-        // Followers
-        if (ai.min_followers != null) setMinFollowers(String(ai.min_followers))
-        if (ai.max_followers != null) setMaxFollowers(String(ai.max_followers))
+        // Store AI-inferred basic filters in ref (not in UI state)
+        const inferred: typeof aiInferredRef.current = { creatorDbFilters: [] }
+        if (ai.country) inferred.country = ai.country
+        if (ai.min_followers != null) inferred.minFollowers = String(ai.min_followers)
+        if (ai.max_followers != null) inferred.maxFollowers = String(ai.max_followers)
         // Build CreatorDB filter inputs from the AI output
-        const aiFilters: CreatorDbFilterInput[] = []
         if (ai.niches) {
-          aiFilters.push({ field: 'niches' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: ai.niches })
+          inferred.creatorDbFilters.push({ field: 'niches' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: ai.niches })
         }
         if (ai.keywords) {
-          aiFilters.push({ field: 'hashtags' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: ai.keywords })
+          inferred.creatorDbFilters.push({ field: 'hashtags' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: ai.keywords })
         }
         if (ai.audience_location) {
-          aiFilters.push({ field: 'audienceLocation' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: ai.audience_location })
+          inferred.creatorDbFilters.push({ field: 'audienceLocation' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: ai.audience_location })
         }
         if (ai.language) {
-          aiFilters.push({ field: 'mainLanguage' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: ai.language })
+          inferred.creatorDbFilters.push({ field: 'mainLanguage' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: ai.language })
         }
         if (ai.audience_age) {
-          aiFilters.push({ field: 'audienceAge' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: ai.audience_age })
+          inferred.creatorDbFilters.push({ field: 'audienceAge' as CreatorDbCanonicalField, op: 'in' as CreatorDbFilterOp, value: ai.audience_age })
         }
         if (ai.min_engagement != null) {
-          aiFilters.push({ field: 'shortEngagementRate' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: String(ai.min_engagement) })
+          inferred.creatorDbFilters.push({ field: 'shortEngagementRate' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: String(ai.min_engagement) })
         }
         if (ai.min_avg_views != null) {
-          aiFilters.push({ field: 'shortAvgViews' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: String(ai.min_avg_views) })
+          inferred.creatorDbFilters.push({ field: 'shortAvgViews' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: String(ai.min_avg_views) })
         }
         if (ai.last_post != null) {
-          aiFilters.push({ field: 'lastPublishTime' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: String(ai.last_post) })
+          inferred.creatorDbFilters.push({ field: 'lastPublishTime' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: String(ai.last_post) })
         }
-        if (aiFilters.length > 0) {
-          setCreatorDbFilters(aiFilters)
-          aiFiltersActiveRef.current = true
-        }
+        aiInferredRef.current = inferred
+        aiFiltersActiveRef.current = inferred.creatorDbFilters.length > 0 || !!inferred.country || !!inferred.minFollowers || !!inferred.maxFollowers
       }
       // Persist so the results survive leaving and returning to the page
       try {
@@ -1684,6 +1698,12 @@ export default function DiscoverPanel() {
           taskId: newTaskId,
         }
         sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(saved))
+        // Also persist AI-inferred filters so they survive navigation
+        if (aiFiltersActiveRef.current) {
+          sessionStorage.setItem(SEARCH_STATE_KEY + ':ai', JSON.stringify(aiInferredRef.current))
+        } else {
+          sessionStorage.removeItem(SEARCH_STATE_KEY + ':ai')
+        }
       } catch {
         // Persistence is cosmetic; quota/serialization issues are ignorable
       }
@@ -1710,28 +1730,16 @@ export default function DiscoverPanel() {
       setSearchPage(0)
       setSearchHasMore(false)
       setSearchTaskId(null)
-      try { sessionStorage.removeItem(SEARCH_STATE_KEY) } catch {}
+      try { sessionStorage.removeItem(SEARCH_STATE_KEY); sessionStorage.removeItem(SEARCH_STATE_KEY + ':ai') } catch {}
       fetchBrowse(0, false)
       return
     }
     if (platforms.length === 0) return
-    // When there's a query in the search box, clear any AI-generated filters
-    // so the server re-parses the new text. User-set filters (from manually
-    // editing the filter panel) are kept.
+    // When there's a query in the search box, clear any AI-inferred filters
+    // so the server re-parses the new text. User-set filters are untouched.
     if (query.trim() && aiFiltersActiveRef.current) {
-      setCreatorDbFilters([])
-      setCountry('')
-      setMinFollowers('')
-      setMaxFollowers('')
+      aiInferredRef.current = { creatorDbFilters: [] }
       aiFiltersActiveRef.current = false
-      // Use a snapshot with cleared filters so the fetch doesn't include stale ones
-      const vals = currentFilterVals()
-      vals.creatorDbFilters = []
-      vals.country = ''
-      vals.minFollowers = ''
-      vals.maxFollowers = ''
-      await clubSearchWith(vals)
-      return
     }
     await clubSearchWith(currentFilterVals())
   }
@@ -1741,7 +1749,17 @@ export default function DiscoverPanel() {
   // caller save a different snapshot (the user's visible filter values)
   // than the one actually searched with.
   const clubSearchWith = async (v: FilterVals, persist?: FilterVals) => {
-    const populatedCreatorDbFilters = v.creatorDbFilters.filter((filter) => filter.value.trim() !== '')
+    // Merge AI-inferred filters with user-visible filters for the backend query.
+    // AI-inferred filters are only applied when the user hasn't set the same field manually.
+    const ai = aiInferredRef.current
+    const mergedCountry = v.country.trim() || ai.country || ''
+    const mergedMinFollowers = v.minFollowers || ai.minFollowers || ''
+    const mergedMaxFollowers = v.maxFollowers || ai.maxFollowers || ''
+    // Merge creatorDb filters: user-set fields take precedence over AI-inferred
+    const userFields = new Set(v.creatorDbFilters.filter((f) => f.value.trim()).map((f) => f.field))
+    const mergedAiCdbFilters = ai.creatorDbFilters.filter((f) => !userFields.has(f.field))
+    const allCreatorDbFilters = [...v.creatorDbFilters, ...mergedAiCdbFilters]
+    const populatedCreatorDbFilters = allCreatorDbFilters.filter((filter) => filter.value.trim() !== '')
     const qs = new URLSearchParams({
       platform: v.platform,
       limit: String(CLUB_PAGE_SIZE),
@@ -1763,20 +1781,20 @@ export default function DiscoverPanel() {
       // cdb_filters so they are first-class CreatorDB filters and won't be
       // silently dropped by the 10-filter merge/trim in the backend.
       const hasField = (f: string) => filters.some((x) => x.field === f)
-      if (v.minFollowers && !hasField('followers')) {
-        filters.push({ field: 'followers' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: Number(v.minFollowers) })
-      } else if (v.minFollowers && hasField('followers')) {
+      if (mergedMinFollowers && !hasField('followers')) {
+        filters.push({ field: 'followers' as CreatorDbCanonicalField, op: '>' as CreatorDbFilterOp, value: Number(mergedMinFollowers) })
+      } else if (mergedMinFollowers && hasField('followers')) {
         // Don't add duplicate; user-set cdb_filter takes precedence
       }
-      if (v.maxFollowers) {
+      if (mergedMaxFollowers) {
         // For maxFollowers, add as a separate '<' entry (same field, different op is fine)
         const hasMaxFollowers = filters.some((x) => x.field === 'followers' && x.op === '<')
         if (!hasMaxFollowers) {
-          filters.push({ field: 'followers' as CreatorDbCanonicalField, op: '<' as CreatorDbFilterOp, value: Number(v.maxFollowers) })
+          filters.push({ field: 'followers' as CreatorDbCanonicalField, op: '<' as CreatorDbFilterOp, value: Number(mergedMaxFollowers) })
         }
       }
-      if (v.country.trim() && !hasField('country')) {
-        const countries = v.country.split(',').map((c) => c.trim().toUpperCase()).filter(Boolean)
+      if (mergedCountry.trim() && !hasField('country')) {
+        const countries = mergedCountry.split(',').map((c) => c.trim().toUpperCase()).filter(Boolean)
         if (countries.length === 1) {
           filters.push({ field: 'country' as CreatorDbCanonicalField, op: '=' as CreatorDbFilterOp, value: countries[0] })
         } else if (countries.length > 1) {
@@ -1788,9 +1806,9 @@ export default function DiscoverPanel() {
       }
       qs.set('cdb_filters', JSON.stringify(filters))
     }
-    if (v.country.trim()) qs.set('country', v.country.split(',')[0].trim().toUpperCase())
-    if (v.minFollowers) qs.set('min_followers', v.minFollowers)
-    if (v.maxFollowers) qs.set('max_followers', v.maxFollowers)
+    if (mergedCountry.trim()) qs.set('country', mergedCountry.split(',')[0].trim().toUpperCase())
+    if (mergedMinFollowers) qs.set('min_followers', mergedMinFollowers)
+    if (mergedMaxFollowers) qs.set('max_followers', mergedMaxFollowers)
     if (v.minEngagement) qs.set('min_engagement', v.minEngagement)
     if (v.maxEngagement) qs.set('max_engagement', v.maxEngagement)
     if (v.gender) qs.set('gender', v.gender)
@@ -1831,11 +1849,13 @@ export default function DiscoverPanel() {
     else if (sort === 'relevance') qs.set('cdb_sort', 'platformScore')
     if (showLatestPost) qs.set('show_latest_post', '1')
 
+    // Always persist the user-visible filter state (not the merged AI values)
+    // so session restore doesn't leak AI-inferred filters into the UI.
     await runSearchPage(
       { endpoint: 'club-search', params: qs.toString(), pageSize: CLUB_PAGE_SIZE },
       0,
       false,
-      persist ?? v
+      persist ?? currentFilterVals()
     )
   }
 
@@ -1890,7 +1910,7 @@ export default function DiscoverPanel() {
     setSearchPage(0)
     setSearchHasMore(false)
     setSearchTaskId(null)
-    try { sessionStorage.removeItem(SEARCH_STATE_KEY) } catch {}
+    try { sessionStorage.removeItem(SEARCH_STATE_KEY); sessionStorage.removeItem(SEARCH_STATE_KEY + ':ai') } catch {}
     refreshHistory()
     fetchBrowse(0, false)
   }

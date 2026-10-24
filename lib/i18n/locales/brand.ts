@@ -848,6 +848,8 @@ export const brand = {
       confirmUnlock: 'Confirm · {n} credits',
       contactViaOverseed: 'Contact creator via Overseed',
       contactViaOverseedDesc: 'From first contact to content delivery, review, and payment — manage the entire collaboration in one place.',
+      credits: 'credits',
+      contactCreditNote: 'Credits are only deducted when your message is successfully sent.',
     },
   },
   zh: {
@@ -1699,6 +1701,8 @@ export const brand = {
       confirmUnlock: '确认 · {n} 积分',
       contactViaOverseed: '通过 Overseed 联系达人',
       contactViaOverseedDesc: '从首次联系到沟通、交稿、审核及支付，一站式管理合作全流程。',
+      credits: '积分',
+      contactCreditNote: '积分仅在消息成功发送后扣除。',
     },
   },
 }

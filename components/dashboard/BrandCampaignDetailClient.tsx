@@ -516,8 +516,8 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       console.table(autoFilters)
       console.groupEnd()
 
-      // Set the filters in state so they appear in the UI
-      setCdbFilters(autoFilters)
+      // AI-inferred filters are used for the backend query only,
+      // not shown in the visible filter UI.
 
       // Build the full filter set for the search
       const filters: { field: string; op: string; value: string | number | boolean | string[] }[] = []
@@ -1357,7 +1357,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-7 mt-4 max-w-2xl">
           <div><p className="text-xs text-[#7f8bb1]">{m.budget}</p><b>{budget}</b></div>
           <div><p className="text-xs text-[#7f8bb1]">{m.deadline}</p><b>{campaign.deadline ? new Date(campaign.deadline).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : m.flexible}</b></div>
-          <div><p className="text-xs text-[#7f8bb1]">{m.status}</p><span className="inline-flex mt-1 px-3 py-1 rounded-md bg-slate-100 text-xs font-semibold capitalize">{directStatusLabel(campaign.status)}</span></div>
+          <div><p className="text-xs text-[#7f8bb1]">{m.status}</p><span className="inline-flex mt-1 px-3 py-1 rounded-full bg-slate-100 text-xs font-semibold capitalize">{directStatusLabel(campaign.status)}</span></div>
         </div>
       </div>
       <Link href={`/dashboard/brand/campaigns/${campaign.id}/edit`} className="rounded-2xl border border-white/80 bg-white/40 px-6 py-3 font-semibold text-sm">{m.viewCampaignDetails}&nbsp;→</Link>
@@ -1374,7 +1374,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           {/* Search + filters only appear after the AI recommendation ran */}
           {matched && (
           <form onSubmit={e => { e.preventDefault(); discover(query) }} className="mb-4">
-            <div className="flex gap-2"><div className="workspace-glass-control flex-1 flex items-center gap-3 px-4 py-3">{icon(searchIcon, 'w-4 h-4')}<input value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent outline-none w-full" placeholder={d.searchByNamePlaceholder}/></div><button className="px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold">{d.searchButton}</button></div>
+            <div className="flex gap-2"><div className="workspace-glass-control flex-1 flex items-center gap-3 px-4 py-3">{icon(searchIcon, 'w-4 h-4')}<input value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent outline-none w-full" placeholder={d.searchByNamePlaceholder}/></div><button className="px-6 rounded-full bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold">{d.searchButton}</button></div>
             <div className="space-y-2 mt-3">
               {filterSections}
               <button type="button" onClick={() => { setQuery(''); setCreatorCountry(''); setMinFollowers(''); setMaxFollowers(''); setCdbFilters([]); setCreators([]); setMatched(false); try { sessionStorage.removeItem(searchStateKey) } catch {} }} className="px-3 py-1 text-sm text-[#65739e]">{d.clearAll}</button>
@@ -1632,9 +1632,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       </div>
 
       <aside className="workspace-glass-card rounded-3xl p-5 xl:sticky xl:top-5">
-        <div className="flex justify-between items-center"><h2 className="text-xl font-bold">{m.outreachQueue} <span className="text-sm border border-white rounded-lg px-2 py-1 ml-1">{queue.length}</span></h2><span>⌃</span></div>
+        <div className="flex justify-between items-center"><h2 className="text-xl font-bold">{m.outreachQueue} <span className="text-sm border border-white rounded-full px-2 py-1 ml-1">{queue.length}</span></h2><span>⌃</span></div>
         <p className="text-sm text-[#7180ad] mt-1">{m.queueDesc}</p>
-        <div className="space-y-4 mt-6 max-h-[430px] overflow-auto pr-1">{queue.length === 0 && <div className="py-10 text-center text-sm text-[#7b87aa]">{m.queueEmpty}</div>}{queue.map(q => <div key={q.id} className="flex items-center gap-3"><CreatorAvatar url={q.avatarUrl} name={q.displayName || q.handle || 'Creator'} size="w-10 h-10" textSize="text-xs" /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{q.displayName || q.handle || 'Creator'}</b><p className="text-xs text-[#7e89aa] truncate">@{q.handle?.replace(/^@/, '')}</p></div><span className={`text-[10px] whitespace-nowrap px-2.5 py-1.5 rounded-lg ${STATUS_STYLE[q.status] || STATUS_STYLE.SHORTLISTED}`}>{(zh ? STATUS_LABEL[q.status]?.zh : STATUS_LABEL[q.status]?.en) || q.status.replaceAll('_',' ').toLowerCase()}</span>{q.status === 'SHORTLISTED' && <button onClick={() => removeCreator(q.id)} className="text-[#7180ad]">×</button>}</div>)}</div>
+        <div className="space-y-4 mt-6 max-h-[430px] overflow-auto pr-1">{queue.length === 0 && <div className="py-10 text-center text-sm text-[#7b87aa]">{m.queueEmpty}</div>}{queue.map(q => <div key={q.id} className="flex items-center gap-3"><CreatorAvatar url={q.avatarUrl} name={q.displayName || q.handle || 'Creator'} size="w-10 h-10" textSize="text-xs" /><div className="min-w-0 flex-1"><b className="block truncate text-sm">{q.displayName || q.handle || 'Creator'}</b><p className="text-xs text-[#7e89aa] truncate">@{q.handle?.replace(/^@/, '')}</p></div><span className={`text-[10px] whitespace-nowrap px-2.5 py-1.5 rounded-full ${STATUS_STYLE[q.status] || STATUS_STYLE.SHORTLISTED}`}>{(zh ? STATUS_LABEL[q.status]?.zh : STATUS_LABEL[q.status]?.en) || q.status.replaceAll('_',' ').toLowerCase()}</span>{q.status === 'SHORTLISTED' && <button onClick={() => removeCreator(q.id)} className="text-[#7180ad]">×</button>}</div>)}</div>
         <div className="mt-6 bg-indigo-50/60 rounded-2xl p-4 text-sm"><b>ⓘ &nbsp;{m.aboutOutreach}</b><p className="text-xs text-[#6775a0] mt-2">{m.aboutOutreachDesc}</p></div>
       </aside>
     </div>
@@ -1724,12 +1724,12 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 {outreachFiles.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-2">
                     {outreachFiles.map((f, i) => (
-                      <span key={`${f.name}-${i}`} className="flex items-center gap-2 pl-1.5 pr-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+                      <span key={`${f.name}-${i}`} className="flex items-center gap-2 pl-1.5 pr-2 py-1 bg-gray-50 border border-gray-200 rounded-full text-xs text-gray-600">
                         {f.type.startsWith('image/') ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={URL.createObjectURL(f)} alt="" className="w-6 h-6 rounded object-cover" />
+                          <img src={URL.createObjectURL(f)} alt="" className="w-6 h-6 rounded-full object-cover" />
                         ) : (
-                          <span className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500">PDF</span>
+                          <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500">PDF</span>
                         )}
                         <span className="max-w-[140px] truncate">{f.name}</span>
                         <button onClick={() => setOutreachFiles(outreachFiles.filter((_, j) => j !== i))} className="text-gray-400 hover:text-gray-600" aria-label="Remove">×</button>
@@ -1750,7 +1750,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               </label>
 
               {outreachError && (
-                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{outreachError}</div>
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-2xl p-3 text-sm text-red-700">{outreachError}</div>
               )}
 
               <div className="flex items-center justify-end gap-3 mt-5">

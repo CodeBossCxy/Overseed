@@ -1243,10 +1243,13 @@ export default function CreatorDetailModal({
                 onClick={() => openContact()}
                 className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-gray-900 text-white rounded-full text-sm font-semibold hover:bg-black transition"
               >
-                {t.creatorDetail.contactViaOverseed} ↗
+                {t.creatorDetail.contactViaOverseed} · 2 {t.creatorDetail.credits} ↗
               </button>
-              <p className="text-xs text-gray-400 mt-2 italic">
+              <p className="text-xs text-gray-400 mt-2">
                 {t.creatorDetail.contactViaOverseedDesc}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                {t.creatorDetail.contactCreditNote}
               </p>
             </div>
           )}
