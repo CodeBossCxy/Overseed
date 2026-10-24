@@ -45,14 +45,26 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are a translator. Translate the following message to ${langName}. Only return the translated text, nothing else. If the text is already in ${langName}, return it as-is.`,
+          content: `You are a translator. Translate the following text to ${langName}. Rules:
+- Return ONLY the translated text, no explanations.
+- Preserve ALL markdown syntax exactly: headings (## ), bold (**), italic (*), bullet lists (- ), numbered lists, links, code blocks.
+- Keep heading levels unchanged (e.g. "## About" → "## 关于").
+- Keep list markers as "- " (dash + space), never replace them with "·" or other symbols.
+- Do not add or remove any markdown formatting.
+- If the text is already in ${langName}, return it unchanged.`,
         },
         { role: 'user', content: text },
       ],
       max_tokens: 1024,
     })
 
-    const translated = completion.choices[0]?.message?.content || text
+    let translated = completion.choices[0]?.message?.content || text
+
+    // Fix common LLM markdown corruption:
+    // 1. "#Title" → "# Title" (missing space after heading markers)
+    translated = translated.replace(/^(#{1,6})([^ #\n])/gm, '$1 $2')
+    // 2. "· item" or "• item" → "- item" (wrong bullet markers)
+    translated = translated.replace(/^[\s]*[·•]\s*/gm, '- ')
 
     return NextResponse.json({ translated })
   } catch (error) {

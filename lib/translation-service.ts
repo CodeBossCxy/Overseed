@@ -147,13 +147,58 @@ async function translateChunk(
 /**
  * Translate text to target language
  */
+/**
+ * Fix common markdown corruption from machine translation services.
+ *
+ * Google Translate specifically:
+ * - Splits "##" into "# #" (inserts space between hash marks)
+ * - Splits "**bold**" into "* *bold* *" (spaces inside star pairs)
+ * - Converts "- " list markers into "·" or "•"
+ * - HTML-encodes special characters
+ */
+function repairMarkdown(translated: string): string {
+  let t = translated
+
+  // Google Translate splits "##" → "# #", "###" → "# # #" etc.
+  // Reassemble consecutive "# " sequences at line start into proper heading markers
+  t = t.replace(/^(#\s)+#(?=\s|\S)/gm, (match) => {
+    const level = (match.match(/#/g) || []).length
+    return '#'.repeat(level)
+  })
+
+  // "#Title" → "# Title" (missing space after heading markers)
+  t = t.replace(/^(#{1,6})([^ #\n])/gm, '$1 $2')
+
+  // Google Translate splits "**" → "* *" — reassemble bold markers
+  // "* *text* *" → "**text**"
+  t = t.replace(/\*\s\*/g, '**')
+
+  // "· item" or "• item" → "- item" (wrong bullet markers)
+  t = t.replace(/^(\s*)[·•]\s*/gm, '$1- ')
+
+  // Google Translate may HTML-encode: &quot; &#39; &amp; &lt; &gt;
+  t = t.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+
+  // Clean up stray spaces *inside* bold markers only:
+  // "**  text**" → "**text**" (leading space after opening **)
+  // "text  **" → "text**" (trailing space before closing **)
+  // But do NOT remove space BEFORE opening ** (e.g. "- **text**" must keep the "- ")
+  t = t.replace(/(\*\*)\s+/g, '$1')  // remove space after opening **
+  t = t.replace(/\s+(\*\*)/g, '$1')  // remove space before closing **
+  // Restore necessary space after list markers: "-**" → "- **"
+  t = t.replace(/^(\s*-)\*\*/gm, '$1 **')
+
+  return t
+}
+
 export async function translateText(
   text: string,
   targetLang: SupportedLanguage,
   sourceLang: SupportedLanguage = 'en'
 ): Promise<string> {
   if (!text || targetLang === sourceLang) return text
-  return googleTranslate(text, targetLang, sourceLang)
+  const translated = await googleTranslate(text, targetLang, sourceLang)
+  return repairMarkdown(translated)
 }
 
 /**
