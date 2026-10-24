@@ -264,6 +264,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [searchNextOffset, setSearchNextOffset] = useState(0)
   const lastSearchRef = useRef<{ endpoint: string; qs: URLSearchParams; pageSize: number } | null>(null)
   const [searchPrice, setSearchPrice] = useState<number | null>(null)
+  const [outreachPrice, setOutreachPrice] = useState<number | null>(null)
   const [queueBusy, setQueueBusy] = useState(false)
   const [error, setError] = useState('')
   const {
@@ -698,6 +699,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       .then(data => {
         if (data?.creditSystemEnabled && typeof data.prices?.discovery_search === 'number') {
           setSearchPrice(data.prices.discovery_search)
+          if (typeof data.prices?.outreach === 'number') setOutreachPrice(data.prices.outreach)
         }
       })
       .catch(() => {})
@@ -1453,6 +1455,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                   {zh ? '清除' : 'Clear'}
                 </button>
               </div>
+              {outreachPrice != null && (
+                <span className="text-xs text-amber-600 font-medium bg-amber-50 border border-amber-200/60 px-2.5 py-1 rounded-full flex-shrink-0">
+                  ✦ {outreachPrice * selectedForOutreach.size} {zh ? '积分' : 'credits'}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={openBulkOutreach}
@@ -1753,12 +1760,25 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 <div className="mt-3 bg-red-50 border border-red-200 rounded-2xl p-3 text-sm text-red-700">{outreachError}</div>
               )}
 
-              <div className="flex items-center justify-end gap-3 mt-5">
+              {outreachPrice != null && (
+                <div className="mt-4 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200/60 rounded-xl px-3 py-2">
+                  <span>✦</span>
+                  <span>{zh
+                    ? `将扣除 ${outreachPrice * selectedForOutreach.size} 积分（每位达人 ${outreachPrice} 积分 × ${selectedForOutreach.size} 位）`
+                    : `${outreachPrice * selectedForOutreach.size} credits will be deducted (${outreachPrice} per creator × ${selectedForOutreach.size})`
+                  }</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 mt-4">
                 <button onClick={() => setOutreachModalOpen(false)} disabled={outreachSending} className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">
                   {m.cancelBtn}
                 </button>
                 <button onClick={sendOutreach} disabled={outreachSending || outreachMsg.trim().length < 10 || selectedForOutreach.size === 0} className="px-6 py-2.5 bg-gradient-to-r from-primary-600 to-rose-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed">
                   {outreachSending ? m.sendingMsg : `${m.sendMessage} (${selectedForOutreach.size})`}
+                  {!outreachSending && outreachPrice != null && (
+                    <span className="font-normal ml-1">· {outreachPrice * selectedForOutreach.size} {zh ? '积分' : 'credits'}</span>
+                  )}
                 </button>
               </div>
             </>

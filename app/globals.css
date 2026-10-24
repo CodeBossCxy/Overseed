@@ -712,6 +712,29 @@ main > .page-enter-animation:has(.ai-assistant-page) {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.58),
     0 5px 16px rgba(45, 49, 78, 0.035) !important;
+  /* Force custom appearance on native form controls (Safari, Firefox) */
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+
+/* Native selects need a dropdown chevron since appearance:none removes it */
+select.workspace-glass-control {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 0.75rem !important;
+  padding-right: 2rem !important;
+}
+
+/* Number inputs: hide native spinners for consistent sizing */
+input[type="number"].workspace-glass-control {
+  -moz-appearance: textfield !important;
+}
+input[type="number"].workspace-glass-control::-webkit-inner-spin-button,
+input[type="number"].workspace-glass-control::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
 }
 
 .workspace-glass-control.workspace-glass-control-square {

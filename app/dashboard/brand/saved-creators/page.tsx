@@ -317,8 +317,8 @@ export default function SavedCreatorsPage() {
       const creators = getSelectedCreatorObjects().map(c => ({
         platform: c.platforms[0] || 'unknown',
         handle: c.handle || c.name,
-        display_name: c.name,
-        avatar_url: c.avatarUrl || '',
+        displayName: c.name,
+        avatarUrl: c.avatarUrl || '',
         followerCount: c.followers || 0,
         engagementRate: c.engagement || 0,
         country: c.country || '',
@@ -326,11 +326,16 @@ export default function SavedCreatorsPage() {
         bio: c.bio || '',
         profileUrl: c.profileUrl || '',
       }))
-      const form = new FormData()
-      form.set('creators', JSON.stringify(creators))
-      form.set('message', bulkMsg)
-      bulkFiles.forEach(f => form.append('files', f))
-      const res = await fetch('/api/outreach/submit', { method: 'POST', body: form })
+      const res = await fetch('/api/outreach/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Outreach to ${creators.length} creators`,
+          briefMessage: bulkMsg.trim(),
+          platform: creators[0]?.platform || 'unknown',
+          creators,
+        }),
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.message || 'Failed to send outreach')

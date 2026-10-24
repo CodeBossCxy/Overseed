@@ -828,6 +828,7 @@ export default function DiscoverPanel() {
             search: num(data.prices.discovery_search),
             profile: num(data.prices.profile_view),
             analytics: num(data.prices.analytics),
+            outreach: num(data.prices.outreach),
           })
         }
       })
@@ -3302,6 +3303,12 @@ export default function DiscoverPanel() {
                   <span className="text-xs font-medium text-gray-500">
                     {d.outreachSelectedCount.replace('{n}', String(selectedCreators.size))}
                   </span>
+                  {/* Credit cost indicator */}
+                  {creditPrices?.outreach != null && (
+                    <span className="text-xs text-amber-600 font-medium bg-amber-50 border border-amber-200/60 px-2.5 py-1 rounded-full">
+                      ✦ {creditPrices.outreach * selectedCreators.size} {d.creditsUnit}
+                    </span>
+                  )}
                   {/* Bulk outreach button */}
                   <button
                     type="button"
@@ -3850,12 +3857,22 @@ export default function DiscoverPanel() {
                   <div className="mt-3 rounded-lg p-3 text-sm" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c' }}>{bulkError}</div>
                 )}
 
-                <div className="flex items-center justify-end gap-3 mt-5">
+                {creditPrices?.outreach != null && (
+                  <div className="mt-4 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200/60 rounded-xl px-3 py-2">
+                    <span>✦</span>
+                    <span>{d.outreachCreditNote?.replace('{n}', String(selectedCreators.size)).replace('{cost}', String(creditPrices.outreach * selectedCreators.size)).replace('{per}', String(creditPrices.outreach)) || `${creditPrices.outreach * selectedCreators.size} credits (${creditPrices.outreach} per creator × ${selectedCreators.size})`}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-3 mt-4">
                   <button onClick={() => setBulkOutreachOpen(false)} disabled={bulkSending} className="px-5 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-50" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
                     {d.outreachCancel}
                   </button>
                   <button onClick={sendBulkOutreach} disabled={bulkSending || bulkMsg.trim().length < 10} className="px-6 py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: 'linear-gradient(to right, #4f46e5, #e11d48)', color: '#ffffff' }}>
                     {bulkSending ? d.outreachSending : d.outreachSend}
+                    {!bulkSending && creditPrices?.outreach != null && (
+                      <span className="font-normal ml-1">· {creditPrices.outreach * selectedCreators.size} {d.creditsUnit}</span>
+                    )}
                   </button>
                 </div>
               </>
