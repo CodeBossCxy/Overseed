@@ -60,11 +60,17 @@ export async function POST(req: NextRequest) {
 
     let translated = completion.choices[0]?.message?.content || text
 
-    // Fix common LLM markdown corruption:
-    // 1. "#Title" → "# Title" (missing space after heading markers)
+    // Fix common markdown corruption from translation:
+    // "# #Title" → "## Title" (Google splits ## into # #)
+    translated = translated.replace(/^(#\s)+#(?=\s|\S)/gm, (m: string) => '#'.repeat((m.match(/#/g) || []).length))
     translated = translated.replace(/^(#{1,6})([^ #\n])/gm, '$1 $2')
-    // 2. "· item" or "• item" → "- item" (wrong bullet markers)
+    // "* *bold* *" → "**bold**" (Google splits ** into * *)
+    translated = translated.replace(/\*\s\*/g, '**')
+    // "· item" or "• item" → "- item"
     translated = translated.replace(/^[\s]*[·•]\s*/gm, '- ')
+    // Clean spaces inside bold, then restore list marker spacing
+    translated = translated.replace(/(\*\*)\s+/g, '$1').replace(/\s+(\*\*)/g, '$1')
+    translated = translated.replace(/^(\s*-)\*\*/gm, '$1 **')
 
     return NextResponse.json({ translated })
   } catch (error) {

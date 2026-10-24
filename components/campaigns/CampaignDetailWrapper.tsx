@@ -32,42 +32,27 @@ export default function CampaignDetailWrapper({
   useEffect(() => {
     if (!isUGCTranslated) {
       setCampaign(initialCampaign)
+      setIsLoading(false)
       return
     }
 
-    async function fetchTranslatedCampaign() {
-      setIsLoading(true)
-      try {
-        const response = await fetch(`/api/campaigns/${initialCampaign.id}?lang=${locale}`)
-        const data = await response.json()
-        if (data && !data.message) {
-          setCampaign(data)
-        }
-      } catch (error) {
-        console.error('Error fetching campaign:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+    // Show original content immediately — swap in translation when ready
+    setCampaign(initialCampaign)
+    setIsLoading(true)
 
-    fetchTranslatedCampaign()
+    const controller = new AbortController()
+    fetch(`/api/campaigns/${initialCampaign.id}?lang=${locale}&track=0`, {
+      signal: controller.signal,
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && !data.message) setCampaign(data)
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+
+    return () => controller.abort()
   }, [locale, isUGCTranslated, initialCampaign])
-
-  if (isLoading) {
-    return (
-      <div className="animate-pulse">
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-3">
-            <div className="h-4 bg-gray-200 rounded w-full"></div>
-            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-            <div className="h-4 bg-gray-200 rounded w-4/6"></div>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div>

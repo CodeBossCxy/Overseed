@@ -45,6 +45,7 @@ async function googleTranslate(
           target: targetLang,
           format: 'text',
         }),
+        signal: AbortSignal.timeout(8000),
       }
     )
 
@@ -84,40 +85,50 @@ async function freeTranslate(
       return await translateChunk(text, source, target)
     }
 
-    // Split by paragraphs/sentences to stay under limit
+    // Split by paragraphs/sentences to stay under limit, then translate in parallel
     const paragraphs = text.split(/\n+/)
-    const translatedParts: string[] = []
+    const allChunks: { index: number; text: string; isBlank: boolean }[] = []
 
-    for (const paragraph of paragraphs) {
+    for (let i = 0; i < paragraphs.length; i++) {
+      const paragraph = paragraphs[i]
       if (!paragraph.trim()) {
-        translatedParts.push(paragraph)
+        allChunks.push({ index: i, text: paragraph, isBlank: true })
         continue
       }
       if (paragraph.length <= MAX_CHUNK) {
-        translatedParts.push(await translateChunk(paragraph, source, target))
+        allChunks.push({ index: i, text: paragraph, isBlank: false })
       } else {
-        // Split by sentences
         const sentences = paragraph.match(/[^.!?]+[.!?]*/g) || [paragraph]
         let chunk = ''
-        const chunks: string[] = []
         for (const sentence of sentences) {
           if ((chunk + sentence).length > MAX_CHUNK && chunk) {
-            chunks.push(chunk)
+            allChunks.push({ index: i, text: chunk, isBlank: false })
             chunk = sentence
           } else {
             chunk += sentence
           }
         }
-        if (chunk) chunks.push(chunk)
-
-        const translated = await Promise.all(
-          chunks.map((c) => translateChunk(c, source, target))
-        )
-        translatedParts.push(translated.join(''))
+        if (chunk) allChunks.push({ index: i, text: chunk, isBlank: false })
       }
     }
 
-    return translatedParts.join('\n')
+    // Translate all non-blank chunks in parallel
+    const results = await Promise.all(
+      allChunks.map(async (c) =>
+        c.isBlank ? c.text : translateChunk(c.text, source, target)
+      )
+    )
+
+    // Reassemble by paragraph index
+    const byParagraph = new Map<number, string[]>()
+    allChunks.forEach((c, i) => {
+      if (!byParagraph.has(c.index)) byParagraph.set(c.index, [])
+      byParagraph.get(c.index)!.push(results[i])
+    })
+    return Array.from(byParagraph.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([, parts]) => parts.join(''))
+      .join('\n')
   } catch (error) {
     console.error('Free translate error:', error)
     return text // Return original text on failure instead of garbled mix
@@ -130,7 +141,7 @@ async function translateChunk(
   targetLang: string
 ): Promise<string> {
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`
-  const response = await fetch(url)
+  const response = await fetch(url, { signal: AbortSignal.timeout(5000) })
   const data = await response.json()
 
   if (data.responseStatus === 200 && data.responseData?.translatedText) {
@@ -323,17 +334,28 @@ export async function getTranslatedEntity<T extends { id: string; originalLangua
     translations.map((t) => [t.fieldName, t.content])
   )
 
-  // Check which fields need auto-translation
+  // Check which fields need auto-translation (missing or suspiciously truncated)
   const missingFields: string[] = []
   for (const field of fields) {
-    if (!translationMap.has(field) && (entity as Record<string, unknown>)[field]) {
+    const original = (entity as Record<string, unknown>)[field]
+    if (!original) continue
+    const cached = translationMap.get(field)
+    if (!cached) {
       missingFields.push(field)
+    } else if (typeof original === 'string' && cached.length < original.length * 0.3 && original.length > 100) {
+      // Cached translation is less than 30% of original length — likely truncated/corrupt
+      missingFields.push(field)
+      translationMap.delete(field)
+      // Delete the corrupt cached entry
+      prisma.translation.deleteMany({
+        where: { entityType, entityId: entity.id, fieldName: field, languageCode: targetLanguage },
+      }).catch(() => {})
     }
   }
 
-  // Auto-translate missing fields
+  // Auto-translate missing fields in parallel
   if (missingFields.length > 0) {
-    for (const field of missingFields) {
+    await Promise.all(missingFields.map(async (field) => {
       const originalText = (entity as Record<string, unknown>)[field]
       if (typeof originalText === 'string' && originalText.trim()) {
         // Detect actual content language to avoid translating text that's already
@@ -342,28 +364,31 @@ export async function getTranslatedEntity<T extends { id: string; originalLangua
         const cjkRatio = cjkCount / originalText.length
         const actualLang = cjkRatio > 0.15 ? 'zh' : cjkRatio < 0.05 && /[a-zA-Z]/.test(originalText) ? 'en' : null
         if (actualLang && actualLang === targetLanguage) {
-          // Content is already in the target language — skip translation
-          continue
+          return // Content is already in the target language
         }
         const sourceLang = actualLang || originalLang
-        const translatedText = await translateText(
-          originalText,
-          targetLanguage,
-          sourceLang
-        )
+        try {
+          const translatedText = await translateText(
+            originalText,
+            targetLanguage,
+            sourceLang
+          )
 
-        await addTranslation({
-          entityType,
-          entityId: entity.id,
-          fieldName: field,
-          languageCode: targetLanguage,
-          content: translatedText,
-          isAutoTranslated: true,
-        })
+          await addTranslation({
+            entityType,
+            entityId: entity.id,
+            fieldName: field,
+            languageCode: targetLanguage,
+            content: translatedText,
+            isAutoTranslated: true,
+          })
 
-        translationMap.set(field, translatedText)
+          translationMap.set(field, translatedText)
+        } catch {
+          // Translation failed for this field — keep original
+        }
       }
-    }
+    }))
   }
 
   // Apply translations to entity

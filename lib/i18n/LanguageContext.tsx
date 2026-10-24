@@ -47,18 +47,29 @@ function detectInitialAutoTranslate(): boolean {
   return saved !== null ? saved === 'true' : true
 }
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  // Lazy initializers run synchronously on first render — no FOWL
-  const [locale, setLocaleState] = useState<Locale>(detectInitialLocale)
-  const initialAutoTranslate = detectInitialAutoTranslate()
-  const [autoTranslateUGC, setAutoTranslateUGCState] = useState(initialAutoTranslate)
-  const [isUGCTranslated, setIsUGCTranslated] = useState(initialAutoTranslate)
+export function LanguageProvider({ children, serverLocale }: { children: React.ReactNode; serverLocale?: Locale }) {
+  // Use the server-provided locale for the initial render on BOTH server and
+  // client so SSR HTML matches hydration. After mount, sync to the client's
+  // preferred locale (localStorage / browser language) if it differs.
+  const fallback = serverLocale || 'en'
+  const [locale, setLocaleState] = useState<Locale>(fallback)
+  const [autoTranslateUGC, setAutoTranslateUGCState] = useState(true)
+  const [isUGCTranslated, setIsUGCTranslated] = useState(true)
   const { data: session, status } = useSession()
   const hasFetchedRef = useRef(false)
 
-  // Sync <html lang> and cookie on mount (synchronous state already correct)
+  // After hydration, reconcile with the client's preferred locale
   useEffect(() => {
-    syncLocaleEnvironment(locale)
+    const clientLocale = detectInitialLocale()
+    const autoTrans = detectInitialAutoTranslate()
+    if (clientLocale !== fallback) {
+      setLocaleState(clientLocale)
+      syncLocaleEnvironment(clientLocale)
+    } else {
+      syncLocaleEnvironment(fallback)
+    }
+    setAutoTranslateUGCState(autoTrans)
+    setIsUGCTranslated(autoTrans)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

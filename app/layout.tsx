@@ -2,10 +2,12 @@ import type { Metadata, Viewport } from 'next'
 import { DM_Serif_Display, Manrope, Noto_Sans_SC } from 'next/font/google'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
+import { cookies, headers } from 'next/headers'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import SessionProvider from '@/components/SessionProvider'
 import { LanguageProvider } from '@/lib/i18n/LanguageContext'
+import type { Locale } from '@/lib/i18n/translations'
 import ThemeProvider from '@/components/ThemeProvider'
 import BetaFeedbackWidget from '@/components/BetaFeedbackWidget'
 import ScrollRestoration from '@/components/ScrollRestoration'
@@ -68,10 +70,25 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await getServerSession(authOptions)
+  const [session, cookieStore, headerStore] = await Promise.all([
+    getServerSession(authOptions),
+    cookies(),
+    headers(),
+  ])
+  const localeCookie = cookieStore.get('locale')?.value
+  let serverLocale: Locale = 'en'
+  if (localeCookie === 'zh' || localeCookie === 'en') {
+    serverLocale = localeCookie
+  } else {
+    // First visit: detect from Accept-Language header
+    const acceptLang = headerStore.get('accept-language') || ''
+    if (acceptLang.split(',').some(l => l.trim().startsWith('zh'))) {
+      serverLocale = 'zh'
+    }
+  }
 
   return (
-    <html lang="en" suppressHydrationWarning style={{ colorScheme: 'light' }}>
+    <html lang={serverLocale === 'zh' ? 'zh-CN' : 'en'} suppressHydrationWarning style={{ colorScheme: 'light' }}>
       <head>
         <link rel="icon" type="image/png" href="/icon-pink.png" />
         <script
@@ -104,7 +121,7 @@ export default async function RootLayout({
       </head>
       <body className={`${manrope.variable} ${notoSansSC.variable} ${GeistMono.variable} ${dmSerifDisplay.variable} font-sans`}>
         <SessionProvider session={session}>
-          <LanguageProvider>
+          <LanguageProvider serverLocale={serverLocale}>
             <ThemeProvider>
               {children}
               <ScrollRestoration />
