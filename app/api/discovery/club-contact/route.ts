@@ -58,6 +58,10 @@ export async function POST(req: NextRequest) {
   const platform = String(form.get('platform') || '') as ClubPlatform
   const handle = String(form.get('handle') || '').trim()
   const message = String(form.get('message') || '').trim()
+  const displayName = String(form.get('displayName') || '') || null
+  const avatarUrl = String(form.get('avatarUrl') || '') || null
+  const followerCountStr = String(form.get('followerCount') || '')
+  const followerCount = followerCountStr ? Number(followerCountStr) : null
 
   if (!platform || !handle) {
     return NextResponse.json({ message: 'platform and handle required', code: 'VALIDATION_ERROR' }, { status: 400 })
@@ -215,6 +219,71 @@ export async function POST(req: NextRequest) {
       attachments,
     })
     if (error) throw new Error(error.message)
+
+    // Track contact in CreatorProfile for outreach status
+    try {
+      const cleanHandle = handle.replace(/^@/, '').toLowerCase()
+      await prisma.creatorProfile.upsert({
+        where: { platform_handle: { platform, handle: cleanHandle } },
+        create: {
+          platform,
+          handle: cleanHandle,
+          displayName: null,
+          lastContactedAt: new Date(),
+          contactCount: 1,
+          firstSeenAt: new Date(),
+          lastRefreshedAt: new Date(),
+          refreshCount: 0,
+        },
+        update: {
+          lastContactedAt: new Date(),
+          contactCount: { increment: 1 },
+        },
+      })
+    } catch (e) {
+      console.error('[club-contact] CreatorProfile upsert failed:', e)
+    }
+
+    // Create an OutreachCampaign + OutreachRecipient so this contact appears
+    // in the Messages "Outreach" tab alongside campaign-based outreach.
+    try {
+      const cleanHandle = handle.replace(/^@/, '').toLowerCase()
+      // The CreatorProfile was upserted above, so it should exist
+      const profile = await prisma.creatorProfile.findUnique({
+        where: { platform_handle: { platform, handle: cleanHandle } },
+        select: { id: true, email: true },
+      })
+      if (profile) {
+        const brandProfile = await prisma.brandProfile.findUnique({ where: { userId }, select: { id: true } })
+        const outreachCampaign = await prisma.outreachCampaign.create({
+          data: {
+            userId,
+            brandId: brandProfile?.id || '',
+            title: `Outreach to @${handle}`,
+            briefMessage: message,
+            quantity: 1,
+            platform,
+            status: 'COMPLETED',
+          },
+        })
+        await prisma.outreachRecipient.create({
+          data: {
+            outreachCampaignId: outreachCampaign.id,
+            creatorProfileId: profile.id,
+            platform,
+            handle: cleanHandle,
+            displayName,
+            avatarUrl,
+            followerCount: followerCount != null && !isNaN(followerCount) ? followerCount : null,
+            email: creatorEmail || profile.email || null,
+            status: 'SENT',
+            sentAt: new Date(),
+          },
+        })
+      }
+    } catch (e) {
+      console.error('[club-contact] OutreachRecipient creation failed:', e)
+    }
   } catch (err: any) {
     // Send failed — refund credits
     if (outreachCharge) {

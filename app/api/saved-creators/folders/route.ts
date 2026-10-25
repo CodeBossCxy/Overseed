@@ -25,10 +25,10 @@ export async function GET() {
   const folders = await prisma.savedCreatorFolder.findMany({
     where: { brandId },
     orderBy: { createdAt: 'asc' },
-    include: { _count: { select: { creators: true } } },
+    include: { _count: { select: { creators: true, discoveryCreators: true } } },
   })
   return NextResponse.json({
-    folders: folders.map((f) => ({ id: f.id, name: f.name, count: f._count.creators })),
+    folders: folders.map((f) => ({ id: f.id, name: f.name, count: f._count.creators + f._count.discoveryCreators })),
   })
 }
 

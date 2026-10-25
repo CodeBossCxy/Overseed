@@ -105,7 +105,8 @@ export async function POST(req: NextRequest) {
           followerCount: typeof c.followerCount === 'number' ? c.followerCount : null,
           engagementRate: typeof c.engagementRate === 'number' ? c.engagementRate : null,
           email: bioEmail || profile.email,
-          status: 'PENDING',
+          status: 'SENT',
+          sentAt: new Date(),
         },
         update: {},
       })

@@ -67,12 +67,14 @@ export async function POST(req: NextRequest) {
       followerCount: typeof body.followerCount === 'number' ? body.followerCount : null,
       engagementRate: typeof body.engagementRate === 'number' ? body.engagementRate : null,
       nicheTags: Array.isArray(body.nicheTags) ? body.nicheTags : [],
+      folderId: body.folderId || null,
     },
     update: {
       displayName: body.displayName || undefined,
       avatarUrl: body.avatarUrl || undefined,
       followerCount: typeof body.followerCount === 'number' ? body.followerCount : undefined,
       engagementRate: typeof body.engagementRate === 'number' ? body.engagementRate : undefined,
+      folderId: body.folderId || undefined,
     },
   })
   return NextResponse.json({ saved: true })

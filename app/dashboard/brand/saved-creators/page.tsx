@@ -7,6 +7,7 @@ import { PlatformIcon } from '@/components/campaigns/CampaignRowCard'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import UGCTranslateToggle from '@/components/UGCTranslateToggle'
 import CreatorAvatar from '@/components/ui/CreatorAvatar'
+import CreatorDetailModal, { useCreatorDetail, type DiscoveredCreator } from '@/components/discovery/CreatorDetailModal'
 
 // Saved Creators: the brand's bookmarked platform creators, as a filterable
 // card grid. Bookmarks come from the applications table and creator profiles.
@@ -77,6 +78,44 @@ export default function SavedCreatorsPage() {
   const [bulkSending, setBulkSending] = useState(false)
   const [bulkSent, setBulkSent] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
+
+  // Creator detail modal (same as discover page)
+  const {
+    detailFor,
+    detail,
+    detailLoading,
+    detailError,
+    detailBlocked,
+    featureUnlocks,
+    featureUnlocked,
+    featureLoading,
+    featureError,
+    featureConfirm,
+    openDetail: openDetailHook,
+    closeDetail,
+    unlockFeature,
+    unlockAudienceBundle,
+    promptUnlock,
+    dismissConfirm,
+  } = useCreatorDetail()
+
+  const openCreatorProfile = (row: any) => {
+    const creator: DiscoveredCreator = {
+      id: row._id,
+      platform: row.platforms?.[0] || row.discoveryPlatform || 'instagram',
+      handle: row.handle || row.discoveryHandle || null,
+      display_name: row.name || null,
+      bio: row.bio || null,
+      country: row.country || null,
+      follower_count: row.followers || null,
+      engagement_rate: row.engagement || null,
+      niche_tags: row.niche ? [row.niche] : [],
+      profile_url: row.profileUrl || null,
+      avatar_url: row.avatarUrl || null,
+      score: null,
+    }
+    openDetailHook(creator)
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -236,7 +275,12 @@ export default function SavedCreatorsPage() {
       isVerified: false,
       savedAt: row.savedAt,
       folderId: row.folderId || null,
-      profileUrl: null as string | null,
+      profileUrl: row.handle ? (
+        row.platform === 'instagram' ? `https://www.instagram.com/${row.handle}/` :
+        row.platform === 'tiktok' ? `https://www.tiktok.com/@${row.handle}` :
+        row.platform === 'youtube' ? `https://www.youtube.com/@${row.handle}` :
+        null
+      ) : null,
       influencerId: null as string | null,
       discoveryId: row.id,
       discoveryPlatform: row.platform,
@@ -527,116 +571,146 @@ export default function SavedCreatorsPage() {
         ) : paged.length === 0 ? (
           <div className="workspace-glass-card rounded-2xl p-10 text-center text-gray-500">{s.noMatches}</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {paged.map((row) => (
-              <div key={row._id} className="workspace-glass-card rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-3 gap-2">
-                  <span className="text-xs text-gray-400 flex-shrink-0">{savedAgo(row.savedAt)}</span>
-                  {row._type === 'discovery' && (
-                    <span className="text-[10px] px-2 py-0.5 bg-violet-50 text-violet-600 rounded-full font-medium">{s.discoveryBadge}</span>
-                  )}
-                  {folders.length > 0 && row._type === 'registered' && row.influencerId && (
-                    <select
-                      value={row.folderId || ''}
-                      onChange={(e) => moveToFolder(row.influencerId!, e.target.value)}
-                      disabled={busyId === row._id}
-                      className="ml-auto max-w-[45%] truncate px-2 py-1 workspace-glass-control text-xs text-gray-600 focus:outline-none disabled:opacity-50"
-                      title={s.moveToFolder}
-                    >
-                      <option value="">{s.ungrouped}</option>
-                      {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                    </select>
-                  )}
-                  <button
-                    onClick={() => row._type === 'discovery' ? unsaveDiscovery(row._id, row.discoveryPlatform!, row.discoveryHandle!) : unsave(row._id)}
-                    disabled={busyId === row._id}
-                    className="text-primary-600 hover:text-red-500 transition disabled:opacity-50"
-                    title={s.savedState}
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <CreatorAvatar url={row.avatarUrl} name={row.name} size="w-16 h-16" textSize="text-xl" />
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-900 flex items-center gap-1.5 truncate">
-                      {row.name}
-                      {row.isVerified && (
-                        <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2l2.4 2.4 3.3-.5.5 3.3L20.6 9.6 22 12l-1.4 2.4.6 3.3-3.3.5L15.4 21.6 12 20.2 8.6 21.6 6.1 18.2l-3.3-.5.6-3.3L2 12l1.4-2.4-.5-3.3 3.3.5L8.6 2.4 12 2zm-1.2 12.7l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z" />
-                        </svg>
-                      )}
-                    </p>
-                    {row.handle && <p className="text-sm text-gray-500 truncate">@{row.handle}</p>}
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      {row.platforms.slice(0, 3).map((p: string) => (
-                        <PlatformIcon key={p} name={p} />
-                      ))}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {paged.map((row) => {
+              const platformName = row.platforms[0] || row.discoveryPlatform || 'instagram'
+              const profileUrl = row.profileUrl || (row.handle ? (
+                platformName === 'instagram' ? `https://www.instagram.com/${row.handle}/` :
+                platformName === 'tiktok' ? `https://www.tiktok.com/@${row.handle}` :
+                platformName === 'youtube' ? `https://www.youtube.com/@${row.handle}` : null
+              ) : null)
+              const PLATFORM_LABELS: Record<string, string> = { youtube: 'YouTube', instagram: 'Instagram', tiktok: 'TikTok' }
+              return (
+              <div key={row._id} className={`workspace-glass-card rounded-2xl p-5 transition-colors ${selectedCreators.has(row._id) ? 'ring-2 ring-primary-400 bg-primary-50/30' : ''}`}>
+                {/* Top section: avatar + info + platform link */}
+                <div className="flex gap-4">
+                  {/* Avatar with gradient ring */}
+                  <div className="flex-shrink-0">
+                    <div className="w-[80px] h-[80px] rounded-full p-[3px] bg-gradient-to-br from-yellow-400 via-pink-500 to-purple-600">
+                      <div className="w-full h-full rounded-full bg-white p-[2px]">
+                        <div className="w-full h-full rounded-full bg-gray-100 overflow-hidden">
+                          <CreatorAvatar url={row.avatarUrl} name={row.name} size="w-full h-full" textSize="text-xl" />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {row.niche && (
-                  <span className="inline-block mt-3 px-2.5 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
-                    {t.categoryNames[row.niche] || row.niche}
-                  </span>
-                )}
-
-                <div className="grid grid-cols-3 divide-x divide-gray-100 mt-3 text-center">
-                  <div>
-                    <p className="text-sm font-bold text-gray-900 tabular-nums">{row.followers ? compact(row.followers) : '—'}</p>
-                    <p className="text-[11px] text-gray-400">{s.followers}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{countryLabel(row.country)}</p>
-                    <p className="text-[11px] text-gray-400">{s.country}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900 tabular-nums">{row.engagement != null ? `${row.engagement.toFixed(1)}%` : '—'}</p>
-                    <p className="text-[11px] text-gray-400">{s.engRate}</p>
-                  </div>
-                </div>
-
-                {row.bio && <p className="text-xs text-gray-500 mt-3 line-clamp-1">{row.bio}</p>}
-
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                  {row.profileUrl ? (
-                    <Link
-                      href={row.profileUrl}
-                      className="prismatic-primary-button bg-primary-600 text-white text-center px-4 py-2 rounded-full text-sm font-bold transition"
-                    >
-                      <span className="relative z-10">{s.viewProfile}</span>
-                    </Link>
-                  ) : (
-                    <span className="text-center px-4 py-2 bg-gray-100 text-gray-400 rounded-full text-sm font-medium cursor-not-allowed">
-                      {s.viewProfile}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => toggleSelectCreator(row._id)}
-                    className={`text-center px-4 py-2 rounded-full text-sm font-semibold transition ${
-                      selectedCreators.has(row._id)
-                        ? 'bg-primary-50 border border-primary-300 text-primary-700'
-                        : 'bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
-                    }`}
-                  >
-                    {selectedCreators.has(row._id) ? (
-                      <span className="flex items-center justify-center gap-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        {zh ? '已添加联系' : 'Added to outreach'}
-                      </span>
-                    ) : (
-                      <span>+ {zh ? '联系' : 'Contact'}</span>
+                  {/* Name, handle, badge */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-extrabold text-lg text-gray-900 truncate leading-tight uppercase tracking-wide">
+                          {row.name}
+                        </p>
+                        {row.handle && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <p className="text-sm text-gray-400">@{row.handle}</p>
+                            <button
+                              type="button"
+                              onClick={() => navigator.clipboard?.writeText(row.handle || '')}
+                              className="text-gray-300 hover:text-gray-500 flex-shrink-0"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {/* Open on Platform link */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {profileUrl && (
+                          <a
+                            href={profileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+                          >
+                            <PlatformIcon name={platformName} />
+                            {zh ? `在${PLATFORM_LABELS[platformName] || platformName}上查看` : `Open on ${PLATFORM_LABELS[platformName] || platformName}`}
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7v10" />
+                            </svg>
+                          </a>
+                        )}
+                        <span className="text-[10px] text-gray-400">{savedAgo(row.savedAt)}</span>
+                      </div>
+                    </div>
+                    {/* Bio */}
+                    {row.bio && <p className="mt-2 text-xs text-gray-500 line-clamp-2 leading-relaxed">{row.bio}</p>}
+                    {/* Niche tags */}
+                    {row.niche && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
+                          {t.categoryNames[row.niche] || row.niche}
+                        </span>
+                      </div>
                     )}
-                  </button>
+                  </div>
+                </div>
+
+                {/* Bottom row: followers + actions */}
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100/80">
+                  {/* Followers */}
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                    </svg>
+                    <span className="text-lg font-bold text-gray-900">{row.followers ? compact(row.followers) : '—'}</span>
+                    <span className="text-sm text-gray-400">{s.followers}</span>
+                  </div>
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => openCreatorProfile(row)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-400 to-slate-400 text-white rounded-full text-xs font-semibold hover:from-indigo-500 hover:to-slate-500 transition shadow-sm"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                      {s.viewProfile}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleSelectCreator(row._id)}
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition ${
+                        selectedCreators.has(row._id)
+                          ? 'bg-primary-50 border border-primary-300 text-primary-700'
+                          : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                      }`}
+                    >
+                      {selectedCreators.has(row._id) ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                          {zh ? '已添加联系' : 'Added'}
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                          </svg>
+                          {zh ? '联系' : 'Contact'}
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => row._type === 'discovery' ? unsaveDiscovery(row._id, row.discoveryPlatform!, row.discoveryHandle!) : unsave(row._id)}
+                      disabled={busyId === row._id}
+                      className="w-9 h-9 flex items-center justify-center rounded-full border bg-amber-50 border-amber-200 text-amber-600 transition flex-shrink-0 disabled:opacity-50"
+                      title={s.savedState}
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -676,7 +750,7 @@ export default function SavedCreatorsPage() {
       {/* Bulk outreach modal */}
       {bulkOutreachOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !bulkSending && setBulkOutreachOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+          <div data-solid className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" style={{ backgroundColor: 'white' }} onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-900">
                 {zh ? `批量联系 ${selectedCreators.size} 位创作者` : `Bulk Contact ${selectedCreators.size} Creator${selectedCreators.size > 1 ? 's' : ''}`}
@@ -754,6 +828,35 @@ export default function SavedCreatorsPage() {
             )}
           </div>
         </div>
+      )}
+      {/* Creator detail popup (same as discover page) */}
+      {detailFor && (
+        <CreatorDetailModal
+          creator={detailFor}
+          detail={detail}
+          detailLoading={detailLoading}
+          detailError={detailError}
+          detailBlocked={detailBlocked}
+          featureUnlocks={featureUnlocks}
+          featureUnlocked={featureUnlocked}
+          featureLoading={featureLoading}
+          featureError={featureError}
+          featureConfirm={featureConfirm}
+          onClose={closeDetail}
+          onUnlockFeature={unlockFeature}
+          onUnlockAudienceBundle={unlockAudienceBundle}
+          onPromptUnlock={promptUnlock}
+          onDismissConfirm={dismissConfirm}
+          onDismissFeatureError={() => {}}
+          onOpenRelated={(creator) => openDetailHook(creator)}
+          savedKeys={new Set()}
+          onToggleSave={() => {}}
+          onOpenContact={() => {}}
+          nicheMap={{}}
+          zh={locale === 'zh'}
+          locale={locale}
+          t={t}
+        />
       )}
     </BrandWorkspaceLayout>
   )

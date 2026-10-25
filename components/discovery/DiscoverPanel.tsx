@@ -18,6 +18,7 @@ import {
 } from '@/lib/creatordb-filter-fields'
 import { calculateRelevance } from '@/lib/relevance-scoring'
 import CreatorDetailModal, { useCreatorDetail, QUOTA_CODES as DETAIL_QUOTA_CODES } from '@/components/discovery/CreatorDetailModal'
+import SaveToFolderPopup from '@/components/discovery/SaveToFolderPopup'
 
 interface DiscoveredCreator {
   id: string
@@ -817,6 +818,7 @@ export default function DiscoverPanel() {
     search: number | null
     profile: number | null
     analytics: number | null
+    outreach: number | null
   } | null>(null)
   useEffect(() => {
     fetch('/api/pricing/config')
@@ -983,50 +985,105 @@ export default function DiscoverPanel() {
       .then((data) => setSavedKeys(new Set(data.keys || [])))
       .catch(() => {})
   }, [])
+
+  // Contacted creators — track by "platform:handle" keys for "Manage Collaboration" state
+  const [contactedKeys, setContactedKeys] = useState<Map<string, { status: string; sentAt: string | null }>>(new Map())
+  useEffect(() => {
+    fetch('/api/discovery/contacted-keys')
+      .then((res) => (res.ok ? res.json() : { keys: {} }))
+      .then((data) => {
+        const map = new Map<string, { status: string; sentAt: string | null }>()
+        if (data.keys && typeof data.keys === 'object') {
+          for (const [k, v] of Object.entries(data.keys)) {
+            map.set(k, v as { status: string; sentAt: string | null })
+          }
+        }
+        setContactedKeys(map)
+      })
+      .catch(() => {})
+  }, [])
+
+  // Session-sticky folder for saving creators (YouTube-style)
+  const [sessionFolderId, setSessionFolderId] = useState<string | null>(null)
+  const [sessionFolderName, setSessionFolderName] = useState<string | null>(null)
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false)
+  const [pendingSaveCreator, setPendingSaveCreator] = useState<DiscoveredCreator | null>(null)
+  const [saveToast, setSaveToast] = useState<{ name: string; folder: string | null } | null>(null)
+  // Manage collaboration popup
+  const [manageCreator, setManageCreator] = useState<{ creator: DiscoveredCreator; status: { status: string; sentAt: string | null } } | null>(null)
+
+  const doSaveCreator = async (creator: DiscoveredCreator, folderId: string | null, folderName: string | null) => {
+    const handle = (creator.handle || '').replace(/^@/, '').toLowerCase()
+    const key = `${creator.platform}:${handle}`
+    setSavingKey(key)
+    setSavedKeys((prev) => { const next = new Set(prev); next.add(key); return next })
+    try {
+      const res = await fetch('/api/saved-creators/discovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: creator.platform,
+          handle,
+          displayName: creator.display_name,
+          avatarUrl: creator.avatar_url,
+          followerCount: creator.follower_count,
+          engagementRate: creator.engagement_rate != null ? Number(creator.engagement_rate) : null,
+          nicheTags: creator.niche_tags || [],
+          folderId,
+        }),
+      })
+      if (!res.ok) {
+        setSavedKeys((prev) => { const next = new Set(prev); next.delete(key); return next })
+      } else {
+        setSaveToast({ name: creator.display_name || creator.handle || 'Creator', folder: folderName })
+        setTimeout(() => setSaveToast(null), 4000)
+      }
+    } catch {
+      setSavedKeys((prev) => { const next = new Set(prev); next.delete(key); return next })
+    } finally {
+      setSavingKey(null)
+    }
+  }
+
+  const onFolderSelected = (folderId: string | null, folderName: string | null) => {
+    setSessionFolderId(folderId ?? '')
+    setSessionFolderName(folderName)
+    setFolderPickerOpen(false)
+    if (pendingSaveCreator) {
+      doSaveCreator(pendingSaveCreator, folderId, folderName)
+      setPendingSaveCreator(null)
+    }
+  }
+
   const toggleSaveCreator = async (creator: DiscoveredCreator) => {
     const handle = (creator.handle || '').replace(/^@/, '').toLowerCase()
     if (!handle) return
     const key = `${creator.platform}:${handle}`
     if (savingKey === key) return
-    setSavingKey(key)
     const wasSaved = savedKeys.has(key)
-    setSavedKeys((prev) => {
-      const next = new Set(prev)
-      wasSaved ? next.delete(key) : next.add(key)
-      return next
-    })
-    try {
-      const res = wasSaved
-        ? await fetch(`/api/saved-creators/discovery?platform=${encodeURIComponent(creator.platform)}&handle=${encodeURIComponent(handle)}`, { method: 'DELETE' })
-        : await fetch('/api/saved-creators/discovery', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              platform: creator.platform,
-              handle,
-              displayName: creator.display_name,
-              avatarUrl: creator.avatar_url,
-              followerCount: creator.follower_count,
-              engagementRate: creator.engagement_rate != null ? Number(creator.engagement_rate) : null,
-              nicheTags: creator.niche_tags || [],
-            }),
-          })
-      if (!res.ok) {
-        // Revert on failure
-        setSavedKeys((prev) => {
-          const next = new Set(prev)
-          wasSaved ? next.add(key) : next.delete(key)
-          return next
-        })
+
+    if (wasSaved) {
+      setSavingKey(key)
+      setSavedKeys((prev) => { const next = new Set(prev); next.delete(key); return next })
+      try {
+        const res = await fetch(`/api/saved-creators/discovery?platform=${encodeURIComponent(creator.platform)}&handle=${encodeURIComponent(handle)}`, { method: 'DELETE' })
+        if (!res.ok) setSavedKeys((prev) => { const next = new Set(prev); next.add(key); return next })
+      } catch {
+        setSavedKeys((prev) => { const next = new Set(prev); next.add(key); return next })
+      } finally {
+        setSavingKey(null)
       }
-    } catch {
-      setSavedKeys((prev) => {
-        const next = new Set(prev)
-        wasSaved ? next.add(key) : next.delete(key)
-        return next
-      })
-    } finally {
-      setSavingKey(null)
+      return
+    }
+
+    // Save — check if folder already chosen for this session
+    if (sessionFolderId !== null) {
+      // Folder already chosen (or explicitly "no folder") — save directly
+      await doSaveCreator(creator, sessionFolderId || null, sessionFolderName)
+    } else {
+      // First save in session — show folder picker
+      setPendingSaveCreator(creator)
+      setFolderPickerOpen(true)
     }
   }
   // Pricing v3: quota/credit exhaustion codes → show a plans/credits CTA
@@ -1344,6 +1401,9 @@ export default function DiscoverPanel() {
       fd.set('platform', detailFor.platform)
       fd.set('handle', detailFor.handle)
       fd.set('message', contactMsg.trim())
+      if (detailFor.display_name) fd.set('displayName', detailFor.display_name)
+      if (detailFor.avatar_url) fd.set('avatarUrl', detailFor.avatar_url)
+      if (detailFor.follower_count != null) fd.set('followerCount', String(detailFor.follower_count))
       contactFiles.forEach((f) => fd.append('files', f))
       const res = await fetch('/api/discovery/club-contact', { method: 'POST', body: fd })
       window.dispatchEvent(new Event('credits:refresh'))
@@ -1353,6 +1413,13 @@ export default function DiscoverPanel() {
         throw new Error(data?.message || 'Failed to send message')
       }
       setContactSent(true)
+      // Mark creator as contacted in local state
+      const contactKey = `${detailFor.platform}:${(detailFor.handle || '').replace(/^@/, '').toLowerCase()}`
+      setContactedKeys((prev) => {
+        const next = new Map(prev)
+        next.set(contactKey, { status: 'SENT', sentAt: new Date().toISOString() })
+        return next
+      })
     } catch (err: any) {
       setContactError(err.message || 'Failed to send message')
     } finally {
@@ -2252,7 +2319,7 @@ export default function DiscoverPanel() {
   // ---- Advanced filter rendering --------
   const activePlatform = platforms[0] as 'instagram' | 'youtube' | 'tiktok'
   const zh = locale === 'zh'
-  const inputCls = 'px-3 py-1.5 workspace-glass-control text-sm focus:outline-none'
+  const inputCls = 'h-[38px] px-3 py-1.5 workspace-glass-control text-sm focus:outline-none'
   const labelCls = 'block text-xs font-medium text-gray-500 mb-1.5'
   const creatorDbFilterFor = (field: CreatorDbCanonicalField): CreatorDbFilterInput => {
     const existing = creatorDbFilters.find((filter) => filter.field === field)
@@ -3528,31 +3595,51 @@ export default function DiscoverPanel() {
                           {d.resultsViewProfile}
                         </a>
                       ) : null}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); toggleSelectCreator(creator) }}
-                        className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition ${
-                          isCreatorSelected(creator)
-                            ? 'bg-primary-50 border border-primary-300 text-primary-700'
-                            : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
-                        }`}
-                      >
-                        {isCreatorSelected(creator) ? (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                            </svg>
-                            {d.resultsAddedToOutreach}
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                            </svg>
-                            {d.resultsContact}
-                          </>
-                        )}
-                      </button>
+                      {(() => {
+                        const contactKey = handle ? `${creator.platform}:${handle}` : null
+                        const contacted = contactKey ? contactedKeys.get(contactKey) : null
+                        if (contacted) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setManageCreator({ creator, status: contacted }) }}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {zh ? '管理合作' : 'Manage'}
+                            </button>
+                          )
+                        }
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); toggleSelectCreator(creator) }}
+                            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition ${
+                              isCreatorSelected(creator)
+                                ? 'bg-primary-50 border border-primary-300 text-primary-700'
+                                : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                            }`}
+                          >
+                            {isCreatorSelected(creator) ? (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                                {d.resultsAddedToOutreach}
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                {d.resultsContact}
+                              </>
+                            )}
+                          </button>
+                        )
+                      })()}
                       <button
                         type="button"
                         disabled={!handle || savingKey === saveKey}
@@ -3880,6 +3967,120 @@ export default function DiscoverPanel() {
           </div>
         </div>,
       document.body)}
+
+      {/* Folder picker popup */}
+      <SaveToFolderPopup
+        open={folderPickerOpen}
+        onClose={() => { setFolderPickerOpen(false); setPendingSaveCreator(null) }}
+        onSelect={onFolderSelected}
+        zh={zh}
+      />
+
+      {/* Bottom toast bar showing current save folder */}
+      {saveToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 bg-gray-900 text-white rounded-2xl shadow-xl text-sm animate-in slide-in-from-bottom-4">
+          <svg className="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+          </svg>
+          <span>
+            {zh ? '已保存' : 'Saved'} <b>{saveToast.name}</b>
+            {saveToast.folder && <> {zh ? '到' : 'to'} <b>{saveToast.folder}</b></>}
+          </span>
+          <button
+            type="button"
+            onClick={() => { setSaveToast(null); setSessionFolderId(null); setSessionFolderName(null) }}
+            className="text-white/60 hover:text-white text-xs font-medium underline underline-offset-2 ml-2"
+          >
+            {zh ? '更改文件夹' : 'Change folder'}
+          </button>
+        </div>
+      )}
+
+      {/* Manage Collaboration popup */}
+      {manageCreator && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={() => setManageCreator(null)}>
+          <div data-solid className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" style={{ backgroundColor: 'white' }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gray-100 overflow-hidden flex-shrink-0">
+                  <CreatorAvatar url={manageCreator.creator.avatar_url} name={manageCreator.creator.display_name || manageCreator.creator.handle || '?'} textSize="text-lg" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900 truncate">{manageCreator.creator.display_name || manageCreator.creator.handle}</p>
+                  <p className="text-sm text-gray-400">@{(manageCreator.creator.handle || '').replace(/^@/, '')}</p>
+                </div>
+              </div>
+            </div>
+            {/* Progress timeline */}
+            <div className="px-6 py-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">{zh ? '合作进度' : 'Collaboration Progress'}</p>
+              <div className="space-y-0">
+                {[
+                  { key: 'sent', label: zh ? '外联已发送' : 'Outreach Sent', desc: zh ? '消息已通过 Overseed 发送给创作者' : 'Message sent to the creator via Overseed', done: true },
+                  { key: 'awaiting', label: zh ? '等待回复' : 'Awaiting Response', desc: zh ? '等待创作者回复您的合作邀请' : 'Waiting for the creator to respond to your invitation', done: false, active: true },
+                  { key: 'responded', label: zh ? '已回复' : 'Responded', desc: zh ? '创作者已回复，可开始协商合作' : 'Creator responded — ready to negotiate collaboration', done: false },
+                  { key: 'negotiating', label: zh ? '协商中' : 'Negotiating', desc: zh ? '确定合作条款、交付内容和报酬' : 'Finalizing terms, deliverables, and compensation', done: false },
+                  { key: 'in_progress', label: zh ? '合作进行中' : 'In Progress', desc: zh ? '创作者正在制作内容' : 'Creator is producing content', done: false },
+                  { key: 'completed', label: zh ? '已完成' : 'Completed', desc: zh ? '合作成功完成' : 'Collaboration successfully completed', done: false },
+                ].map((step, i, arr) => (
+                  <div key={step.key} className="flex gap-3">
+                    {/* Timeline line + dot */}
+                    <div className="flex flex-col items-center">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        step.done ? 'bg-emerald-500 text-white' : (step as any).active ? 'bg-primary-500 text-white ring-4 ring-primary-100' : 'bg-gray-200 text-gray-400'
+                      }`}>
+                        {step.done ? (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        ) : (step as any).active ? (
+                          <div className="w-2 h-2 bg-white rounded-full" />
+                        ) : (
+                          <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                        )}
+                      </div>
+                      {i < arr.length - 1 && (
+                        <div className={`w-0.5 h-8 ${step.done ? 'bg-emerald-300' : 'bg-gray-200'}`} />
+                      )}
+                    </div>
+                    {/* Label */}
+                    <div className="pb-6">
+                      <p className={`text-sm font-semibold ${step.done ? 'text-emerald-700' : (step as any).active ? 'text-gray-900' : 'text-gray-400'}`}>{step.label}</p>
+                      <p className={`text-xs mt-0.5 ${step.done || (step as any).active ? 'text-gray-500' : 'text-gray-300'}`}>{step.desc}</p>
+                      {step.done && manageCreator.status.sentAt && step.key === 'sent' && (
+                        <p className="text-[10px] text-gray-400 mt-1">
+                          {new Date(manageCreator.status.sentAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setManageCreator(null)
+                  if (manageCreator.creator) openContact(manageCreator.creator)
+                }}
+                className="text-sm font-medium text-primary-600 hover:text-primary-700"
+              >
+                {zh ? '再次联系' : 'Contact Again'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setManageCreator(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition"
+              >
+                {zh ? '关闭' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
