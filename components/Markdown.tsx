@@ -26,8 +26,8 @@ function cleanMarkdown(raw: string): string {
   t = t.replace(/^(\s*)[·•]\s*/gm, '$1- ')
   // HTML entities from translation APIs
   t = t.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-  // Clean stray spaces inside bold markers
-  t = t.replace(/(\*\*)\s+/g, '$1').replace(/\s+(\*\*)/g, '$1')
+  // Clean stray spaces inside bold markers (same line only — preserve newlines)
+  t = t.replace(/(\*\*)[^\S\n]+/g, '$1').replace(/[^\S\n]+(\*\*)/g, '$1')
   // Restore list marker spacing: "-**" → "- **"
   t = t.replace(/^(\s*-)\*\*/gm, '$1 **')
   return t
