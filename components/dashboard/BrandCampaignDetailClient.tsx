@@ -321,7 +321,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       setCreatorCountry(s.creatorCountry || '')
       setMinFollowers(s.minFollowers || '')
       setMaxFollowers(s.maxFollowers || '')
-      setCdbFilters(s.cdbFilters || [])
+      // Don't restore AI-inferred cdbFilters — they shouldn't be shown in the UI
       const all = s.allCreators || s.creators
       setAllCreators(all)
       setCreators(all.slice(0, PAGE_SIZE))
@@ -336,10 +336,10 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     if (!matched || creators.length === 0) return
     try {
       sessionStorage.setItem(searchStateKey, JSON.stringify({
-        query, platform, creatorCountry, minFollowers, maxFollowers, cdbFilters, creators, allCreators, searchTaskId,
+        query, platform, creatorCountry, minFollowers, maxFollowers, creators, allCreators, searchTaskId,
       }))
     } catch {}
-  }, [matched, creators, allCreators, query, platform, creatorCountry, minFollowers, maxFollowers, cdbFilters, searchStateKey])
+  }, [matched, creators, allCreators, query, platform, creatorCountry, minFollowers, maxFollowers, searchStateKey])
 
   const loadQueue = useCallback(async () => {
     const res = await fetch(`/api/campaigns/${campaign.id}/outreach`)
