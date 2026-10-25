@@ -2820,6 +2820,7 @@ export default function DiscoverPanel() {
                     const isCustomMax = maxFollowers === 'custom' || (maxFollowers && !maxPresets.includes(Number(maxFollowers)))
                     return (
                   <div className="flex items-center gap-1.5">
+                    <div className="flex-1 min-w-0">
                     {isCustomMin ? (
                       <input
                         type="number"
@@ -2840,22 +2841,24 @@ export default function DiscoverPanel() {
                             ;(e.target as HTMLInputElement).blur()
                           }
                         }}
-                        className={`w-1/2 ${inputCls}`}
+                        className={`w-full ${inputCls}`}
                       />
                     ) : (
                       <select
                         value={minFollowers}
                         onChange={(e) => { setMinFollowers(e.target.value); setFollowerTier('custom') }}
-                        className={`w-1/2 ${inputCls}`}
+                        className={`w-full ${inputCls}`}
                       >
                         <option value="">Min</option>
+                        <option value="custom">{d.customOption}</option>
                         {minPresets.map((n) => (
                           <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                         ))}
-                        <option value="custom">{d.customOption}</option>
                       </select>
                     )}
-                    <span className="text-gray-400 font-medium text-sm">–</span>
+                    </div>
+                    <span className="text-gray-400 font-medium text-sm flex-shrink-0">–</span>
+                    <div className="flex-1 min-w-0">
                     {isCustomMax ? (
                       <input
                         type="number"
@@ -2876,21 +2879,22 @@ export default function DiscoverPanel() {
                             ;(e.target as HTMLInputElement).blur()
                           }
                         }}
-                        className={`w-1/2 ${inputCls}`}
+                        className={`w-full ${inputCls}`}
                       />
                     ) : (
                       <select
                         value={maxFollowers}
                         onChange={(e) => { setMaxFollowers(e.target.value); setFollowerTier('custom') }}
-                        className={`w-1/2 ${inputCls}`}
+                        className={`w-full ${inputCls}`}
                       >
                         <option value="">Max</option>
+                        <option value="custom">{d.customOption}</option>
                         {maxPresets.map((n) => (
                           <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                         ))}
-                        <option value="custom">{d.customOption}</option>
                       </select>
                     )}
+                    </div>
                   </div>
                     )
                   })()}

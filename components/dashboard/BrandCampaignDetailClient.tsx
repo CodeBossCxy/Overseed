@@ -1064,6 +1064,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               </span>
             </label>
             <div className="flex items-center gap-1.5">
+              <div className="flex-1 min-w-0">
               {minFollowers === 'custom' || (minFollowers && !['' ,'1000','5000','10000','25000','50000','100000','250000','500000','1000000'].includes(minFollowers)) ? (
                 <input
                   type="number"
@@ -1079,22 +1080,24 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                     const v = e.target.value.trim()
                     if (!v || Number(v) <= 0) setMinFollowers('')
                   }}
-                  className={`flex-1 ${inputCls}`}
+                  className={`w-full ${inputCls}`}
                 />
               ) : (
                 <select
                   value={minFollowers}
                   onChange={(e) => { setMinFollowers(e.target.value); setFollowerTierMode('custom') }}
-                  className={`flex-1 ${inputCls}`}
+                  className={`w-full ${inputCls}`}
                 >
                   <option value="">{d.anyOption}</option>
+                  <option value="custom">{d.customOption}</option>
                   {[1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000].map((n) => (
                     <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                   ))}
-                  <option value="custom">{d.customOption}</option>
                 </select>
               )}
-              <span className="text-gray-400 font-medium text-sm">–</span>
+              </div>
+              <span className="text-gray-400 font-medium text-sm flex-shrink-0">–</span>
+              <div className="flex-1 min-w-0">
               {maxFollowers === 'custom' || (maxFollowers && !['','5000','10000','25000','50000','100000','250000','500000','1000000','5000000','10000000'].includes(maxFollowers)) ? (
                 <input
                   type="number"
@@ -1110,21 +1113,22 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                     const v = e.target.value.trim()
                     if (!v || Number(v) <= 0) setMaxFollowers('')
                   }}
-                  className={`flex-1 ${inputCls}`}
+                  className={`w-full ${inputCls}`}
                 />
               ) : (
                 <select
                   value={maxFollowers}
                   onChange={(e) => { setMaxFollowers(e.target.value); setFollowerTierMode('custom') }}
-                  className={`flex-1 ${inputCls}`}
+                  className={`w-full ${inputCls}`}
                 >
                   <option value="">{d.anyOption}</option>
+                  <option value="custom">{d.customOption}</option>
                   {[5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 5000000, 10000000].map((n) => (
                     <option key={n} value={String(n)}>{n.toLocaleString()}</option>
                   ))}
-                  <option value="custom">{d.customOption}</option>
                 </select>
               )}
+              </div>
             </div>
           </div>
           {/* Last active */}
