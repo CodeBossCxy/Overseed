@@ -79,6 +79,19 @@ export default function SavedCreatorsPage() {
   const [bulkSent, setBulkSent] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
 
+  // Contacted creators — for "Manage Collaboration" button state
+  const [contactedKeys, setContactedKeys] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    fetch('/api/discovery/contacted-keys')
+      .then((res) => (res.ok ? res.json() : { keys: {} }))
+      .then((data) => {
+        if (data.keys && typeof data.keys === 'object') {
+          setContactedKeys(new Set(Object.keys(data.keys)))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   // Creator detail modal (same as discover page)
   const {
     detailFor,
@@ -670,31 +683,51 @@ export default function SavedCreatorsPage() {
                       </svg>
                       {s.viewProfile}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleSelectCreator(row._id)}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition ${
-                        selectedCreators.has(row._id)
-                          ? 'bg-primary-50 border border-primary-300 text-primary-700'
-                          : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
-                      }`}
-                    >
-                      {selectedCreators.has(row._id) ? (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                          </svg>
-                          {zh ? '已添加联系' : 'Added'}
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                          </svg>
-                          {zh ? '联系' : 'Contact'}
-                        </>
-                      )}
-                    </button>
+                    {(() => {
+                      const contactKey = row.handle ? `${row.platforms[0] || row.discoveryPlatform || 'instagram'}:${row.handle}` : null
+                      const isContacted = contactKey ? contactedKeys.has(contactKey) : false
+                      if (isContacted) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => openCreatorProfile(row)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {zh ? '管理合作' : 'Manage'}
+                          </button>
+                        )
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => toggleSelectCreator(row._id)}
+                          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition ${
+                            selectedCreators.has(row._id)
+                              ? 'bg-primary-50 border border-primary-300 text-primary-700'
+                              : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                          }`}
+                        >
+                          {selectedCreators.has(row._id) ? (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                              {zh ? '已添加联系' : 'Added'}
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                              </svg>
+                              {zh ? '联系' : 'Contact'}
+                            </>
+                          )}
+                        </button>
+                      )
+                    })()}
                     <button
                       type="button"
                       onClick={() => row._type === 'discovery' ? unsaveDiscovery(row._id, row.discoveryPlatform!, row.discoveryHandle!) : unsave(row._id)}
