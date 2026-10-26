@@ -47,6 +47,24 @@ export default function ProductTour({ role }: ProductTourProps) {
       window.dispatchEvent(new CustomEvent('tour:clearCampaignCreators'))
     }
 
+    // ── Transition helpers ──
+    // Hide the driver overlay/popover during async navigation so stale
+    // highlights don't flash on the old content.
+    const startTransition = () => {
+      document.body.classList.add('tour-transitioning')
+    }
+    const endTransition = () =>
+      new Promise<void>((resolve) => {
+        // Wait two animation frames so the browser has painted the new
+        // content before we reveal the highlight.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            document.body.classList.remove('tour-transitioning')
+            resolve()
+          })
+        })
+      })
+
     // Helper: read the first campaign's URL from the DOM
     const getFirstCampaignHref = (): string | null => {
       const el = document.querySelector('[data-tour="first-campaign"]')
@@ -239,6 +257,10 @@ export default function ProductTour({ role }: ProductTourProps) {
           side: 'right' as const,
           align: 'start' as const,
         },
+        onHighlightStarted: () => {
+          const el = document.querySelector('[data-tour="ai-assistant"]')
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        },
       },
       // Step 19: AI Chat (idx 18)
       {
@@ -308,7 +330,7 @@ export default function ProductTour({ role }: ProductTourProps) {
       }
       const laterMap: Record<number, { path: string; waitFor: string }> = {
         16: { path: '/dashboard/messages', waitFor: '[data-tour="messages-inbox"]' },
-        17: { path: '/dashboard/brand', waitFor: '[data-tour="ai-assistant"]' },
+        17: { path: '/dashboard/messages', waitFor: '[data-tour="ai-assistant"]' },
         18: { path: '/ai-assistant', waitFor: '[data-tour="ai-chat-panel"]' },
         19: { path: '/ai-assistant', waitFor: '[data-tour="ai-image-tab"]' },
       }
@@ -335,6 +357,7 @@ export default function ProductTour({ role }: ProductTourProps) {
         const nextIdx = (opts.state.activeIndex ?? 0) + 1
 
         if (role === 'brand') {
+          startTransition()
           // Step 3 → 4: navigate into the first campaign detail page
           if (nextIdx === 3) {
             // We're on campaigns list, read the first campaign URL
@@ -423,6 +446,7 @@ export default function ProductTour({ role }: ProductTourProps) {
             await waitForElement(target.waitFor)
             await new Promise((r) => setTimeout(r, 300))
           }
+          await endTransition()
         }
 
         d.moveNext()
@@ -431,6 +455,7 @@ export default function ProductTour({ role }: ProductTourProps) {
         const prevIdx = (opts.state.activeIndex ?? 0) - 1
 
         if (role === 'brand') {
+          startTransition()
           // Navigate to the correct page first (if needed)
           const target = getBrandStepPage(prevIdx)
           if (target && window.location.pathname !== target.path) {
@@ -529,11 +554,13 @@ export default function ProductTour({ role }: ProductTourProps) {
               }
             }
           }
+          await endTransition()
         }
 
         d.movePrevious()
       },
       onDestroyStarted: () => {
+        document.body.classList.remove('tour-transitioning')
         hideTourCreators()
         if ((d as any)._tourKeyHandler) {
           window.removeEventListener('keydown', (d as any)._tourKeyHandler)

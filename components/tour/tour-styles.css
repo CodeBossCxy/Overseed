@@ -98,9 +98,29 @@
 /* Overlay */
 .driver-overlay {
   background: rgba(0, 0, 0, 0.35) !important;
+  transition: opacity 200ms ease !important;
 }
 
 /* Highlighted stage */
 .driver-active-element {
   border-radius: 12px !important;
+}
+
+/* ── Transition blanking ──
+   While navigating between pages/tabs, hide the overlay & popover
+   so the user doesn't see a stale highlight flash on the old content. */
+body.tour-transitioning .driver-overlay,
+body.tour-transitioning .driver-popover {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: none !important;
+}
+
+/* Fade-in when the transition class is removed */
+.driver-popover {
+  transition: opacity 180ms ease !important;
+}
+body:not(.tour-transitioning) .driver-popover,
+body:not(.tour-transitioning) .driver-overlay {
+  opacity: 1;
 }
