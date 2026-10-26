@@ -971,6 +971,7 @@ export default function DiscoverPanel() {
   contentMapRef.current = contentMap
   const [unavailable, setUnavailable] = useState(false)
 
+
   // Ref to the current nicheMap — used inside effects to check cache without
   // creating a dependency that would re-trigger the effect.
   const nicheMapRef = useRef(nicheMap)

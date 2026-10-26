@@ -173,9 +173,12 @@ export default function WorkspaceLayout({
 
   // Tour spotlight identifiers for key nav items
   const TOUR_IDS: Record<string, string> = {
+    '/dashboard/brand': 'dashboard-overview',
+    '/dashboard/brand/campaigns': 'campaigns-nav',
     '/dashboard/brand/discover': 'discover',
-    '/ai-assistant': 'ai-assistant',
     '/dashboard/messages': 'messages',
+    '/dashboard/brand/saved-creators': 'saved-creators-nav',
+    '/ai-assistant': 'ai-assistant',
     '/browse': 'browse-campaigns',
     '/dashboard/influencer/applications': 'my-applications',
   }

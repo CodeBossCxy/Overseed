@@ -308,6 +308,170 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [allCreators, setAllCreators] = useState<Creator[]>([]) // all creators across pages
   const [searchTaskId, setSearchTaskId] = useState<string | null>(null) // server task ID for free pagination
 
+  // ── Product Tour: inject cached example creators when tour reaches this step ──
+  const creatorsRef = useRef(creators)
+  creatorsRef.current = creators
+  const matchedRef = useRef(matched)
+  matchedRef.current = matched
+  const tabRef = useRef(tab)
+  tabRef.current = tab
+  const tourPrevStateRef = useRef<{ creators: Creator[]; matched: boolean; tab: 'detail' | 'direct' } | null>(null)
+  useEffect(() => {
+    const TOUR_CREATORS: Creator[] = [
+      {
+        id: 'cdb:instagram:lorraineschwartz',
+        platform: 'instagram',
+        handle: 'lorraineschwartz',
+        display_name: 'Lorraine Schwartz',
+        bio: 'The Queen of Diamonds 💎 Celebrity jeweler to the stars. Iconic red carpet moments.',
+        country: 'US',
+        language: 'en',
+        follower_count: 831000,
+        engagement_rate: '1.8',
+        niche_tags: ['Jewelry', 'Luxury', 'Fashion'],
+        profile_url: 'https://www.instagram.com/lorraineschwartz',
+        avatar_url: null,
+        score: 95,
+      },
+      {
+        id: 'cdb:instagram:theblingbag',
+        platform: 'instagram',
+        handle: 'theblingbag',
+        display_name: 'The Bling Bag',
+        bio: 'Your daily dose of jewelry inspiration ✨ Earrings, necklaces & accessories.',
+        country: 'US',
+        language: 'en',
+        follower_count: 245000,
+        engagement_rate: '3.2',
+        niche_tags: ['Jewelry', 'Earrings', 'Accessories'],
+        profile_url: 'https://www.instagram.com/theblingbag',
+        avatar_url: null,
+        score: 91,
+      },
+      {
+        id: 'cdb:instagram:fashionista_in_style',
+        platform: 'instagram',
+        handle: 'fashionista_in_style',
+        display_name: 'Fashionista In Style',
+        bio: 'Fashion & jewelry content creator 💫 Styling tips and accessory hauls.',
+        country: 'US',
+        language: 'en',
+        follower_count: 189000,
+        engagement_rate: '4.1',
+        niche_tags: ['Fashion', 'Jewelry', 'Style'],
+        profile_url: 'https://www.instagram.com/fashionista_in_style',
+        avatar_url: null,
+        score: 88,
+      },
+    ]
+
+    const handleShowDirectTab = () => {
+      if (!tourPrevStateRef.current) {
+        tourPrevStateRef.current = {
+          creators: creatorsRef.current,
+          matched: matchedRef.current,
+          tab: tabRef.current,
+        }
+      }
+      setTabRaw('direct')
+      setMatched(false)
+      setCreators([])
+    }
+
+    const handleShowTourCreators = () => {
+      if (!tourPrevStateRef.current) {
+        tourPrevStateRef.current = {
+          creators: creatorsRef.current,
+          matched: matchedRef.current,
+          tab: tabRef.current,
+        }
+      }
+      setTabRaw('direct')
+      setCreators(TOUR_CREATORS)
+      setMatched(true)
+      setAiMatching(false)
+    }
+
+    const handleClearTourCreators = () => {
+      if (tourPrevStateRef.current) {
+        setCreators(tourPrevStateRef.current.creators)
+        setMatched(tourPrevStateRef.current.matched)
+        setTabRaw(tourPrevStateRef.current.tab)
+        tourPrevStateRef.current = null
+      }
+    }
+
+    const handleShowDetailTab = () => {
+      setTabRaw('detail')
+    }
+
+    const handleShowMatchingLoading = () => {
+      setAiMatching(true)
+    }
+
+    const handleOpenTourProfile = () => {
+      // Open the first cached tour creator's profile
+      const c = creatorsRef.current[0]
+      if (c) openCreatorDetail(c as any)
+    }
+
+    const handleCloseTourProfile = () => {
+      closeCreatorDetail()
+    }
+
+    const handleSelectFirstCreator = () => {
+      const c = creatorsRef.current[0]
+      if (c) {
+        const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
+        if (handle) {
+          setSelectedForOutreach(new Set([`${c.platform}:${handle}`]))
+        }
+      }
+    }
+
+    const handleDeselectAllCreators = () => {
+      setSelectedForOutreach(new Set())
+    }
+
+    const handleOpenOutreachEditor = () => {
+      setOutreachModalOpen(true)
+      setOutreachMsg('')
+      setOutreachFiles([])
+      setOutreachSent(false)
+      setOutreachError(null)
+    }
+
+    const handleCloseOutreachEditor = () => {
+      setOutreachModalOpen(false)
+    }
+
+    window.addEventListener('tour:openOutreachEditor', handleOpenOutreachEditor)
+    window.addEventListener('tour:closeOutreachEditor', handleCloseOutreachEditor)
+    window.addEventListener('tour:selectFirstCreator', handleSelectFirstCreator)
+    window.addEventListener('tour:deselectAllCreators', handleDeselectAllCreators)
+    window.addEventListener('tour:showDirectTab', handleShowDirectTab)
+    window.addEventListener('tour:showDetailTab', handleShowDetailTab)
+    window.addEventListener('tour:showMatchingLoading', handleShowMatchingLoading)
+    window.addEventListener('tour:showCampaignCreators', handleShowTourCreators)
+    window.addEventListener('tour:clearCampaignCreators', handleClearTourCreators)
+    window.addEventListener('tour:openProfile', handleOpenTourProfile)
+    window.addEventListener('tour:closeProfile', handleCloseTourProfile)
+    return () => {
+      window.removeEventListener('tour:openOutreachEditor', handleOpenOutreachEditor)
+      window.removeEventListener('tour:closeOutreachEditor', handleCloseOutreachEditor)
+      window.removeEventListener('tour:selectFirstCreator', handleSelectFirstCreator)
+      window.removeEventListener('tour:deselectAllCreators', handleDeselectAllCreators)
+      window.removeEventListener('tour:showDirectTab', handleShowDirectTab)
+      window.removeEventListener('tour:showDetailTab', handleShowDetailTab)
+      window.removeEventListener('tour:showMatchingLoading', handleShowMatchingLoading)
+      window.removeEventListener('tour:showCampaignCreators', handleShowTourCreators)
+      window.removeEventListener('tour:clearCampaignCreators', handleClearTourCreators)
+      window.removeEventListener('tour:openProfile', handleOpenTourProfile)
+      window.removeEventListener('tour:closeProfile', handleCloseTourProfile)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Filters + results survive navigating away and back (per campaign, per tab)
   const searchStateKey = `campaign-discover:${initialCampaign.id}:v1`
   useEffect(() => {
@@ -816,9 +980,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const budget = campaign.paymentMin ? `$${formatNumber(Number(campaign.paymentMin), locale)}${campaign.paymentMax ? ` – $${formatNumber(Number(campaign.paymentMax), locale)}` : '+'}` : campaign.giftDescription || m.negotiable
   const cover = campaign.images?.[0]
 
-  const campaignTabs = <div className="flex gap-2 mb-5 p-1.5 w-fit rounded-2xl bg-white/35 border border-white/50">
+  const campaignTabs = <div data-tour="campaign-tabs" className="flex gap-2 mb-5 p-1.5 w-fit rounded-2xl bg-white/35 border border-white/50">
     <button onClick={() => setTab('detail')} className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${tab === 'detail' ? 'bg-white/80 shadow-sm text-[#17255f]' : 'text-[#7180ad]'}`}>{m.tabDetail}</button>
-    <button onClick={() => setTab('direct')} className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${tab === 'direct' ? 'bg-white/80 shadow-sm text-[#17255f]' : 'text-[#7180ad]'}`}>{m.tabDirect}</button>
+    <button data-tour="direct-outreach-tab" onClick={() => setTab('direct')} className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${tab === 'direct' ? 'bg-white/80 shadow-sm text-[#17255f]' : 'text-[#7180ad]'}`}>{m.tabDirect}</button>
   </div>
 
   const fCls = 'workspace-glass-control px-3 py-2 text-sm'
@@ -1296,7 +1460,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           </button>
         </div>
       )}
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_390px] gap-5 items-start">
+      <div data-tour="campaign-detail-content" className="grid xl:grid-cols-[minmax(0,1fr)_390px] gap-5 items-start">
         <div className="min-w-0 space-y-4">
           <header>
             <h1 className="text-4xl font-bold tracking-tight">{campaign.title}</h1>
@@ -1389,7 +1553,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           )}
           {error && <div className="mb-3 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>}
           {!matched && (
-            <section className="workspace-glass-card rounded-3xl px-6 py-12 text-center">
+            <section data-tour="ai-match-section" className="workspace-glass-card rounded-3xl px-6 py-12 text-center">
               <div className="w-14 h-14 mx-auto rounded-2xl bg-white/70 text-indigo-600 flex items-center justify-center text-2xl">✨</div>
               <h3 className="font-bold text-xl mt-4">{m.aiMatchTitle}</h3>
               <p className="text-sm text-[#7180ad] mt-2 max-w-lg mx-auto">{m.aiMatchDesc}</p>
@@ -1422,6 +1586,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 type="button"
                 onClick={aiMatch}
                 disabled={aiMatching}
+                data-tour="ai-match-button"
                 className="mt-6 px-8 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold disabled:opacity-50"
               >
                 ✨ {aiMatching ? m.aiMatchLoading : m.aiMatchButton}
@@ -1439,7 +1604,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           {matched && (<>
           {/* Selection bar for bulk outreach */}
           {selectedForOutreach.size > 0 && (
-            <div className="mb-3 flex items-center justify-between gap-3 p-3 rounded-2xl bg-primary-50/70 border border-primary-200/50">
+            <div data-tour="bulk-outreach-bar" className="mb-3 flex items-center justify-between gap-3 p-3 rounded-2xl bg-primary-50/70 border border-primary-200/50">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex -space-x-2 flex-shrink-0">
                   {getSelectedCreatorObjects().slice(0, 4).map((c, i) => (
@@ -1475,13 +1640,13 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           )}
           <div className="flex items-center justify-between mb-3"><b>{loading ? m.findingCreators : m.creatorsForYou.replace('{count}', String(creators.length))}{searchPage > 0 && ` · ${m.pageNum.replace('{n}', String(searchPage + 1))}`}</b><span className="text-sm text-[#7180ad]">{m.sortBy}<b>{m.relevance}</b></span></div>
           <div className={`space-y-3 transition-opacity ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
-            {creators.map(c => {
+            {creators.map((c, cIdx) => {
               const handle = (c.handle || '').replace(/^@/, '').toLowerCase()
               const creatorKey = handle ? `${c.platform}:${handle}` : null
               return (
               <div key={c.id} className="workspace-glass-card rounded-2xl p-5">
                 {/* Top section: avatar + info + platform link */}
-                <div className="flex gap-4">
+                <div className="flex gap-4" {...(cIdx === 0 ? { 'data-tour': 'campaign-creator-card-info' } : {})}>
                   {/* Avatar with gradient ring */}
                   <div className="flex-shrink-0">
                     <div className="w-[80px] h-[80px] rounded-full p-[3px] bg-gradient-to-br from-yellow-400 via-pink-500 to-purple-600">
@@ -1553,11 +1718,12 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                     <span className="text-lg font-bold text-gray-900">{c.follower_count != null ? new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US').format(c.follower_count) : '—'}</span>
                     <span className="text-sm text-gray-400">{d.followers}</span>
                   </div>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5" {...(cIdx === 0 ? { 'data-tour': 'campaign-creator-card-actions' } : {})}>
                     <button
                       type="button"
                       onClick={() => openCreator(c)}
                       className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-400 to-slate-400 text-white rounded-full text-sm font-semibold hover:from-indigo-500 hover:to-slate-500 transition shadow-sm"
+                      {...(cIdx === 0 ? { 'data-tour': 'campaign-creator-view-profile' } : {})}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
@@ -1568,6 +1734,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                       type="button"
                       disabled={queuedIds.has(c.id)}
                       onClick={() => toggleSelectForOutreach(c)}
+                      {...(cIdx === 0 ? { 'data-tour': 'creator-contact-button' } : {})}
                       className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition disabled:opacity-50 ${
                         isSelectedForOutreach(c)
                           ? 'bg-primary-600 text-white shadow-sm'
@@ -1595,6 +1762,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                           type="button"
                           onClick={() => toggleSaveCreator(c)}
                           disabled={savingKey === k}
+                          {...(cIdx === 0 ? { 'data-tour': 'creator-save-button' } : {})}
                           className={`w-11 h-11 rounded-full flex items-center justify-center transition flex-shrink-0 ${
                             isSaved
                               ? 'bg-amber-50 text-amber-500'
@@ -1690,7 +1858,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
         onClick={() => !outreachSending && setOutreachModalOpen(false)}
       >
-        <div className="rounded-3xl shadow-2xl max-w-lg w-full p-7" style={{ backgroundColor: '#ffffff' }} onClick={(e) => e.stopPropagation()}>
+        <div data-tour="outreach-message-editor" className="rounded-3xl shadow-2xl max-w-lg w-full p-7" style={{ backgroundColor: '#ffffff' }} onClick={(e) => e.stopPropagation()}>
           {outreachSent ? (
             <div className="text-center py-6">
               <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl">✓</div>

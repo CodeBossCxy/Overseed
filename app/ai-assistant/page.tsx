@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useSession } from 'next-auth/react'
 import RoleShell from '@/components/workspace/RoleShell'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -83,6 +84,10 @@ export default function AIAssistantPage() {
   const [modePickerOpen, setModePickerOpen] = useState(false)
   const [showAdvancedModels, setShowAdvancedModels] = useState(false)
   const modePickerRef = useRef<HTMLDivElement>(null)
+  const [shareMenuOpen, setShareMenuOpen] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const shareMenuRef = useRef<HTMLDivElement>(null)
+  const shareButtonRef = useRef<HTMLButtonElement>(null)
   const [folders, setFolders] = useState<{ id: string; name: string; chatIds: string[] }[]>([])
   const [activeFolder, setActiveFolder] = useState<string | null>(null) // null = "All"
   const [addingFolder, setAddingFolder] = useState(false)
@@ -112,6 +117,19 @@ export default function AIAssistantPage() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [modePickerOpen])
+
+  // Close share menu on click outside
+  useEffect(() => {
+    if (!shareMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node) &&
+          shareButtonRef.current && !shareButtonRef.current.contains(e.target as Node)) {
+        setShareMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [shareMenuOpen])
 
   const toggleModePicker = () => {
     if (!modePickerOpen && modeButtonRef.current) {
@@ -569,6 +587,45 @@ export default function AIAssistantPage() {
     }
   }
 
+  const handleExportChatPdf = async () => {
+    if (!chatId || messages.length === 0) return
+    setExportingPdf(true)
+    setShareMenuOpen(false)
+    try {
+      // Build markdown from chat messages
+      const chatTitle = chatList.find(c => c.id === chatId)?.title || 'Overseed AI Chat'
+      const chatMarkdown = messages.map(m => {
+        const role = m.role === 'user' ? '**You**' : '**Overseed AI**'
+        const time = m.timestamp.toLocaleString()
+        return `${role}  \n*${time}*\n\n${m.content}`
+      }).join('\n\n---\n\n')
+
+      const res = await fetch('/api/ai-chat/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: chatMarkdown,
+          title: chatTitle,
+          format: 'pdf',
+          theme: themeMode,
+          isChat: true,
+        }),
+      })
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${chatTitle}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert(t.aiAssistant.exportPdfError)
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
   const formatLabels: Record<string, { label: string; ext: string; icon: string }> = {
     docx: { label: t.aiAssistant.formatWord, ext: '.docx', icon: 'W' },
     xlsx: { label: t.aiAssistant.formatExcel, ext: '.xlsx', icon: 'X' },
@@ -707,6 +764,69 @@ export default function AIAssistantPage() {
     return groups.filter(g => g.chats.length > 0)
   }
 
+  const shareButtonEl = (chatId && messages.length > 0) ? (
+    <>
+      <button
+        ref={shareButtonRef}
+        onClick={() => setShareMenuOpen(!shareMenuOpen)}
+        disabled={exportingPdf}
+        className="p-2 rounded-xl text-gray-500 hover:bg-white/60 hover:text-gray-700 transition disabled:opacity-50"
+        title={t.aiAssistant.shareChat}
+      >
+        {exportingPdf ? (
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+        )}
+      </button>
+      {shareMenuOpen && createPortal(
+        <div
+          ref={shareMenuRef}
+          className="fixed w-56 rounded-xl shadow-xl border border-gray-200 overflow-hidden z-[9999] py-1"
+          style={{
+            backgroundColor: '#ffffff',
+            left: Math.min(shareButtonRef.current?.getBoundingClientRect().left ?? 0, window.innerWidth - 240),
+            top: (shareButtonRef.current?.getBoundingClientRect().bottom ?? 0) + 6,
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleExportChatPdf}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition text-left"
+          >
+            <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <div>
+              <p className="font-medium">{t.aiAssistant.exportPdf}</p>
+              <p className="text-[11px] text-gray-400">PDF with Overseed watermark</p>
+            </div>
+          </button>
+          <div className="border-t border-gray-100" />
+          <button
+            type="button"
+            disabled
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-400 cursor-not-allowed text-left"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <div>
+              <p className="font-medium">{t.aiAssistant.shareWithUser}</p>
+              <p className="text-[11px] text-gray-400">{t.aiAssistant.shareComingSoon}</p>
+            </div>
+          </button>
+        </div>,
+        document.body
+      )}
+    </>
+  ) : null
+
   const suggestionCards = [
     {
       title: t.aiAssistant.card1Title,
@@ -760,7 +880,7 @@ export default function AIAssistantPage() {
         <div className="ai-workspace rounded-3xl overflow-hidden">
 
         {/* Image Generation tab */}
-        {activeTab === 'image' && <ImageGenerationPanel isProUser={isProUser} activeTab={activeTab} onTabChange={setActiveTab} />}
+        {activeTab === 'image' && <ImageGenerationPanel isProUser={isProUser} activeTab={activeTab} onTabChange={setActiveTab} shareButton={shareButtonEl} />}
 
         {/* Conversation sidebar */}
         {activeTab === 'chat' && isProUser && sidebarOpen && (
@@ -991,10 +1111,10 @@ export default function AIAssistantPage() {
         )}
 
         {/* Main chat area (kept mounted so chat state survives tab switches) */}
-        <div className={`chat-panel ${activeTab === 'chat' ? 'flex' : 'hidden'} min-w-0 relative workspace-glass-card`}>
+        <div data-tour="ai-chat-panel" className={`chat-panel ${activeTab === 'chat' ? 'flex' : 'hidden'} min-w-0 relative workspace-glass-card`}>
           {/* Top bar */}
           <div className="h-14 flex items-center justify-between px-4 border-b border-white/55 bg-white/35 backdrop-blur flex-shrink-0">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {isProUser && !sidebarOpen && (
                 <button
                   onClick={() => setSidebarOpen(true)}
@@ -1007,6 +1127,7 @@ export default function AIAssistantPage() {
                   </svg>
                 </button>
               )}
+              {shareButtonEl}
             </div>
 
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60">
@@ -1024,6 +1145,7 @@ export default function AIAssistantPage() {
                 {t.aiAssistant.tabChat}
               </button>
               <button
+                data-tour="ai-image-tab"
                 onClick={() => setActiveTab('image')}
                 className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm transition ${
                   activeTab === 'image'
@@ -1365,11 +1487,11 @@ export default function AIAssistantPage() {
                             </svg>
                           </button>
 
-                          {modePickerOpen && modePickerPos && (
+                          {modePickerOpen && modePickerPos && createPortal(
                             <div
                               ref={modePickerRef}
-                              className="fixed w-72 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-[9999]"
-                              style={{ left: modePickerPos.left, bottom: modePickerPos.bottom }}
+                              className="fixed w-72 rounded-2xl shadow-xl border border-gray-200 overflow-hidden z-[9999]"
+                              style={{ left: modePickerPos.left, bottom: modePickerPos.bottom, backgroundColor: '#ffffff' }}
                             >
                               <div className="px-4 pt-4 pb-2">
                                 <p className="text-xs font-semibold text-gray-900">{t.aiAssistant.chooseAiMode}</p>
@@ -1444,7 +1566,8 @@ export default function AIAssistantPage() {
                                   </div>
                                 )}
                               </div>
-                            </div>
+                            </div>,
+                            document.body
                           )}
                         </>
                       )}

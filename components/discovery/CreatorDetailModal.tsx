@@ -611,6 +611,7 @@ export default function CreatorDetailModal({
         onClick={closeDetail}
       >
         <div
+          data-tour="creator-profile-modal"
           className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >

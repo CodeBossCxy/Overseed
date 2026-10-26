@@ -1,0 +1,90 @@
+OVERSEED PLATFORM — COMPLETE FEATURE INVENTORY
+================================================
+
+PUBLIC PAGES
+------------
+- Homepage, Creator landing, Brand landing (marketing pages)
+- Browse campaigns (public campaign discovery, gated by tier)
+- Campaign detail & apply (view and apply to individual campaigns)
+- Pricing, FAQ, Terms, Privacy, Guidelines, Contact (info pages)
+- Public profiles (influencer and brand profile pages)
+
+AUTHENTICATION & ACCOUNT
+-------------------------
+- Sign up / Sign in (with OTP verification)
+- Forgot & reset password
+- Beta code validation & invite tracking
+- User settings (language, theme preferences)
+
+BRAND WORKSPACE
+---------------
+- Dashboard: stats overview (campaigns, applications, collaborations)
+- Campaign management: create, edit, pause, complete campaigns; review applications; set compensation types, follower requirements, content guidelines
+- Creator discovery: advanced search/filter via CreatorDB & Influencers Club integrations; unlock paid creator info; save creators to folders
+- Outreach: mass outreach campaigns with auto-recipient selection, match scoring, delivery tracking, status pipeline
+- Messaging: real-time inbox with creators (Pusher), file attachments, message translation
+- Collaborations: full lifecycle (confirmation > active > submitted > completed); deliverables tracking, revision rounds, proof submission
+- Brand verification: submit legal docs for Overseed review
+- Subscription management: upgrade plans, buy credit packs via Stripe
+
+CREATOR WORKSPACE
+-----------------
+- Dashboard: stats overview
+- Browse & apply to campaigns; track applications
+- Save campaigns (bookmark for later)
+- Social accounts: link/verify Instagram, TikTok, YouTube, Twitter etc. (via URL or screenshot analysis)
+- Profile editing: bio, niches, languages, location
+- Collaborations: track collab status, submit deliverables
+- Payouts: payment history, Stripe Connect setup
+- Messaging: real-time inbox with brands
+
+AI FEATURES
+-----------
+- AI Assistant: multi-model chat (GPT, Claude, DeepSeek, Kimi) with 6 modes (Auto, Quick, Creative, Reasoning, Documents, All-Purpose)
+- Chat history with folder organization
+- Document export (DOCX, XLSX, PDF)
+- Web search integration
+- File/image attachments, message feedback, edit & resend
+- AI Image Generation: prompt-based with size/quality controls, generation history
+
+CREDITS & PAYMENTS
+------------------
+- Unified credit wallet (lot-based with expiry)
+- Append-only credit ledger
+- Stripe checkout, subscriptions, credit pack purchases
+- Payment holds & releases to creators
+- Platform fee tracking
+
+ADMIN PANEL
+-----------
+- System stats (users, campaigns, applications)
+- User management
+- Beta code & invite management
+- Beta feedback review
+- AI usage analytics
+- CreatorDB & Club credit logs
+- Campaign moderation / review
+- Brand verification review
+- Credits administration
+
+CROSS-CUTTING FEATURES
+-----------------------
+- Multilingual: English & Simplified Chinese with per-user preference, auto-translation of UGC, translation caching
+- Real-time messaging via Pusher
+- File storage via S3 (images, attachments, presigned URLs)
+- Analytics: page view tracking, quota usage monitoring
+- Notifications system
+- Onboarding: starter tasks for new users
+
+SUBSCRIPTION TIERS
+------------------
+- Free: Limited dashboard & campaign browsing
+- Campaign Plus: Campaign creation, limited discovery, basic messaging
+- Outreach Plus: Mass outreach, advanced discovery filters
+- Pro: Full AI assistant, image gen, unlimited campaigns, advanced outreach
+
+SUMMARY
+-------
+- ~95+ API endpoints
+- 30+ page routes
+- 4 major user roles: Creator, Brand, Agency, Admin

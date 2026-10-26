@@ -204,7 +204,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
             : 'bg-gray-300'
 
   return (
-    <div className="max-w-7xl mx-auto workspace-page-tight pb-8">
+    <div data-tour="campaigns-page" className="max-w-7xl mx-auto workspace-page-tight pb-8">
       {/* Header */}
       <div className="mb-5">
         <div>
@@ -303,8 +303,8 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
       ) : paged.length === 0 ? (
         <div className="workspace-glass-card rounded-2xl p-10 text-center text-gray-500">{c.noMatches}</div>
       ) : (
-        <div className="space-y-3">
-          {paged.map((cp) => {
+        <div data-tour="campaign-list" className="space-y-3">
+          {paged.map((cp, cpIdx) => {
             const dl = deadlineInfo(cp)
             const caption = statusCaption(cp)
             const isDraft = cp.status === 'DRAFT'
@@ -316,6 +316,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
                 className={`group workspace-glass-card workspace-glass-option rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8 min-h-[108px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
                   isDraft ? 'border-2 border-dashed border-gray-300 bg-gray-50/50 saturate-[.85]' : ''
                 }`}
+                {...(cpIdx === 0 ? { 'data-tour': 'first-campaign', 'data-tour-href': cp.brandId === brandId ? `/dashboard/brand/campaigns/${cp.id}` : `/campaign/${cp.id}` } : {})}
               >
                 {/* Thumb + title */}
                 <div className="flex items-center gap-5 flex-1 min-w-0 lg:max-w-[440px]">

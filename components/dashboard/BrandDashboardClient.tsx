@@ -242,7 +242,7 @@ export default function BrandDashboardClient({
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div data-tour="dashboard-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {statCards.map((card) => (
           <Link key={card.label} href={card.href} className="workspace-glass-card rounded-2xl p-5 flex gap-4 hover:bg-white/45 transition">
             <div className="w-11 h-11 rounded-full bg-gray-50 shadow-sm flex items-center justify-center flex-shrink-0 text-gray-600">

@@ -497,6 +497,7 @@ export default function MessagesPage() {
         <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
           {/* Conversation List (left panel) */}
           <div
+            data-tour="messages-inbox"
             className={`w-full md:w-[360px] xl:w-[430px] flex-shrink-0 workspace-glass-card rounded-3xl overflow-hidden flex flex-col ${
               showMobileThread ? 'hidden md:flex' : 'flex'
             }`}

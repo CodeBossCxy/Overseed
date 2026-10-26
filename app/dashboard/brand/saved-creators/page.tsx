@@ -425,7 +425,7 @@ export default function SavedCreatorsPage() {
 
   return (
     <BrandWorkspaceLayout>
-      <div className="max-w-6xl mx-auto workspace-page-tight pb-8">
+      <div data-tour="saved-creators-page" className="max-w-6xl mx-auto workspace-page-tight pb-8">
         {/* Header */}
         <div className="mb-6 flex items-start justify-between gap-3">
           <div>
@@ -439,7 +439,7 @@ export default function SavedCreatorsPage() {
         </div>
 
         {/* Folders */}
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div data-tour="saved-creators-folders" className="mb-4 flex flex-wrap items-center gap-2">
           <button
             onClick={() => { setActiveFolder(''); setPage(1) }}
             className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${

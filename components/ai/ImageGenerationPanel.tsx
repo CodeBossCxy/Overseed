@@ -285,7 +285,7 @@ function ImageGallery({
   )
 }
 
-export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange }: { isProUser: boolean; activeTab?: 'chat' | 'image'; onTabChange?: (tab: 'chat' | 'image') => void }) {
+export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange, shareButton }: { isProUser: boolean; activeTab?: 'chat' | 'image'; onTabChange?: (tab: 'chat' | 'image') => void; shareButton?: React.ReactNode }) {
   const { t, locale } = useLanguage()
   const ai = t.aiAssistant
   const studio = ai.imageStudio
@@ -734,6 +734,7 @@ export default function ImageGenerationPanel({ isProUser, activeTab, onTabChange
           )}
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-100/60 text-primary-600"><Sparkles className="w-4 h-4" /></span>
           <div className="flex-1 min-w-0"><h2 className="text-sm font-semibold text-gray-900">{studio.results}</h2><p className="mt-0.5 text-xs text-gray-500">{studio.resultsSubtitle}</p></div>
+          {shareButton}
           {images.length > 0 && <span className="rounded-full border border-white/70 bg-white/50 px-2.5 py-1 text-xs text-gray-500">{images.length}</span>}
           {onTabChange && (
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/40 border border-white/60 ml-2">
