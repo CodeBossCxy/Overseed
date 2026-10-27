@@ -856,7 +856,7 @@ export async function GET(req: NextRequest) {
     if (displayResults.length > 0) {
       // Debug: log bio availability
       const bioCheck = displayResults.map((r: any) => ({ handle: r.handle, hasBio: !!r.bio?.trim(), bioLen: r.bio?.length ?? 0 }))
-      console.log(`[club-search] Bio availability: ${bioCheck.filter(b => b.hasBio).length}/${bioCheck.length} have bios`, bioCheck)
+      console.log(`[club-search] Bio availability: ${bioCheck.filter((b: any) => b.hasBio).length}/${bioCheck.length} have bios`, bioCheck)
       const biosToScore = displayResults
         .filter((r: any) => r.handle && r.bio?.trim())
         .map((r: any) => ({ handle: r.handle, bio: r.bio }))
