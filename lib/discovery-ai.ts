@@ -10,6 +10,8 @@ import type { CreatorDbCanonicalField, CreatorDbFilterOp } from '@/lib/creatordb
 export interface ParsedDiscoveryQuery {
   keywords: string | null
   niches: string | null
+  related_niches: string | null
+  content_styles: string[] | null
   platform: 'youtube' | 'instagram' | 'tiktok' | null
   country: string | null
   min_followers: number | null
@@ -55,6 +57,10 @@ export function sanitizeParsedQuery(raw: any): ParsedDiscoveryQuery {
   return {
     keywords: str(raw?.keywords).slice(0, 150) || null,
     niches: str(raw?.niches).slice(0, 200) || null,
+    related_niches: str(raw?.related_niches).slice(0, 200) || null,
+    content_styles: Array.isArray(raw?.content_styles)
+      ? raw.content_styles.map((s: unknown) => str(s).toLowerCase()).filter(Boolean).slice(0, 5)
+      : null,
     platform: PLATFORMS.has(platform) ? (platform as ParsedDiscoveryQuery['platform']) : null,
     country: /^[A-Z]{2}$/.test(country) ? country : null,
     min_followers: minFollowers,
@@ -87,6 +93,8 @@ Reply with ONLY a JSON object, no prose, using exactly these keys (use null when
 {
   "keywords": "short English hashtag/topic terms for creator search, comma-separated, 1-4 words each. E.g. 'skincare, beauty tips'. Choose terms creators in this space actually use.",
   "niches": "The most SPECIFIC niche/category for the product, comma-separated, 1-2 terms max. Use the product category, NOT broad parent categories. E.g. for earrings → 'Jewelry, Earring' (NOT 'Fashion'). For a face mask → 'Skincare' (NOT 'Beauty'). For a gaming headset → 'Gaming'. For running shoes → 'Running'. Be specific — broad niches like Fashion, Lifestyle, Beauty return too many irrelevant results.",
+  "related_niches": "Secondary niches for fallback if primary niches return too few results, comma-separated. E.g. for 'Jewelry, Earring' → 'Fashion Accessories, Handmade'. For 'Automotive' → 'Cars, Vehicles, Motor'. Keep 2-3 terms." | null,
+  "content_styles": ["preferred content types inferred from context, e.g. 'review', 'tutorial', 'unboxing', 'lifestyle', 'demonstration'"] | null,
   "platform": "youtube" | "instagram" | "tiktok" | null,
   "country": "ISO 3166-1 alpha-2 code of the CREATOR's country, e.g. US" | null,
   "audience_location": "ISO 3166-1 alpha-2 of the target AUDIENCE's country" | null,
@@ -175,6 +183,10 @@ export interface CreatorDbFilterFromAI {
   field: CreatorDbCanonicalField
   op: CreatorDbFilterOp
   value: string | number | boolean | string[]
+  /** Where this filter originated */
+  source?: 'campaign' | 'user' | 'ai' | 'system'
+  /** Whether this filter can be relaxed during retry */
+  constraint?: 'hard' | 'soft'
 }
 
 export function toCreatorDbFilters(
@@ -183,40 +195,40 @@ export function toCreatorDbFilters(
   const filters: CreatorDbFilterFromAI[] = []
   const platform = parsed.platform || 'instagram'
 
-  // ── Tier 1: Core identity (always keep) ──
+  // ── Tier 1: Core identity (AI-inferred, soft — can be broadened to related niches) ──
   if (parsed.niches) {
-    filters.push({ field: 'niches', op: 'in', value: parsed.niches })
+    filters.push({ field: 'niches', op: 'in', value: parsed.niches, source: 'ai', constraint: 'soft' })
   }
   if (parsed.country) {
-    filters.push({ field: 'country', op: '=', value: parsed.country })
+    filters.push({ field: 'country', op: '=', value: parsed.country, source: 'ai', constraint: 'soft' })
   }
 
-  // ── Tier 2: Sizing (important but droppable in retry) ──
+  // ── Tier 2: Sizing (AI-inferred, soft) ──
   if (parsed.min_followers != null) {
-    filters.push({ field: 'followers', op: '>', value: parsed.min_followers })
+    filters.push({ field: 'followers', op: '>', value: parsed.min_followers, source: 'ai', constraint: 'soft' })
   }
   if (parsed.max_followers != null) {
-    filters.push({ field: 'followers', op: '<', value: parsed.max_followers })
+    filters.push({ field: 'followers', op: '<', value: parsed.max_followers, source: 'ai', constraint: 'soft' })
   }
 
-  // ── Tier 3: Quality & targeting (most likely to over-constrain) ──
+  // ── Tier 3: Quality & targeting (AI-inferred, soft) ──
   if (parsed.min_engagement != null) {
-    filters.push({ field: 'shortEngagementRate', op: '>', value: parsed.min_engagement })
+    filters.push({ field: 'shortEngagementRate', op: '>', value: parsed.min_engagement, source: 'ai', constraint: 'soft' })
   }
   if (parsed.language) {
-    filters.push({ field: 'mainLanguage', op: '=', value: parsed.language })
+    filters.push({ field: 'mainLanguage', op: '=', value: parsed.language, source: 'ai', constraint: 'soft' })
   }
   if (parsed.audience_location) {
-    filters.push({ field: 'audienceLocation', op: '=', value: parsed.audience_location })
+    filters.push({ field: 'audienceLocation', op: '=', value: parsed.audience_location, source: 'ai', constraint: 'soft' })
   }
   if (parsed.last_post != null) {
-    filters.push({ field: 'lastPublishTime', op: '>', value: parsed.last_post })
+    filters.push({ field: 'lastPublishTime', op: '>', value: parsed.last_post, source: 'ai', constraint: 'soft' })
   }
   if (parsed.audience_age) {
-    filters.push({ field: 'audienceAge', op: 'in', value: [parsed.audience_age] })
+    filters.push({ field: 'audienceAge', op: 'in', value: [parsed.audience_age], source: 'ai', constraint: 'soft' })
   }
   if (parsed.min_avg_views != null) {
-    filters.push({ field: 'shortAvgViews', op: '>', value: parsed.min_avg_views })
+    filters.push({ field: 'shortAvgViews', op: '>', value: parsed.min_avg_views, source: 'ai', constraint: 'soft' })
   }
 
   // NOTE: We intentionally do NOT add `keywords` as a hashtags filter here.
@@ -228,14 +240,20 @@ export function toCreatorDbFilters(
   return { filters: filters.slice(0, 10), platform }
 }
 
+export interface BroadenResult {
+  filters: CreatorDbFilterFromAI[]
+  dropped: { field: CreatorDbCanonicalField; reason: string }[]
+}
+
 /**
  * Progressively broaden filters for retry when a search returns 0 results.
- * Each round drops the most restrictive filter category. Returns null when
- * no more filters can be dropped (only niches or country remain).
+ * Only drops filters with constraint='soft'. Hard constraints (explicit user
+ * or campaign filters) are never relaxed. Returns null when no more soft
+ * filters can be dropped.
  */
 export function broadenFilters(
   filters: CreatorDbFilterFromAI[],
-): CreatorDbFilterFromAI[] | null {
+): BroadenResult | null {
   // Drop in order of restrictiveness (most restrictive first)
   const DROP_ORDER: CreatorDbCanonicalField[] = [
     'hashtags',            // exact-match — almost always too narrow
@@ -249,13 +267,17 @@ export function broadenFilters(
   ]
 
   for (const field of DROP_ORDER) {
-    const has = filters.some((f) => f.field === field)
-    if (has) {
-      return filters.filter((f) => f.field !== field)
+    // Only drop soft constraints — hard ones are never relaxed
+    const droppable = filters.some((f) => f.field === field && f.constraint !== 'hard')
+    if (droppable) {
+      return {
+        filters: filters.filter((f) => !(f.field === field && f.constraint !== 'hard')),
+        dropped: [{ field, reason: 'Relaxed to broaden search results' }],
+      }
     }
   }
 
-  // Only core filters remain (niches, country) — can't broaden further
+  // Only hard constraints and core filters remain — can't broaden further
   return null
 }
 

@@ -15,6 +15,7 @@ import {
 import {
   CREATORDB_LANGUAGE_OPTIONS,
 } from '@/lib/creatordb-filter-fields'
+import { buildMatchProfile, matchFiltersToApiFilters } from '@/lib/campaign-match-profile'
 import Markdown from '@/components/Markdown'
 import CreatorAvatar from '@/components/ui/CreatorAvatar'
 import CreatorDetailModal, { useCreatorDetail } from '@/components/discovery/CreatorDetailModal'
@@ -33,12 +34,19 @@ type QueueItem = {
 }
 type Campaign = {
   id: string; title: string; status: string; deadline: string | null
-  compensationType: string; paymentMin: number | string | null; paymentMax: number | string | null
+  compensationType: string; compensationTypes?: string[]; paymentMin: number | string | null; paymentMax: number | string | null
   giftDescription: string | null; giftValue?: number | string | null; images: string[]; description: string | null
   contentGuidelines?: string | null; contentType?: string | null; createdAt: string
   campaignStartDate?: string | null; campaignEndDate?: string | null
   totalSlots: number; filledSlots: number; viewCount: number
   hashtagsRequired?: string | null; mentionsRequired?: string | null
+  // New campaign matching fields
+  campaignObjective?: string | null
+  targetCountries?: string[]; targetLanguages?: string[]
+  targetAudienceAge?: string[]; targetAudienceGender?: string | null
+  productUrl?: string | null; brandPositioning?: string | null
+  contentStyles?: string[]; creatorTierPreference?: string | null; creatorTypePreference?: string | null
+  budgetPerCreator?: number | string | null; totalBudget?: number | string | null
   categories: { categoryId: string; category: { name: string } }[]
   platforms: { platformId: string; platform: { name: string } }[]
   followerRequirements?: { id: string; minFollowers: number; maxFollowers: number | null; minEngagementRate?: string | number | null; platform: { name: string } }[]
@@ -238,7 +246,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   }
 
   // Keep these simple states for creator country + followers (injected into cdb_filters on search)
-  const [creatorCountry, setCreatorCountry] = useState('')
+  // Default creator country from campaign's target countries
+  const [creatorCountry, setCreatorCountry] = useState(() => {
+    const countries = (initialCampaign as any).targetCountries as string[] | undefined
+    return countries?.[0] || ''
+  })
   const [minFollowers, setMinFollowers] = useState(() => {
     const min = initialCampaign.followerRequirements?.[0]?.minFollowers
     return min ? String(min) : ''
@@ -609,58 +621,60 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     if (aiMatching) return
     setAiMatching(true); setError('')
     try {
-      // Determine platform from campaign
-      const campPlatform = (campaign.platforms[0]?.platform.name || '').toLowerCase()
-      const activePlatform = ['tiktok', 'instagram', 'youtube'].includes(campPlatform) ? campPlatform : platform
-      if (['tiktok', 'instagram', 'youtube'].includes(campPlatform)) {
-        setPlatform(campPlatform)
-      }
+      // Build a structured matching profile from campaign data. This generates
+      // typed filters with source/constraint metadata and a natural-language
+      // brief for AI niche extraction + bio scoring.
+      const profile = buildMatchProfile(campaign)
 
-      // Build a natural-language brief from the campaign — the backend's AI
-      // will parse this into structured CreatorDB filters, handle smart retry
-      // on zero results, and use the full text for bio relevance scoring.
-      const briefParts = [
-        campaign.title,
-        `Categories: ${campaign.categories.map(c => c.category.name).join(', ')}`,
-        `Platform: ${activePlatform}`,
-        campaign.description ? `Description: ${campaign.description.slice(0, 500)}` : '',
-        campaign.contentGuidelines ? `Content guidelines: ${campaign.contentGuidelines.slice(0, 200)}` : '',
-        campaign.contentType ? `Content type: ${campaign.contentType}` : '',
-        query.trim() ? `Additional keywords: ${query.trim()}` : '',
-      ].filter(Boolean).join('\n')
-
-      // Build user-set filters (followers, country) as cdb_filters so the
-      // backend preserves them during AI merge
-      const userFilters: { field: string; op: string; value: string | number | boolean | string[] }[] = []
+      // Apply user overrides from the filter UI (take precedence over campaign)
+      const apiFilters = matchFiltersToApiFilters(profile.filters)
+      // Override follower range if user changed it in the UI
       if (minFollowers) {
-        userFilters.push({ field: 'followers', op: '>', value: Number(minFollowers) })
+        const idx = apiFilters.findIndex(f => f.field === 'followers' && f.op === '>')
+        if (idx >= 0) apiFilters[idx].value = Number(minFollowers)
+        else apiFilters.push({ field: 'followers', op: '>', value: Number(minFollowers) })
       }
       if (maxFollowers) {
-        userFilters.push({ field: 'followers', op: '<', value: Number(maxFollowers) })
+        const idx = apiFilters.findIndex(f => f.field === 'followers' && f.op === '<')
+        if (idx >= 0) apiFilters[idx].value = Number(maxFollowers)
+        else apiFilters.push({ field: 'followers', op: '<', value: Number(maxFollowers) })
       }
+      // Override country if user changed it
       if (creatorCountry.trim()) {
-        userFilters.push({ field: 'country', op: '=', value: creatorCountry.trim().toUpperCase() })
+        const idx = apiFilters.findIndex(f => f.field === 'country')
+        if (idx >= 0) apiFilters[idx].value = creatorCountry.trim().toUpperCase()
+        else apiFilters.push({ field: 'country', op: '=', value: creatorCountry.trim().toUpperCase() })
+      }
+
+      // Append user keywords to the brief
+      const briefText = query.trim()
+        ? `${profile.briefText}\nAdditional keywords: ${query.trim()}`
+        : profile.briefText
+
+      if (['tiktok', 'instagram', 'youtube'].includes(profile.platform)) {
+        setPlatform(profile.platform)
       }
 
       const qs = new URLSearchParams({
-        platform: activePlatform,
+        platform: profile.platform,
         limit: String(BATCH_SIZE),
         offset: '0',
         cdb_sort: 'followers',
-        q: briefParts,
+        q: briefText,
       })
-      if (userFilters.length > 0) {
-        qs.set('cdb_filters', JSON.stringify(userFilters))
+      if (apiFilters.length > 0) {
+        qs.set('cdb_filters', JSON.stringify(apiFilters))
       }
       if (minFollowers) qs.set('min_followers', minFollowers)
       if (maxFollowers) qs.set('max_followers', maxFollowers)
       if (creatorCountry.trim()) qs.set('country', creatorCountry.trim().toUpperCase())
 
       // ── LOG ──
-      console.group('[DirectOutreach] AI Match')
-      console.log('Brief:', briefParts)
-      console.log('User filters:', userFilters)
-      console.log('Platform:', activePlatform)
+      console.group('[DirectOutreach] AI Match via MatchProfile')
+      console.log('Brief:', briefText.slice(0, 200))
+      console.log('Filters:', apiFilters)
+      console.log('Platform:', profile.platform)
+      console.log('Metadata:', profile.metadata)
       console.groupEnd()
 
       const res = await fetch(`/api/discovery/club-search?${qs}`)
@@ -684,6 +698,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         })))
       }
       if (data?.ai_parsed) console.log('AI parsed params:', data.ai_parsed)
+      if (data?.search_adjustments) console.log('Search adjustments:', data.search_adjustments)
       console.groupEnd()
 
       if (!res.ok) throw new Error(data?.message || 'Creator matching is temporarily unavailable.')
@@ -1501,6 +1516,34 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               <div className="w-14 h-14 mx-auto rounded-2xl bg-white/70 text-indigo-600 flex items-center justify-center text-2xl">✨</div>
               <h3 className="font-bold text-xl mt-4">{m.aiMatchTitle}</h3>
               <p className="text-sm text-[#7180ad] mt-2 max-w-lg mx-auto">{m.aiMatchDesc}</p>
+              {/* AI Match Profile Preview */}
+              {(() => {
+                const cats = campaign.categories.map(c => c.category.name)
+                const platLabel = PLATFORM_LABEL[platform] || platform
+                const countries = campaign.targetCountries?.length ? campaign.targetCountries.join(', ') : null
+                const languages = campaign.targetLanguages?.length ? campaign.targetLanguages.join(', ') : null
+                const objective = campaign.campaignObjective?.replace(/_/g, ' ') || null
+                const styles = campaign.contentStyles?.length ? campaign.contentStyles.map(s => s.replace(/_/g, ' ')).join(', ') : null
+                const hasPreview = cats.length > 0 || countries || objective
+                if (!hasPreview) return null
+                return (
+                  <div className="mt-5 mx-auto max-w-lg text-left bg-white/50 rounded-2xl border border-white/60 p-4">
+                    <p className="text-xs font-semibold text-gray-600 mb-2.5 flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" /></svg>
+                      {zh ? 'AI 将根据您的活动自动搜索' : 'AI will search based on your campaign'}
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full font-medium">{platLabel}</span>
+                      {cats.map(c => <span key={c} className="px-2.5 py-1 bg-violet-50 text-violet-700 rounded-full">{c}</span>)}
+                      {countries && <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full">📍 {countries}</span>}
+                      {languages && <span className="px-2.5 py-1 bg-sky-50 text-sky-700 rounded-full">🗣 {languages}</span>}
+                      {objective && <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full">🎯 {objective.toLowerCase()}</span>}
+                      {styles && <span className="px-2.5 py-1 bg-pink-50 text-pink-700 rounded-full">🎬 {styles.toLowerCase()}</span>}
+                      {minFollowers && <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full">👥 {minFollowers}{maxFollowers ? `–${maxFollowers}` : '+'}</span>}
+                    </div>
+                  </div>
+                )
+              })()}
               <div className="mt-5 mx-auto max-w-lg grid sm:grid-cols-3 gap-2 text-xs text-[#5f6c95]">
                 {[m.aiMatchStep1, m.aiMatchStep2, m.aiMatchStep3].map((s, i) => (
                   <div key={s} className="bg-white/40 rounded-xl px-3 py-2.5">
@@ -1645,6 +1688,21 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                     {(() => {
                       const bio = c.bio || (creatorKey ? bioMap[creatorKey] : null)
                       return bio ? <p className="mt-2 text-xs text-gray-500 line-clamp-2 leading-relaxed">{bio}</p> : null
+                    })()}
+                    {/* Match score */}
+                    {(() => {
+                      const bd = (c as any).match_breakdown
+                      if (!bd?.total) return null
+                      const tierColors = { excellent: 'text-emerald-600 bg-emerald-50 border-emerald-200', strong: 'text-blue-600 bg-blue-50 border-blue-200', potential: 'text-amber-600 bg-amber-50 border-amber-200', low: 'text-gray-500 bg-gray-50 border-gray-200' }
+                      const tierLabels = { excellent: zh ? '优秀匹配' : 'Excellent', strong: zh ? '强匹配' : 'Strong', potential: zh ? '潜力匹配' : 'Potential', low: zh ? '低匹配' : 'Low' }
+                      const tier = bd.tier as keyof typeof tierColors
+                      return (
+                        <div className="mt-2">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full border ${tierColors[tier] || tierColors.low}`}>
+                            {bd.total}/100 — {tierLabels[tier] || tier}
+                          </span>
+                        </div>
+                      )
                     })()}
                     {/* Niche tags (fetched separately like discovery) */}
                     <div className="flex flex-wrap gap-1.5 mt-2">

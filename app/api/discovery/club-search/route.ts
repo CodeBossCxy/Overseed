@@ -9,7 +9,7 @@ import { discoverySearch, discoverySearchCacheProbe, getProvider, providerName }
 import { CREATORDB_FIELD_MAP, CREATORDB_PLATFORMS, type CreatorDbCanonicalField, type CreatorDbFilterOp, type CreatorDbPlatform } from '@/lib/creatordb-filter-fields'
 import { CREATORDB_PRESETS, type CreatorDbFilterValue, type CreatorDbPresetId } from '@/lib/creatordb-filter-presets'
 import { buildCustomSearchRequest, buildSearchRequest, type CreatorDbCanonicalFilter, type CreatorDbExtraFilter, type CreatorDbPresetOverrides } from '@/lib/creatordb-search-request'
-import { parseDiscoveryQuery, toCreatorDbFilters, broadenFilters } from '@/lib/discovery-ai'
+import { parseDiscoveryQuery, toCreatorDbFilters, broadenFilters, type CreatorDbFilterFromAI } from '@/lib/discovery-ai'
 import {
   CLUB_FILTER_DEFS,
   CREATOR_HAS_KEYS,
@@ -753,6 +753,7 @@ export async function GET(req: NextRequest) {
     // ── Smart retry: if AI-parsed search returned 0 results, progressively
     // broaden filters by dropping the most restrictive ones and retrying.
     // Max 3 retry rounds to stay within timeout. No extra credit charge.
+    const searchAdjustments: { field: string; reason: string }[] = []
     if (
       fullResults.length === 0 &&
       aiParsed &&
@@ -760,19 +761,22 @@ export async function GET(req: NextRequest) {
       !useYoutube &&
       requestedPage === 0
     ) {
-      let currentFilters = creatorDbFilters.map((f) => ({
+      let currentFilters: CreatorDbFilterFromAI[] = creatorDbFilters.map((f) => ({
         field: f.field,
         op: f.op,
         value: f.value as string | number | boolean | string[],
+        source: (f as any).source,
+        constraint: (f as any).constraint,
       }))
       for (let retry = 0; retry < 3; retry++) {
         const broader = broadenFilters(currentFilters)
         if (!broader) break
-        currentFilters = broader
+        currentFilters = broader.filters
+        searchAdjustments.push(...broader.dropped)
         try {
           const retryOpts = {
             ...searchOpts,
-            creatorDbFilters: broader.map((f) => ({
+            creatorDbFilters: broader.filters.map((f) => ({
               field: f.field,
               op: f.op,
               value: f.value as CreatorDbFilterValue,
@@ -785,10 +789,8 @@ export async function GET(req: NextRequest) {
           if (retryResults.length > 0) {
             result = retryResult
             fullResults = retryResults
-            // Update the filters that actually produced results so the
-            // client can display the broadened filter state.
             creatorDbFilters = retryOpts.creatorDbFilters
-            console.log(`[discovery-ai] Retry ${retry + 1} succeeded with ${retryResults.length} results after broadening filters`)
+            console.log(`[discovery-ai] Retry ${retry + 1} succeeded with ${retryResults.length} results after broadening filters. Dropped:`, broader.dropped)
             break
           }
         } catch {
@@ -796,6 +798,46 @@ export async function GET(req: NextRequest) {
         }
       }
     }
+
+    // ── Multi-strategy fallback: try related niches when primary niche
+    // returned too few results and AI provided alternatives ──
+    if (
+      fullResults.length < 5 &&
+      aiParsed?.related_niches &&
+      creatorDbFilters &&
+      !useYoutube &&
+      requestedPage === 0
+    ) {
+      try {
+        const relatedFilters = creatorDbFilters.map((f) => {
+          if (f.field === 'niches') {
+            return { ...f, value: aiParsed!.related_niches as CreatorDbFilterValue }
+          }
+          return f
+        })
+        const relatedOpts = { ...searchOpts, creatorDbFilters: relatedFilters }
+        const relatedResult = await mergeEnrichedProfileFields(
+          await discoverySearch(relatedOpts)
+        )
+        const relatedResults = relatedResult?.results ?? []
+        if (relatedResults.length > 0) {
+          // Merge: deduplicate by handle, primary results first
+          const existingHandles = new Set(fullResults.map((r: any) => `${r.platform}:${r.handle}`))
+          const newCreators = relatedResults.filter((r: any) =>
+            !existingHandles.has(`${r.platform}:${r.handle}`)
+          )
+          fullResults = [...fullResults, ...newCreators]
+          searchAdjustments.push({
+            field: 'niches',
+            reason: `Expanded to related niches: ${aiParsed.related_niches}`,
+          })
+          console.log(`[discovery-ai] Related niche fallback added ${newCreators.length} creators`)
+        }
+      } catch {
+        // Non-critical — skip related niche search
+      }
+    }
+
     settleAfterResponse(fullResults.length)
     // Save the FULL result set (up to API_PAGE_SIZE) in the task log
     const taskId = await persistTaskPage(result)
@@ -892,6 +934,53 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // 3. Creator type classification + multi-dimensional ranking
+    try {
+      const { classifyCreatorTypeCached } = await import('@/lib/creator-type-classifier')
+      const { scoreCreator } = await import('@/lib/ranking-weights')
+
+      // Build scoring context from search parameters
+      const scoringContext = {
+        objective: (searchOpts as any).campaignObjective || null,
+      }
+
+      for (const r of displayResults as any[]) {
+        // Creator type classification
+        const key = r.handle ? `${r.platform}:${r.handle}` : null
+        if (key) {
+          const ct = classifyCreatorTypeCached(key, {
+            bio: r.bio,
+            handle: r.handle,
+            category: r.category,
+            niche_tags: r.niche_tags,
+            follower_count: r.follower_count,
+          })
+          r.creator_type = ct.type
+          r.creator_type_confidence = ct.confidence
+        }
+
+        // Multi-dimensional match scoring
+        const breakdown = scoreCreator(
+          {
+            niche_tags: r.niche_tags,
+            bio: r.bio,
+            engagement_rate: typeof r.engagement_rate === 'number' ? r.engagement_rate : null,
+            follower_count: r.follower_count,
+            country: r.country,
+            platform: r.platform || searchOpts.platform,
+            ai_relevance: r.ai_relevance,
+          },
+          scoringContext,
+        )
+        r.match_score = breakdown.total
+        r.match_breakdown = breakdown
+        // Update ai_relevance to the composite score for backward compat
+        r.ai_relevance = breakdown.total
+      }
+    } catch (err: any) {
+      console.warn('[club-search] Creator classification/ranking failed:', err?.message)
+    }
+
     return NextResponse.json({
       ...result,
       results: displayResults,
@@ -902,7 +991,9 @@ export async function GET(req: NextRequest) {
       ...(aiParsed ? {
         ai_parsed: {
           niches: aiParsed.niches,
+          related_niches: aiParsed.related_niches,
           keywords: aiParsed.keywords,
+          content_styles: aiParsed.content_styles,
           platform: aiParsed.platform,
           country: aiParsed.country,
           audience_location: aiParsed.audience_location,
@@ -915,6 +1006,7 @@ export async function GET(req: NextRequest) {
           min_avg_views: aiParsed.min_avg_views,
         },
       } : {}),
+      ...(searchAdjustments.length > 0 ? { search_adjustments: searchAdjustments } : {}),
     })
   } catch (err: any) {
     const isCreatorDbAdvancedSearch = Boolean(creatorDbPreset || creatorDbFilters || (task?.request as any)?.creatorDbPreset || (task?.request as any)?.creatorDbFilters)

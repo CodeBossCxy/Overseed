@@ -36,6 +36,13 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
     redirect('/dashboard/brand')
   }
 
+  // Convert Prisma Decimal fields to plain numbers for client component serialization
+  const plainCampaign = JSON.parse(JSON.stringify(campaign, (_key, value) =>
+    value !== null && typeof value === 'object' && typeof value.toNumber === 'function'
+      ? value.toNumber()
+      : value
+  ))
+
   const [categories, platforms] = await Promise.all([
     prisma.category.findMany({
       where: { isActive: true },
@@ -63,7 +70,7 @@ export default async function EditCampaignPage({ params }: { params: Promise<{ i
         <CampaignForm
           categories={categories}
           platforms={platforms}
-          initialData={campaign}
+          initialData={plainCampaign}
           isEditing
         />
       </div>

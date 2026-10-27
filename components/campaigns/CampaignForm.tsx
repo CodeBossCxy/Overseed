@@ -26,6 +26,48 @@ interface CampaignFormProps {
   isEditing?: boolean
 }
 
+const COUNTRY_OPTIONS = [
+  { code: 'US', label: 'United States' }, { code: 'GB', label: 'United Kingdom' },
+  { code: 'CA', label: 'Canada' }, { code: 'AU', label: 'Australia' },
+  { code: 'BR', label: 'Brazil' }, { code: 'MX', label: 'Mexico' },
+  { code: 'DE', label: 'Germany' }, { code: 'FR', label: 'France' },
+  { code: 'ES', label: 'Spain' }, { code: 'IT', label: 'Italy' },
+  { code: 'JP', label: 'Japan' }, { code: 'KR', label: 'South Korea' },
+  { code: 'CN', label: 'China' }, { code: 'IN', label: 'India' },
+  { code: 'ID', label: 'Indonesia' }, { code: 'TH', label: 'Thailand' },
+  { code: 'VN', label: 'Vietnam' }, { code: 'PH', label: 'Philippines' },
+  { code: 'MY', label: 'Malaysia' }, { code: 'SG', label: 'Singapore' },
+  { code: 'AE', label: 'UAE' }, { code: 'SA', label: 'Saudi Arabia' },
+  { code: 'TR', label: 'Turkey' }, { code: 'RU', label: 'Russia' },
+  { code: 'PL', label: 'Poland' }, { code: 'NL', label: 'Netherlands' },
+  { code: 'SE', label: 'Sweden' }, { code: 'NO', label: 'Norway' },
+  { code: 'DK', label: 'Denmark' }, { code: 'FI', label: 'Finland' },
+  { code: 'PT', label: 'Portugal' }, { code: 'AR', label: 'Argentina' },
+  { code: 'CL', label: 'Chile' }, { code: 'CO', label: 'Colombia' },
+  { code: 'ZA', label: 'South Africa' }, { code: 'NG', label: 'Nigeria' },
+  { code: 'EG', label: 'Egypt' }, { code: 'IL', label: 'Israel' },
+  { code: 'NZ', label: 'New Zealand' }, { code: 'HK', label: 'Hong Kong' },
+  { code: 'TW', label: 'Taiwan' },
+]
+
+const LANGUAGE_OPTIONS = [
+  { code: 'en', label: 'English' }, { code: 'es', label: 'Spanish' },
+  { code: 'pt', label: 'Portuguese' }, { code: 'fr', label: 'French' },
+  { code: 'de', label: 'German' }, { code: 'it', label: 'Italian' },
+  { code: 'ja', label: 'Japanese' }, { code: 'ko', label: 'Korean' },
+  { code: 'zh', label: 'Chinese' }, { code: 'ar', label: 'Arabic' },
+  { code: 'hi', label: 'Hindi' }, { code: 'th', label: 'Thai' },
+  { code: 'vi', label: 'Vietnamese' }, { code: 'id', label: 'Indonesian' },
+  { code: 'ms', label: 'Malay' }, { code: 'tr', label: 'Turkish' },
+  { code: 'ru', label: 'Russian' }, { code: 'pl', label: 'Polish' },
+  { code: 'nl', label: 'Dutch' }, { code: 'sv', label: 'Swedish' },
+  { code: 'da', label: 'Danish' }, { code: 'fi', label: 'Finnish' },
+  { code: 'no', label: 'Norwegian' }, { code: 'he', label: 'Hebrew' },
+  { code: 'tl', label: 'Filipino' },
+]
+
+const AGE_OPTIONS = ['13-17', '18-24', '25-34', '35-44', '45-64', '65+']
+
 export default function CampaignForm({
   categories,
   platforms,
@@ -63,6 +105,7 @@ export default function CampaignForm({
     productPurchaseAmount: initialData?.productPurchaseAmount || '',
     isProductReimbursed: initialData?.isProductReimbursed || false,
     contentType: initialData?.contentType || 'ANY',
+    contentTypes: initialData?.contentTypes?.length ? initialData.contentTypes : (initialData?.contentType && initialData.contentType !== 'ANY' ? [initialData.contentType] : []),
     contentGuidelines: initialData?.contentGuidelines || '',
     wordCountMin: initialData?.wordCountMin || '',
     wordCountMax: initialData?.wordCountMax || '',
@@ -76,6 +119,18 @@ export default function CampaignForm({
       maxFollowers: r.maxFollowers,
     })) || [],
     images: initialData?.images || [],
+    campaignObjective: initialData?.campaignObjective || '',
+    targetCountries: initialData?.targetCountries || [],
+    targetLanguages: initialData?.targetLanguages || [],
+    targetAudienceAge: initialData?.targetAudienceAge || [],
+    targetAudienceGender: initialData?.targetAudienceGender || '',
+    productUrl: initialData?.productUrl || '',
+    brandPositioning: initialData?.brandPositioning || '',
+    contentStyles: initialData?.contentStyles || [],
+    creatorTierPreference: initialData?.creatorTierPreference || '',
+    creatorTypePreference: initialData?.creatorTypePreference || '',
+    budgetPerCreator: initialData?.budgetPerCreator || '',
+    totalBudget: initialData?.totalBudget || '',
   })
 
   const spotsInvalid = formData.totalSlots === '' || parseInt(String(formData.totalSlots)) < 1
@@ -104,6 +159,15 @@ export default function CampaignForm({
     })
   }
 
+  const toggleArrayField = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: (prev as any)[field].includes(value)
+        ? (prev as any)[field].filter((v: string) => v !== value)
+        : [...(prev as any)[field], value],
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent, asDraft = false) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -127,7 +191,7 @@ export default function CampaignForm({
       if (!formData.campaignStartDate) missing.push(cf.campaignStartDate)
       if (!formData.campaignEndDate) missing.push(cf.campaignEndDate)
       if (formData.images.length === 0) missing.push(cf.campaignImages)
-      // Step 2
+      // Step 4
       if (formData.compensationTypes.length === 0) missing.push(cf.compensationType)
       if (formData.compensationTypes.includes('PAID')) {
         if (!formData.paymentMin) missing.push(cf.paymentMin)
@@ -164,6 +228,20 @@ export default function CampaignForm({
           ...r,
           minFollowers: parseInt(r.minFollowers) || 0,
         })),
+        campaignObjective: formData.campaignObjective || null,
+        targetCountries: formData.targetCountries,
+        targetLanguages: formData.targetLanguages,
+        targetAudienceAge: formData.targetAudienceAge,
+        targetAudienceGender: formData.targetAudienceGender || null,
+        productUrl: formData.productUrl || null,
+        brandPositioning: formData.brandPositioning || null,
+        contentTypes: formData.contentTypes,
+        contentType: formData.contentTypes.length === 0 ? 'ANY' : formData.contentTypes[0],
+        contentStyles: formData.contentStyles,
+        creatorTierPreference: formData.creatorTierPreference || null,
+        creatorTypePreference: formData.creatorTypePreference || null,
+        budgetPerCreator: formData.budgetPerCreator ? parseFloat(formData.budgetPerCreator) : null,
+        totalBudget: formData.totalBudget ? parseFloat(formData.totalBudget) : null,
       }
 
       const url = isEditing ? `/api/campaigns/${initialData.id}` : '/api/campaigns'
@@ -418,6 +496,36 @@ export default function CampaignForm({
 
   const fieldCls = 'w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white'
 
+  const CONTENT_STYLE_OPTIONS = [
+    { value: 'REVIEW', label: cf.styleReview },
+    { value: 'TUTORIAL', label: cf.styleTutorial },
+    { value: 'UNBOXING', label: cf.styleUnboxing },
+    { value: 'LIFESTYLE', label: cf.styleLifestyle },
+    { value: 'EDUCATIONAL', label: cf.styleEducational },
+    { value: 'ENTERTAINMENT', label: cf.styleEntertainment },
+    { value: 'STORYTELLING', label: cf.styleStorytelling },
+    { value: 'DEMONSTRATION', label: cf.styleDemonstration },
+    { value: 'BEFORE_AFTER', label: cf.styleBeforeAfter },
+    { value: 'PROFESSIONAL', label: cf.styleProfessional },
+  ]
+
+  const CREATOR_TIER_OPTIONS = [
+    { value: '', label: cf.tierAny },
+    { value: 'NANO', label: cf.tierNano },
+    { value: 'MICRO', label: cf.tierMicro },
+    { value: 'MIDTIER', label: cf.tierMidTier },
+    { value: 'MACRO', label: cf.tierMacro },
+    { value: 'MEGA', label: cf.tierMega },
+  ]
+
+  const CREATOR_TYPE_OPTIONS = [
+    { value: '', label: cf.typeAny },
+    { value: 'INDIVIDUAL', label: cf.typeIndividual },
+    { value: 'PROFESSIONAL', label: cf.typeProfessional },
+    { value: 'MEDIA', label: cf.typeMedia },
+    { value: 'BUSINESS', label: cf.typeBusiness },
+  ]
+
   const renderStep1 = () => (
     <div className="space-y-6">
       <div>
@@ -495,6 +603,54 @@ export default function CampaignForm({
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.campaignObjective}</label>
+        <select
+          value={formData.campaignObjective}
+          onChange={(e) => setFormData({ ...formData, campaignObjective: e.target.value })}
+          className={fieldCls}
+        >
+          <option value="">{cf.campaignObjectivePlaceholder}</option>
+          <option value="BRAND_AWARENESS">{cf.objectiveBrandAwareness}</option>
+          <option value="PRODUCT_LAUNCH">{cf.objectiveProductLaunch}</option>
+          <option value="SALES_CONVERSION">{cf.objectiveSalesConversion}</option>
+          <option value="UGC_CREATION">{cf.objectiveUgcCreation}</option>
+          <option value="PRODUCT_REVIEWS">{cf.objectiveProductReviews}</option>
+          <option value="COMMUNITY_ENGAGEMENT">{cf.objectiveCommunityEngagement}</option>
+          <option value="MARKET_TESTING">{cf.objectiveMarketTesting}</option>
+          <option value="BRAND_AMBASSADOR">{cf.objectiveBrandAmbassador}</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.productUrl}</label>
+        <input
+          type="text"
+          value={formData.productUrl}
+          onChange={(e) => setFormData({ ...formData, productUrl: e.target.value })}
+          className={fieldCls}
+          placeholder={cf.productUrlPlaceholder}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.brandPositioning}</label>
+        <select
+          value={formData.brandPositioning}
+          onChange={(e) => setFormData({ ...formData, brandPositioning: e.target.value })}
+          className={fieldCls}
+        >
+          <option value="">{cf.brandPositioningPlaceholder}</option>
+          <option value="AFFORDABLE">{cf.positioningAffordable}</option>
+          <option value="MID_RANGE">{cf.positioningMidRange}</option>
+          <option value="PREMIUM">{cf.positioningPremium}</option>
+          <option value="LUXURY">{cf.positioningLuxury}</option>
+          <option value="INNOVATIVE">{cf.positioningInnovative}</option>
+          <option value="SUSTAINABLE">{cf.positioningSustainable}</option>
+          <option value="OTHER">{cf.positioningOther}</option>
+        </select>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -631,6 +787,252 @@ export default function CampaignForm({
 
   const renderStep2 = () => (
     <div className="space-y-6">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{cf.targetCountries}</label>
+        <div className="flex flex-wrap gap-2">
+          {COUNTRY_OPTIONS.map(opt => (
+            <button
+              key={opt.code}
+              type="button"
+              onClick={() => toggleArrayField('targetCountries', opt.code)}
+              className={`px-3 py-1.5 text-sm rounded-full border transition ${
+                formData.targetCountries.includes(opt.code)
+                  ? 'bg-primary-50 border-primary-300 text-primary-700 font-medium'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{cf.targetLanguages}</label>
+        <div className="flex flex-wrap gap-2">
+          {LANGUAGE_OPTIONS.map(opt => (
+            <button
+              key={opt.code}
+              type="button"
+              onClick={() => toggleArrayField('targetLanguages', opt.code)}
+              className={`px-3 py-1.5 text-sm rounded-full border transition ${
+                formData.targetLanguages.includes(opt.code)
+                  ? 'bg-primary-50 border-primary-300 text-primary-700 font-medium'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{cf.targetAudienceAge}</label>
+        <div className="flex flex-wrap gap-2">
+          {AGE_OPTIONS.map(age => (
+            <button
+              key={age}
+              type="button"
+              onClick={() => toggleArrayField('targetAudienceAge', age)}
+              className={`px-3 py-1.5 text-sm rounded-full border transition ${
+                formData.targetAudienceAge.includes(age)
+                  ? 'bg-primary-50 border-primary-300 text-primary-700 font-medium'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {age}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.targetAudienceGender}</label>
+        <select
+          value={formData.targetAudienceGender}
+          onChange={(e) => setFormData({ ...formData, targetAudienceGender: e.target.value })}
+          className={fieldCls}
+        >
+          <option value="">{cf.genderAny}</option>
+          <option value="MALE">{cf.genderMale}</option>
+          <option value="FEMALE">{cf.genderFemale}</option>
+        </select>
+      </div>
+    </div>
+  )
+
+  const renderStep3 = () => (
+    <div className="space-y-6">
+      <h2 className="text-xl font-semibold">{cf.platformRequirements}</h2>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">{cf.targetPlatforms} *</label>
+        <div className="flex flex-wrap gap-2">
+          {platforms.map((plat) => (
+            <button
+              key={plat.id}
+              type="button"
+              onClick={() => handlePlatformToggle(plat.id)}
+              className={`px-4 py-2 rounded-md text-sm transition ${
+                formData.platformIds.includes(plat.id)
+                  ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {plat.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {formData.followerRequirements.length > 0 && (
+        <div className="space-y-4">
+          <label className="block text-sm font-medium">{cf.followerRequirements}</label>
+          {formData.followerRequirements.map((req: any) => {
+            const platform = platforms.find((p) => p.id === req.platformId)
+            return (
+              <div key={req.platformId} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                <span className="w-24 font-medium">{platform?.name}</span>
+                <div className="flex-1 grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">{cf.minFollowers}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={req.minFollowers}
+                      onChange={(e) => updateFollowerRequirement(req.platformId, 'minFollowers', e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">{cf.maxFollowersOptional}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={req.maxFollowers || ''}
+                      onChange={(e) => updateFollowerRequirement(req.platformId, 'maxFollowers', e.target.value ? parseInt(e.target.value) : null)}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                      placeholder={cf.noLimit}
+                    />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium mb-1">{cf.contentType}</label>
+        <p className="text-xs text-gray-400 mb-2">{cf.contentTypeHint || 'Select one or more. Leave empty for any format.'}</p>
+        <div className="flex flex-wrap gap-2">
+          {([
+            { value: 'IMAGE_POST', label: cf.imagePost },
+            { value: 'VIDEO', label: cf.video },
+            { value: 'STORY', label: cf.story },
+            { value: 'REEL', label: cf.reel },
+          ] as const).map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggleArrayField('contentTypes', opt.value)}
+              className={`px-3 py-1.5 text-sm rounded-full border transition ${
+                formData.contentTypes.includes(opt.value)
+                  ? 'bg-primary-100 border-primary-300 text-primary-700 font-semibold'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{cf.contentStyles}</label>
+        <div className="flex flex-wrap gap-2">
+          {CONTENT_STYLE_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggleArrayField('contentStyles', opt.value)}
+              className={`px-3 py-1.5 text-sm rounded-full border transition ${
+                formData.contentStyles.includes(opt.value)
+                  ? 'bg-primary-50 border-primary-300 text-primary-700 font-medium'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">{cf.contentGuidelines}</label>
+        <textarea
+          rows={4}
+          value={formData.contentGuidelines}
+          onChange={(e) => setFormData({ ...formData, contentGuidelines: e.target.value })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+          placeholder={cf.contentGuidelinesPlaceholder}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">{cf.requiredHashtags}</label>
+          <input
+            type="text"
+            value={formData.hashtagsRequired}
+            onChange={(e) => setFormData({ ...formData, hashtagsRequired: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+            placeholder={cf.hashtagsPlaceholder}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">{cf.requiredMentions}</label>
+          <input
+            type="text"
+            value={formData.mentionsRequired}
+            onChange={(e) => setFormData({ ...formData, mentionsRequired: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+            placeholder={cf.mentionsPlaceholder}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">{cf.minWordCount}</label>
+          <input
+            type="number"
+            min="0"
+            value={formData.wordCountMin}
+            onChange={(e) => setFormData({ ...formData, wordCountMin: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+            placeholder={cf.noMinimum}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">{cf.maxWordCount}</label>
+          <input
+            type="number"
+            min="0"
+            value={formData.wordCountMax}
+            onChange={(e) => setFormData({ ...formData, wordCountMax: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+            placeholder={cf.noMaximum}
+          />
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderStep4 = () => (
+    <div className="space-y-6">
       <h2 className="text-xl font-semibold">{cf.compensation}</h2>
 
       <div>
@@ -758,150 +1160,70 @@ export default function CampaignForm({
           </>
         )}
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.budgetPerCreator}</label>
+          <input
+            type="number"
+            min="0"
+            value={formData.budgetPerCreator}
+            onChange={(e) => setFormData({ ...formData, budgetPerCreator: e.target.value })}
+            className={fieldCls}
+            placeholder={cf.budgetPerCreatorPlaceholder}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.totalBudget}</label>
+          <input
+            type="number"
+            min="0"
+            value={formData.totalBudget}
+            onChange={(e) => setFormData({ ...formData, totalBudget: e.target.value })}
+            className={fieldCls}
+            placeholder={cf.totalBudgetPlaceholder}
+          />
+        </div>
+      </div>
     </div>
   )
 
-  const renderStep3 = () => (
+  const renderStep5 = () => (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">{cf.platformRequirements}</h2>
-
-      <div>
-        <label className="block text-sm font-medium mb-2">{cf.targetPlatforms} *</label>
-        <div className="flex flex-wrap gap-2">
-          {platforms.map((plat) => (
-            <button
-              key={plat.id}
-              type="button"
-              onClick={() => handlePlatformToggle(plat.id)}
-              className={`px-4 py-2 rounded-md text-sm transition ${
-                formData.platformIds.includes(plat.id)
-                  ? 'bg-white text-gray-900 font-bold shadow-sm ring-1 ring-gray-200'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {plat.name}
-            </button>
-          ))}
-        </div>
+      <div className="p-4 bg-gray-50 rounded-xl text-sm text-gray-500">
+        {cf.creatorPreferencesDesc}
       </div>
 
-      {formData.followerRequirements.length > 0 && (
-        <div className="space-y-4">
-          <label className="block text-sm font-medium">{cf.followerRequirements}</label>
-          {formData.followerRequirements.map((req: any) => {
-            const platform = platforms.find((p) => p.id === req.platformId)
-            return (
-              <div key={req.platformId} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                <span className="w-24 font-medium">{platform?.name}</span>
-                <div className="flex-1 grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">{cf.minFollowers}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={req.minFollowers}
-                      onChange={(e) => updateFollowerRequirement(req.platformId, 'minFollowers', e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
-                      placeholder="0"
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">{cf.maxFollowersOptional}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={req.maxFollowers || ''}
-                      onChange={(e) => updateFollowerRequirement(req.platformId, 'maxFollowers', e.target.value ? parseInt(e.target.value) : null)}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                      placeholder={cf.noLimit}
-                    />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
       <div>
-        <label className="block text-sm font-medium mb-1">{cf.contentType} *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.creatorTierPreference}</label>
         <select
-          required
-          value={formData.contentType}
-          onChange={(e) => setFormData({ ...formData, contentType: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+          value={formData.creatorTierPreference}
+          onChange={(e) => setFormData({ ...formData, creatorTierPreference: e.target.value })}
+          className={fieldCls}
         >
-          <option value="ANY">{cf.anyFormat}</option>
-          <option value="IMAGE_POST">{cf.imagePost}</option>
-          <option value="VIDEO">{cf.video}</option>
-          <option value="STORY">{cf.story}</option>
-          <option value="REEL">{cf.reel}</option>
+          {CREATOR_TIER_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
         </select>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">{cf.contentGuidelines}</label>
-        <textarea
-          rows={4}
-          value={formData.contentGuidelines}
-          onChange={(e) => setFormData({ ...formData, contentGuidelines: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
-          placeholder={cf.contentGuidelinesPlaceholder}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">{cf.requiredHashtags}</label>
-          <input
-            type="text"
-            value={formData.hashtagsRequired}
-            onChange={(e) => setFormData({ ...formData, hashtagsRequired: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
-            placeholder={cf.hashtagsPlaceholder}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">{cf.requiredMentions}</label>
-          <input
-            type="text"
-            value={formData.mentionsRequired}
-            onChange={(e) => setFormData({ ...formData, mentionsRequired: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
-            placeholder={cf.mentionsPlaceholder}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">{cf.minWordCount}</label>
-          <input
-            type="number"
-            min="0"
-            value={formData.wordCountMin}
-            onChange={(e) => setFormData({ ...formData, wordCountMin: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
-            placeholder={cf.noMinimum}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">{cf.maxWordCount}</label>
-          <input
-            type="number"
-            min="0"
-            value={formData.wordCountMax}
-            onChange={(e) => setFormData({ ...formData, wordCountMax: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
-            placeholder={cf.noMaximum}
-          />
-        </div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">{cf.creatorTypePreference}</label>
+        <select
+          value={formData.creatorTypePreference}
+          onChange={(e) => setFormData({ ...formData, creatorTypePreference: e.target.value })}
+          className={fieldCls}
+        >
+          {CREATOR_TYPE_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
       </div>
     </div>
   )
 
-  const stepLabels = [cf.stepBasicInfo, cf.stepCompensation, cf.stepRequirements]
-  const nextStepLabel = step < 3 ? stepLabels[step] : null
+  const stepLabels = [cf.stepBrandProduct, cf.stepTargetMarket, cf.stepContentDeliverables, cf.stepCompensation, cf.stepCreatorPreferences]
+  const nextStepLabel = step < 5 ? stepLabels[step] : null
   const tips = [cf.tip1, cf.tip2, cf.tip3, cf.tip4, cf.tip5]
 
   return (
@@ -958,7 +1280,7 @@ export default function CampaignForm({
                     {label}
                   </span>
                 </div>
-                {s < 3 && (
+                {s < 5 && (
                   <div className={`flex-1 h-0.5 mx-3 mt-[-16px] rounded-full ${done ? 'bg-primary-600' : 'bg-gray-200'}`} />
                 )}
               </div>
@@ -983,12 +1305,18 @@ export default function CampaignForm({
               {step === 1
                 ? cf.stepBasicsDesc
                 : step === 2
-                  ? cf.stepCompensationDesc
-                  : cf.stepRequirementsDesc}
+                  ? 'Define your target markets and audience demographics'
+                  : step === 3
+                    ? cf.stepRequirementsDesc
+                    : step === 4
+                      ? cf.stepCompensationDesc
+                      : cf.creatorPreferencesDesc}
             </p>
             {step === 1 && renderStep1()}
             {step === 2 && renderStep2()}
             {step === 3 && renderStep3()}
+            {step === 4 && renderStep4()}
+            {step === 5 && renderStep5()}
           </div>
 
           {/* Navigation */}
@@ -1011,7 +1339,7 @@ export default function CampaignForm({
                   {cf.back}
                 </button>
               )}
-              {step < 3 ? (
+              {step < 5 ? (
                 <button
                   key="next"
                   type="button"

@@ -71,6 +71,17 @@ enum ContentType {
   ANY
 }
 
+enum CampaignObjective {
+  BRAND_AWARENESS
+  PRODUCT_LAUNCH
+  SALES_CONVERSION
+  UGC_CREATION
+  PRODUCT_REVIEWS
+  COMMUNITY_ENGAGEMENT
+  MARKET_TESTING
+  BRAND_AMBASSADOR
+}
+
 enum AlertFrequency {
   INSTANT
   DAILY
@@ -547,12 +558,31 @@ model Campaign {
   isProductReimbursed     Boolean @default(false)
 
   // Content Requirements
-  contentType      ContentType?
+  contentType       ContentType?
+  contentTypes      String[]      @default([])
   contentGuidelines String?       @db.Text
   wordCountMin     Int?
   wordCountMax     Int?
   hashtagsRequired String?
   mentionsRequired String?
+
+  // Campaign Objective & Targeting
+  campaignObjective   CampaignObjective?
+  targetCountries     String[]       @default([])
+  targetLanguages     String[]       @default([])
+  targetAudienceAge   String[]       @default([])
+  targetAudienceGender String?
+  productUrl          String?
+  brandPositioning    String?
+  contentStyles       String[]       @default([])
+
+  // Creator Preferences
+  creatorTierPreference String?
+  creatorTypePreference String?
+
+  // Budget
+  budgetPerCreator    Decimal?       @db.Decimal(10, 2)
+  totalBudget         Decimal?       @db.Decimal(10, 2)
 
   // Media
   images           String[]
