@@ -3341,7 +3341,7 @@ export default function DiscoverPanel() {
                 <span className="text-xs text-gray-500">{d.resultsSortBy}</span>
                 <select
                   value={sortMode}
-                  onChange={(e) => setSortMode(e.target.value as 'followers' | 'relevance' | 'bestMatch')}
+                  onChange={(e) => setSortMode(e.target.value as 'followers' | 'bestMatch')}
                   className="text-xs font-semibold text-gray-700 bg-transparent border-none cursor-pointer focus:outline-none"
                 >
                   <option value="bestMatch">{d.resultsSortBestMatch}</option>
