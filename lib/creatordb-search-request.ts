@@ -208,10 +208,28 @@ export function buildCustomSearchRequest(
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) throw new Error('pageSize must be an integer between 1 and 100')
   if (!Number.isInteger(offset) || offset < 0) throw new Error('offset must be a non-negative integer')
 
-  // ── LOG: Transformed CreatorDB API filters ──
-  console.log('[buildCustomSearchRequest] Niche resolution:', nicheResolution ? JSON.stringify(nicheResolution) : '(none)')
-  console.log('[buildCustomSearchRequest] Final API filters:', JSON.stringify(filters, null, 2))
-  console.log('[buildCustomSearchRequest] Sort:', creatorDbFieldName(sortField, platform), desc ? 'DESC' : 'ASC', '| pageSize:', pageSize, '| offset:', offset)
+  // ── LOG: CreatorDB request summary ──
+  const sortName = creatorDbFieldName(sortField, platform)
+  const filterLines = filters.map((f) => {
+    const val = Array.isArray(f.value) ? JSON.stringify(f.value) : String(f.value)
+    return `  ${f.filterName} ${f.op} ${val}`
+  })
+  console.log(
+    `%c[CreatorDB] Search Request\n` +
+    `%c─── Filters (${filters.length}) ───\n` +
+    filterLines.join('\n') + '\n' +
+    `─── Sort & Pagination ───\n` +
+    `  Sort:     ${sortName} ${desc ? 'DESC' : 'ASC'}\n` +
+    `  Page:     ${pageSize} results, offset ${offset}\n` +
+    (nicheResolution
+      ? `─── Niche Resolution ───\n` +
+        (nicheResolution.matched.length ? `  ✓ Matched: ${nicheResolution.matched.map((m: any) => m.term).join(', ')}\n` : '') +
+        (nicheResolution.fuzzyMatched?.length ? `  ~ Fuzzy:   ${nicheResolution.fuzzyMatched.map((m: any) => m.term).join(', ')}\n` : '') +
+        (nicheResolution.unmatched?.length ? `  ✗ Missed:  ${nicheResolution.unmatched.join(', ')}\n` : '')
+      : ''),
+    'color:#6366f1;font-weight:bold;font-size:12px',
+    'color:#94a3b8;font-size:11px',
+  )
 
   return { filters, sortBy: creatorDbFieldName(sortField, platform), desc, pageSize, offset, nicheResolution }
 }
@@ -293,9 +311,31 @@ export function buildSearchRequest(
   }
   if (!Number.isInteger(offset) || offset < 0) throw new Error('offset must be a non-negative integer')
 
+  const sortName = creatorDbFieldName(preset.sortField, platform)
+  const filterLines = filters.map((f) => {
+    const val = Array.isArray(f.value) ? JSON.stringify(f.value) : String(f.value)
+    return `  ${f.filterName} ${f.op} ${val}`
+  })
+  console.log(
+    `%c[CreatorDB] Preset Search (${presetId})\n` +
+    `%c─── Filters (${filters.length}) ───\n` +
+    filterLines.join('\n') + '\n' +
+    `─── Sort & Pagination ───\n` +
+    `  Sort:     ${sortName} ${preset.desc ? 'DESC' : 'ASC'}\n` +
+    `  Page:     ${pageSize} results, offset ${offset}\n` +
+    (nicheResolution
+      ? `─── Niche Resolution ───\n` +
+        (nicheResolution.matched.length ? `  ✓ Matched: ${nicheResolution.matched.map((m: any) => m.term).join(', ')}\n` : '') +
+        (nicheResolution.fuzzyMatched?.length ? `  ~ Fuzzy:   ${nicheResolution.fuzzyMatched.map((m: any) => m.term).join(', ')}\n` : '') +
+        (nicheResolution.unmatched?.length ? `  ✗ Missed:  ${nicheResolution.unmatched.join(', ')}\n` : '')
+      : ''),
+    'color:#6366f1;font-weight:bold;font-size:12px',
+    'color:#94a3b8;font-size:11px',
+  )
+
   return {
     filters,
-    sortBy: creatorDbFieldName(preset.sortField, platform),
+    sortBy: sortName,
     desc: preset.desc,
     pageSize,
     offset,

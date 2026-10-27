@@ -13,8 +13,11 @@ const globalForLogPrisma = globalThis as unknown as {
   creatorDbLogPrisma: PrismaClient | undefined
 }
 
+// Track whether the remote log DB has failed auth so we stop retrying
+let logDbAuthFailed = false
+
 function getLogPrisma(): PrismaClient {
-  if (logDbUrl) {
+  if (logDbUrl && !logDbAuthFailed) {
     if (!globalForLogPrisma.creatorDbLogPrisma) {
       globalForLogPrisma.creatorDbLogPrisma = new PrismaClient({
         datasources: { db: { url: logDbUrl } },
@@ -22,7 +25,7 @@ function getLogPrisma(): PrismaClient {
     }
     return globalForLogPrisma.creatorDbLogPrisma
   }
-  // No dedicated URL — fall back to the app's default prisma instance
+  // No dedicated URL or auth failed — fall back to the app's default prisma instance
   // (imported lazily to avoid circular deps).
   return require('@/lib/prisma').prisma as PrismaClient
 }
@@ -122,8 +125,22 @@ export async function creatorDbFetch(
         }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('DB log timeout')), 5000)),
       ])
-    } catch (dbErr) {
-      console.error('[CreatorDB usage] DB write failed:', dbErr)
+    } catch (dbErr: any) {
+      // If remote log DB has invalid credentials, stop retrying and fall back
+      // to local DB for the rest of this process lifetime.
+      const isAuthErr = dbErr?.message?.includes('Authentication failed')
+        || dbErr?.message?.includes('password authentication failed')
+        || dbErr?.code === 'P1000'
+      if (logDbUrl && isAuthErr) {
+        if (!logDbAuthFailed) {
+          console.warn('[CreatorDB usage] Remote log DB auth failed — falling back to local DB for this process')
+          logDbAuthFailed = true
+        }
+        // Silent after the first warning
+      } else if (!logDbAuthFailed) {
+        // Only log non-auth errors, and only if we haven't already given up
+        console.error('[CreatorDB usage] DB write failed:', dbErr?.message || dbErr)
+      }
     }
   })()
   // Don't await — let it complete in the background

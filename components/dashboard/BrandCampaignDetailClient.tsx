@@ -553,6 +553,16 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const PAGE_SIZE = 20
   const BATCH_SIZE = 100 // fetch 100 from CreatorDB, slice into 5 pages of 20 client-side
 
+  // Sort results by AI bio relevance (Best Match), ties broken by followers
+  const sortByRelevance = (results: Creator[]) =>
+    [...results].sort((a, b) => {
+      const relA = (a as any).ai_relevance ?? 0
+      const relB = (b as any).ai_relevance ?? 0
+      const diff = relB - relA
+      if (diff !== 0) return diff
+      return (b.follower_count ?? 0) - (a.follower_count ?? 0)
+    })
+
   const discover = useCallback(async (search = '', page = 0, offset = 0) => {
     setLoading(true); setError('')
     const searching = Boolean(search.trim())
@@ -583,7 +593,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Creator discovery is temporarily unavailable.')
-      const results = data?.results || []
+      const results = sortByRelevance(data?.results || [])
       setAllCreators(results)
       setCreators(results)
       setSearchPage(0)
@@ -599,126 +609,59 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     if (aiMatching) return
     setAiMatching(true); setError('')
     try {
-      // ── LOG: Campaign brief inputs ──
-      console.group('[DirectOutreach] AI Match — Campaign Brief')
-      console.log('Campaign ID:', campaign.id)
-      console.log('Campaign Title:', campaign.title)
-      console.log('Categories:', campaign.categories.map(c => c.category.name))
-      console.log('Platforms:', campaign.platforms.map(p => p.platform.name))
-      console.log('Follower requirements:', campaign.followerRequirements)
-      console.log('Content type:', campaign.contentType)
-      console.log('Description:', campaign.description?.slice(0, 200))
-      console.log('User query:', query || '(none)')
-      console.log('Pre-set filters — minFollowers:', minFollowers, 'maxFollowers:', maxFollowers, 'country:', creatorCountry)
-      console.groupEnd()
-
-      // Use AI to extract search parameters from the campaign brief
+      // Determine platform from campaign
       const campPlatform = (campaign.platforms[0]?.platform.name || '').toLowerCase()
-      const activePlatformForAi = ['tiktok', 'instagram', 'youtube'].includes(campPlatform) ? campPlatform : platform
+      const activePlatform = ['tiktok', 'instagram', 'youtube'].includes(campPlatform) ? campPlatform : platform
+      if (['tiktok', 'instagram', 'youtube'].includes(campPlatform)) {
+        setPlatform(campPlatform)
+      }
 
-      // Build a natural-language brief for the AI to parse
+      // Build a natural-language brief from the campaign — the backend's AI
+      // will parse this into structured CreatorDB filters, handle smart retry
+      // on zero results, and use the full text for bio relevance scoring.
       const briefParts = [
         campaign.title,
         `Categories: ${campaign.categories.map(c => c.category.name).join(', ')}`,
-        `Platform: ${activePlatformForAi}`,
+        `Platform: ${activePlatform}`,
         campaign.description ? `Description: ${campaign.description.slice(0, 500)}` : '',
         campaign.contentGuidelines ? `Content guidelines: ${campaign.contentGuidelines.slice(0, 200)}` : '',
         campaign.contentType ? `Content type: ${campaign.contentType}` : '',
         query.trim() ? `Additional keywords: ${query.trim()}` : '',
       ].filter(Boolean).join('\n')
 
-      console.log('[DirectOutreach] AI brief for parsing:', briefParts)
-
-      // Call AI to parse the brief into structured filters
-      let aiParsed: any = null
-      try {
-        const parseRes = await fetch('/api/discovery/parse-query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: briefParts }),
-        })
-        if (parseRes.ok) {
-          const parseData = await parseRes.json()
-          aiParsed = parseData?.parsed || null
-          console.log('[DirectOutreach] AI parsed result:', aiParsed)
-        }
-      } catch (e) {
-        console.warn('[DirectOutreach] AI parsing failed, falling back to categories:', e)
-      }
-
-      const autoFilters: CdbFilter[] = []
-
-      // Use AI-parsed niches (more specific) if available, otherwise fall back to categories
-      const aiNiches = aiParsed?.niches || ''
-      const catNames = campaign.categories.map(c => c.category.name).join(', ')
-      // Prefer AI niches — they include product-specific terms (e.g. Jewelry, Earring)
-      // Only fall back to broad categories if AI returned nothing
-      const finalNiches = aiNiches || catNames || ''
-      console.log('[DirectOutreach] AI niches:', aiNiches, '| Categories:', catNames, '| Using:', finalNiches)
-      if (finalNiches) {
-        autoFilters.push({ field: 'niches', op: 'in', value: finalNiches })
-      }
-
-      // Use AI-parsed keywords as hashtags
-      const aiKeywords = aiParsed?.keywords
-      if (aiKeywords) {
-        autoFilters.push({ field: 'hashtags', op: 'in', value: aiKeywords })
-      } else if (query.trim()) {
-        autoFilters.push({ field: 'hashtags', op: 'in', value: query.trim() })
-      }
-
-      // Map campaign platforms (AI may also suggest one)
-      const parsedPlatform = aiParsed?.platform || campPlatform
-      if (['tiktok', 'instagram', 'youtube'].includes(parsedPlatform)) {
-        setPlatform(parsedPlatform)
-      }
-
-      // Set last active to 3 months for freshness
-      autoFilters.push({ field: 'lastPublishTime', op: '>', value: '90' })
-
-      // ── LOG: Auto-derived filters ──
-      console.group('[DirectOutreach] Auto-derived CDB filters from campaign')
-      console.table(autoFilters)
-      console.groupEnd()
-
-      // AI-inferred filters are used for the backend query only,
-      // not shown in the visible filter UI.
-
-      // Build the full filter set for the search
-      const filters: { field: string; op: string; value: string | number | boolean | string[] }[] = []
-
-      for (const f of autoFilters) {
-        if (!f.value.trim()) continue
-        if (['hashtags', 'niches', 'audienceAge'].includes(f.field)) {
-          filters.push({ field: f.field, op: 'in', value: f.value.split(',').map(v => v.trim()).filter(Boolean) })
-        } else if (['followers', 'shortEngagementRate', 'lastPublishTime'].includes(f.field)) {
-          filters.push({ field: f.field, op: f.op || '>', value: Number(f.value) })
-        } else {
-          filters.push({ field: f.field, op: f.op || '=', value: f.value })
-        }
-      }
-
-      // Inject follower requirements from campaign
-      if (minFollowers && !filters.some(f => f.field === 'followers')) {
-        filters.push({ field: 'followers', op: '>', value: Number(minFollowers) })
+      // Build user-set filters (followers, country) as cdb_filters so the
+      // backend preserves them during AI merge
+      const userFilters: { field: string; op: string; value: string | number | boolean | string[] }[] = []
+      if (minFollowers) {
+        userFilters.push({ field: 'followers', op: '>', value: Number(minFollowers) })
       }
       if (maxFollowers) {
-        filters.push({ field: 'followers', op: '<', value: Number(maxFollowers) })
+        userFilters.push({ field: 'followers', op: '<', value: Number(maxFollowers) })
       }
       if (creatorCountry.trim()) {
-        filters.push({ field: 'country', op: '=', value: creatorCountry.trim().toUpperCase() })
+        userFilters.push({ field: 'country', op: '=', value: creatorCountry.trim().toUpperCase() })
       }
 
-      // ── LOG: Final filters sent to API ──
-      console.group('[DirectOutreach] Final filters → /api/discovery/club-search')
-      console.log('Filters:', JSON.stringify(filters, null, 2))
+      const qs = new URLSearchParams({
+        platform: activePlatform,
+        limit: String(BATCH_SIZE),
+        offset: '0',
+        cdb_sort: 'followers',
+        q: briefParts,
+      })
+      if (userFilters.length > 0) {
+        qs.set('cdb_filters', JSON.stringify(userFilters))
+      }
+      if (minFollowers) qs.set('min_followers', minFollowers)
+      if (maxFollowers) qs.set('max_followers', maxFollowers)
+      if (creatorCountry.trim()) qs.set('country', creatorCountry.trim().toUpperCase())
+
+      // ── LOG ──
+      console.group('[DirectOutreach] AI Match')
+      console.log('Brief:', briefParts)
+      console.log('User filters:', userFilters)
+      console.log('Platform:', activePlatform)
       console.groupEnd()
-
-      const activePlatform = campPlatform && ['youtube', 'instagram', 'tiktok'].includes(campPlatform) ? campPlatform : platform
-      const qs = new URLSearchParams({ platform: activePlatform, limit: String(BATCH_SIZE), offset: '0', cdb_sort: 'followers' })
-      qs.set('cdb_filters', JSON.stringify(filters))
-
-      console.log('[DirectOutreach] Request URL:', `/api/discovery/club-search?platform=${activePlatform}&limit=${PAGE_SIZE}&offset=0&cdb_sort=followers`)
 
       const res = await fetch(`/api/discovery/club-search?${qs}`)
       window.dispatchEvent(new Event('credits:refresh'))
@@ -737,20 +680,21 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           engagement: c.engagement_rate,
           niches: c.niche_tags?.join(', '),
           country: c.country,
+          ai_relevance: c.ai_relevance ?? '—',
         })))
       }
       if (data?.ai_parsed) console.log('AI parsed params:', data.ai_parsed)
       console.groupEnd()
 
       if (!res.ok) throw new Error(data?.message || 'Creator matching is temporarily unavailable.')
-      const results = data?.results || []
+      const results = sortByRelevance(data?.results || [])
       setAllCreators(results)
       setCreators(results)
       setSearchPage(0)
       setSearchTotal(0)
       setSearchTaskId(data?.task_id || null)
       setSearchHasMore(data?.has_next_page ?? false)
-      setSearchNextOffset(1) // next page number for task pagination
+      setSearchNextOffset(1)
       setMatched(true)
     } catch (e: any) { setError(e.message) }
     finally { setAiMatching(false) }
@@ -765,7 +709,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.message || 'Failed to load page.')
-      const results = data?.results || []
+      const results = sortByRelevance(data?.results || [])
       setAllCreators(prev => {
         // Accumulate all pages for session persistence
         const existing = new Set(prev.map((c: Creator) => c.id))
@@ -1845,7 +1789,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           closeCreatorDetail()
           setOutreachError(null)
         }}
-        nicheMap={{}}
+        nicheMap={nicheMap}
         zh={zh}
         locale={locale}
         t={t}

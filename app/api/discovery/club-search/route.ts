@@ -144,29 +144,46 @@ export async function GET(req: NextRequest) {
     if (!task) {
       return NextResponse.json({ message: 'Search task not found', code: 'TASK_NOT_FOUND' }, { status: 404 })
     }
+    // Check for a direct snapshot of the requested page first
     const snapshot = await prisma.discoveryTaskPage.findUnique({
       where: { taskId_page: { taskId: task.id, page: requestedPage } },
     })
-    if (snapshot) {
-      const taskId = task.id
-      after(async () => {
-        await prisma.discoverySearchTask
-          .update({ where: { id: taskId }, data: { updatedAt: new Date() } })
-          .catch(() => {})
-      })
-      const snapshotData = snapshot.data as any
+    // If no direct snapshot, check if an earlier page's batch has enough
+    // results to serve this page (e.g., page 0 fetched 100 results but
+    // only returned 20; pages 1-4 can be sliced from the same batch).
+    const batchSnapshot = !snapshot && requestedPage > 0
+      ? await prisma.discoveryTaskPage.findUnique({
+          where: { taskId_page: { taskId: task.id, page: 0 } },
+        })
+      : null
+    const effectiveSnapshot = snapshot || batchSnapshot
+    if (effectiveSnapshot) {
+      const snapshotData = effectiveSnapshot.data as any
       const fullResults: any[] = snapshotData?.results ?? []
-      const displayResults = fullResults.slice(0, DISPLAY_PAGE_SIZE)
-      return NextResponse.json({
-        ...snapshotData,
-        results: displayResults,
-        has_next_page:
-          displayResults.length === DISPLAY_PAGE_SIZE ||
-          (snapshotData?.has_next_page ?? false),
-        task_id: taskId,
-        page: requestedPage,
-        from_task: true,
-      })
+      // For a direct snapshot, slice from the start; for a batch
+      // snapshot, slice the correct window within the stored results.
+      const sliceStart = snapshot ? 0 : requestedPage * DISPLAY_PAGE_SIZE
+      const sliceEnd = sliceStart + DISPLAY_PAGE_SIZE
+      // Only use the batch if it actually has results for this page
+      if (sliceStart < fullResults.length) {
+        const taskId = task.id
+        after(async () => {
+          await prisma.discoverySearchTask
+            .update({ where: { id: taskId }, data: { updatedAt: new Date() } })
+            .catch(() => {})
+        })
+        const displayResults = fullResults.slice(sliceStart, sliceEnd)
+        return NextResponse.json({
+          ...snapshotData,
+          results: displayResults,
+          has_next_page:
+            sliceEnd < fullResults.length ||
+            (displayResults.length === DISPLAY_PAGE_SIZE && (snapshotData?.has_next_page ?? false)),
+          task_id: taskId,
+          page: requestedPage,
+          from_task: true,
+        })
+      }
     }
   }
 
@@ -452,25 +469,14 @@ export async function GET(req: NextRequest) {
       const converted = toCreatorDbFilters(aiParsed)
       if (converted.filters.length > 0) {
         if (creatorDbFilters) {
-          // User has existing cdb_filters. AI only contributes niches (broad
-          // category) — strip old niches/hashtags AND any numeric filters that
-          // duplicate what the user set via the basic UI params (followers,
-          // engagement, country, etc.), since the basic params are the user's
-          // most recent intent and should take priority.
-          const basicParamFields = new Set<string>()
-          if (num('min_followers') != null || num('max_followers') != null) basicParamFields.add('followers')
-          if (num('min_engagement') != null || num('max_engagement') != null) basicParamFields.add('shortEngagementRate')
-          if (params.get('country')?.trim()) basicParamFields.add('country')
-          if (params.get('language')?.trim()) basicParamFields.add('mainLanguage')
-
+          // User has existing cdb_filters. AI only contributes niches —
+          // all user-entered filters (followers, country, etc.) are preserved.
           creatorDbFilters = creatorDbFilters.filter((f) => {
-            // Always remove old niches/hashtags — AI will replace
+            // Only remove old niches/hashtags — AI will replace with better ones
             if (f.field === 'niches' || f.field === 'hashtags') return false
-            // Remove cdb_filter entries that conflict with basic UI params
-            if (basicParamFields.has(f.field)) return false
             return true
           })
-          // Add only AI niches (no hashtags — they over-constrain)
+          // Add AI-inferred niches (no hashtags — they over-constrain)
           for (const f of converted.filters) {
             if (f.field === 'niches') {
               creatorDbFilters.push({ field: f.field, op: f.op, value: f.value as CreatorDbFilterValue })
@@ -484,13 +490,11 @@ export async function GET(req: NextRequest) {
             value: f.value as CreatorDbFilterValue,
           }))
         }
-        // Sort AI-parsed searches by platform relevance score instead of
-        // raw follower count so results mix relevance with reach.
-        if (!creatorDbSortField) creatorDbSortField = 'platformScore'
-        // If the AI detected a different platform, override the URL param
-        if (aiParsed.platform && CLUB_PLATFORMS.includes(aiParsed.platform as ClubPlatform)) {
-          platform = aiParsed.platform as ClubPlatform
-        }
+        // Keep the caller's sort field (default: followers). Do not override
+        // to platformScore — users expect consistent "most followers" ordering.
+        // Respect the user's explicit platform selection — do NOT override
+        // it with the AI's suggestion. The AI platform hint is still
+        // returned in ai_parsed for informational purposes.
         // Validate the built request (reject before charging if invalid)
         try {
           buildCustomSearchRequest(
@@ -798,10 +802,9 @@ export async function GET(req: NextRequest) {
     // Return only DISPLAY_PAGE_SIZE results to the client
     const displayResults = fullResults.slice(0, DISPLAY_PAGE_SIZE)
 
-    // Replace expiring Instagram CDN avatar URLs with stable Firebase URLs.
-    // The /profile endpoint returns Firebase URLs for 0.1 credits per call —
-    // we already make these calls for niches, so piggyback avatarUrl here to
-    // avoid broken images on the initial render.
+    // 1. Profile enrichment: fetch avatar URLs + bios from CreatorDB profile endpoint.
+    //    The search endpoint doesn't return bios, so we piggyback on the avatar
+    //    enrichment calls to also fetch bio text for AI scoring.
     if (getProvider() === 'creatordb' && displayResults.length > 0) {
       try {
         const { creatorDbFetch: cdbFetch } = await import('@/lib/creatordb-usage')
@@ -809,35 +812,84 @@ export async function GET(req: NextRequest) {
         const PLAT_PATH: Record<string, string> = { instagram: 'instagram', youtube: 'youtube', tiktok: 'tiktok' }
         await Promise.allSettled(
           displayResults.map(async (r: any) => {
-            if (!r.handle || !r.avatar_url) return
-            // Skip already-stable URLs (Firebase, YouTube thumbnails)
-            try {
-              const host = new URL(r.avatar_url).hostname
-              if (host.endsWith('firebasestorage.googleapis.com') || host.endsWith('ggpht.com') || host.endsWith('ytimg.com')) return
-            } catch { return }
+            if (!r.handle) return
             const pp = PLAT_PATH[r.platform]
             if (!pp || !apiKey) return
+            // Skip avatar fetch if URL is already stable, but still fetch bio
+            const needsAvatar = r.avatar_url && (() => {
+              try {
+                const host = new URL(r.avatar_url).hostname
+                return !host.endsWith('firebasestorage.googleapis.com') && !host.endsWith('ggpht.com') && !host.endsWith('ytimg.com')
+              } catch { return false }
+            })()
+            const needsBio = !r.bio?.trim()
+            if (!needsAvatar && !needsBio) return
             try {
+              const fields = ['avatarUrl', 'bio']
               const res = await cdbFetch(
                 `https://apiv3.creatordb.app/${pp}/profile`,
                 {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', 'api-key': apiKey },
-                  body: JSON.stringify({ uniqueId: r.handle, fields: ['avatarUrl'] }),
+                  body: JSON.stringify({ uniqueId: r.handle, fields }),
                   cache: 'no-store',
                   signal: AbortSignal.timeout(5000),
                 },
                 { userId },
               )
               const d = await res.clone().json().catch(() => null)
-              if (d?.data?.avatarUrl) {
+              if (d?.data?.avatarUrl && needsAvatar) {
                 r.avatar_url = d.data.avatarUrl
                 r.avatarUrl = d.data.avatarUrl
+              }
+              if (d?.data?.bio && !r.bio?.trim()) {
+                r.bio = d.data.bio
               }
             } catch { /* non-critical */ }
           }),
         )
       } catch { /* non-critical */ }
+    }
+
+    // 2. AI bio relevance scoring — semantic matching across languages
+    const bioScoreResult: { scores: Map<string, number> | null } = { scores: null }
+    if (displayResults.length > 0) {
+      // Debug: log bio availability
+      const bioCheck = displayResults.map((r: any) => ({ handle: r.handle, hasBio: !!r.bio?.trim(), bioLen: r.bio?.length ?? 0 }))
+      console.log(`[club-search] Bio availability: ${bioCheck.filter(b => b.hasBio).length}/${bioCheck.length} have bios`, bioCheck)
+      const biosToScore = displayResults
+        .filter((r: any) => r.handle && r.bio?.trim())
+        .map((r: any) => ({ handle: r.handle, bio: r.bio }))
+      if (biosToScore.length > 0) {
+        const scoreContext: import('@/lib/discovery-ai').BioScoreContext = {
+          query: rawQuery || undefined,
+          niches: aiParsed?.niches
+            || (creatorDbFilters?.find((f) => f.field === 'niches')?.value as string)
+            || undefined,
+          keywords: aiParsed?.keywords || undefined,
+          platform: searchOpts.platform,
+          country: searchOpts.country || undefined,
+        }
+        console.log(`[club-search] Starting AI bio scoring for ${biosToScore.length} creators, context:`, JSON.stringify(scoreContext))
+        try {
+          const { scoreBioRelevance } = await import('@/lib/discovery-ai')
+          bioScoreResult.scores = await scoreBioRelevance(scoreContext, biosToScore)
+          console.log(`[club-search] AI bio scoring complete: ${bioScoreResult.scores?.size ?? 0} scores`)
+        } catch (err: any) {
+          console.error('[club-search] AI bio scoring failed:', err?.message)
+        }
+      } else {
+        console.log(`[club-search] Skipping AI bio scoring: no bios available (${displayResults.length} results, 0 with bios)`)
+      }
+    }
+
+    // Attach AI bio scores to results
+    if (bioScoreResult.scores && bioScoreResult.scores.size > 0) {
+      for (const r of displayResults as any[]) {
+        if (r.handle && bioScoreResult.scores.has(r.handle)) {
+          r.ai_relevance = bioScoreResult.scores.get(r.handle)
+        }
+      }
     }
 
     return NextResponse.json({

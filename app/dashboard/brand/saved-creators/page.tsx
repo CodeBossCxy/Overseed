@@ -71,6 +71,7 @@ export default function SavedCreatorsPage() {
   const [sort, setSort] = useState<'recent' | 'followers'>('recent')
   const [page, setPage] = useState(1)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [nicheMap, setNicheMap] = useState<Record<string, string[]>>({})
   const [selectedCreators, setSelectedCreators] = useState<Set<string>>(new Set())
   const [bulkOutreachOpen, setBulkOutreachOpen] = useState(false)
   const [bulkMsg, setBulkMsg] = useState('')
@@ -113,16 +114,20 @@ export default function SavedCreatorsPage() {
   } = useCreatorDetail()
 
   const openCreatorProfile = (row: any) => {
+    const platform = row.platforms?.[0] || row.discoveryPlatform || 'instagram'
+    const handle = (row.handle || row.discoveryHandle || '').replace(/^@/, '').toLowerCase()
+    const nicheKey = handle ? `${platform}:${handle}` : null
+    const niches = nicheKey ? nicheMap[nicheKey] : null
     const creator: DiscoveredCreator = {
       id: row._id,
-      platform: row.platforms?.[0] || row.discoveryPlatform || 'instagram',
+      platform,
       handle: row.handle || row.discoveryHandle || null,
       display_name: row.name || null,
       bio: row.bio || null,
       country: row.country || null,
       follower_count: row.followers || null,
       engagement_rate: row.engagement || null,
-      niche_tags: row.niche ? [row.niche] : [],
+      niche_tags: niches && niches.length > 0 ? niches : (row.niche ? [row.niche] : []),
       profile_url: row.profileUrl || null,
       avatar_url: row.avatarUrl || null,
       score: null,
@@ -151,6 +156,48 @@ export default function SavedCreatorsPage() {
       .then((data) => setFolders(data.folders || []))
       .catch(() => {})
   useEffect(() => { loadFolders() }, [])
+
+  // Fetch niches for all saved creators (uses cache, minimal CreatorDB calls)
+  useEffect(() => {
+    const creators: { platform: string; handle: string }[] = []
+    for (const row of saved) {
+      const accts = row.influencer?.socialAccounts || []
+      for (const a of accts) {
+        const p = a.platform?.name?.toLowerCase()
+        const h = a.platformUsername
+        if (p && h) creators.push({ platform: p, handle: h.replace(/^@/, '').toLowerCase() })
+      }
+    }
+    for (const row of discoverySaved) {
+      if (row.platform && row.handle) {
+        creators.push({ platform: row.platform, handle: row.handle.replace(/^@/, '').toLowerCase() })
+      }
+    }
+    if (creators.length === 0) return
+    // Batch in groups of 25 (API limit)
+    const batches: { platform: string; handle: string }[][] = []
+    for (let i = 0; i < creators.length; i += 25) {
+      batches.push(creators.slice(i, i + 25))
+    }
+    Promise.all(
+      batches.map((batch) =>
+        fetch('/api/discovery/creator-niches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ creators: batch }),
+        })
+          .then((r) => (r.ok ? r.json() : { niches: {} }))
+          .catch(() => ({ niches: {} }))
+      ),
+    ).then((results) => {
+      const merged: Record<string, string[]> = {}
+      for (const r of results) {
+        if (r.niches) Object.assign(merged, r.niches)
+      }
+      setNicheMap(merged)
+    })
+  }, [saved, discoverySaved])
+
 
   const createFolder = async () => {
     const name = folderName.trim()
@@ -651,13 +698,32 @@ export default function SavedCreatorsPage() {
                     {/* Bio */}
                     {row.bio && <p className="mt-2 text-xs text-gray-500 line-clamp-2 leading-relaxed">{row.bio}</p>}
                     {/* Niche tags */}
-                    {row.niche && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
-                          {t.categoryNames[row.niche] || row.niche}
-                        </span>
-                      </div>
-                    )}
+                    {(() => {
+                      const nicheKey = row.handle ? `${platformName}:${row.handle.replace(/^@/, '').toLowerCase()}` : null
+                      const niches = nicheKey ? nicheMap[nicheKey] : null
+                      const NICHE_COLORS = ['bg-green-100 text-green-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700', 'bg-blue-100 text-blue-700', 'bg-orange-100 text-orange-700']
+                      if (niches && niches.length > 0) {
+                        return (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {niches.slice(0, 5).map((n, i) => {
+                              const label = n.replace(/^[Ii]d_/, '').replace(/_[Aa]ll$/i, '').replace(/_/g, ' ').trim()
+                              if (!label) return null
+                              return <span key={`${label}-${i}`} className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${NICHE_COLORS[i % NICHE_COLORS.length]}`}>{label}</span>
+                            })}
+                          </div>
+                        )
+                      }
+                      if (row.niche) {
+                        return (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
+                              {t.categoryNames[row.niche] || row.niche}
+                            </span>
+                          </div>
+                        )
+                      }
+                      return null
+                    })()}
                   </div>
                 </div>
 
@@ -885,7 +951,7 @@ export default function SavedCreatorsPage() {
           savedKeys={new Set()}
           onToggleSave={() => {}}
           onOpenContact={() => {}}
-          nicheMap={{}}
+          nicheMap={nicheMap}
           zh={locale === 'zh'}
           locale={locale}
           t={t}

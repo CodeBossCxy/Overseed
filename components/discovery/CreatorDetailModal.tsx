@@ -648,23 +648,32 @@ export default function CreatorDetailModal({
                 <p className="text-sm text-gray-500">
                   @{detailFor.handle?.replace(/^@+/, '')}
                 </p>
-                {/* Category badges */}
-                {detail?.category && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    <span className="px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">{detail.category}</span>
-                    {/* Niche tags from discovery */}
-                    {(() => {
-                      const key = detailFor.handle ? `${detailFor.platform}:${detailFor.handle.replace(/^@/, '').toLowerCase()}` : null
-                      const niches = key ? nicheMap[key] : null
-                      if (!niches) return null
-                      return niches.slice(0, 4).map((n, i) => {
+                {/* Category & niche badges */}
+                {(() => {
+                  const key = detailFor.handle ? `${detailFor.platform}:${detailFor.handle.replace(/^@/, '').toLowerCase()}` : null
+                  const niches = key ? nicheMap[key] : null
+                  const hasCategory = !!detail?.category
+                  const hasNiches = niches && niches.length > 0
+                  const hasCreatorNiches = detailFor.niche_tags && detailFor.niche_tags.length > 0
+                  if (!hasCategory && !hasNiches && !hasCreatorNiches) return null
+                  return (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {hasCategory && (
+                        <span className="px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">{detail.category}</span>
+                      )}
+                      {hasNiches && niches.slice(0, 6).map((n, i) => {
                         const label = n.replace(/^[Ii]d_/, '').replace(/_[Aa]ll$/i, '').replace(/_/g, ' ').trim()
                         if (!label) return null
-                        return <span key={`${label}-${i}`} className="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium capitalize">{label}</span>
-                      })
-                    })()}
-                  </div>
-                )}
+                        return <span key={`niche-${label}-${i}`} className="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium capitalize">{label}</span>
+                      })}
+                      {!hasNiches && hasCreatorNiches && detailFor.niche_tags.slice(0, 6).map((n, i) => {
+                        const label = n.replace(/^[Ii]d_/, '').replace(/_[Aa]ll$/i, '').replace(/_/g, ' ').trim()
+                        if (!label) return null
+                        return <span key={`ctag-${label}-${i}`} className="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-medium capitalize">{label}</span>
+                      })}
+                    </div>
+                  )
+                })()}
               </div>
               {/* Top-right actions */}
               <div className="flex items-center gap-2 pt-3 flex-shrink-0">

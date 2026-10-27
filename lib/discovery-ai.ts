@@ -258,3 +258,139 @@ export function broadenFilters(
   // Only core filters remain (niches, country) — can't broaden further
   return null
 }
+
+// ── AI-powered bio relevance scoring ──────────────────────────────────────────
+// Scores each creator's bio against the search context in a single batched LLM
+// call. Returns a map of handle → 0-100 score. Semantic understanding means
+// "engine and machinery" scores high for an "automotive" search even without
+// keyword overlap.
+
+export interface BioScoreContext {
+  query?: string
+  niches?: string
+  keywords?: string
+  platform?: string
+  country?: string
+}
+
+export interface BioScoreInput {
+  handle: string
+  bio: string
+}
+
+const BIO_SCORE_SYSTEM = `You score how relevant a creator's bio is to a brand's search intent.
+
+You will receive:
+- SEARCH CONTEXT: what the brand is looking for (query, niches, keywords)
+- CREATORS: a list of creators with their handle and bio
+
+For each creator, return a relevance score 0-100:
+- 90-100: Bio directly mentions the exact topic/niche (e.g. "car reviewer" for automotive search)
+- 70-89: Bio strongly implies relevance (e.g. "engine specialist" or "mechanic" for automotive)
+- 40-69: Bio has moderate relevance (e.g. "outdoor adventures with my truck" for automotive)
+- 10-39: Bio has weak/tangential relevance (e.g. "lifestyle blogger" for automotive search)
+- 0-9: Bio is unrelated or empty
+
+Key rules:
+- Understand semantic meaning across languages. A Portuguese bio about "oficina mecânica" is highly relevant to an "automotive" search.
+- Consider indirect signals: tools, activities, settings that imply the niche without naming it.
+- An empty or generic bio (just emojis, "DM for collabs") gets score 0.
+- Be consistent: similar bios should get similar scores.
+
+Reply with ONLY a JSON object: {"scores":[{"h":"handle","s":score}, ...]}
+Keep handles exactly as given. No other text.`
+
+export async function scoreBioRelevance(
+  context: BioScoreContext,
+  creators: BioScoreInput[],
+): Promise<Map<string, number>> {
+  const scores = new Map<string, number>()
+  if (creators.length === 0) return scores
+
+  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.CHAT_API
+  const baseURL = process.env.DEEPSEEK_API_KEY
+    ? (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1')
+    : undefined
+  const model = process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o-mini'
+
+  if (!apiKey) {
+    console.warn('[discovery-ai] No API key for bio scoring')
+    return scores
+  }
+
+  // Build compact user message
+  const contextParts = []
+  if (context.query) contextParts.push(`Query: ${context.query}`)
+  if (context.niches) contextParts.push(`Niches: ${context.niches}`)
+  if (context.keywords) contextParts.push(`Keywords: ${context.keywords}`)
+  if (context.platform) contextParts.push(`Platform: ${context.platform}`)
+  if (context.country) contextParts.push(`Country: ${context.country}`)
+
+  // Truncate bios to keep within token limits
+  const creatorList = creators.map((c) => ({
+    h: c.handle,
+    b: c.bio.slice(0, 200),
+  }))
+
+  const userMsg = `SEARCH CONTEXT:\n${contextParts.join('\n')}\n\nCREATORS:\n${JSON.stringify(creatorList)}`
+
+  try {
+    const client = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) })
+    const completion = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: BIO_SCORE_SYSTEM },
+        { role: 'user', content: userMsg },
+      ],
+      temperature: 0,
+      max_tokens: 1000,
+      response_format: { type: 'json_object' },
+    })
+
+    const content = completion.choices?.[0]?.message?.content?.trim()
+    if (!content) {
+      console.warn('[discovery-ai] Bio scoring: empty LLM response')
+      return scores
+    }
+
+    let parsed: any
+    try {
+      parsed = JSON.parse(content)
+    } catch {
+      console.warn('[discovery-ai] Bio score JSON parse failed:', content.slice(0, 300))
+      return scores
+    }
+
+    // Extract array from any wrapper: {"scores":[...]}, {"results":[...]}, or bare [...]
+    let arr: any[]
+    if (Array.isArray(parsed)) {
+      arr = parsed
+    } else if (typeof parsed === 'object' && parsed !== null) {
+      // Find the first array value in the object
+      arr = Object.values(parsed).find((v): v is any[] => Array.isArray(v)) || []
+    } else {
+      arr = []
+    }
+
+    for (const item of arr) {
+      if (item?.h && typeof item.s === 'number') {
+        scores.set(item.h, Math.max(0, Math.min(100, Math.round(item.s))))
+      }
+    }
+
+    if (arr.length > 0 && scores.size === 0) {
+      console.warn('[discovery-ai] Bio scoring: parsed array but no valid {h,s} entries. Sample:', JSON.stringify(arr[0]))
+    }
+
+    console.log(
+      `%c[AI Bio Scoring] ${scores.size}/${creators.length} creators scored\n` +
+      `%c` + Array.from(scores.entries()).map(([h, s]) => `  ${h}: ${s}`).join('\n'),
+      'color:#6366f1;font-weight:bold',
+      'color:#94a3b8',
+    )
+  } catch (err: any) {
+    console.warn('[discovery-ai] Bio scoring failed:', err?.message)
+  }
+
+  return scores
+}

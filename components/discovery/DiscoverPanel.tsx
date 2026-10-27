@@ -956,8 +956,8 @@ export default function DiscoverPanel() {
   const [avatarOverrides, setAvatarOverrides] = useState<Record<string, string>>({})
   // Creator bios fetched alongside niches from /profile.
   const [bioMap, setBioMap] = useState<Record<string, string>>({})
-  // Client-side relevance sort for search results
-  const [sortByRelevance, setSortByRelevance] = useState(false)
+  // Client-side sort mode for search results
+  const [sortMode, setSortMode] = useState<'followers' | 'bestMatch'>('bestMatch')
 
   // ── Latest post per creator (fetched via /content-detail when toggle is on) ──
   const [contentMap, setContentMap] = useState<Record<string, {
@@ -1701,10 +1701,10 @@ export default function DiscoverPanel() {
       // visible filter UI. User-defined filters remain untouched.
       if (data?.ai_parsed && page === 0) {
         const ai = data.ai_parsed
-        // Switch platform tab if AI detected a different one (this is OK to show)
-        if (ai.platform && ['instagram', 'tiktok', 'youtube'].includes(ai.platform)) {
-          setPlatforms([ai.platform])
-        }
+        // Note: Do NOT override the user's selected platform tab here.
+        // The user explicitly chose a platform; the AI's suggestion was
+        // already sent to the server as a hint but the search ran on the
+        // user's chosen platform.
         // Store AI-inferred basic filters in ref (not in UI state)
         const inferred: typeof aiInferredRef.current = { creatorDbFilters: [] }
         if (ai.country) inferred.country = ai.country
@@ -1915,7 +1915,7 @@ export default function DiscoverPanel() {
     // Map the simple sort dropdown to cdb_sort for CreatorDB searches
     if (sort === 'followers') qs.set('cdb_sort', 'followers')
     else if (sort === 'recent') qs.set('cdb_sort', 'lastPublishTime')
-    else if (sort === 'relevance') qs.set('cdb_sort', 'platformScore')
+
     if (showLatestPost) qs.set('show_latest_post', '1')
 
     // Always persist the user-visible filter state (not the merged AI values)
@@ -2189,6 +2189,7 @@ export default function DiscoverPanel() {
     [searchResult, browseList],
   )
   // Build a relevance query string from text query + filter values (niches, hashtags)
+  // + AI-inferred English terms for cross-language matching
   const relevanceQuery = useMemo(() => {
     const parts: string[] = []
     if (query.trim()) parts.push(query.trim())
@@ -2196,29 +2197,57 @@ export default function DiscoverPanel() {
     if (nicheFilter?.value) parts.push(nicheFilter.value)
     const hashtagFilter = creatorDbFilters.find((f) => f.field === 'hashtags')
     if (hashtagFilter?.value) parts.push(hashtagFilter.value.replace(/#/g, ''))
+    // Append AI-inferred English niches/keywords so relevance scoring works
+    // cross-language (e.g. Chinese query → English niche terms → match English tags)
+    const ai = aiInferredRef.current
+    if (ai.creatorDbFilters.length > 0) {
+      for (const f of ai.creatorDbFilters) {
+        if ((f.field === 'niches' || f.field === 'hashtags') && f.value) {
+          parts.push(f.value.replace(/#/g, ''))
+        }
+      }
+    }
     return parts.join(' ')
-  }, [query, creatorDbFilters])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, creatorDbFilters, searchResult])
 
   const creators = useMemo(() => {
-    if (sortByRelevance && relevanceQuery.trim()) {
-      // Sort by relevance: calculate scores using bio + niches vs query + filters
+    if (sortMode === 'bestMatch' && relevanceQuery.trim()) {
+      // Score every creator by bio + niche relevance
       const scored = creatorsRaw.map((c) => {
         const key = c.handle ? `${c.platform}:${c.handle.replace(/^@/, '').toLowerCase()}` : null
         const bio = c.bio || (key ? bioMap[key] : null) || null
         const niches = key ? (nicheMap[key] || c.niche_tags || []) : (c.niche_tags || [])
-        const { score } = calculateRelevance(relevanceQuery.trim(), bio, niches)
-        return { ...c, _relevance: score }
+        const rel = calculateRelevance(relevanceQuery.trim(), bio, niches)
+        // Use AI-scored bio relevance when available (semantic, cross-language),
+        // fall back to local keyword-based bioScore
+        const aiBio = (c as any).ai_relevance as number | undefined
+        const effectiveBioScore = aiBio != null ? aiBio : rel.bioScore
+        const effectiveScore = effectiveBioScore
+        return { ...c, _relevance: effectiveScore, _bioScore: effectiveBioScore, _localBioScore: rel.bioScore, _nicheScore: rel.nicheScore, _aiBio: aiBio, _bio: bio, _niches: niches }
       })
+      console.group(`[Relevance] Query: "${relevanceQuery.trim()}" | Sort: ${sortMode} | ${scored.length} creators`)
+      console.table(scored.map((c) => ({
+        handle: c.handle,
+        followers: c.follower_count,
+        relevance: c._relevance,
+        aiBioScore: c._aiBio ?? '—',
+        localBioScore: c._localBioScore,
+        nicheScore: c._nicheScore,
+        bio: (c._bio || '').slice(0, 80),
+        niches: (c._niches || []).slice(0, 5).join(', '),
+      })))
+      console.groupEnd()
+      // Best Match: sort by relevance score, break ties by followers
       return [...scored].sort((a, b) => {
         const diff = (b._relevance ?? 0) - (a._relevance ?? 0)
-        // Tiebreaker: higher followers first
         if (diff === 0) return (b.follower_count ?? 0) - (a.follower_count ?? 0)
         return diff
       })
     }
     // Sort by most followers (client-side to guarantee correct order)
     return [...creatorsRaw].sort((a, b) => (b.follower_count ?? 0) - (a.follower_count ?? 0))
-  }, [creatorsRaw, sortByRelevance, relevanceQuery, bioMap, nicheMap])
+  }, [creatorsRaw, sortMode, relevanceQuery, bioMap, nicheMap])
 
   // Clear multi-select when search results change
   useEffect(() => { setSelectedCreators(new Set()) }, [creatorsRaw])
@@ -3311,12 +3340,12 @@ export default function DiscoverPanel() {
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-gray-500">{d.resultsSortBy}</span>
                 <select
-                  value={sortByRelevance ? 'relevance' : 'followers'}
-                  onChange={(e) => setSortByRelevance(e.target.value === 'relevance')}
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value as 'followers' | 'relevance' | 'bestMatch')}
                   className="text-xs font-semibold text-gray-700 bg-transparent border-none cursor-pointer focus:outline-none"
                 >
+                  <option value="bestMatch">{d.resultsSortBestMatch}</option>
                   <option value="followers">{d.resultsSortFollowers}</option>
-                  <option value="relevance">{d.resultsSortRelevance}</option>
                 </select>
               </div>
             </div>
