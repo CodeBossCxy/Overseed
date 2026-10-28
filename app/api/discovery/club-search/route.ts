@@ -173,6 +173,43 @@ export async function GET(req: NextRequest) {
             .catch(() => {})
         })
         const displayResults = fullResults.slice(sliceStart, sliceEnd)
+
+        // Run match scoring on batch-served results that weren't enriched
+        // during the initial page 0 response. Scoring is purely computational
+        // (no external API calls) so it's fast and free.
+        if (!snapshot) {
+          try {
+            const { classifyCreatorTypeCached } = await import('@/lib/creator-type-classifier')
+            const { scoreCreator } = await import('@/lib/ranking-weights')
+            for (const r of displayResults as any[]) {
+              if (r.match_breakdown) continue // already scored
+              const key = r.handle ? `${r.platform}:${r.handle}` : null
+              if (key) {
+                const ct = classifyCreatorTypeCached(key, {
+                  bio: r.bio, handle: r.handle, category: r.category,
+                  niche_tags: r.niche_tags, follower_count: r.follower_count,
+                })
+                r.creator_type = ct.type
+                r.creator_type_confidence = ct.confidence
+              }
+              const breakdown = scoreCreator(
+                {
+                  niche_tags: r.niche_tags, bio: r.bio,
+                  engagement_rate: typeof r.engagement_rate === 'number' ? r.engagement_rate : null,
+                  follower_count: r.follower_count, country: r.country,
+                  platform: r.platform, ai_relevance: r.ai_relevance,
+                },
+                { objective: null },
+              )
+              r.match_score = breakdown.total
+              r.match_breakdown = breakdown
+              r.ai_relevance = breakdown.total
+            }
+          } catch (err: any) {
+            console.warn('[club-search] Batch page scoring failed:', err?.message)
+          }
+        }
+
         return NextResponse.json({
           ...snapshotData,
           results: displayResults,

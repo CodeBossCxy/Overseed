@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -131,6 +131,28 @@ function compact(value: number | null) {
 
 type CampaignStats = { total: number; pending: number; approved: number; rejected: number; underReview: number }
 
+/** Tiny isolated input — typing never re-renders the parent. */
+function DebouncedInput({
+  defaultValue = '', onCommit, delay = 300, ...props
+}: { defaultValue?: string; onCommit: (v: string) => void; delay?: number } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const ref = useRef<HTMLInputElement>(null)
+  const commitRef = useRef(onCommit)
+  commitRef.current = onCommit
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  return (
+    <input
+      {...props}
+      ref={ref}
+      defaultValue={defaultValue}
+      onChange={(e) => {
+        const v = e.target.value
+        if (timer.current) clearTimeout(timer.current)
+        timer.current = setTimeout(() => commitRef.current(v), delay)
+      }}
+    />
+  )
+}
+
 export default function BrandCampaignDetailClient({ campaign: initialCampaign, stats }: { campaign: Campaign; stats: CampaignStats }) {
   const { t, locale } = useLanguage()
   const d = t.brand.discover
@@ -211,28 +233,26 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     </div>
   )
   const [tab, setTabRaw] = useState<'detail' | 'direct'>('detail')
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(`campaign-tab:${initialCampaign.id}`)
-      if (saved === 'direct') setTabRaw('direct')
-    } catch {}
-  }, [initialCampaign.id])
   const setTab = (t: 'detail' | 'direct') => {
     setTabRaw(t)
-    try { sessionStorage.setItem(`campaign-tab:${initialCampaign.id}`, t) } catch {}
   }
+  // Scroll to top on mount (Next.js client navigation preserves scroll position).
+  // Use requestAnimationFrame to run after the browser has laid out the new content
+  // and after Next.js scroll restoration has fired.
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+    })
+  }, [])
   const [query, setQuery] = useState('')
   // Filters default to the campaign brief (platform / follower requirement);
   // the brand can adjust them before running the AI match.
-  const [platform, setPlatform] = useState(() => {
-    const p = (initialCampaign.platforms[0]?.platform.name || '').toLowerCase()
-    return ['tiktok', 'instagram', 'youtube'].includes(p) ? p : 'tiktok'
-  })
+  const [platform, setPlatform] = useState('auto')
   // CreatorDB canonical filters
   type CdbFilter = { field: string; op: string; value: string }
   const [cdbFilters, setCdbFilters] = useState<CdbFilter[]>([])
   const cdbFilterFor = (field: string) => cdbFilters.find(f => f.field === field) || { field, op: '=', value: '' }
-  const updateCdbFilter = (field: string, updates: Partial<CdbFilter>) => {
+  const updateCdbFilter = useCallback((field: string, updates: Partial<CdbFilter>) => {
     setCdbFilters(prev => {
       const exists = prev.find(f => f.field === field)
       if (exists) {
@@ -243,22 +263,14 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       const newFilter = { field, op: '=', value: '', ...updates }
       return newFilter.value.trim() ? [...prev, newFilter] : prev
     })
-  }
+  }, [])
+  const nicheOnChange = useCallback((v: string) => updateCdbFilter('niches', { op: 'in', value: v }), [updateCdbFilter])
 
   // Keep these simple states for creator country + followers (injected into cdb_filters on search)
-  // Default creator country from campaign's target countries
-  const [creatorCountry, setCreatorCountry] = useState(() => {
-    const countries = (initialCampaign as any).targetCountries as string[] | undefined
-    return countries?.[0] || ''
-  })
-  const [minFollowers, setMinFollowers] = useState(() => {
-    const min = initialCampaign.followerRequirements?.[0]?.minFollowers
-    return min ? String(min) : ''
-  })
-  const [maxFollowers, setMaxFollowers] = useState(() => {
-    const max = initialCampaign.followerRequirements?.[0]?.maxFollowers
-    return max ? String(max) : ''
-  })
+  // All filters start empty — the AI match reads the campaign brief directly.
+  const [creatorCountry, setCreatorCountry] = useState('')
+  const [minFollowers, setMinFollowers] = useState('')
+  const [maxFollowers, setMaxFollowers] = useState('')
   const [creators, setCreators] = useState<Creator[]>([])
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -575,10 +587,17 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       return (b.follower_count ?? 0) - (a.follower_count ?? 0)
     })
 
+  // Resolve 'auto' to the campaign's platform
+  const resolvedPlatform = (() => {
+    if (platform !== 'auto') return platform
+    const p = (campaign.platforms[0]?.platform.name || '').toLowerCase()
+    return ['tiktok', 'instagram', 'youtube'].includes(p) ? p : 'instagram'
+  })()
+
   const discover = useCallback(async (search = '', page = 0, offset = 0) => {
     setLoading(true); setError('')
     const searching = Boolean(search.trim())
-    const qs = new URLSearchParams({ platform })
+    const qs = new URLSearchParams({ platform: resolvedPlatform })
     const filters = buildCdbFiltersParam()
 
     if (filters.length > 0) {
@@ -615,7 +634,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       setSearchNextOffset(1)
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false); setMatched(true) }
-  }, [platform, buildCdbFiltersParam])
+  }, [resolvedPlatform, buildCdbFiltersParam])
 
   const aiMatch = async () => {
     if (aiMatching) return
@@ -651,12 +670,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         ? `${profile.briefText}\nAdditional keywords: ${query.trim()}`
         : profile.briefText
 
-      if (['tiktok', 'instagram', 'youtube'].includes(profile.platform)) {
-        setPlatform(profile.platform)
-      }
+      // Use resolved platform (respects 'auto' → campaign platform)
+      const activePlatform = resolvedPlatform
 
       const qs = new URLSearchParams({
-        platform: profile.platform,
+        platform: activePlatform,
         limit: String(BATCH_SIZE),
         offset: '0',
         cdb_sort: 'followers',
@@ -719,7 +737,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
     if (loading || !searchTaskId) return
     setLoading(true); setError('')
     try {
-      const qs = new URLSearchParams({ task_id: searchTaskId, page: String(page), platform })
+      const qs = new URLSearchParams({ task_id: searchTaskId, page: String(page), platform: resolvedPlatform })
       const res = await fetch(`/api/discovery/club-search?${qs}`)
       window.dispatchEvent(new Event('credits:refresh'))
       const data = await res.json().catch(() => null)
@@ -1111,6 +1129,13 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
               </span>
             </label>
             <select value={platform} onChange={e => setPlatform(e.target.value)} className={`w-full ${inputCls}`}>
+              <option value="auto">
+                {zh ? '按活动设置' : 'From campaign'}{(() => {
+                  const p = (campaign.platforms[0]?.platform.name || '').toLowerCase()
+                  const label: Record<string, string> = { tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube' }
+                  return label[p] ? ` (${label[p]})` : ''
+                })()}
+              </option>
               <option value="tiktok">TikTok</option>
               <option value="instagram">Instagram</option>
               <option value="youtube">YouTube</option>
@@ -1161,10 +1186,9 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 {d.hashtags}
               </span>
             </label>
-            <input
+            <DebouncedInput
               type="text"
-              value={cdbFilterFor('hashtags').value}
-              onChange={(e) => updateCdbFilter('hashtags', { op: 'in', value: e.target.value })}
+              onCommit={(v) => updateCdbFilter('hashtags', { op: 'in', value: v })}
               placeholder={d.hashtagsPlaceholder}
               className={`w-full ${inputCls}`}
             />
@@ -1173,7 +1197,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           <NicheAutocomplete
             platform={platform}
             value={cdbFilterFor('niches').value}
-            onChange={(v) => updateCdbFilter('niches', { op: 'in', value: v })}
+            onChange={nicheOnChange}
             labelCls={labelCls}
             inputCls={inputCls}
             zh={zh}
@@ -1506,7 +1530,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
             <div className="flex gap-2"><div className="workspace-glass-control flex-1 flex items-center gap-3 px-4 py-3">{icon(searchIcon, 'w-4 h-4')}<input value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent outline-none w-full" placeholder={d.searchByNamePlaceholder}/></div><button className="px-6 rounded-full bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold">{d.searchButton}</button></div>
             <div className="space-y-2 mt-3">
               {filterSections}
-              <button type="button" onClick={() => { setQuery(''); setCreatorCountry(''); setMinFollowers(''); setMaxFollowers(''); setCdbFilters([]); setCreators([]); setMatched(false); try { sessionStorage.removeItem(searchStateKey) } catch {} }} className="px-3 py-1 text-sm text-[#65739e]">{d.clearAll}</button>
+              <button type="button" onClick={() => { setQuery(''); setPlatform('auto'); setCreatorCountry(''); setMinFollowers(''); setMaxFollowers(''); setCdbFilters([]); setCreators([]); setAllCreators([]); setMatched(false); setSearchPage(0); setSearchHasMore(false); setSearchTaskId(null); setSelectedForOutreach(new Set()); try { sessionStorage.removeItem(searchStateKey) } catch {} }} className="px-3 py-1 text-sm text-[#65739e]">{d.clearAll}</button>
             </div>
           </form>
           )}
@@ -1749,26 +1773,33 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           </div>
           {/* Pagination */}
           {(searchPage > 0 || searchHasMore) && (
-            <div className="mt-5 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => goToPage(searchPage - 1)}
-                disabled={searchPage === 0 || loading}
-                className="px-5 py-2.5 bg-white/55 text-gray-700 rounded-full text-sm font-semibold hover:bg-white/75 transition disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                ← {m.prevPage}
-              </button>
-              <span className="min-w-20 text-center text-sm font-medium text-gray-500">
-                {m.pageNum.replace('{n}', String(searchPage + 1))}
-              </span>
-              <button
-                type="button"
-                onClick={() => goToPage(searchPage + 1)}
-                disabled={!searchHasMore || loading}
-                className="px-5 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {m.nextPageBtn} →
-              </button>
+            <div className="mt-5 flex flex-col items-center gap-2">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => goToPage(searchPage - 1)}
+                  disabled={searchPage === 0 || loading}
+                  className="px-5 py-2.5 bg-white/55 text-gray-700 rounded-full text-sm font-semibold hover:bg-white/75 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← {m.prevPage}
+                </button>
+                <span className="min-w-20 text-center text-sm font-medium text-gray-500">
+                  {m.pageNum.replace('{n}', String(searchPage + 1))}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => goToPage(searchPage + 1)}
+                  disabled={!searchHasMore || loading}
+                  className="px-5 py-2.5 bg-primary-600 text-white rounded-full text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {m.nextPageBtn} →
+                </button>
+              </div>
+              {searchHasMore && searchPrice != null && (
+                <p className="text-xs text-gray-400">
+                  {zh ? `翻页将扣除 ${searchPrice} 积分` : `Next page costs ${searchPrice} credits`}
+                </p>
+              )}
             </div>
           )}
           </>)}

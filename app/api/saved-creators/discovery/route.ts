@@ -100,3 +100,25 @@ export async function DELETE(req: NextRequest) {
   await prisma.savedDiscoveryCreator.deleteMany({ where: { brandId, platform, handle } })
   return NextResponse.json({ saved: false })
 }
+
+// PATCH /api/saved-creators/discovery { id, folderId } — move to folder
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) {
+    return NextResponse.json({ message: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
+  }
+  const brandId = await getBrandId((session.user as any).id)
+  if (!brandId) {
+    return NextResponse.json({ message: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+  }
+  const body = await req.json()
+  const { id, folderId } = body
+  if (!id) {
+    return NextResponse.json({ message: 'id is required', code: 'VALIDATION_ERROR' }, { status: 400 })
+  }
+  await prisma.savedDiscoveryCreator.updateMany({
+    where: { id, brandId },
+    data: { folderId: folderId || null },
+  })
+  return NextResponse.json({ ok: true })
+}

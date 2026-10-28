@@ -231,7 +231,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
           onClick={() => { setMineOnly(false); setPage(1) }}
           className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
             !mineOnly
-              ? 'bg-white shadow-sm text-gray-900'
+              ? 'bg-primary-600 text-white shadow-sm'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -436,7 +436,7 @@ export default function BrandCampaignsClient({ campaigns, isVerified, brandId }:
                     )
                   )}
                   <span className="inline-flex items-center justify-center gap-3 text-sm font-semibold text-gray-700 group-hover:text-primary-700 transition">
-                    {c.manageCampaign}
+                    {cp.brandId === brandId ? c.manageCampaign : c.view}
                     <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
                   </span>
                   {cp.brandId === brandId && (

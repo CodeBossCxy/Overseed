@@ -63,6 +63,7 @@ export default function SavedCreatorsPage() {
   const [folderName, setFolderName] = useState('')
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [platform, setPlatform] = useState('')
   const [country, setCountry] = useState('')
@@ -258,6 +259,31 @@ export default function SavedCreatorsPage() {
       }
     } finally {
       setBusyId(null)
+    }
+  }
+
+  const moveDiscoveryToFolder = async (id: string, folderId: string) => {
+    setBusyId(id)
+    try {
+      const res = await fetch('/api/saved-creators/discovery', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, folderId: folderId || null }),
+      })
+      if (res.ok) {
+        setDiscoverySaved((prev) => prev.map((row) => (row.id === id ? { ...row, folderId: folderId || null } : row)))
+        loadFolders()
+      }
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const moveCreatorToFolder = (row: { _type: string; _id: string; influencerId: string | null; discoveryId: string | null }, folderId: string) => {
+    if (row._type === 'discovery' && row.discoveryId) {
+      moveDiscoveryToFolder(row.discoveryId, folderId)
+    } else if (row.influencerId) {
+      moveToFolder(row.influencerId, folderId)
     }
   }
 
@@ -489,7 +515,17 @@ export default function SavedCreatorsPage() {
         <div data-tour="saved-creators-folders" className="mb-4 flex flex-wrap items-center gap-2">
           <button
             onClick={() => { setActiveFolder(''); setPage(1) }}
+            onDragOver={(e) => { e.preventDefault(); setDragOverFolder('__all__') }}
+            onDragLeave={() => setDragOverFolder(null)}
+            onDrop={(e) => {
+              e.preventDefault(); setDragOverFolder(null)
+              try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'))
+                if (data?._id) moveCreatorToFolder(data, '')
+              } catch {}
+            }}
             className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
+              dragOverFolder === '__all__' ? 'bg-primary-100 text-primary-700 ring-2 ring-primary-400' :
               activeFolder === '' ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200' : 'bg-white/45 text-gray-600 hover:bg-white/70'
             }`}
           >
@@ -499,7 +535,17 @@ export default function SavedCreatorsPage() {
             <span key={f.id} className="inline-flex items-center">
               <button
                 onClick={() => { setActiveFolder(f.id); setPage(1) }}
+                onDragOver={(e) => { e.preventDefault(); setDragOverFolder(f.id) }}
+                onDragLeave={() => setDragOverFolder(null)}
+                onDrop={(e) => {
+                  e.preventDefault(); setDragOverFolder(null)
+                  try {
+                    const data = JSON.parse(e.dataTransfer.getData('text/plain'))
+                    if (data?._id) moveCreatorToFolder(data, f.id)
+                  } catch {}
+                }}
                 className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${
+                  dragOverFolder === f.id ? 'bg-primary-100 text-primary-700 ring-2 ring-primary-400' :
                   activeFolder === f.id ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200' : 'bg-white/45 text-gray-600 hover:bg-white/70'
                 }`}
               >
@@ -641,7 +687,15 @@ export default function SavedCreatorsPage() {
               ) : null)
               const PLATFORM_LABELS: Record<string, string> = { youtube: 'YouTube', instagram: 'Instagram', tiktok: 'TikTok' }
               return (
-              <div key={row._id} className={`workspace-glass-card rounded-2xl p-5 transition-colors ${selectedCreators.has(row._id) ? 'ring-2 ring-primary-400 bg-primary-50/30' : ''}`}>
+              <div
+                key={row._id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', JSON.stringify({ _id: row._id, _type: row._type, influencerId: row.influencerId, discoveryId: row.discoveryId }))
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                className={`workspace-glass-card rounded-2xl p-5 transition-colors cursor-grab active:cursor-grabbing ${selectedCreators.has(row._id) ? 'ring-2 ring-primary-400 bg-primary-50/30' : ''}`}
+              >
                 {/* Top section: avatar + info + platform link */}
                 <div className="flex gap-4">
                   {/* Avatar with gradient ring */}
@@ -794,6 +848,19 @@ export default function SavedCreatorsPage() {
                         </button>
                       )
                     })()}
+                    {/* Move to folder dropdown */}
+                    <select
+                      value={row.folderId || ''}
+                      onChange={(e) => moveCreatorToFolder(row, e.target.value)}
+                      className="text-xs bg-white/60 border border-gray-200 rounded-full px-2 py-1.5 text-gray-500 hover:border-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-400 cursor-pointer"
+                      title={zh ? '移动到文件夹' : 'Move to folder'}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="">{zh ? '📁 无文件夹' : '📁 No folder'}</option>
+                      {folders.map(f => (
+                        <option key={f.id} value={f.id}>📁 {f.name}</option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={() => row._type === 'discovery' ? unsaveDiscovery(row._id, row.discoveryPlatform!, row.discoveryHandle!) : unsave(row._id)}

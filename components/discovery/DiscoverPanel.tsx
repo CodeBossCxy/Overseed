@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
+import { memo, useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -231,7 +231,7 @@ export function MultiSelectFilter({
 
 export { NicheTags }
 
-export function NicheAutocomplete({
+export const NicheAutocomplete = memo(function NicheAutocomplete({
   value, onChange, labelCls, inputCls, zh,
 }: {
   platform: string; value: string; onChange: (v: string) => void
@@ -242,8 +242,8 @@ export function NicheAutocomplete({
   const [query, setQuery] = useState(value)
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => { setQuery(value) }, [value])
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -263,11 +263,13 @@ export function NicheAutocomplete({
 
   const handleFocus = () => { setOpen(true) }
 
+  const debouncedOnChange = useRef<ReturnType<typeof setTimeout> | null>(null)
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value
     setQuery(v)
-    onChange(v)
     setOpen(true)
+    if (debouncedOnChange.current) clearTimeout(debouncedOnChange.current)
+    debouncedOnChange.current = setTimeout(() => onChangeRef.current(v), 300)
   }
 
   const selectNiche = (name: string) => {
@@ -281,7 +283,7 @@ export function NicheAutocomplete({
     }
     const joined = confirmed.join(', ')
     setQuery(joined)
-    onChange(joined)
+    onChangeRef.current(joined)
     setOpen(false)
   }
 
@@ -323,7 +325,7 @@ export function NicheAutocomplete({
       )}
     </div>
   )
-}
+})
 
 const PLATFORMS = ['tiktok', 'instagram', 'youtube'] as const
 const PLATFORM_LABELS: Record<string, string> = {
@@ -1974,6 +1976,12 @@ export default function DiscoverPanel() {
 
   const clearSearch = () => {
     setQuery('')
+    // Reset all filters
+    setCountry(''); setFollowerTierMode(''); setMinFollowers(''); setMaxFollowers('')
+    setMinEngagement(''); setMaxEngagement(''); setGender(''); setLanguage('')
+    setBioKeywords(''); setLastPost(''); setAudienceAge('')
+    setCreatorDbFilters([]); setShowLatestPost(false)
+    // Reset search state
     setSearchResult(null)
     setActiveSearch(null)
     setSearchPage(0)
@@ -2603,7 +2611,9 @@ export default function DiscoverPanel() {
               type="button"
               onClick={() => {
                 setCountry(''); setFollowerTier(''); setMinFollowers(''); setMaxFollowers('')
-                setCreatorDbFilters([]); setAudienceAge('')
+                setMinEngagement(''); setMaxEngagement(''); setGender(''); setLanguage('')
+                setBioKeywords(''); setLastPost(''); setAudienceAge('')
+                setCreatorDbFilters([]); setShowLatestPost(false)
               }}
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition"
             >
