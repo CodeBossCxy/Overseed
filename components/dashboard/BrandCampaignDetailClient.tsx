@@ -313,7 +313,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   const [bioMap, setBioMap] = useState<Record<string, string>>({})
   const [followerTierMode, setFollowerTierMode] = useState('')
   const [openFilterSections, setOpenFilterSections] = useState<Record<string, boolean>>({
-    audience: true, creator: true, performance: true,
+    audience: false, creator: false, performance: false,
   })
   const toggleFilterSection = (key: string) => setOpenFilterSections(prev => ({ ...prev, [key]: !prev[key] }))
 
@@ -1512,47 +1512,11 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
           )}
           {error && <div className="mb-3 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>}
           {!matched && (
-            <section data-tour="ai-match-section" className="workspace-glass-card rounded-3xl px-6 py-12 text-center">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-white/70 text-indigo-600 flex items-center justify-center text-2xl">✨</div>
-              <h3 className="font-bold text-xl mt-4">{m.aiMatchTitle}</h3>
-              <p className="text-sm text-[#7180ad] mt-2 max-w-lg mx-auto">{m.aiMatchDesc}</p>
-              {/* AI Match Profile Preview */}
-              {(() => {
-                const cats = campaign.categories.map(c => c.category.name)
-                const platLabel = PLATFORM_LABEL[platform] || platform
-                const countries = campaign.targetCountries?.length ? campaign.targetCountries.join(', ') : null
-                const languages = campaign.targetLanguages?.length ? campaign.targetLanguages.join(', ') : null
-                const objective = campaign.campaignObjective?.replace(/_/g, ' ') || null
-                const styles = campaign.contentStyles?.length ? campaign.contentStyles.map(s => s.replace(/_/g, ' ')).join(', ') : null
-                const hasPreview = cats.length > 0 || countries || objective
-                if (!hasPreview) return null
-                return (
-                  <div className="mt-5 mx-auto max-w-lg text-left bg-white/50 rounded-2xl border border-white/60 p-4">
-                    <p className="text-xs font-semibold text-gray-600 mb-2.5 flex items-center gap-1.5">
-                      <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" /></svg>
-                      {zh ? 'AI 将根据您的活动自动搜索' : 'AI will search based on your campaign'}
-                    </p>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full font-medium">{platLabel}</span>
-                      {cats.map(c => <span key={c} className="px-2.5 py-1 bg-violet-50 text-violet-700 rounded-full">{c}</span>)}
-                      {countries && <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full">📍 {countries}</span>}
-                      {languages && <span className="px-2.5 py-1 bg-sky-50 text-sky-700 rounded-full">🗣 {languages}</span>}
-                      {objective && <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full">🎯 {objective.toLowerCase()}</span>}
-                      {styles && <span className="px-2.5 py-1 bg-pink-50 text-pink-700 rounded-full">🎬 {styles.toLowerCase()}</span>}
-                      {minFollowers && <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full">👥 {minFollowers}{maxFollowers ? `–${maxFollowers}` : '+'}</span>}
-                    </div>
-                  </div>
-                )
-              })()}
-              <div className="mt-5 mx-auto max-w-lg grid sm:grid-cols-3 gap-2 text-xs text-[#5f6c95]">
-                {[m.aiMatchStep1, m.aiMatchStep2, m.aiMatchStep3].map((s, i) => (
-                  <div key={s} className="bg-white/40 rounded-xl px-3 py-2.5">
-                    <span className="text-indigo-500 font-bold">{i + 1}.</span> {s}
-                  </div>
-                ))}
-              </div>
+            <section data-tour="ai-match-section" className="workspace-glass-card rounded-3xl px-6 py-8 text-center">
+              <h3 className="font-bold text-xl">{m.aiMatchTitle}</h3>
+              <p className="text-sm text-[#7180ad] mt-1.5 max-w-lg mx-auto">{m.aiMatchDesc}</p>
               <form
-                className="mt-6 mx-auto max-w-xl"
+                className="mt-5 mx-auto max-w-xl"
                 onSubmit={(e) => { e.preventDefault(); aiMatch() }}
               >
                 <div className="workspace-glass-control flex items-center gap-3 px-4 py-3 text-left">
@@ -1566,7 +1530,6 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                 </div>
               </form>
               <div className="mt-4 mx-auto max-w-2xl space-y-2">
-                <p className="text-xs text-[#7d88aa] mb-2">{m.aiMatchFiltersNote}</p>
                 {filterSections}
               </div>
               <button

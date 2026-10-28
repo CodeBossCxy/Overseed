@@ -412,7 +412,7 @@ export const brand = {
           findingCreators: 'Finding creators…',
           creatorsFound: '{count} creators found',
           aiMatchTitle: 'Let AI find your creators',
-          aiMatchDesc: 'No need to search manually — our AI engine reads your campaign brief (category, platforms, follower requirements and description) and recommends the creators that match it best.',
+          aiMatchDesc: 'No need to search manually — our AI engine reads your campaign brief, and recommends the creators that match it best.',
           aiMatchStep1: 'AI analyzes your campaign brief',
           aiMatchStep2: 'Recommends the 10 best-matching creators',
           aiMatchStep3: 'Add your favorites to the outreach queue',
