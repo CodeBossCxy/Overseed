@@ -3,14 +3,13 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { safeLocalCreatorDiscovery } from '@/lib/discovery'
-import { clubConfigured, clubShowcase } from '@/lib/influencers-club'
+import { discoverySearch, getProvider } from '@/lib/discovery-provider'
 import { youtubeConfigured, youtubeBrowseCreators } from '@/lib/youtube'
 
 // GET /api/discovery/creators — brand-only creator database browse.
-// Registered Overseed creators come first, followed by a fixed influencers.club
-// "showcase" (top 10 Instagram creators who are also on YouTube + TikTok).
-// The showcase is fetched from the club API exactly once (~0.1 vendor
-// credits) and permanently cached — browsing never charges brands.
+// Registered Overseed creators come first, followed by curated extras:
+// YouTube gets the YouTube-API list; Instagram/TikTok get a CreatorDB
+// top-creators query (sorted by followers, cached in club_search_cache).
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -29,20 +28,44 @@ export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams
   const local = await safeLocalCreatorDiscovery(params)
 
-  // Curated extras apply to the default view only: first page, no country
-  // filter (curated creators' countries are mostly unknown). YouTube (the
-  // default pill) gets the YouTube-API list ranked by subscribers desc;
-  // Instagram keeps the permanently cached club showcase.
+  // Curated extras apply to the default view only: first page, no country filter.
   const platform = (params.get('platform') || '').toLowerCase()
   const offset = Number(params.get('offset') || 0)
   const defaultView = offset === 0 && !params.get('country')?.trim()
   const wantYoutube = defaultView && (!platform || platform === 'youtube') && youtubeConfigured()
-  const wantShowcase = defaultView && platform === 'instagram' && clubConfigured()
+  const wantCurated = defaultView && ['instagram', 'tiktok'].includes(platform) && getProvider() === 'creatordb'
 
-  if (!wantYoutube && !wantShowcase) return NextResponse.json(local)
+  if (!wantYoutube && !wantCurated) return NextResponse.json(local)
 
   try {
-    const curated = wantYoutube ? await youtubeBrowseCreators() : await clubShowcase()
+    let curated: { results: any[] }
+    if (wantYoutube) {
+      curated = await youtubeBrowseCreators()
+    } else {
+      // Use CreatorDB to fetch top creators by followers for the browse view.
+      // Check cache first to avoid unnecessary API calls.
+      const cacheKey = `browse:${platform}:top20`
+      const cached = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } }).catch(() => null)
+      if (cached?.data && Array.isArray((cached.data as any).results)) {
+        curated = cached.data as any
+      } else {
+        curated = await discoverySearch({
+          platform: platform as any,
+          limit: 20,
+          page: 0,
+          logUserId: userId,
+        })
+        // Cache for future browse views (best-effort)
+        if (curated.results?.length > 0) {
+          await prisma.clubSearchCache.upsert({
+            where: { key: cacheKey },
+            create: { key: cacheKey, data: curated as any },
+            update: { data: curated as any },
+          }).catch(() => {})
+        }
+      }
+    }
+
     const min = Number(params.get('min_followers') || 0)
     const max = Number(params.get('max_followers') || 0)
     const seen = new Set(

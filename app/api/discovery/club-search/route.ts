@@ -976,11 +976,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 3. Defer AI bio scoring to after() — runs after response is sent
-    if (displayResults.length > 0 && taskId) {
+    // 3. AI bio scoring — inline when score_inline=1, otherwise deferred
+    const scoreInline = params.get('score_inline') === '1'
+    if (displayResults.length > 0) {
       const biosToScore = displayResults
-        .filter((r: any) => r.handle && r.bio?.trim())
-        .map((r: any) => ({ handle: r.handle, bio: r.bio }))
+        .filter((r: any) => r.handle && (r.bio?.trim() || r.display_name?.trim()))
+        .map((r: any) => ({ handle: r.handle, bio: r.bio || '', displayName: r.display_name || r.displayName || null }))
       if (biosToScore.length > 0) {
         const scoreContext = {
           query: rawQuery || undefined,
@@ -991,17 +992,39 @@ export async function GET(req: NextRequest) {
           platform: searchOpts.platform,
           country: searchOpts.country || undefined,
         }
-        after(async () => {
-          try {
-            const { scoreBioRelevance } = await import('@/lib/discovery-ai')
-            const bioScores = await scoreBioRelevance(scoreContext as any, biosToScore)
-            if (bioScores && bioScores.size > 0) {
-              console.log(`[club-search] Deferred bio scoring complete: ${bioScores.size} scores`)
+        const runBioScoring = async () => {
+          const { scoreBioRelevance } = await import('@/lib/discovery-ai')
+          const bioScores = await scoreBioRelevance(scoreContext as any, biosToScore)
+          if (bioScores && bioScores.size > 0) {
+            // Apply scores back to display results and re-run match scoring
+            const { scoreCreator: sc } = await import('@/lib/ranking-weights')
+            for (const r of displayResults as any[]) {
+              const s = bioScores.get(r.handle)
+              if (s != null) {
+                r.ai_relevance = s
+                const bd = sc(
+                  { niche_tags: r.niche_tags, bio: r.bio, engagement_rate: r.engagement_rate, follower_count: r.follower_count, country: r.country, platform: r.platform || searchOpts.platform, ai_relevance: s },
+                  { objective: null },
+                )
+                r.match_score = bd.total
+                r.match_breakdown = bd
+              }
             }
-          } catch (err: any) {
-            console.error('[club-search] Deferred bio scoring failed:', err?.message)
+            // Re-sort by match score
+            displayResults.sort((a: any, b: any) => (b.match_score ?? 0) - (a.match_score ?? 0))
           }
-        })
+        }
+        if (scoreInline) {
+          try { await runBioScoring() } catch (err: any) {
+            console.warn('[club-search] Inline bio scoring failed:', err?.message)
+          }
+        } else if (taskId) {
+          after(async () => {
+            try { await runBioScoring() } catch (err: any) {
+              console.error('[club-search] Deferred bio scoring failed:', err?.message)
+            }
+          })
+        }
       }
     }
 

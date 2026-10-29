@@ -304,26 +304,28 @@ export interface BioScoreContext {
 export interface BioScoreInput {
   handle: string
   bio: string
+  displayName?: string | null
 }
 
-const BIO_SCORE_SYSTEM = `You score how relevant a creator's bio is to a brand's search intent.
+const BIO_SCORE_SYSTEM = `You score how relevant a creator is to a brand's search intent.
 
 You will receive:
 - SEARCH CONTEXT: what the brand is looking for (query, niches, keywords)
-- CREATORS: a list of creators with their handle and bio
+- CREATORS: a list of creators with their handle, display name (n), and bio (b)
 
-For each creator, return a relevance score 0-100:
-- 90-100: Bio directly mentions the exact topic/niche (e.g. "car reviewer" for automotive search)
-- 70-89: Bio strongly implies relevance (e.g. "engine specialist" or "mechanic" for automotive)
-- 40-69: Bio has moderate relevance (e.g. "outdoor adventures with my truck" for automotive)
-- 10-39: Bio has weak/tangential relevance (e.g. "lifestyle blogger" for automotive search)
-- 0-9: Bio is unrelated or empty
+Evaluate BOTH the display name AND the bio together. Score 0-100:
+- 90-100: Directly mentions the exact topic/niche (e.g. "car reviewer" for automotive, "The Gemologist" for jewelry)
+- 70-89: Strongly implies relevance through related materials, tools, or expertise (e.g. for jewelry: "gem dealer", "diamond", "gold", "silver", "gemstone", "sapphire", "ruby"; for automotive: "engine specialist", "mechanic")
+- 40-69: Moderate relevance through adjacent topics or lifestyle overlap (e.g. for jewelry: "luxury lifestyle", "fashion accessories", "handmade crafts"; for automotive: "outdoor adventures with my truck")
+- 10-39: Weak/tangential relevance
+- 0: Unrelated, empty, or generic bio with no relevant display name
 
 Key rules:
-- Understand semantic meaning across languages. A Portuguese bio about "oficina mecânica" is highly relevant to an "automotive" search.
-- Consider indirect signals: tools, activities, settings that imply the niche without naming it.
-- An empty or generic bio (just emojis, "DM for collabs") gets score 0.
-- Be consistent: similar bios should get similar scores.
+- Score based on the COMBINATION of display name + bio. A generic bio with a highly relevant display name (e.g. "TheGemologist" for jewelry) should still score 60-80.
+- Think about RELATED MATERIALS and CONCEPTS, not just exact keyword matches. For "jewelry": gems, stones, gold, silver, copper, diamonds, pearls, beads, crystals, carats, etc. For "automotive": engines, wheels, tires, mechanics, fuel, racing, etc. For "skincare": dermatology, ingredients, SPF, serums, acids, etc.
+- Understand semantic meaning across languages.
+- An empty bio with an irrelevant display name gets score 0.
+- Be consistent: similar profiles should get similar scores.
 
 Reply with ONLY a JSON object: {"scores":[{"h":"handle","s":score}, ...]}
 Keep handles exactly as given. No other text.`
@@ -357,6 +359,7 @@ export async function scoreBioRelevance(
   // Truncate bios to keep within token limits
   const creatorList = creators.map((c) => ({
     h: c.handle,
+    ...(c.displayName ? { n: c.displayName } : {}),
     b: c.bio.slice(0, 200),
   }))
 

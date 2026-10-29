@@ -1108,6 +1108,10 @@ export default function DiscoverPanel() {
     setActiveSearch(null)
     setSearchPage(0)
     setSearchHasMore(false)
+    setSearchTaskId(null)
+    // Clear AI-inferred filters so the new platform search gets fresh AI parsing
+    aiInferredRef.current = { creatorDbFilters: [] }
+    aiFiltersActiveRef.current = false
   }
 
   /* TEMP: influencers.club creator detail popup (contact info stripped

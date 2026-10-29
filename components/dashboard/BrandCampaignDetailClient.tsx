@@ -497,13 +497,17 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
   }, [])
 
   // Filters + results survive navigating away and back (per campaign, per tab)
-  const searchStateKey = `campaign-discover:${initialCampaign.id}:v1`
+  const searchStateKey = `campaign-discover:${initialCampaign.id}:v2`
   useEffect(() => {
+    // Clean up old v1 keys that may contain stale browse data
+    try { sessionStorage.removeItem(`campaign-discover:${initialCampaign.id}:v1`) } catch {}
     try {
       const raw = sessionStorage.getItem(searchStateKey)
       if (!raw) return
       const s = JSON.parse(raw)
       if (!Array.isArray(s?.creators) || s.creators.length === 0) return
+      // Only restore if there was an actual search (not a generic browse)
+      if (!s.searchTaskId && !s.query?.trim()) return
       setQuery(s.query || '')
       if (s.platform) setPlatform(s.platform)
       setCreatorCountry(s.creatorCountry || '')
@@ -633,7 +637,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       setSearchHasMore(data?.has_next_page ?? false)
       setSearchNextOffset(1)
     } catch (e: any) { setError(e.message) }
-    finally { setLoading(false); setMatched(true) }
+    finally { setLoading(false); if (search.trim() || filters.length > 0) setMatched(true) }
   }, [resolvedPlatform, buildCdbFiltersParam])
 
   const aiMatch = async () => {
@@ -678,6 +682,7 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
         limit: String(BATCH_SIZE),
         offset: '0',
         cdb_sort: 'followers',
+        score_inline: '1',
         q: briefText,
       })
       if (apiFilters.length > 0) {
@@ -700,24 +705,26 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
       const data = await res.json().catch(() => null)
 
       // ── LOG: Response summary ──
-      console.group('[DirectOutreach] Search response')
-      console.log('Status:', res.status)
-      console.log('Total results:', data?.total)
-      console.log('Returned results:', data?.results?.length)
       if (data?.results?.length > 0) {
-        console.table(data.results.slice(0, 5).map((c: any) => ({
+        console.group(`[DirectOutreach] ${data.results.length} creators | platform: ${activePlatform}`)
+        console.table(data.results.map((c: any) => ({
           handle: c.handle,
-          display_name: c.display_name,
           followers: c.follower_count,
-          engagement: c.engagement_rate,
-          niches: c.niche_tags?.join(', '),
-          country: c.country,
-          ai_relevance: c.ai_relevance ?? '—',
+          matchScore: c.match_score ?? '—',
+          tier: c.match_breakdown?.tier ?? '—',
+          aiBioScore: c.ai_relevance ?? '—',
+          engagement: c.engagement_rate ?? '—',
+          bio: (c.bio || '').slice(0, 80),
+          niches: (c.niche_tags || []).slice(0, 5).join(', '),
+          country: c.country ?? '—',
+          type: c.creator_type ?? '—',
         })))
+        console.groupEnd()
+      } else {
+        console.log('[DirectOutreach] 0 results returned')
       }
-      if (data?.ai_parsed) console.log('AI parsed params:', data.ai_parsed)
-      if (data?.search_adjustments) console.log('Search adjustments:', data.search_adjustments)
-      console.groupEnd()
+      if (data?.ai_parsed) console.log('[DirectOutreach] AI parsed:', data.ai_parsed)
+      if (data?.search_adjustments) console.log('[DirectOutreach] Adjustments:', data.search_adjustments)
 
       if (!res.ok) throw new Error(data?.message || 'Creator matching is temporarily unavailable.')
       const results = sortByRelevance(data?.results || [])

@@ -160,24 +160,9 @@ export function buildMatchProfile(campaign: {
     })
   }
 
-  if (campaign.targetAudienceGender && campaign.targetAudienceGender !== 'ANY') {
-    filters.push({
-      field: 'audienceGender',
-      op: '=',
-      value: campaign.targetAudienceGender.toLowerCase(),
-      source: 'campaign',
-      constraint: 'soft',
-    })
-  }
-
-  // ── Recency (system default) ───────────────────────────────────────────────
-  filters.push({
-    field: 'lastPublishTime',
-    op: '>',
-    value: 90, // active within 90 days
-    source: 'system',
-    constraint: 'soft',
-  })
+  // audienceGender and lastPublishTime are intentionally omitted here.
+  // They over-constrain AI matching results. Users can set them manually
+  // via the filter UI if needed.
 
   // ── Build brief text for AI niche extraction + bio scoring ─────────────────
   const briefParts = [
