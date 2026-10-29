@@ -314,8 +314,9 @@ function buildCreatorDbRequestBody(opts: ClubSearchOptions): { body: object; pla
   return { body, platformPath, nicheResolution }
 }
 
-function cdbCacheKey(body: object): string {
-  return 'cdb:' + createHash('sha1').update(JSON.stringify(body)).digest('hex')
+function cdbCacheKey(body: object, platform?: string): string {
+  const payload = platform ? { __platform: platform, ...body } : body
+  return 'cdb:' + createHash('sha1').update(JSON.stringify(payload)).digest('hex')
 }
 
 async function searchFetch(url: string, init: RequestInit, userId?: string): Promise<Response> {
@@ -383,7 +384,7 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
   // Check cache before making API call
   try {
     const { prisma } = await import('@/lib/prisma')
-    const cacheKey = cdbCacheKey(body)
+    const cacheKey = cdbCacheKey(body, platformPath)
     const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
     if (hit && (!hit.expiresAt || hit.expiresAt > new Date())) {
       return { ...(hit.data as object), cached: true }
@@ -523,7 +524,7 @@ export async function creatordbSearch(opts: ClubSearchOptions) {
   }
 
   // Save to cache for future requests, then rehost images in background
-  const cacheKey = cdbCacheKey(body)
+  const cacheKey = cdbCacheKey(body, platformPath)
   try {
     const { prisma } = await import('@/lib/prisma')
     const { getCacheExpiresAt } = await import('@/lib/discovery-cache-rehost')
@@ -570,7 +571,7 @@ export async function creatordbSearchCacheProbe(opts: ClubSearchOptions) {
     const built = buildCreatorDbRequestBody(opts)
     if (!built) return null
     const { prisma } = await import('@/lib/prisma')
-    const cacheKey = cdbCacheKey(built.body)
+    const cacheKey = cdbCacheKey(built.body, built.platformPath)
     const hit = await prisma.clubSearchCache.findUnique({ where: { key: cacheKey } })
     if (hit && (!hit.expiresAt || hit.expiresAt > new Date())) {
       return { ...(hit.data as object), cached: true }

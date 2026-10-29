@@ -25,7 +25,12 @@ async function CampaignsContent() {
   }
 
   const campaigns = await prisma.campaign.findMany({
-    where: {},
+    where: {
+      OR: [
+        { brandId: brandProfile.id },
+        { status: { in: ['ACTIVE', 'COMPLETED'] } },
+      ],
+    },
     include: {
       categories: {
         include: { category: true },

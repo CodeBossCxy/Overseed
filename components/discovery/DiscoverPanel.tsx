@@ -1692,6 +1692,9 @@ export default function DiscoverPanel() {
         return
       }
       setSearchResult(data)
+      if (data?.niches && typeof data.niches === 'object') {
+        setNicheMap(prev => ({ ...prev, ...data.niches }))
+      }
       setActiveSearch(request)
       setSearchPage(page)
       setSearchHasMore(typeof data?.has_next_page === 'boolean' ? data.has_next_page : results.length === request.pageSize)
@@ -1820,6 +1823,20 @@ export default function DiscoverPanel() {
   // caller save a different snapshot (the user's visible filter values)
   // than the one actually searched with.
   const clubSearchWith = async (v: FilterVals, persist?: FilterVals) => {
+    // Auto-detect platform from query text (e.g. "tiktok creators" or "在tiktok上")
+    // and switch the tab so the search goes to the right platform.
+    if (v.query.trim()) {
+      const q = v.query.toLowerCase()
+      const detected = q.includes('tiktok') || q.includes('抖音') ? 'tiktok'
+        : q.includes('youtube') || q.includes('油管') ? 'youtube'
+        : q.includes('instagram') || q.includes('ins ') || q.includes('ins上') ? 'instagram'
+        : null
+      if (detected && detected !== v.platform) {
+        setPlatforms([detected])
+        v = { ...v, platform: detected }
+        if (persist) persist = { ...persist, platform: detected }
+      }
+    }
     // Merge AI-inferred filters with user-visible filters for the backend query.
     // AI-inferred filters are only applied when the user hasn't set the same field manually.
     const ai = aiInferredRef.current

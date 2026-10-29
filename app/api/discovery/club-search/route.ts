@@ -508,16 +508,15 @@ export async function GET(req: NextRequest) {
       if (converted.filters.length > 0) {
         if (creatorDbFilters) {
           // User has existing cdb_filters. AI only contributes niches —
-          // all user-entered filters (followers, country, etc.) are preserved.
-          creatorDbFilters = creatorDbFilters.filter((f) => {
-            // Only remove old niches/hashtags — AI will replace with better ones
-            if (f.field === 'niches' || f.field === 'hashtags') return false
-            return true
-          })
-          // Add AI-inferred niches (no hashtags — they over-constrain)
-          for (const f of converted.filters) {
-            if (f.field === 'niches') {
-              creatorDbFilters.push({ field: f.field, op: f.op, value: f.value as CreatorDbFilterValue })
+          // all user-entered filters (followers, country, hashtags, etc.) are preserved.
+          const hasUserNiches = creatorDbFilters.some((f) => f.field === 'niches')
+          // Only replace niches if user didn't set them; never touch user hashtags
+          if (!hasUserNiches) {
+            creatorDbFilters = creatorDbFilters.filter((f) => f.field !== 'niches')
+            for (const f of converted.filters) {
+              if (f.field === 'niches') {
+                creatorDbFilters.push({ field: f.field, op: f.op, value: f.value as CreatorDbFilterValue })
+              }
             }
           }
         } else {
@@ -881,6 +880,7 @@ export async function GET(req: NextRequest) {
     const taskId = await persistTaskPage(result)
     // Return only DISPLAY_PAGE_SIZE results to the client
     const displayResults = fullResults.slice(0, DISPLAY_PAGE_SIZE)
+    const nicheResults: Record<string, string[]> = {}
 
     // 1. Profile enrichment: fetch avatar URLs + bios from CreatorDB profile endpoint.
     //    The search endpoint doesn't return bios, so we piggyback on the avatar
@@ -905,7 +905,7 @@ export async function GET(req: NextRequest) {
             const needsBio = !r.bio?.trim()
             if (!needsAvatar && !needsBio) return
             try {
-              const fields = ['avatarUrl', 'bio']
+              const fields = ['avatarUrl', 'bio', 'niches']
               const res = await cdbFetch(
                 `https://apiv3.creatordb.app/${pp}/profile`,
                 {
@@ -925,23 +925,64 @@ export async function GET(req: NextRequest) {
               if (d?.data?.bio && !r.bio?.trim()) {
                 r.bio = d.data.bio
               }
+              if (Array.isArray(d?.data?.niches)) {
+                nicheResults[`${r.platform}:${r.handle}`] = d.data.niches
+              }
             } catch { /* non-critical */ }
           }),
         )
       } catch { /* non-critical */ }
     }
 
-    // 2. AI bio relevance scoring — semantic matching across languages
-    const bioScoreResult: { scores: Map<string, number> | null } = { scores: null }
+    // 2. Creator type classification + ranking (synchronous, fast)
     if (displayResults.length > 0) {
-      // Debug: log bio availability
-      const bioCheck = displayResults.map((r: any) => ({ handle: r.handle, hasBio: !!r.bio?.trim(), bioLen: r.bio?.length ?? 0 }))
-      console.log(`[club-search] Bio availability: ${bioCheck.filter((b: any) => b.hasBio).length}/${bioCheck.length} have bios`, bioCheck)
+      try {
+        const { classifyCreatorTypeCached } = await import('@/lib/creator-type-classifier')
+        const { scoreCreator } = await import('@/lib/ranking-weights')
+        const scoringContext = {
+          objective: (searchOpts as any).campaignObjective || null,
+        }
+        for (const r of displayResults as any[]) {
+          const key = r.handle ? `${r.platform}:${r.handle}` : null
+          if (key) {
+            const ct = classifyCreatorTypeCached(key, {
+              bio: r.bio,
+              handle: r.handle,
+              category: r.category,
+              niche_tags: r.niche_tags,
+              follower_count: r.follower_count,
+            })
+            r.creator_type = ct.type
+            r.creator_type_confidence = ct.confidence
+          }
+          const breakdown = scoreCreator(
+            {
+              niche_tags: r.niche_tags,
+              bio: r.bio,
+              engagement_rate: typeof r.engagement_rate === 'number' ? r.engagement_rate : null,
+              follower_count: r.follower_count,
+              country: r.country,
+              platform: r.platform || searchOpts.platform,
+              ai_relevance: r.ai_relevance ?? null,
+            },
+            scoringContext,
+          )
+          r.match_score = breakdown.total
+          r.match_breakdown = breakdown
+          r.ai_relevance = breakdown.total
+        }
+      } catch (err: any) {
+        console.warn('[club-search] Classification/ranking failed:', err?.message)
+      }
+    }
+
+    // 3. Defer AI bio scoring to after() — runs after response is sent
+    if (displayResults.length > 0 && taskId) {
       const biosToScore = displayResults
         .filter((r: any) => r.handle && r.bio?.trim())
         .map((r: any) => ({ handle: r.handle, bio: r.bio }))
       if (biosToScore.length > 0) {
-        const scoreContext: import('@/lib/discovery-ai').BioScoreContext = {
+        const scoreContext = {
           query: rawQuery || undefined,
           niches: aiParsed?.niches
             || (creatorDbFilters?.find((f) => f.field === 'niches')?.value as string)
@@ -950,78 +991,24 @@ export async function GET(req: NextRequest) {
           platform: searchOpts.platform,
           country: searchOpts.country || undefined,
         }
-        console.log(`[club-search] Starting AI bio scoring for ${biosToScore.length} creators, context:`, JSON.stringify(scoreContext))
-        try {
-          const { scoreBioRelevance } = await import('@/lib/discovery-ai')
-          bioScoreResult.scores = await scoreBioRelevance(scoreContext, biosToScore)
-          console.log(`[club-search] AI bio scoring complete: ${bioScoreResult.scores?.size ?? 0} scores`)
-        } catch (err: any) {
-          console.error('[club-search] AI bio scoring failed:', err?.message)
-        }
-      } else {
-        console.log(`[club-search] Skipping AI bio scoring: no bios available (${displayResults.length} results, 0 with bios)`)
+        after(async () => {
+          try {
+            const { scoreBioRelevance } = await import('@/lib/discovery-ai')
+            const bioScores = await scoreBioRelevance(scoreContext as any, biosToScore)
+            if (bioScores && bioScores.size > 0) {
+              console.log(`[club-search] Deferred bio scoring complete: ${bioScores.size} scores`)
+            }
+          } catch (err: any) {
+            console.error('[club-search] Deferred bio scoring failed:', err?.message)
+          }
+        })
       }
-    }
-
-    // Attach AI bio scores to results
-    if (bioScoreResult.scores && bioScoreResult.scores.size > 0) {
-      for (const r of displayResults as any[]) {
-        if (r.handle && bioScoreResult.scores.has(r.handle)) {
-          r.ai_relevance = bioScoreResult.scores.get(r.handle)
-        }
-      }
-    }
-
-    // 3. Creator type classification + multi-dimensional ranking
-    try {
-      const { classifyCreatorTypeCached } = await import('@/lib/creator-type-classifier')
-      const { scoreCreator } = await import('@/lib/ranking-weights')
-
-      // Build scoring context from search parameters
-      const scoringContext = {
-        objective: (searchOpts as any).campaignObjective || null,
-      }
-
-      for (const r of displayResults as any[]) {
-        // Creator type classification
-        const key = r.handle ? `${r.platform}:${r.handle}` : null
-        if (key) {
-          const ct = classifyCreatorTypeCached(key, {
-            bio: r.bio,
-            handle: r.handle,
-            category: r.category,
-            niche_tags: r.niche_tags,
-            follower_count: r.follower_count,
-          })
-          r.creator_type = ct.type
-          r.creator_type_confidence = ct.confidence
-        }
-
-        // Multi-dimensional match scoring
-        const breakdown = scoreCreator(
-          {
-            niche_tags: r.niche_tags,
-            bio: r.bio,
-            engagement_rate: typeof r.engagement_rate === 'number' ? r.engagement_rate : null,
-            follower_count: r.follower_count,
-            country: r.country,
-            platform: r.platform || searchOpts.platform,
-            ai_relevance: r.ai_relevance,
-          },
-          scoringContext,
-        )
-        r.match_score = breakdown.total
-        r.match_breakdown = breakdown
-        // Update ai_relevance to the composite score for backward compat
-        r.ai_relevance = breakdown.total
-      }
-    } catch (err: any) {
-      console.warn('[club-search] Creator classification/ranking failed:', err?.message)
     }
 
     return NextResponse.json({
       ...result,
       results: displayResults,
+      niches: nicheResults,
       total: result?.total ?? displayResults.length,
       has_next_page: displayResults.length === DISPLAY_PAGE_SIZE || (result?.has_next_page ?? false),
       task_id: taskId,
