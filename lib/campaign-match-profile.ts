@@ -143,10 +143,18 @@ export function buildMatchProfile(campaign: {
 
   // ── Audience demographics (soft) ───────────────────────────────────────────
   if (campaign.targetAudienceAge && campaign.targetAudienceAge.length > 0) {
+    // Map campaign age buckets to CreatorDB format:
+    // '45-64' (single bucket) → '45-54', '55-64' (two buckets)
+    // '65-' → '65+'
+    const cdbAges = campaign.targetAudienceAge.flatMap((age) => {
+      if (age === '45-64') return ['45-54', '55-64']
+      if (age === '65-') return ['65+']
+      return [age]
+    })
     filters.push({
       field: 'audienceAge',
       op: 'in',
-      value: campaign.targetAudienceAge,
+      value: cdbAges,
       source: 'campaign',
       constraint: 'soft',
     })

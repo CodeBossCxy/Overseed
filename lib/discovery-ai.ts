@@ -225,7 +225,13 @@ export function toCreatorDbFilters(
     filters.push({ field: 'lastPublishTime', op: '>', value: parsed.last_post, source: 'ai', constraint: 'soft' })
   }
   if (parsed.audience_age) {
-    filters.push({ field: 'audienceAge', op: 'in', value: [parsed.audience_age], source: 'ai', constraint: 'soft' })
+    // Map Influencers Club age buckets to CreatorDB buckets
+    const ageMap: Record<string, string[]> = {
+      '45-64': ['45-54', '55-64'],
+      '65-': ['65+'],
+    }
+    const mapped = ageMap[parsed.audience_age] || [parsed.audience_age]
+    filters.push({ field: 'audienceAge', op: 'in', value: mapped, source: 'ai', constraint: 'soft' })
   }
   if (parsed.min_avg_views != null) {
     filters.push({ field: 'shortAvgViews', op: '>', value: parsed.min_avg_views, source: 'ai', constraint: 'soft' })

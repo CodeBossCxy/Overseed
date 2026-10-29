@@ -174,10 +174,11 @@ export async function GET(req: NextRequest) {
         })
         const displayResults = fullResults.slice(sliceStart, sliceEnd)
 
-        // Run match scoring on batch-served results that weren't enriched
-        // during the initial page 0 response. Scoring is purely computational
-        // (no external API calls) so it's fast and free.
-        if (!snapshot) {
+        // Run match scoring on results that don't have scores yet.
+        // This covers batch-served pages (items 21-100 from page 0's fetch)
+        // and old snapshots saved before scoring was added.
+        // Scoring is purely computational (no external API calls).
+        if (displayResults.some((r: any) => !r.match_breakdown)) {
           try {
             const { classifyCreatorTypeCached } = await import('@/lib/creator-type-classifier')
             const { scoreCreator } = await import('@/lib/ranking-weights')

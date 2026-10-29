@@ -1676,21 +1676,6 @@ export default function BrandCampaignDetailClient({ campaign: initialCampaign, s
                       const bio = c.bio || (creatorKey ? bioMap[creatorKey] : null)
                       return bio ? <p className="mt-2 text-xs text-gray-500 line-clamp-2 leading-relaxed">{bio}</p> : null
                     })()}
-                    {/* Match score */}
-                    {(() => {
-                      const bd = (c as any).match_breakdown
-                      if (!bd?.total) return null
-                      const tierColors = { excellent: 'text-emerald-600 bg-emerald-50 border-emerald-200', strong: 'text-blue-600 bg-blue-50 border-blue-200', potential: 'text-amber-600 bg-amber-50 border-amber-200', low: 'text-gray-500 bg-gray-50 border-gray-200' }
-                      const tierLabels = { excellent: zh ? '优秀匹配' : 'Excellent', strong: zh ? '强匹配' : 'Strong', potential: zh ? '潜力匹配' : 'Potential', low: zh ? '低匹配' : 'Low' }
-                      const tier = bd.tier as keyof typeof tierColors
-                      return (
-                        <div className="mt-2">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full border ${tierColors[tier] || tierColors.low}`}>
-                            {bd.total}/100 — {tierLabels[tier] || tier}
-                          </span>
-                        </div>
-                      )
-                    })()}
                     {/* Niche tags (fetched separately like discovery) */}
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       <NicheTags creatorKey={creatorKey} nicheMap={nicheMap} loading={nichesLoading} />
